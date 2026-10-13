@@ -822,7 +822,7 @@ dialog.sig::backdrop{background:rgba(20,24,33,.45)}
 .fmt-note{margin:8px 0 2px;font-size:12px;color:var(--muted)}
 .tp-page .tt.fmt{font-family:"AlefEmbed",Arial,sans-serif;unicode-bidi:normal;outline:none;border-radius:4px;padding:2px 4px;margin:0 -4px}
 .tp-page .tt.fmt:focus{background:color-mix(in srgb,var(--blue) 6%,transparent);outline:1px solid color-mix(in srgb,var(--blue) 40%,transparent)}
-.tt.fmt>div{min-height:1em;unicode-bidi:plaintext}
+.tt.fmt>div{min-height:1em;unicode-bidi:isolate}
 .tt.fmt>div.h{font-weight:700;font-size:1.25em}
 .tt.fmt[data-dir="rtl"]>div{direction:rtl;unicode-bidi:isolate}
 .tt.fmt[data-dir="ltr"]>div{direction:ltr;unicode-bidi:isolate}
@@ -930,7 +930,7 @@ dialog.sig::backdrop{background:rgba(20,24,33,.45)}
 
 <aside class="tpanel hidden" id="tpanel" aria-label="תרגום">
   <div class="tp-head">
-    <h2>תרגום המסמך</h2>
+    <h2>תרגום ועריכת טקסט</h2>
     <button class="icon-btn" id="tpSettingsBtn" title="הגדרות תרגום" aria-label="הגדרות תרגום">⚙</button>
     <button class="icon-btn" id="tpClose" title="סגירה" aria-label="סגירת חלונית התרגום">×</button>
   </div>
@@ -954,6 +954,7 @@ dialog.sig::backdrop{background:rgba(20,24,33,.45)}
     <div class="seg" role="group" aria-label="שפת יעד">
       <button class="segb" data-target="he" aria-pressed="true">לעברית</button>
       <button class="segb" data-target="en" aria-pressed="false">לאנגלית</button>
+      <button class="segb" data-target="none" aria-pressed="false" title="הטקסט של הקובץ כמו שהוא, לעריכה ולעיצוב">בלי תרגום</button>
     </div>
     <label class="field">היקף
       <select id="tpScope"><option value="all">כל המסמך</option><option value="cur">העמוד הנוכחי</option></select></label>
@@ -984,6 +985,7 @@ dialog.sig::backdrop{background:rgba(20,24,33,.45)}
   </details>
   <div class="tp-foot hidden" id="tpFoot">
     <button class="btn primary" id="tpPdf">שמירת התרגום כ-PDF</button>
+    <button class="btn" id="tpDocx">שמירה כ-Word</button>
     <button class="btn" id="tpTxt">שמירה כטקסט</button>
     <button class="btn" id="tpCopy">העתקה</button>
   </div>
@@ -1021,12 +1023,17 @@ const ALEF_B64 = "AAEAAAASAQAABAAgRkZUTWatrcwAAVxAAAAAHEdERUYHrgj9AAFcXAAAAEJHUE
    ===================================================================== */
 const RE_R=/[\u0590-\u05FF\uFB1D-\uFB4F]/;
 const RE_L=/[A-Za-z0-9\u00C0-\u024F\u0370-\u03FF\u0400-\u04FF]/;
+const RE_LL=/[A-Za-z\u00C0-\u024F\u0370-\u03FF\u0400-\u04FF]/; // letters only
+// paragraph direction by majority: a Hebrew line that starts with an English word is still RTL
+function paraDir(text,fallback){let r=0,l=0;for(const c of text){if(RE_R.test(c))r++;else if(RE_LL.test(c))l++;}if(!r&&!l)return fallback||'R';return r&&r>=l*.5?'R':'L';}
+// symbol-font bullets (Wingdings etc.) -> a real bullet
+const cleanText=t=>t.replace(/[\uE000-\uF8FF]/g,'•').replace(/\u00A0/g,' ');
 const MIRROR={'(':')',')':'(','[':']',']':'[','{':'}','}':'{','<':'>','>':'<','«':'»','»':'«'};
 function bidiRuns(line,forced){
   const ch=[...line];
   const t=ch.map(c=>RE_R.test(c)?'R':RE_L.test(c)?'L':'N');
-  const first=t.find(x=>x!=='N');
-  const base=forced||(first==='L'?'L':'R');
+  const first=ch.find(c=>RE_R.test(c)||RE_LL.test(c));
+  const base=forced||(first&&RE_LL.test(first)?'L':'R');
   const res=t.slice();
   for(let i=0;i<res.length;i++){
     if(res[i]!=='N')continue;
@@ -1481,14 +1488,15 @@ window.__buildPdf=buildPdf; // used by automated tests
 
 // returns {handle} when saved through the file system, true when shared/downloaded, false when cancelled
 async function saveBytes(name,bytes,kind){
-  const isTxt=kind==='txt';
+  const isTxt=kind==='txt',isDocx=kind==='docx';
+  const DOCX_MIME='application/vnd.openxmlformats-officedocument.wordprocessingml.document';
   if(FS){
     try{
-      const h=await showSaveFilePicker({suggestedName:name,types:isTxt?[{description:'טקסט',accept:{'text/plain':['.txt']}}]:PDF_TYPE});
-      await writeHandle(h,bytes);return isTxt?true:{handle:h};
+      const h=await showSaveFilePicker({suggestedName:name,types:isTxt?[{description:'טקסט',accept:{'text/plain':['.txt']}}]:isDocx?[{description:'Word',accept:{[DOCX_MIME]:['.docx']}}]:PDF_TYPE});
+      await writeHandle(h,bytes);return (isTxt||isDocx)?true:{handle:h};
     }catch(e){if(e&&e.name==='AbortError')return false;throw e;}
   }
-  const type=isTxt?'text/plain':'application/pdf';
+  const type=isTxt?'text/plain':isDocx?DOCX_MIME:'application/pdf';
   const file=new File([bytes],name,{type});
   // phones: open the share sheet (save to Files, send by WhatsApp/mail…)
   if(matchMedia('(pointer:coarse)').matches&&navigator.canShare&&navigator.canShare({files:[file]})){
@@ -1511,11 +1519,39 @@ const TR={
 function status(msg,err){const s=$('tpStatus');s.textContent=msg;s.classList.toggle('err',!!err);}
 
 async function pageText(i){
-  const P=S.pages[i];const tc=await P.page.getTextContent();
-  let out='';
-  for(const it of tc.items){if(!('str' in it))continue;out+=it.str;if(it.hasEOL)out+='\n';}
-  return out.replace(/[ \t]+\n/g,'\n').replace(/\n{3,}/g,'\n\n').trim();
+  const P=S.pages[i];const tc=await P.page.getTextContent({disableCombineTextItems:true});
+  const raw=tc.items.filter(it=>'str' in it&&it.str&&it.str.trim());
+  const tilted=raw.some(it=>Math.abs(it.transform[1])>.01||Math.abs(it.transform[2])>.01);
+  if(tilted){let out='';for(const it of raw){out+=it.str;if(it.hasEOL)out+='\n';}return cleanText(out).replace(/[ \t]+\n/g,'\n').replace(/\n{3,}/g,'\n\n').trim();}
+  const items=raw.map(it=>({s:it.str,x:it.transform[4],y:it.transform[5],w:it.width,h:Math.abs(it.transform[3])||it.height||10}));
+  items.sort((a,b)=>b.y-a.y||a.x-b.x);
+  const lines=[];
+  for(const it of items){const L=lines[lines.length-1];if(L&&Math.abs(L.y-it.y)<Math.max(2,Math.min(L.h,it.h)*.45))L.items.push(it);else lines.push({y:it.y,h:it.h,items:[it]});}
+  const out=[];let prev=null;
+  for(const L of lines){
+    const rtl=paraDir(L.items.map(x=>x.s).join(''),'R')==='R';
+    L.items.sort((a,b)=>rtl?b.x-a.x:a.x-b.x);
+    // tokens and the separators between them, in reading order of the line's direction
+    const seq=[];let last=null;
+    for(const it of L.items){
+      if(last){const gap=rtl?last.x-(it.x+it.w):it.x-(last.x+last.w);seq.push({sep:gap>it.h*.18?' ':''});}
+      let str=it.s;
+      if(rtl&&!RE_R.test(str)&&!RE_L.test(str))str=[...str].reverse().map(c=>MIRROR[c]||c).join(''); // lone brackets/punctuation
+      seq.push({tok:str,ltr:!RE_R.test(str)&&RE_L.test(str)});last=it;
+    }
+    if(rtl){ // English words / numbers inside a Hebrew line read left-to-right
+      for(let a=0;a<seq.length;a+=2){
+        if(!seq[a].ltr)continue;let b=a;while(b+2<seq.length&&seq[b+2].ltr)b+=2;
+        if(b>a){const part=seq.slice(a,b+1).reverse();seq.splice(a,part.length,...part);}a=b;
+      }
+    }
+    let txt='';for(const x of seq){if('sep' in x){if(x.sep&&!/\s$/.test(txt))txt+=' ';}else txt+=x.tok;}
+    if(prev&&prev.y-L.y>Math.max(prev.h,L.h)*1.9)out.push('');
+    out.push(txt.replace(/\s+/g,' ').trim());prev=L;
+  }
+  return cleanText(out.join('\n')).replace(/\n{3,}/g,'\n\n').trim();
 }
+
 function detectLocal(text){
   const c={he:0,ar:0,ru:0,lat:0,cjk:0,el:0};
   for(const ch of text){
@@ -1612,6 +1648,7 @@ function pageCard(i){
 async function runTranslate(){
   if(TR.running||!S.doc)return;
   const st=await getSettingsSafe();
+  if(TR.target==='none'){await loadOwnText();return;}
   if(!st.hasKey){openSettings(true);status('צריך להזין מפתח API לפני התרגום.',true);return;}
   const idx=$('tpScope').value==='cur'?[currentPageIndex()]:S.pages.map((_,i)=>i);
   TR.running=true;TR.stop=false;$('tpGo').disabled=true;$('tpStop').classList.remove('hidden');
@@ -1629,7 +1666,7 @@ async function runTranslate(){
       if(r.error){el.textContent=errText(r);el.className='tt err';if(['NO_KEY','NETWORK','DAILY_LIMIT'].includes(r.error)||r.status===401||r.status===403||(r.status===400&&/credit|balance/i.test(r.error)))failed=r;continue;}
       const p=parseTr(r.raw);
       if(p.lang&&!TR.langFromApi){TR.langFromApi=p.lang;$('tpLang').textContent=LANG_HE[p.lang]||p.lang;}
-      TR.pages[i]={text:p.text,target};renderTT(el,i);
+      TR.pages[i]={text:cleanText(p.text),target};renderTT(el,i);
       done++;status(`תורגמו ${done} מתוך ${idx.length} עמודים`);
     }
   };
@@ -1642,8 +1679,18 @@ async function runTranslate(){
   else status(`התרגום הושלם (${done} עמודים).`);
   $('tpFoot').classList.toggle('hidden',!TR.pages.some(p=>p&&p.text));$('tpFmt').classList.toggle('hidden',!TR.pages.some(p=>p&&p.text));
 }
+async function loadOwnText(){
+  const idx=$('tpScope').value==='cur'?[currentPageIndex()]:S.pages.map((_,i)=>i);
+  if($('tpScope').value==='all'){$('tpResults').innerHTML='';TR.pages=[];}
+  let n=0;
+  for(const i of idx){const el=pageCard(i);const text=await pageText(i);
+    if(text.replace(/\s/g,'').length<2){el.textContent='אין טקסט בעמוד הזה (ייתכן שהוא סרוק).';el.className='tt err';TR.pages[i]={text:'',target:'none'};continue;}
+    TR.pages[i]={text,target:'none'};renderTT(el,i);n++;}
+  status(n?'הטקסט מוכן לעריכה. לוחצים עליו כדי לתקן, ומעצבים למטה.':'לא נמצא טקסט בקובץ.',!n);
+  $('tpFoot').classList.toggle('hidden',!n);$('tpFmt').classList.toggle('hidden',!n);
+}
 function translatedPages(){return TR.pages.map((p,i)=>p&&p.text?{i,text:p.text}:null).filter(Boolean);}
-function baseName(){return S.name.replace(/\.pdf$/i,'')+(TR.target==='en'?' - English':' - עברית');}
+function baseName(){return S.name.replace(/\.pdf$/i,'')+(TR.target==='en'?' - English':TR.target==='none'?' - ערוך':' - עברית');}
 
 /* ---------- formatting of the translation (panel preview + PDF) ---------- */
 const FMT_DEF={dir:'auto',align:'start',size:12,lh:1.55,head:true,hdr:true};
@@ -1659,7 +1706,9 @@ function renderTT(el,i){
   el.dataset.dir=FMT.dir;el.dataset.align=FMT.align;
   el.style.fontSize=(FMT.size*1.25)+'px';el.style.lineHeight=FMT.lh;
   const lines=t.text.split('\n');el.innerHTML='';
-  lines.forEach((ln,k)=>{const d=document.createElement('div');d.textContent=ln||'\u200b';if(FMT.head&&isHeading(lines,k))d.className='h';el.append(d);});
+  const docDir=paraDir(t.text,'R');
+  lines.forEach((ln,k)=>{const d=document.createElement('div');d.textContent=ln||'\u200b';if(FMT.head&&isHeading(lines,k))d.className='h';
+    const dr=FMT.dir==='rtl'?'R':FMT.dir==='ltr'?'L':paraDir(ln,docDir);d.dir=dr==='R'?'rtl':'ltr';el.append(d);});
   if(!el.dataset.bound){el.dataset.bound=1;
     el.addEventListener('input',()=>{const p=TR.pages[+el.closest('.tp-page').dataset.i];if(p)p.text=el.innerText.replace(/\u200b/g,'').replace(/\n$/,'');});
     el.addEventListener('paste',e=>{e.preventDefault();document.execCommand('insertText',false,(e.clipboardData||window.clipboardData).getData('text/plain'));});
@@ -1683,7 +1732,7 @@ async function exportTranslationPdf(){
     const font=await doc.embedFont(b64Bytes(ALEF_B64),{subset:true});
     const bold=FMT.head?await doc.embedFont(b64Bytes(ALEF_BOLD_B64),{subset:true}):font;
     const W=595.28,H=841.89,M=56,maxW=W-2*M;
-    const forced=FMT.dir==='rtl'?'R':FMT.dir==='ltr'?'L':null;
+    const forcedAll=FMT.dir==='rtl'?'R':FMT.dir==='ltr'?'L':null;let forced=forcedAll;
     const grey=PDFLib.rgb(.45,.47,.52),ink=PDFLib.rgb(.11,.14,.2);
     // one line: bidi runs -> words; justify spreads the free space over the spaces
     const drawLine=(pg,line,y,f,sz,color,justify)=>{
@@ -1702,9 +1751,10 @@ async function exportTranslationPdf(){
     for(const{i,text}of list){
       let pg=doc.addPage([W,H]);let y=H-M;
       const newPage=()=>{pg=doc.addPage([W,H]);y=H-M;};
-      if(FMT.hdr){drawLine(pg,`תרגום עמוד ${i+1} מתוך הקובץ ${S.name}`,y-font.heightAtSize(9,{descender:false}),font,9,grey,false);y-=9*1.4+FMT.size;}
-      const src=text.split('\n');
+      if(FMT.hdr){forced='R';drawLine(pg,`${TR.target==='none'?'טקסט':'תרגום'} עמוד ${i+1} מתוך הקובץ ${S.name}`,y-font.heightAtSize(9,{descender:false}),font,9,grey,false);y-=9*1.4+FMT.size;}
+      const src=text.split('\n');const docDir=paraDir(text,'R');
       src.forEach((para,k)=>{
+        forced=forcedAll||paraDir(para,docDir);
         const h=FMT.head&&isHeading(src,k);const f=h?bold:font,sz=h?FMT.size*1.25:FMT.size,LH=sz*FMT.lh;
         if(!para.trim()){y-=FMT.size*FMT.lh*.6;return;}
         const wrapped=wrapLines(para,f,sz,maxW);
@@ -1723,6 +1773,63 @@ async function exportTranslationPdf(){
 }
 function translationText(){return translatedPages().map(p=>`— עמוד ${p.i+1} —\n${p.text}`).join('\n\n');}
 window.__exportTr=exportTranslationPdf;
+
+/* ---------- Word (.docx) export: a tiny zip writer + WordprocessingML, RTL aware ---------- */
+const CRC=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0;}return t;})();
+const crc32=b=>{let c=~0;for(let i=0;i<b.length;i++)c=CRC[(c^b[i])&255]^(c>>>8);return(~c)>>>0;};
+function zip(files){ // [{name, data:Uint8Array}] stored (no compression)
+  const enc=new TextEncoder();const parts=[],central=[];let off=0;
+  for(const f of files){
+    const name=enc.encode(f.name),d=f.data,crc=crc32(d);
+    const h=new DataView(new ArrayBuffer(30));h.setUint32(0,0x04034b50,true);h.setUint16(4,20,true);h.setUint16(6,0x0800,true);h.setUint16(8,0,true);
+    h.setUint32(14,crc,true);h.setUint32(18,d.length,true);h.setUint32(22,d.length,true);h.setUint16(26,name.length,true);
+    parts.push(new Uint8Array(h.buffer),name,d);
+    const c=new DataView(new ArrayBuffer(46));c.setUint32(0,0x02014b50,true);c.setUint16(4,20,true);c.setUint16(6,20,true);c.setUint16(8,0x0800,true);
+    c.setUint32(16,crc,true);c.setUint32(20,d.length,true);c.setUint32(24,d.length,true);c.setUint16(28,name.length,true);c.setUint32(42,off,true);
+    central.push(new Uint8Array(c.buffer),name);off+=30+name.length+d.length;
+  }
+  const cs=central.reduce((t,a)=>t+a.length,0);
+  const e=new DataView(new ArrayBuffer(22));e.setUint32(0,0x06054b50,true);e.setUint16(8,files.length,true);e.setUint16(10,files.length,true);e.setUint32(12,cs,true);e.setUint32(16,off,true);
+  const all=[...parts,...central,new Uint8Array(e.buffer)];const out=new Uint8Array(all.reduce((t,a)=>t+a.length,0));let p=0;for(const a of all){out.set(a,p);p+=a.length;}
+  return out;
+}
+const xe=t=>t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+function docxRuns(text,size,bold,color){
+  // split into Hebrew / non-Hebrew runs (logical order); Word does the bidi itself
+  const segs=[];for(const c of text){const r=RE_R.test(c)?'R':RE_LL.test(c)?'L':null;const last=segs[segs.length-1];
+    if(last&&(r===null||r===last.d))last.t+=c;else segs.push({d:r||(last?last.d:'R'),t:c});}
+  const sz=Math.round(size*2);
+  return segs.map(g=>`<w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/>${bold?'<w:b/><w:bCs/>':''}${color?`<w:color w:val="${color}"/>`:''}<w:sz w:val="${sz}"/><w:szCs w:val="${sz}"/>${g.d==='R'?'<w:rtl/>':''}</w:rPr><w:t xml:space="preserve">${xe(g.t)}</w:t></w:r>`).join('');
+}
+function docxPara(text,dir,{size,bold,color,align,lh,after}){
+  const rtl=dir==='R';let jc='';
+  if(align==='center')jc='center';else if(align==='justify')jc='both';
+  else if(align==='right')jc=rtl?'left':'right';else if(align==='left')jc=rtl?'right':'left';
+  return `<w:p><w:pPr>${rtl?'<w:bidi/>':''}<w:spacing w:after="${after||0}" w:line="${Math.round(lh*240)}" w:lineRule="auto"/>${jc?`<w:jc w:val="${jc}"/>`:''}</w:pPr>${text?docxRuns(text,size,bold,color):''}</w:p>`;
+}
+async function exportDocx(){
+  document.activeElement&&document.activeElement.blur&&document.activeElement.blur();
+  const list=translatedPages();if(!list.length)return;
+  const body=[];
+  list.forEach(({i,text},n)=>{
+    if(n)body.push('<w:p><w:r><w:br w:type="page"/></w:r></w:p>');
+    if(FMT.hdr)body.push(docxPara(`${TR.target==='none'?'טקסט':'תרגום'} עמוד ${i+1} מתוך הקובץ ${S.name}`,'R',{size:9,color:'737885',align:'start',lh:1.2,after:160}));
+    const src=text.split('\n'),docDir=paraDir(text,'R');
+    src.forEach((para,k)=>{const h=FMT.head&&isHeading(src,k);const dir=FMT.dir==='rtl'?'R':FMT.dir==='ltr'?'L':paraDir(para,docDir);
+      body.push(docxPara(para,dir,{size:h?FMT.size*1.25:FMT.size,bold:h,align:FMT.align,lh:FMT.lh,after:h?120:0}));});
+  });
+  const doc=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${body.join('')}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134" w:header="567" w:footer="567" w:gutter="0"/><w:bidi/></w:sectPr></w:body></w:document>`;
+  const enc=new TextEncoder();
+  const files=[
+    {name:'[Content_Types].xml',data:enc.encode('<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>')},
+    {name:'_rels/.rels',data:enc.encode('<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>')},
+    {name:'word/document.xml',data:enc.encode(doc)}
+  ];
+  const bytes=zip(files);
+  try{if(await saveBytes(baseName()+'.docx',bytes,'docx'))toast('נשמר כקובץ Word');}catch(e){toast('השמירה נכשלה: '+(e.message||e));}
+}
+window.__exportDocx=exportDocx;
+$('tpDocx').onclick=exportDocx;
 
 /* settings */
 // כתובת שרת התרגום (Cloudflare Worker). ריק = התרגום המובנה כבוי ומשתמשים במפתח אישי
@@ -1787,6 +1894,7 @@ $('trBtn').onclick=()=>{const p=$('tpanel');const show=p.classList.contains('hid
 $('tpClose').onclick=()=>{$('tpanel').classList.add('hidden');setTimeout(fitWidth,0);};
 document.querySelectorAll('.segb').forEach(b=>b.onclick=()=>setTarget(b.dataset.target));
 $('tpGo').onclick=runTranslate;
+document.querySelectorAll('.segb').forEach(b=>b.addEventListener('click',()=>{$('tpGo').textContent=b.dataset.target==='none'?'טעינת הטקסט':'תרגום';}));
 $('tpStop').onclick=()=>{TR.stop=true;status('עוצר…');};
 $('tpPdf').onclick=exportTranslationPdf;
 $('tpTxt').onclick=async()=>{const t=translationText();if(t&&await saveBytes(baseName()+'.txt',new TextEncoder().encode('\ufeff'+t),'txt'))toast('נשמר כקובץ טקסט');};
