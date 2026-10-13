@@ -75,7 +75,12 @@ button{font:inherit;color:inherit}
 
 /* pointer behaviour per tool */
 body[data-tool="select"] .ann{pointer-events:none}
-body[data-tool="select"] .tw{pointer-events:auto}
+body[data-tool="select"] .tw,body[data-tool="select"] .iw{pointer-events:auto}
+body[data-tool="text"] .iw,body[data-tool="highlight"] .iw,body[data-tool="pen"] .iw,body[data-tool="snip"] .iw,body[data-tool="place"] .iw,body[data-tool="snip"] .tw,body[data-tool="place"] .tw{pointer-events:none}
+body[data-tool="snip"] .ann{pointer-events:auto;cursor:crosshair;touch-action:none}
+body[data-tool="place"] .ann{pointer-events:auto;cursor:copy}
+body[data-tool="eraser"] .iw:hover{filter:drop-shadow(0 0 2px var(--danger))}
+body[data-tool="eraser"] .iw img{pointer-events:none}
 body[data-tool="text"] .ann{pointer-events:auto;cursor:text}
 body[data-tool="highlight"] .ann,body[data-tool="pen"] .ann{pointer-events:auto;cursor:crosshair;touch-action:none}
 body[data-tool="highlight"] .tw,body[data-tool="pen"] .tw{pointer-events:none}
@@ -93,6 +98,678 @@ body[data-tool="eraser"] .ann path:hover{stroke:var(--danger)}
 .drop p{margin:0;color:var(--muted);max-width:30ch}
 body.dragging .drop{border-color:var(--blue);border-style:solid}
 .hidden{display:none!important}
+
+/* ---------- pdf.js text + form layers (from pdf_viewer.css) ---------- */
+.textLayer {
+  position: absolute;
+  text-align: initial;
+  inset: 0;
+  overflow: hidden;
+  opacity: 0.25;
+  line-height: 1;
+  -webkit-text-size-adjust: none;
+     -moz-text-size-adjust: none;
+          text-size-adjust: none;
+  forced-color-adjust: none;
+  transform-origin: 0 0;
+  z-index: 2;
+}
+.textLayer :is(span, br) {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+}
+/* Only necessary in Google Chrome, see issue 14205, and most unfortunately
+ * the problem doesn't show up in "text" reference tests. */
+.textLayer span.markedContent {
+  top: 0;
+  height: 0;
+}
+.textLayer .highlight {
+  margin: -1px;
+  padding: 1px;
+  background-color: var(--highlight-bg-color);
+  border-radius: 4px;
+}
+.textLayer .highlight.appended {
+  position: initial;
+}
+.textLayer .highlight.begin {
+  border-radius: 4px 0 0 4px;
+}
+.textLayer .highlight.end {
+  border-radius: 0 4px 4px 0;
+}
+.textLayer .highlight.middle {
+  border-radius: 0;
+}
+.textLayer .highlight.selected {
+  background-color: var(--highlight-selected-bg-color);
+}
+.textLayer ::-moz-selection {
+  background: blue;
+  background: AccentColor; /* stylelint-disable-line declaration-block-no-duplicate-properties */
+}
+.textLayer ::selection {
+  background: blue;
+  background: AccentColor; /* stylelint-disable-line declaration-block-no-duplicate-properties */
+}
+/* Avoids https://github.com/mozilla/pdf.js/issues/13840 in Chrome */
+.textLayer br::-moz-selection {
+  background: transparent;
+}
+.textLayer br::selection {
+  background: transparent;
+}
+.textLayer .endOfContent {
+  display: block;
+  position: absolute;
+  inset: 100% 0 0;
+  z-index: -1;
+  cursor: default;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
+}
+.textLayer .endOfContent.active {
+  top: 0;
+}
+.annotationLayer .textWidgetAnnotation :is(input, textarea):required,
+  .annotationLayer .choiceWidgetAnnotation select:required,
+  .annotationLayer
+    .buttonWidgetAnnotation:is(.checkBox, .radioButton)
+    input:required {
+    outline: 1.5px solid selectedItem;
+  }
+.annotationLayer .linkAnnotation:hover {
+    -webkit-backdrop-filter: var(--hcm-highligh-filter);
+            backdrop-filter: var(--hcm-highligh-filter);
+  }
+.annotationLayer .linkAnnotation > a:hover {
+    opacity: 0 !important;
+    background: none !important;
+    box-shadow: none;
+  }
+.annotationLayer .popupAnnotation .popup {
+    outline: calc(1.5px * var(--scale-factor)) solid CanvasText !important;
+    background-color: ButtonFace !important;
+    color: ButtonText !important;
+  }
+.annotationLayer .highlightArea:hover::after {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    -webkit-backdrop-filter: var(--hcm-highligh-filter);
+            backdrop-filter: var(--hcm-highligh-filter);
+    content: "";
+    pointer-events: none;
+  }
+.annotationLayer .popupAnnotation.focused .popup {
+    outline: calc(3px * var(--scale-factor)) solid Highlight !important;
+  }
+.annotationLayer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  transform-origin: 0 0;
+  z-index: 3;
+}
+.annotationLayer[data-main-rotation="90"] .norotate {
+  transform: rotate(270deg) translateX(-100%);
+}
+.annotationLayer[data-main-rotation="180"] .norotate {
+  transform: rotate(180deg) translate(-100%, -100%);
+}
+.annotationLayer[data-main-rotation="270"] .norotate {
+  transform: rotate(90deg) translateY(-100%);
+}
+.annotationLayer canvas {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.annotationLayer section {
+  position: absolute;
+  text-align: initial;
+  pointer-events: auto;
+  box-sizing: border-box;
+  transform-origin: 0 0;
+}
+.annotationLayer .linkAnnotation {
+  outline: var(--link-outline);
+}
+.annotationLayer :is(.linkAnnotation, .buttonWidgetAnnotation.pushButton) > a {
+  position: absolute;
+  font-size: 1em;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+.annotationLayer
+  :is(.linkAnnotation, .buttonWidgetAnnotation.pushButton):not(.hasBorder)
+  > a:hover {
+  opacity: 0.2;
+  background-color: rgba(255, 255, 0, 1);
+  box-shadow: 0 2px 10px rgba(255, 255, 0, 1);
+}
+.annotationLayer .linkAnnotation.hasBorder:hover {
+  background-color: rgba(255, 255, 0, 0.2);
+}
+.annotationLayer .hasBorder {
+  background-size: 100% 100%;
+}
+.annotationLayer .textAnnotation img {
+  position: absolute;
+  cursor: pointer;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+}
+.annotationLayer .textWidgetAnnotation :is(input, textarea),
+.annotationLayer .choiceWidgetAnnotation select,
+.annotationLayer .buttonWidgetAnnotation:is(.checkBox, .radioButton) input {
+  background-image: var(--annotation-unfocused-field-background);
+  border: 2px solid var(--input-unfocused-border-color);
+  box-sizing: border-box;
+  font: calc(9px * var(--scale-factor)) sans-serif;
+  height: 100%;
+  margin: 0;
+  vertical-align: top;
+  width: 100%;
+}
+.annotationLayer .textWidgetAnnotation :is(input, textarea):required,
+.annotationLayer .choiceWidgetAnnotation select:required,
+.annotationLayer
+  .buttonWidgetAnnotation:is(.checkBox, .radioButton)
+  input:required {
+  outline: 1.5px solid red;
+}
+.annotationLayer .choiceWidgetAnnotation select option {
+  padding: 0;
+}
+.annotationLayer .buttonWidgetAnnotation.radioButton input {
+  border-radius: 50%;
+}
+.annotationLayer .textWidgetAnnotation textarea {
+  resize: none;
+}
+.annotationLayer .textWidgetAnnotation :is(input, textarea)[disabled],
+.annotationLayer .choiceWidgetAnnotation select[disabled],
+.annotationLayer
+  .buttonWidgetAnnotation:is(.checkBox, .radioButton)
+  input[disabled] {
+  background: none;
+  border: 2px solid var(--input-disabled-border-color);
+  cursor: not-allowed;
+}
+.annotationLayer .textWidgetAnnotation :is(input, textarea):hover,
+.annotationLayer .choiceWidgetAnnotation select:hover,
+.annotationLayer
+  .buttonWidgetAnnotation:is(.checkBox, .radioButton)
+  input:hover {
+  border: 2px solid var(--input-hover-border-color);
+}
+.annotationLayer .textWidgetAnnotation :is(input, textarea):hover,
+.annotationLayer .choiceWidgetAnnotation select:hover,
+.annotationLayer .buttonWidgetAnnotation.checkBox input:hover {
+  border-radius: 2px;
+}
+.annotationLayer .textWidgetAnnotation :is(input, textarea):focus,
+.annotationLayer .choiceWidgetAnnotation select:focus {
+  background: none;
+  border: 2px solid var(--input-focus-border-color);
+  border-radius: 2px;
+  outline: var(--input-focus-outline);
+}
+.annotationLayer .buttonWidgetAnnotation:is(.checkBox, .radioButton) :focus {
+  background-image: none;
+  background-color: transparent;
+}
+.annotationLayer .buttonWidgetAnnotation.checkBox :focus {
+  border: 2px solid var(--input-focus-border-color);
+  border-radius: 2px;
+  outline: var(--input-focus-outline);
+}
+.annotationLayer .buttonWidgetAnnotation.radioButton :focus {
+  border: 2px solid var(--input-focus-border-color);
+  outline: var(--input-focus-outline);
+}
+.annotationLayer .buttonWidgetAnnotation.checkBox input:checked::before,
+.annotationLayer .buttonWidgetAnnotation.checkBox input:checked::after,
+.annotationLayer .buttonWidgetAnnotation.radioButton input:checked::before {
+  background-color: CanvasText;
+  content: "";
+  display: block;
+  position: absolute;
+}
+.annotationLayer .buttonWidgetAnnotation.checkBox input:checked::before,
+.annotationLayer .buttonWidgetAnnotation.checkBox input:checked::after {
+  height: 80%;
+  left: 45%;
+  width: 1px;
+}
+.annotationLayer .buttonWidgetAnnotation.checkBox input:checked::before {
+  transform: rotate(45deg);
+}
+.annotationLayer .buttonWidgetAnnotation.checkBox input:checked::after {
+  transform: rotate(-45deg);
+}
+.annotationLayer .buttonWidgetAnnotation.radioButton input:checked::before {
+  border-radius: 50%;
+  height: 50%;
+  left: 30%;
+  top: 20%;
+  width: 50%;
+}
+.annotationLayer .textWidgetAnnotation input.comb {
+  font-family: monospace;
+  padding-left: 2px;
+  padding-right: 0;
+}
+.annotationLayer .textWidgetAnnotation input.comb:focus {
+  /*
+   * Letter spacing is placed on the right side of each character. Hence, the
+   * letter spacing of the last character may be placed outside the visible
+   * area, causing horizontal scrolling. We avoid this by extending the width
+   * when the element has focus and revert this when it loses focus.
+   */
+  width: 103%;
+}
+.annotationLayer .buttonWidgetAnnotation:is(.checkBox, .radioButton) input {
+  -webkit-appearance: none;
+     -moz-appearance: none;
+          appearance: none;
+}
+.annotationLayer .fileAttachmentAnnotation .popupTriggerArea {
+  height: 100%;
+  width: 100%;
+}
+.annotationLayer .popupAnnotation {
+  position: absolute;
+  font-size: calc(9px * var(--scale-factor));
+  pointer-events: none;
+  width: -moz-max-content;
+  width: max-content;
+  max-width: 45%;
+  height: auto;
+}
+.annotationLayer .popup {
+  background-color: rgba(255, 255, 153, 1);
+  box-shadow: 0 calc(2px * var(--scale-factor)) calc(5px * var(--scale-factor))
+    rgba(136, 136, 136, 1);
+  border-radius: calc(2px * var(--scale-factor));
+  outline: 1.5px solid rgb(255, 255, 74);
+  padding: calc(6px * var(--scale-factor));
+  cursor: pointer;
+  font: message-box;
+  white-space: normal;
+  word-wrap: break-word;
+  pointer-events: auto;
+}
+.annotationLayer .popupAnnotation.focused .popup {
+  outline-width: 3px;
+}
+.annotationLayer .popup * {
+  font-size: calc(9px * var(--scale-factor));
+}
+.annotationLayer .popup > .header {
+  display: inline-block;
+}
+.annotationLayer .popup > .header h1 {
+  display: inline;
+}
+.annotationLayer .popup > .header .popupDate {
+  display: inline-block;
+  margin-left: calc(5px * var(--scale-factor));
+  width: -moz-fit-content;
+  width: fit-content;
+}
+.annotationLayer .popupContent {
+  border-top: 1px solid rgba(51, 51, 51, 1);
+  margin-top: calc(2px * var(--scale-factor));
+  padding-top: calc(2px * var(--scale-factor));
+}
+.annotationLayer .richText > * {
+  white-space: pre-wrap;
+  font-size: calc(9px * var(--scale-factor));
+}
+.annotationLayer .popupTriggerArea {
+  cursor: pointer;
+}
+.annotationLayer section svg {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+}
+.annotationLayer .annotationTextContent {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  color: transparent;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
+  pointer-events: none;
+}
+.annotationLayer .annotationTextContent span {
+  width: 100%;
+  display: inline-block;
+}
+.annotationLayer svg.quadrilateralsContainer {
+  contain: strict;
+  width: 0;
+  height: 0;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: -1;
+}
+.annotationEditorLayer[data-main-rotation="0"]
+    :is([data-editor-rotation="0"], [data-editor-rotation="180"]) > .resizers > .resizer.topLeft,
+      .annotationEditorLayer[data-main-rotation="90"]
+    :is([data-editor-rotation="270"], [data-editor-rotation="90"]) > .resizers > .resizer.topLeft,
+      .annotationEditorLayer[data-main-rotation="180"]
+    :is([data-editor-rotation="180"], [data-editor-rotation="0"]) > .resizers > .resizer.topLeft,
+      .annotationEditorLayer[data-main-rotation="270"]
+    :is([data-editor-rotation="90"], [data-editor-rotation="270"]) > .resizers > .resizer.topLeft,
+      .annotationEditorLayer[data-main-rotation="0"]
+    :is([data-editor-rotation="0"], [data-editor-rotation="180"]) > .resizers > .resizer.bottomRight,
+      .annotationEditorLayer[data-main-rotation="90"]
+    :is([data-editor-rotation="270"], [data-editor-rotation="90"]) > .resizers > .resizer.bottomRight,
+      .annotationEditorLayer[data-main-rotation="180"]
+    :is([data-editor-rotation="180"], [data-editor-rotation="0"]) > .resizers > .resizer.bottomRight,
+      .annotationEditorLayer[data-main-rotation="270"]
+    :is([data-editor-rotation="90"], [data-editor-rotation="270"]) > .resizers > .resizer.bottomRight {
+        cursor: nwse-resize;
+      }
+.annotationEditorLayer[data-main-rotation="0"]
+    :is([data-editor-rotation="0"], [data-editor-rotation="180"]) > .resizers > .resizer.topMiddle,
+      .annotationEditorLayer[data-main-rotation="90"]
+    :is([data-editor-rotation="270"], [data-editor-rotation="90"]) > .resizers > .resizer.topMiddle,
+      .annotationEditorLayer[data-main-rotation="180"]
+    :is([data-editor-rotation="180"], [data-editor-rotation="0"]) > .resizers > .resizer.topMiddle,
+      .annotationEditorLayer[data-main-rotation="270"]
+    :is([data-editor-rotation="90"], [data-editor-rotation="270"]) > .resizers > .resizer.topMiddle,
+      .annotationEditorLayer[data-main-rotation="0"]
+    :is([data-editor-rotation="0"], [data-editor-rotation="180"]) > .resizers > .resizer.bottomMiddle,
+      .annotationEditorLayer[data-main-rotation="90"]
+    :is([data-editor-rotation="270"], [data-editor-rotation="90"]) > .resizers > .resizer.bottomMiddle,
+      .annotationEditorLayer[data-main-rotation="180"]
+    :is([data-editor-rotation="180"], [data-editor-rotation="0"]) > .resizers > .resizer.bottomMiddle,
+      .annotationEditorLayer[data-main-rotation="270"]
+    :is([data-editor-rotation="90"], [data-editor-rotation="270"]) > .resizers > .resizer.bottomMiddle {
+        cursor: ns-resize;
+      }
+.annotationEditorLayer[data-main-rotation="0"]
+    :is([data-editor-rotation="0"], [data-editor-rotation="180"]) > .resizers > .resizer.topRight,
+      .annotationEditorLayer[data-main-rotation="90"]
+    :is([data-editor-rotation="270"], [data-editor-rotation="90"]) > .resizers > .resizer.topRight,
+      .annotationEditorLayer[data-main-rotation="180"]
+    :is([data-editor-rotation="180"], [data-editor-rotation="0"]) > .resizers > .resizer.topRight,
+      .annotationEditorLayer[data-main-rotation="270"]
+    :is([data-editor-rotation="90"], [data-editor-rotation="270"]) > .resizers > .resizer.topRight,
+      .annotationEditorLayer[data-main-rotation="0"]
+    :is([data-editor-rotation="0"], [data-editor-rotation="180"]) > .resizers > .resizer.bottomLeft,
+      .annotationEditorLayer[data-main-rotation="90"]
+    :is([data-editor-rotation="270"], [data-editor-rotation="90"]) > .resizers > .resizer.bottomLeft,
+      .annotationEditorLayer[data-main-rotation="180"]
+    :is([data-editor-rotation="180"], [data-editor-rotation="0"]) > .resizers > .resizer.bottomLeft,
+      .annotationEditorLayer[data-main-rotation="270"]
+    :is([data-editor-rotation="90"], [data-editor-rotation="270"]) > .resizers > .resizer.bottomLeft {
+        cursor: nesw-resize;
+      }
+.annotationEditorLayer[data-main-rotation="0"]
+    :is([data-editor-rotation="0"], [data-editor-rotation="180"]) > .resizers > .resizer.middleRight,
+      .annotationEditorLayer[data-main-rotation="90"]
+    :is([data-editor-rotation="270"], [data-editor-rotation="90"]) > .resizers > .resizer.middleRight,
+      .annotationEditorLayer[data-main-rotation="180"]
+    :is([data-editor-rotation="180"], [data-editor-rotation="0"]) > .resizers > .resizer.middleRight,
+      .annotationEditorLayer[data-main-rotation="270"]
+    :is([data-editor-rotation="90"], [data-editor-rotation="270"]) > .resizers > .resizer.middleRight,
+      .annotationEditorLayer[data-main-rotation="0"]
+    :is([data-editor-rotation="0"], [data-editor-rotation="180"]) > .resizers > .resizer.middleLeft,
+      .annotationEditorLayer[data-main-rotation="90"]
+    :is([data-editor-rotation="270"], [data-editor-rotation="90"]) > .resizers > .resizer.middleLeft,
+      .annotationEditorLayer[data-main-rotation="180"]
+    :is([data-editor-rotation="180"], [data-editor-rotation="0"]) > .resizers > .resizer.middleLeft,
+      .annotationEditorLayer[data-main-rotation="270"]
+    :is([data-editor-rotation="90"], [data-editor-rotation="270"]) > .resizers > .resizer.middleLeft {
+        cursor: ew-resize;
+      }
+.annotationEditorLayer[data-main-rotation="0"]
+    :is([data-editor-rotation="90"], [data-editor-rotation="270"]) > .resizers > .resizer.topLeft,
+      .annotationEditorLayer[data-main-rotation="90"]
+    :is([data-editor-rotation="0"], [data-editor-rotation="180"]) > .resizers > .resizer.topLeft,
+      .annotationEditorLayer[data-main-rotation="180"]
+    :is([data-editor-rotation="270"], [data-editor-rotation="90"]) > .resizers > .resizer.topLeft,
+      .annotationEditorLayer[data-main-rotation="270"]
+    :is([data-editor-rotation="180"], [data-editor-rotation="0"]) > .resizers > .resizer.topLeft,
+      .annotationEditorLayer[data-main-rotation="0"]
+    :is([data-editor-rotation="90"], [data-editor-rotation="270"]) > .resizers > .resizer.bottomRight,
+      .annotationEditorLayer[data-main-rotation="90"]
+    :is([data-editor-rotation="0"], [data-editor-rotation="180"]) > .resizers > .resizer.bottomRight,
+      .annotationEditorLayer[data-main-rotation="180"]
+    :is([data-editor-rotation="270"], [data-editor-rotation="90"]) > .resizers > .resizer.bottomRight,
+      .annotationEditorLayer[data-main-rotation="270"]
+    :is([data-editor-rotation="180"], [data-editor-rotation="0"]) > .resizers > .resizer.bottomRight {
+        cursor: nesw-resize;
+      }
+.annotationEditorLayer[data-main-rotation="0"]
+    :is([data-editor-rotation="90"], [data-editor-rotation="270"]) > .resizers > .resizer.topMiddle,
+      .annotationEditorLayer[data-main-rotation="90"]
+    :is([data-editor-rotation="0"], [data-editor-rotation="180"]) > .resizers > .resizer.topMiddle,
+      .annotationEditorLayer[data-main-rotation="180"]
+    :is([data-editor-rotation="270"], [data-editor-rotation="90"]) > .resizers > .resizer.topMiddle,
+      .annotationEditorLayer[data-main-rotation="270"]
+    :is([data-editor-rotation="180"], [data-editor-rotation="0"]) > .resizers > .resizer.topMiddle,
+      .annotationEditorLayer[data-main-rotation="0"]
+    :is([data-editor-rotation="90"], [data-editor-rotation="270"]) > .resizers > .resizer.bottomMiddle,
+      .annotationEditorLayer[data-main-rotation="90"]
+    :is([data-editor-rotation="0"], [data-editor-rotation="180"]) > .resizers > .resizer.bottomMiddle,
+      .annotationEditorLayer[data-main-rotation="180"]
+    :is([data-editor-rotation="270"], [data-editor-rotation="90"]) > .resizers > .resizer.bottomMiddle,
+      .annotationEditorLayer[data-main-rotation="270"]
+    :is([data-editor-rotation="180"], [data-editor-rotation="0"]) > .resizers > .resizer.bottomMiddle {
+        cursor: ew-resize;
+      }
+.annotationEditorLayer[data-main-rotation="0"]
+    :is([data-editor-rotation="90"], [data-editor-rotation="270"]) > .resizers > .resizer.topRight,
+      .annotationEditorLayer[data-main-rotation="90"]
+    :is([data-editor-rotation="0"], [data-editor-rotation="180"]) > .resizers > .resizer.topRight,
+      .annotationEditorLayer[data-main-rotation="180"]
+    :is([data-editor-rotation="270"], [data-editor-rotation="90"]) > .resizers > .resizer.topRight,
+      .annotationEditorLayer[data-main-rotation="270"]
+    :is([data-editor-rotation="180"], [data-editor-rotation="0"]) > .resizers > .resizer.topRight,
+      .annotationEditorLayer[data-main-rotation="0"]
+    :is([data-editor-rotation="90"], [data-editor-rotation="270"]) > .resizers > .resizer.bottomLeft,
+      .annotationEditorLayer[data-main-rotation="90"]
+    :is([data-editor-rotation="0"], [data-editor-rotation="180"]) > .resizers > .resizer.bottomLeft,
+      .annotationEditorLayer[data-main-rotation="180"]
+    :is([data-editor-rotation="270"], [data-editor-rotation="90"]) > .resizers > .resizer.bottomLeft,
+      .annotationEditorLayer[data-main-rotation="270"]
+    :is([data-editor-rotation="180"], [data-editor-rotation="0"]) > .resizers > .resizer.bottomLeft {
+        cursor: nwse-resize;
+      }
+.annotationEditorLayer[data-main-rotation="0"]
+    :is([data-editor-rotation="90"], [data-editor-rotation="270"]) > .resizers > .resizer.middleRight,
+      .annotationEditorLayer[data-main-rotation="90"]
+    :is([data-editor-rotation="0"], [data-editor-rotation="180"]) > .resizers > .resizer.middleRight,
+      .annotationEditorLayer[data-main-rotation="180"]
+    :is([data-editor-rotation="270"], [data-editor-rotation="90"]) > .resizers > .resizer.middleRight,
+      .annotationEditorLayer[data-main-rotation="270"]
+    :is([data-editor-rotation="180"], [data-editor-rotation="0"]) > .resizers > .resizer.middleRight,
+      .annotationEditorLayer[data-main-rotation="0"]
+    :is([data-editor-rotation="90"], [data-editor-rotation="270"]) > .resizers > .resizer.middleLeft,
+      .annotationEditorLayer[data-main-rotation="90"]
+    :is([data-editor-rotation="0"], [data-editor-rotation="180"]) > .resizers > .resizer.middleLeft,
+      .annotationEditorLayer[data-main-rotation="180"]
+    :is([data-editor-rotation="270"], [data-editor-rotation="90"]) > .resizers > .resizer.middleLeft,
+      .annotationEditorLayer[data-main-rotation="270"]
+    :is([data-editor-rotation="180"], [data-editor-rotation="0"]) > .resizers > .resizer.middleLeft {
+        cursor: ns-resize;
+      }
+.annotationEditorLayer
+    :is(
+      [data-main-rotation="0"] [data-editor-rotation="90"],
+      [data-main-rotation="90"] [data-editor-rotation="0"],
+      [data-main-rotation="180"] [data-editor-rotation="270"],
+      [data-main-rotation="270"] [data-editor-rotation="180"]
+    ) .altText {
+      rotate: 270deg;
+    }
+[dir="ltr"] .annotationEditorLayer
+    :is(
+      [data-main-rotation="0"] [data-editor-rotation="90"],
+      [data-main-rotation="90"] [data-editor-rotation="0"],
+      [data-main-rotation="180"] [data-editor-rotation="270"],
+      [data-main-rotation="270"] [data-editor-rotation="180"]
+    ) .altText {
+        inset-inline-start: calc(100% - 8px);
+      }
+[dir="ltr"] .annotationEditorLayer
+    :is(
+      [data-main-rotation="0"] [data-editor-rotation="90"],
+      [data-main-rotation="90"] [data-editor-rotation="0"],
+      [data-main-rotation="180"] [data-editor-rotation="270"],
+      [data-main-rotation="270"] [data-editor-rotation="180"]
+    ) .altText.small {
+          inset-inline-start: calc(100% + 8px);
+          inset-block-start: 100%;
+        }
+[dir="rtl"] .annotationEditorLayer
+    :is(
+      [data-main-rotation="0"] [data-editor-rotation="90"],
+      [data-main-rotation="90"] [data-editor-rotation="0"],
+      [data-main-rotation="180"] [data-editor-rotation="270"],
+      [data-main-rotation="270"] [data-editor-rotation="180"]
+    ) .altText {
+        inset-block-end: calc(100% - 8px);
+      }
+[dir="rtl"] .annotationEditorLayer
+    :is(
+      [data-main-rotation="0"] [data-editor-rotation="90"],
+      [data-main-rotation="90"] [data-editor-rotation="0"],
+      [data-main-rotation="180"] [data-editor-rotation="270"],
+      [data-main-rotation="270"] [data-editor-rotation="180"]
+    ) .altText.small {
+          inset-inline-start: -8px;
+          inset-block-start: 0;
+        }
+.annotationEditorLayer
+    :is(
+      [data-main-rotation="0"] [data-editor-rotation="180"],
+      [data-main-rotation="90"] [data-editor-rotation="90"],
+      [data-main-rotation="180"] [data-editor-rotation="0"],
+      [data-main-rotation="270"] [data-editor-rotation="270"]
+    ) .altText {
+      rotate: 180deg;
+
+      inset-block-end: calc(100% - 8px);
+      inset-inline-start: calc(100% - 8px);
+    }
+.annotationEditorLayer
+    :is(
+      [data-main-rotation="0"] [data-editor-rotation="180"],
+      [data-main-rotation="90"] [data-editor-rotation="90"],
+      [data-main-rotation="180"] [data-editor-rotation="0"],
+      [data-main-rotation="270"] [data-editor-rotation="270"]
+    ) .altText.small {
+        inset-inline-start: 100%;
+        inset-block-start: -8px;
+      }
+.annotationEditorLayer
+    :is(
+      [data-main-rotation="0"] [data-editor-rotation="270"],
+      [data-main-rotation="90"] [data-editor-rotation="180"],
+      [data-main-rotation="180"] [data-editor-rotation="90"],
+      [data-main-rotation="270"] [data-editor-rotation="0"]
+    ) .altText {
+      rotate: 90deg;
+    }
+[dir="ltr"] .annotationEditorLayer
+    :is(
+      [data-main-rotation="0"] [data-editor-rotation="270"],
+      [data-main-rotation="90"] [data-editor-rotation="180"],
+      [data-main-rotation="180"] [data-editor-rotation="90"],
+      [data-main-rotation="270"] [data-editor-rotation="0"]
+    ) .altText {
+        inset-block-end: calc(100% - 8px);
+      }
+[dir="ltr"] .annotationEditorLayer
+    :is(
+      [data-main-rotation="0"] [data-editor-rotation="270"],
+      [data-main-rotation="90"] [data-editor-rotation="180"],
+      [data-main-rotation="180"] [data-editor-rotation="90"],
+      [data-main-rotation="270"] [data-editor-rotation="0"]
+    ) .altText.small {
+          inset-inline-start: -8px;
+          inset-block-start: 0;
+        }
+[dir="rtl"] .annotationEditorLayer
+    :is(
+      [data-main-rotation="0"] [data-editor-rotation="270"],
+      [data-main-rotation="90"] [data-editor-rotation="180"],
+      [data-main-rotation="180"] [data-editor-rotation="90"],
+      [data-main-rotation="270"] [data-editor-rotation="0"]
+    ) .altText {
+        inset-inline-start: calc(100% - 8px);
+      }
+[dir="rtl"] .annotationEditorLayer
+    :is(
+      [data-main-rotation="0"] [data-editor-rotation="270"],
+      [data-main-rotation="90"] [data-editor-rotation="180"],
+      [data-main-rotation="180"] [data-editor-rotation="90"],
+      [data-main-rotation="270"] [data-editor-rotation="0"]
+    ) .altText.small {
+          inset-inline-start: calc(100% + 8px);
+          inset-block-start: 100%;
+        }
+[data-main-rotation="90"] {
+  transform: rotate(90deg) translateY(-100%);
+}
+[data-main-rotation="180"] {
+  transform: rotate(180deg) translate(-100%, -100%);
+}
+[data-main-rotation="270"] {
+  transform: rotate(270deg) translateX(-100%);
+}
+.page .textLayer{opacity:1;z-index:2}
+.page .textLayer ::selection{background:rgba(43,89,195,.32)}
+.page .annotationLayer{z-index:3}
+.page .ann{z-index:4}
+
+/* ---------- images & signatures on the page ---------- */
+.iw{position:absolute;touch-action:none}
+.iw img{width:100%;height:100%;display:block;user-select:none;-webkit-user-drag:none;cursor:move}
+.iw .rs{position:absolute;width:14px;height:14px;inset-inline-start:-7px;bottom:-7px;background:var(--blue);border:2px solid #fff;border-radius:50%;cursor:nesw-resize;opacity:0;touch-action:none}
+.iw:hover,.iw:focus-within{outline:1px dashed var(--blue)}
+.iw:hover .rs{opacity:1}
+.snipbox{position:absolute;border:2px dashed var(--blue);background:rgba(43,89,195,.08)}
+
+/* ---------- signature dialog ---------- */
+dialog.sig{border:0;border-radius:10px;padding:0;width:min(560px,94vw);background:var(--bar);color:var(--ink);box-shadow:var(--shadow)}
+dialog.sig::backdrop{background:rgba(20,24,33,.45)}
+.sig-in{padding:16px;display:flex;flex-direction:column;gap:12px}
+.sig-in h2{margin:0;font-size:18px}
+.sig-pad{background:#fff;border:1px solid var(--line);border-radius:6px;touch-action:none;width:100%;aspect-ratio:5/2;display:block;cursor:crosshair}
+.sig-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.sig-row .grow{margin-inline-end:auto;color:var(--muted);font-size:13px}
+.sig-saved{display:flex;gap:8px;flex-wrap:wrap}
+.sig-saved .s{position:relative;background:#fff;border:1px solid var(--line);border-radius:6px;padding:4px;cursor:pointer;height:56px;display:grid;place-items:center}
+.sig-saved .s:hover{border-color:var(--blue)}
+.sig-saved img{max-height:46px;max-width:140px}
+.sig-saved .x{position:absolute;top:-8px;inset-inline-end:-8px;width:20px;height:20px;border-radius:50%;border:1px solid var(--line);background:var(--bar);font-size:12px;line-height:1;cursor:pointer;padding:0}
 
 /* ---------- pages panel ---------- */
 .pgpanel{width:190px;flex:none;background:var(--bar);border-inline-end:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
@@ -173,6 +850,12 @@ body.dragging .drop{border-color:var(--blue);border-style:solid}
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 20c3-1 4-4 7-4s3 3 6 2 3-5 3-5" stroke-linecap="round"/><path d="M16 4l4 4-7 7-4 1 1-4z" stroke-linejoin="round"/></svg><span>עט</span></button>
     <button class="tool" data-tool="eraser" aria-pressed="false" title="מחק (E)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M8 20h12M5 15l9-9 5 5-8 8H8z" stroke-linejoin="round" stroke-linecap="round"/></svg><span>מחק</span></button>
+    <button class="tool" data-tool="snip" aria-pressed="false" title="העתקת אזור כתמונה (C)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4" stroke-linecap="round" stroke-linejoin="round"/><rect x="8" y="8" width="8" height="8" rx="1"/></svg><span>העתקה</span></button>
+    <button class="tool" data-action="sign" title="הוספת חתימה">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 17c2-4 4-9 6-9s-1 9 1 9 3-5 5-5-1 5 1 5 3-2 4-3" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 21h18" stroke-linecap="round"/></svg><span>חתימה</span></button>
+    <button class="tool" data-action="image" title="הוספת תמונה">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M21 16l-5-5-8 8" stroke-linejoin="round"/></svg><span>תמונה</span></button>
   </nav>
 
   <div class="group zoom">
@@ -192,6 +875,7 @@ body.dragging .drop{border-color:var(--blue);border-style:solid}
   </div>
   <input type="file" id="file" accept="application/pdf,.pdf" hidden>
   <input type="file" id="mergeFile" accept="application/pdf,.pdf" hidden multiple>
+  <input type="file" id="imgFile" accept="image/*" hidden>
 </header>
 
 <div class="opts" id="opts">
@@ -199,6 +883,7 @@ body.dragging .drop{border-color:var(--blue);border-style:solid}
   <div class="swatches hidden" id="swatches"></div>
   <label class="hidden" id="sizeWrap"><span id="sizeLabel">גודל</span>
     <input type="range" id="size" min="6" max="48" step="1"> <span id="sizeVal"></span></label>
+  <button class="btn hidden" id="pasteBtn" title="הדבקה מהלוח (Ctrl+V)">הדבקה</button>
   <span class="pageinfo" id="pageInfo"></span>
 </div>
 
@@ -234,13 +919,14 @@ body.dragging .drop{border-color:var(--blue);border-style:solid}
 
   <section class="tp-settings hidden" id="tpSettings">
     <div class="seg" role="group" aria-label="שירות תרגום">
-      <button class="segp" data-provider="gemini" aria-pressed="true">Gemini · חינם</button>
+      <button class="segp" data-provider="builtin" aria-pressed="false">מובנה · בלי מפתח</button>
+      <button class="segp" data-provider="gemini" aria-pressed="true">מפתח Gemini אישי</button>
       <button class="segp" data-provider="claude" aria-pressed="false">Claude · בתשלום</button>
     </div>
     <p id="tpHelp"></p>
-    <label class="field">מפתח API
+    <label class="field" id="tpKeyWrap">מפתח API
       <input type="password" id="tpKey" autocomplete="off" dir="ltr"></label>
-    <label class="field">מודל
+    <label class="field" id="tpModelWrap">מודל
       <select id="tpModel"></select></label>
     <button class="btn primary" id="tpSaveKey">שמירה</button>
   </section>
@@ -270,6 +956,19 @@ body.dragging .drop{border-color:var(--blue);border-style:solid}
 </aside>
 </div>
 
+<dialog class="sig" id="sigDlg">
+  <div class="sig-in">
+    <h2>חתימה</h2>
+    <div class="sig-saved" id="sigSaved"></div>
+    <canvas class="sig-pad" id="sigPad" width="1000" height="400" aria-label="משטח חתימה"></canvas>
+    <div class="sig-row">
+      <span class="grow">חתמו עם העכבר, האצבע או העט</span>
+      <button class="btn" id="sigClear">ניקוי</button>
+      <button class="btn" id="sigCancel">ביטול</button>
+      <button class="btn primary" id="sigUse">שימוש בחתימה</button>
+    </div>
+  </div>
+</dialog>
 <div class="toast" id="toast" role="status"></div>
 <div class="busy hidden" id="busy"><div id="busyMsg">רגע…</div></div>
 
@@ -307,6 +1006,12 @@ function bidiRuns(line){
     if(last&&last.dir===res[i]) last.text+=ch[i]; else runs.push({dir:res[i],text:ch[i]});
   }
   return {base,runs:base==='R'?runs.reverse():runs};
+}
+// one string that fontkit (which reverses Hebrew-script strings) will draw in correct visual order
+function pdfVisual(line){
+  const{runs}=bidiRuns(line);
+  const vis=runs.map(r=>r.dir==='R'?[...r.text].map(c=>MIRROR[c]||c).reverse().join(''):r.text).join('');
+  return RE_R.test(line)?[...vis].reverse().join(''):vis;
 }
 function runForPdf(run){
   if(run.dir!=='R') return run.text;
@@ -355,7 +1060,10 @@ async function openFile(file,handle){
     $('empty').classList.add('hidden');
     ['saveBtn','saveAsBtn','trBtn','pgBtn'].forEach(id=>$(id).disabled=false);
     TR.reset();
+    S.hasForm=false;try{S.hasForm=!!(await doc.getFieldObjects());}catch(_){}
     await buildPages();
+    setTool(S.tool);
+    if(S.hasForm)toast('יש בקובץ שדות טופס. לחצו עליהם כדי למלא');
     fitWidth();
     if(!$('tpanel').classList.contains('hidden'))detect();
     if(!$('pgpanel').classList.contains('hidden'))renderThumbs();
@@ -375,12 +1083,15 @@ async function buildPages(){
     const page=await S.doc.getPage(i);
     const el=document.createElement('div');el.className='page';el.dataset.i=i-1;
     const canvas=document.createElement('canvas');
+    const txl=document.createElement('div');txl.className='textLayer';
+    const frm=document.createElement('div');frm.className='annotationLayer';
     const ann=document.createElement('div');ann.className='ann';
     const hl=document.createElement('div');
+    const il=document.createElement('div');
     const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
     const tl=document.createElement('div');
-    ann.append(hl,svg,tl);el.append(canvas,ann);wrap.append(el);
-    const P={i,page,el,canvas,ann,hl,svg,tl,vp:null,renderedAt:0,task:null};
+    ann.append(hl,il,svg,tl);el.append(canvas,txl,frm,ann);wrap.append(el);
+    const P={i,page,el,canvas,txl,frm,ann,hl,il,svg,tl,vp:null,renderedAt:0,task:null};
     S.pages.push(P);bindAnnEvents(P);
   }
   layout();
@@ -389,6 +1100,7 @@ function layout(){
   for(const P of S.pages){
     P.vp=P.page.getViewport({scale:S.zoom});
     P.el.style.width=P.vp.width+'px';P.el.style.height=P.vp.height+'px';
+    P.el.style.setProperty('--scale-factor',S.zoom);
     P.renderedAt=0;
     io.unobserve(P.el);io.observe(P.el);
     drawAnns(P);
@@ -406,6 +1118,25 @@ async function renderPage(P){
   try{await P.task.promise;}catch(e){if(e&&e.name==='RenderingCancelledException')return;console.error(e);return;}
   if(S.zoom!==z)return;
   c.className='';P.canvas.replaceWith(c);P.canvas=c;
+  renderLayers(P,z);
+}
+// selectable text (copy/paste) + fillable form fields
+const linkStub={externalLinkTarget:0,externalLinkRel:'noopener',getDestinationHash:()=>'#',getAnchorUrl:()=>'#',addLinkAttributes(){},navigateTo(){},goToDestination(){},executeNamedAction(){},executeSetOCGState(){},isInPresentationMode:false,eventBus:null};
+async function renderLayers(P,z){
+  const vp=P.page.getViewport({scale:z}).clone({dontFlip:true});
+  try{
+    const div=document.createElement('div');div.className='textLayer';
+    await pdfjs.renderTextLayer({textContentSource:P.page.streamTextContent(),container:div,viewport:vp,textDivs:[]}).promise;
+    if(S.zoom!==z)return;P.txl.replaceWith(div);P.txl=div;
+  }catch(e){console.warn('text layer',e);}
+  try{
+    if(!P.annots)P.annots=(await P.page.getAnnotations({intent:'display'})).filter(a=>a.annotationType===20);
+    if(!P.annots.length||S.zoom!==z)return;
+    const div=document.createElement('div');div.className='annotationLayer';
+    await new pdfjs.AnnotationLayer({div,page:P.page,viewport:vp}).render({annotations:P.annots,annotationStorage:S.doc.annotationStorage,renderForms:true,linkService:linkStub,enableScripting:false});
+    if(S.zoom!==z)return;P.frm.replaceWith(div);P.frm=div;
+    div.addEventListener('input',()=>setDirty(true));div.addEventListener('change',()=>setDirty(true));
+  }catch(e){console.warn('form layer',e);}
 }
 function setZoom(z,keepCenter=true){
   z=Math.max(.25,Math.min(5,z));if(Math.abs(z-S.zoom)<.001)return;
@@ -444,12 +1175,35 @@ function removeAnn(id){const k=S.anns.findIndex(a=>a.id===id);if(k<0)return;snap
 const pageOf=a=>S.pages[a.page];
 
 function drawAnns(P){
-  P.hl.innerHTML='';P.svg.innerHTML='';P.tl.innerHTML='';
+  P.hl.innerHTML='';P.il.innerHTML='';P.svg.innerHTML='';P.tl.innerHTML='';
   for(const a of S.anns){if(a.page!==P.i-1)continue;
     if(a.type==='hl')P.hl.append(hlEl(P,a));
     else if(a.type==='ink')P.svg.append(inkEl(P,a));
     else if(a.type==='text')P.tl.append(textEl(P,a));
+    else if(a.type==='img')P.il.append(imgEl(P,a));
   }
+}
+function imgEl(P,a){
+  const[l,t]=toCss(P,a.x,a.y);
+  const w=document.createElement('div');w.className='iw';w.dataset.id=a.id;
+  Object.assign(w.style,{left:l+'px',top:t+'px',width:a.w*S.zoom+'px',height:a.h*S.zoom+'px'});
+  const img=document.createElement('img');img.src=a.src;img.alt=a.sig?'חתימה':'תמונה';img.draggable=false;
+  const rs=document.createElement('div');rs.className='rs';rs.title='שינוי גודל';
+  w.append(img,rs);
+  const drag=(el,resize)=>el.addEventListener('pointerdown',e=>{
+    if(S.tool!=='select')return;
+    e.preventDefault();e.stopPropagation();el.setPointerCapture(e.pointerId);snapshot();
+    const[sx,sy]=localXY(P,e);const ox=parseFloat(w.style.left),oy=parseFloat(w.style.top),ow=parseFloat(w.style.width),oh=parseFloat(w.style.height);
+    const mv=ev=>{const[cx,cy]=localXY(P,ev);
+      if(resize){const nw=Math.max(20,ow-(cx-sx));const nh=nw*oh/ow;w.style.width=nw+'px';w.style.height=nh+'px';w.style.left=ox+ow-nw+'px';}
+      else{w.style.left=ox+cx-sx+'px';w.style.top=oy+cy-sy+'px';}};
+    const up=()=>{el.removeEventListener('pointermove',mv);el.removeEventListener('pointerup',up);
+      const[px,py]=toPdf(P,parseFloat(w.style.left),parseFloat(w.style.top));a.x=px;a.y=py;
+      a.w=parseFloat(w.style.width)/S.zoom;a.h=parseFloat(w.style.height)/S.zoom;};
+    el.addEventListener('pointermove',mv);el.addEventListener('pointerup',up);
+  });
+  drag(img,false);drag(rs,true);
+  return w;
 }
 function hlEl(P,a){
   const[x1,y1]=toCss(P,a.x1,a.y1),[x2,y2]=toCss(P,a.x2,a.y2);
@@ -524,17 +1278,29 @@ function bindAnnEvents(P){
       draft={kind:'ink',pts:[[cx,cy]],el:p};p.setAttribute('d',`M${cx} ${cy} l0.1 0`);return;
     }
     if(tool==='eraser'){e.preventDefault();P.ann.setPointerCapture(e.pointerId);draft={kind:'erase'};eraseAt(e);}
+    if(tool==='snip'){
+      e.preventDefault();P.ann.setPointerCapture(e.pointerId);
+      const d=document.createElement('div');d.className='snipbox';P.hl.append(d);draft={kind:'snip',sx:cx,sy:cy,el:d};return;
+    }
+    if(tool==='place'&&S.pending){
+      e.preventDefault();const pd=S.pending;S.pending=null;
+      addImage(P,pd.src,pd.ratio,pd.wPt,cx,cy,pd.sig);setTool('select');
+    }
   });
   P.ann.addEventListener('pointermove',e=>{
     if(!draft)return;const[cx,cy]=localXY(P,e);
-    if(draft.kind==='hl'){Object.assign(draft.el.style,{left:Math.min(cx,draft.sx)+'px',top:Math.min(cy,draft.sy)+'px',width:Math.abs(cx-draft.sx)+'px',height:Math.abs(cy-draft.sy)+'px'});}
+    if(draft.kind==='hl'||draft.kind==='snip'){Object.assign(draft.el.style,{left:Math.min(cx,draft.sx)+'px',top:Math.min(cy,draft.sy)+'px',width:Math.abs(cx-draft.sx)+'px',height:Math.abs(cy-draft.sy)+'px'});}
     else if(draft.kind==='ink'){const evs=e.getCoalescedEvents?e.getCoalescedEvents():[e];for(const ev of evs)draft.pts.push(localXY(P,ev));
       draft.el.setAttribute('d',draft.pts.map((p,k)=>(k?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' '));}
     else if(draft.kind==='erase')eraseAt(e);
   });
   const finish=e=>{
     if(!draft)return;const d=draft;draft=null;
-    if(d.kind==='hl'){
+    if(d.kind==='snip'){
+      const[cx,cy]=localXY(P,e);d.el.remove();
+      if(Math.abs(cx-d.sx)<6||Math.abs(cy-d.sy)<6)return;
+      snipRegion(P,Math.min(cx,d.sx),Math.min(cy,d.sy),Math.abs(cx-d.sx),Math.abs(cy-d.sy));
+    }else if(d.kind==='hl'){
       const[cx,cy]=localXY(P,e);d.el.remove();
       if(Math.abs(cx-d.sx)<3||Math.abs(cy-d.sy)<3)return;
       const[x1,y1]=toPdf(P,d.sx,d.sy),[x2,y2]=toPdf(P,cx,cy);
@@ -570,12 +1336,49 @@ function wrapLines(text,font,size,maxW){
   }
   return out;
 }
+function dataUrlBytes(u){return b64Bytes(u.slice(u.indexOf(',')+1));}
+// copies what the user typed into form fields (pdf.js) into the saved file (pdf-lib), with a Hebrew font
+async function applyFormValues(doc){
+  if(!S.hasForm)return;
+  const store=S.doc.annotationStorage;let changed=0;
+  let form;try{form=doc.getForm();}catch(_){return;}
+  for(const P of S.pages){
+    if(!P.annots)P.annots=(await P.page.getAnnotations({intent:'display'})).filter(a=>a.annotationType===20);
+    for(const w of P.annots){
+      if(!w.fieldName)continue;
+      const v=store.getValue(w.id,{});if(!('value' in v))continue;
+      const f=form.getFieldMaybe(w.fieldName);if(!f)continue;
+      try{
+        const k=f.constructor.name,val=v.value;
+        if(f instanceof PDFLib.PDFTextField){f.setText(val==null?'':String(val));changed++;}
+        else if(f instanceof PDFLib.PDFCheckBox){val?f.check():f.uncheck();changed++;}
+        else if(f instanceof PDFLib.PDFRadioGroup){if(val===true&&w.buttonValue){f.select(String(w.buttonValue));changed++;}}
+        else if(f instanceof PDFLib.PDFDropdown||f instanceof PDFLib.PDFOptionList){const arr=Array.isArray(val)?val:[val];if(arr.length&&arr[0]!=null){f.select(arr.map(String));changed++;}}
+      }catch(e){console.warn('field',w.fieldName,e);}
+    }
+  }
+  if(changed){
+    try{
+      doc.registerFontkit(fontkit);const hf=await doc.embedFont(b64Bytes(ALEF_B64),{subset:true});
+      form.updateFieldAppearances(hf);
+      // Hebrew text fields: keep the real value, but draw it right-aligned in correct visual order
+      for(const f of form.getFields()){
+        if(!(f instanceof PDFLib.PDFTextField))continue;const val=f.getText()||'';if(!RE_R.test(val))continue;
+        const shown=val.split('\n').map(pdfVisual).join('\n');
+        const proxy=new Proxy(f,{get:(t,k)=>k==='getText'?()=>shown:k==='getAlignment'?()=>PDFLib.TextAlignment.Right:(typeof t[k]==='function'?t[k].bind(t):t[k])});
+        try{f.updateAppearances(hf,(_f,w,font)=>PDFLib.defaultTextFieldAppearanceProvider(proxy,w,font));}catch(e){console.warn('rtl field',e);}
+      }
+    }catch(e){console.warn('appearances',e);}
+  }
+}
 async function buildPdf(){
   const{PDFDocument,BlendMode,LineCapStyle}=PDFLib;
   const doc=await PDFDocument.load(S.bytes,{ignoreEncryption:true});
   let font=null;
   if(S.anns.some(a=>a.type==='text')){doc.registerFontkit(fontkit);font=await doc.embedFont(b64Bytes(ALEF_B64),{subset:true});}
+  await applyFormValues(doc);
   const pages=doc.getPages();
+  const imgCache=new Map();
   for(const a of S.anns){
     const pg=pages[a.page];if(!pg)continue;
     if(a.type==='hl'){
@@ -586,6 +1389,13 @@ async function buildPdf(){
       pg.pushOperators(PDFLib.pushGraphicsState(),PDFLib.setLineJoin(PDFLib.LineJoinStyle.Round));
       pg.drawSvgPath(d,{x:0,y:0,borderColor:hexRgb(a.color),borderWidth:a.w,borderLineCap:LineCapStyle.Round});
       pg.pushOperators(PDFLib.popGraphicsState());
+    }else if(a.type==='img'){
+      let im=imgCache.get(a.src);
+      if(!im){const bytes=dataUrlBytes(a.src);im=/^data:image\/jpe?g/.test(a.src)?await doc.embedJpg(bytes):await doc.embedPng(bytes);imgCache.set(a.src,im);}
+      const vp1=S.pages[a.page].page.getViewport({scale:1});
+      const[bx,by]=vp1.convertToViewportPoint(a.x,a.y);
+      const[x,y]=vp1.convertToPdfPoint(bx,by+a.h); // image origin = its bottom-left corner on screen
+      pg.drawImage(im,{x,y,width:a.w,height:a.h,rotate:PDFLib.degrees(vp1.rotation||0)});
     }else if(a.type==='text'&&a.text.trim()){
       const size=a.size,LH=size*1.35;
       const asc=font.heightAtSize(size,{descender:false}),full=font.heightAtSize(size);
@@ -709,7 +1519,7 @@ function trSystem(target){
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 async function callTranslate(text,target){
   const st=loadST();const key=st.provider==='claude'?st.claudeKey:st.geminiKey;
-  if(!key)return{error:'NO_KEY'};
+  if(st.provider!=='builtin'&&!key)return{error:'NO_KEY'};
   try{
     if(st.provider==='claude'){
       const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
@@ -721,13 +1531,15 @@ async function callTranslate(text,target){
     const url=`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(st.model)}:generateContent`;
     const body=JSON.stringify({systemInstruction:{parts:[{text:trSystem(target)}]},contents:[{role:'user',parts:[{text:`<page>\n${text}\n</page>`}]}],generationConfig:{temperature:0.2,maxOutputTokens:16384}});
     for(let attempt=0;attempt<5;attempt++){
-      const r=await fetch(url,{method:'POST',headers:{'content-type':'application/json','x-goog-api-key':key},body});
+      const r=st.provider==='builtin'
+        ?await fetch(TRANSLATE_URL,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({text,target})})
+        :await fetch(url,{method:'POST',headers:{'content-type':'application/json','x-goog-api-key':key},body});
       const d=await r.json().catch(()=>({}));
       if(r.status===429||r.status===503){
         if(/per ?day/i.test(JSON.stringify(d)))return{error:'DAILY_LIMIT',status:429};
         const info=((d.error&&d.error.details)||[]).find(x=>x.retryDelay);
         const wait=info?Math.min(60,parseFloat(info.retryDelay)||10):10*(attempt+1);
-        status(`Gemini מבקש להמתין ${Math.round(wait)} שניות (מגבלת המסלול החינמי)…`);
+        status(`שירות התרגום עמוס, ממתין ${Math.round(wait)} שניות…`);
         await sleep(wait*1000+500);continue;
       }
       if(!r.ok){const msg=(d.error&&d.error.message)||('HTTP '+r.status);return{error:msg,status:/API key not valid|API_KEY_INVALID/i.test(msg)?401:r.status};}
@@ -748,7 +1560,7 @@ function errText(r){
   if(r.error==='DAILY_LIMIT')return'נגמרה המכסה היומית החינמית של Gemini. היא מתאפסת מחר בסביבות 10:00 בבוקר.';
   if(r.error==='RATE_LIMIT')return'Gemini עמוס כרגע. נסו שוב בעוד דקה.';
   if(r.error==='EMPTY')return'התקבלה תשובה ריקה לעמוד הזה. נסו לתרגם אותו שוב.';
-  if(r.status===401)return'מפתח ה-API לא תקין. בדקו אותו בהגדרות (⚙).';
+  if(r.status===401)return'המפתח נדחה ('+r.error+'). בדקו שהעתקתם אותו במלואו, או צרו מפתח חדש.';
   if(r.status===403)return'הגישה נדחתה: '+r.error;
   if(r.status===429)return'יותר מדי בקשות. נסו שוב בעוד דקה.';
   if(r.status===400&&/credit|balance/i.test(r.error))return'אין מספיק קרדיט בחשבון ה-API.';
@@ -831,9 +1643,12 @@ function translationText(){return translatedPages().map(p=>`— עמוד ${p.i+1
 window.__exportTr=exportTranslationPdf;
 
 /* settings */
+// כתובת שרת התרגום (Cloudflare Worker). ריק = התרגום המובנה כבוי ומשתמשים במפתח אישי
+const TRANSLATE_URL='https://siman-translate.lioralmo1.workers.dev/';
 const PROVIDERS={
+  builtin:{help:'תרגום מוכן לשימוש, בלי מפתח ובלי הרשמה. מתאים למסמכים רגילים; למסמכים רגישים עדיף לא להשתמש בתרגום מקוון.',ph:'',re:/.*/,reMsg:'',models:[['default','ברירת מחדל']]},
   gemini:{help:'תרגום חינמי באמצעות Google Gemini. יוצרים מפתח בחינם, בלי כרטיס אשראי, ב-<a href="https://aistudio.google.com/apikey" data-ext>aistudio.google.com/apikey</a>. במסלול החינמי Google רשאית להשתמש בטקסט לשיפור המודלים, לכן לא מומלץ למסמכים רגישים.',
-    ph:'AIza...',re:/^AIza/,reMsg:'מפתח Gemini מתחיל ב-AIza',
+    ph:'AQ.…',re:/^(AQ\.|AIza)/,reMsg:'מפתח Gemini מתחיל ב-AQ. (או ב-AIza במפתחות ישנים)',
     models:[['gemini-flash-latest','Gemini Flash — איכות טובה'],['gemini-flash-lite-latest','Gemini Flash-Lite — מהיר, מכסה גדולה יותר']]},
   claude:{help:'תרגום באיכות הגבוהה ביותר באמצעות Claude. דורש מפתח בתשלום מ-<a href="https://console.anthropic.com/settings/keys" data-ext>console.anthropic.com</a>.',
     ph:'sk-ant-...',re:/^sk-ant-/,reMsg:'מפתח Claude מתחיל ב-sk-ant-',
@@ -842,14 +1657,16 @@ const PROVIDERS={
 // translation settings live only in this browser (localStorage)
 function loadST(){
   let c={};try{c=JSON.parse(localStorage.getItem('siman.settings')||'{}');}catch(_){}
-  const provider=c.provider==='claude'?'claude':'gemini';
-  const model=(provider==='claude'?c.claudeModel:c.geminiModel)||PROVIDERS[provider].models[0][0];
-  return{...c,provider,model,hasKey:!!(provider==='claude'?c.claudeKey:c.geminiKey),hasGeminiKey:!!c.geminiKey,hasClaudeKey:!!c.claudeKey};
+  let provider=c.provider==='claude'?'claude':c.provider==='gemini'?'gemini':(TRANSLATE_URL?'builtin':'gemini');
+  if(provider==='builtin'&&!TRANSLATE_URL)provider='gemini';
+  const model=provider==='builtin'?'default':(provider==='claude'?c.claudeModel:c.geminiModel)||PROVIDERS[provider].models[0][0];
+  return{...c,provider,model,hasKey:provider==='builtin'||!!(provider==='claude'?c.claudeKey:c.geminiKey),hasGeminiKey:!!c.geminiKey,hasClaudeKey:!!c.claudeKey};
 }
 function saveST(patch){
   let c={};try{c=JSON.parse(localStorage.getItem('siman.settings')||'{}');}catch(_){}
   c.provider=patch.provider;
-  if(patch.provider==='claude'){c.claudeModel=patch.model;if(patch.apiKey)c.claudeKey=patch.apiKey;}
+  if(patch.provider==='builtin'){}
+  else if(patch.provider==='claude'){c.claudeModel=patch.model;if(patch.apiKey)c.claudeKey=patch.apiKey;}
   else{c.geminiModel=patch.model;if(patch.apiKey)c.geminiKey=patch.apiKey;}
   try{localStorage.setItem('siman.settings',JSON.stringify(c));}catch(_){}
   return loadST();
@@ -861,7 +1678,8 @@ function showProvider(pv){
   uiProvider=pv;const P=PROVIDERS[pv];
   document.querySelectorAll('.segp').forEach(b=>b.setAttribute('aria-pressed',b.dataset.provider===pv));
   $('tpHelp').innerHTML=P.help;bindExt($('tpHelp'));
-  const has=pv==='gemini'?ST.hasGeminiKey:ST.hasClaudeKey;
+  const has=pv==='builtin'||(pv==='gemini'?ST.hasGeminiKey:ST.hasClaudeKey);
+  $('tpKeyWrap').classList.toggle('hidden',pv==='builtin');$('tpModelWrap').classList.toggle('hidden',pv==='builtin');
   $('tpKey').value='';$('tpKey').placeholder=has?'מפתח שמור ✓ (להחלפה הדביקו חדש)':P.ph;
   $('tpModel').innerHTML=P.models.map(([v,t])=>`<option value="${v}">${t}</option>`).join('');
   if(pv===ST.provider&&P.models.some(m=>m[0]===ST.model))$('tpModel').value=ST.model;
@@ -870,11 +1688,11 @@ async function openSettings(show){
   $('tpSettings').classList.toggle('hidden',!show);
   if(show){await getSettingsSafe();showProvider(ST.provider);setTimeout(()=>$('tpKey').focus(),0);}
 }
-document.querySelectorAll('.segp').forEach(b=>b.onclick=()=>showProvider(b.dataset.provider));
+document.querySelectorAll('.segp').forEach(b=>{if(b.dataset.provider==='builtin'&&!TRANSLATE_URL)b.remove();else b.onclick=()=>showProvider(b.dataset.provider);});
 $('tpSaveKey').onclick=async()=>{
   const key=$('tpKey').value.trim(),model=$('tpModel').value,P=PROVIDERS[uiProvider];
-  const has=uiProvider==='gemini'?ST.hasGeminiKey:ST.hasClaudeKey;
-  if(key&&!P.re.test(key)){status(P.reMsg,true);return;}
+  const has=uiProvider==='builtin'||(uiProvider==='gemini'?ST.hasGeminiKey:ST.hasClaudeKey);
+  if(uiProvider!=='builtin'&&key&&!P.re.test(key)){status(P.reMsg,true);return;}
   if(!key&&!has){status('הדביקו מפתח API לפני השמירה.',true);return;}
   const patch={provider:uiProvider,model};if(key)patch.apiKey=key;
   ST=saveST(patch);
@@ -896,9 +1714,11 @@ $('tpCopy').onclick=async()=>{try{await navigator.clipboard.writeText(translatio
 /* ===================== tools & options ===================== */
 function setTool(t){
   S.tool=t;document.body.dataset.tool=t;
-  document.querySelectorAll('.tool').forEach(b=>b.setAttribute('aria-pressed',b.dataset.tool===t));
+  document.querySelectorAll('.tool[data-tool]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.tool===t));
+  $('pasteBtn').classList.toggle('hidden',t!=='select'||!S.doc);
+  if(t!=='place')S.pending=null;
   const sw=$('swatches'),sz=$('sizeWrap'),lbl=$('optLabel');
-  const labels={select:'גוללים, קוראים ועורכים תיבות טקסט קיימות',text:'לחצו על הדף כדי לכתוב',highlight:'גררו מלבן על מה שרוצים לסמן',pen:'כתבו או ציירו חופשי',eraser:'לחצו או גררו על סימון כדי למחוק אותו'};
+  const labels={snip:'גררו מלבן סביב האזור שרוצים להעתיק. אחר כך מדביקים ב-Word, בוואטסאפ או בתוך המסמך',place:'לחצו על הדף במקום שבו לשים את '+(S.pending&&S.pending.sig?'החתימה':'התמונה'),select:'בוחרים טקסט להעתקה, ממלאים טפסים, מזיזים תמונות וחתימות',text:'לחצו על הדף כדי לכתוב',highlight:'גררו מלבן על מה שרוצים לסמן',pen:'כתבו או ציירו חופשי',eraser:'לחצו או גררו על סימון כדי למחוק אותו'};
   lbl.textContent=labels[t];
   sw.classList.toggle('hidden',!PALETTE[t]);sz.classList.toggle('hidden',!SIZES[t]);
   if(PALETTE[t]){sw.innerHTML='';PALETTE[t].forEach(c=>{const b=document.createElement('button');b.className='sw';b.style.background=c;b.title=c;b.setAttribute('aria-label','צבע '+c);
@@ -907,7 +1727,10 @@ function setTool(t){
 }
 $('size').addEventListener('input',e=>{const t=S.tool;if(!SIZES[t])return;S.size[t]=+e.target.value;$('sizeVal').textContent=e.target.value;
   if(t==='text'&&S.lastText){const a=S.anns.find(x=>x.id===S.lastText);const el=document.querySelector(`.tw[data-id="${S.lastText}"] .tx`);if(a&&el){a.size=S.size.text;el.style.fontSize=a.size*S.zoom+'px';setDirty(true);}}});
-$('tools').addEventListener('click',e=>{const b=e.target.closest('.tool');if(b)setTool(b.dataset.tool);});
+$('tools').addEventListener('click',e=>{const b=e.target.closest('.tool');if(!b)return;
+  if(b.dataset.action==='sign'){if(!S.doc){toast('פתחו קודם קובץ PDF');return;}openSig();return;}
+  if(b.dataset.action==='image'){if(!S.doc){toast('פתחו קודם קובץ PDF');return;}$('imgFile').click();return;}
+  setTool(b.dataset.tool);});
 
 /* ===================== wiring ===================== */
 async function pickFile(){
@@ -944,13 +1767,141 @@ addEventListener('keydown',e=>{
   if(mod&&e.key.toLowerCase()==='y'){e.preventDefault();redoAct();return;}
   if(mod&&(e.key==='='||e.key==='+')){e.preventDefault();setZoom(S.zoom*1.2);return;}
   if(mod&&e.key==='-'){e.preventDefault();setZoom(S.zoom/1.2);return;}
-  const map={v:'select',t:'text',h:'highlight',p:'pen',e:'eraser'};
+  const map={v:'select',t:'text',h:'highlight',p:'pen',e:'eraser',c:'snip'};
   const k=e.code.replace('Key','').toLowerCase();
   if(!mod&&map[k]){setTool(map[k]);}
 });
 addEventListener('beforeunload',e=>{if(S.dirty){e.preventDefault();e.returnValue='';}});
 let rT;addEventListener('resize',()=>{clearTimeout(rT);rT=setTimeout(updatePageInfo,150);});
 setTool('select');
+
+/* =====================================================================
+   IMAGES · SIGNATURES · COPY AREA · PASTE
+   ===================================================================== */
+function visibleCenter(){
+  const i=currentPageIndex();const P=S.pages[i];const r=P.el.getBoundingClientRect(),d=$('desk').getBoundingClientRect();
+  const cy=Math.min(Math.max((d.top+d.bottom)/2-r.top,40),r.height-40);
+  return{P,cx:r.width/2,cy};
+}
+function addImage(P,src,ratio,wPt,cx,cy,sig){
+  const wCss=Math.min(wPt*S.zoom,P.vp.width*.9),hCss=wCss*ratio;
+  const left=Math.max(0,cx-wCss/2),top=Math.max(0,cy-hCss/2);
+  const[x,y]=toPdf(P,left,top);
+  snapshot();
+  S.anns.push({id:S.nextId++,type:'img',page:P.i-1,x,y,w:wCss/S.zoom,h:hCss/S.zoom,src,sig:!!sig});
+  drawAnns(P);setTool('select');
+}
+// any image -> PNG/JPEG data URL (pdf-lib embeds only these), scaled down if huge
+function normalizeImage(blob){
+  return new Promise((res,rej)=>{
+    const url=URL.createObjectURL(blob);const im=new Image();
+    im.onload=()=>{
+      const max=2400,k=Math.min(1,max/Math.max(im.naturalWidth,im.naturalHeight));
+      const c=document.createElement('canvas');c.width=Math.round(im.naturalWidth*k);c.height=Math.round(im.naturalHeight*k);
+      c.getContext('2d').drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(url);
+      const jpg=/jpe?g/.test(blob.type);
+      res({src:c.toDataURL(jpg?'image/jpeg':'image/png',.92),ratio:c.height/c.width,natW:c.width});
+    };
+    im.onerror=()=>{URL.revokeObjectURL(url);rej(new Error('התמונה לא נטענה'));};im.src=url;
+  });
+}
+function startPlace(src,ratio,wPt,sig){S.pending={src,ratio,wPt,sig};setTool('place');}
+$('imgFile').onchange=async e=>{
+  const f=e.target.files[0];e.target.value='';if(!f)return;
+  try{const n=await normalizeImage(f);startPlace(n.src,n.ratio,Math.min(260,n.natW*.75),false);}catch(err){toast(err.message);}
+};
+
+/* --- copy an area of the page as an image --- */
+async function snipRegion(P,x,y,w,h){
+  try{
+    const k=Math.max(2,S.zoom*dpr())/S.zoom;
+    const vp=P.page.getViewport({scale:S.zoom*k});
+    const full=document.createElement('canvas');full.width=Math.ceil(vp.width);full.height=Math.ceil(vp.height);
+    const ctx=full.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,full.width,full.height);
+    await P.page.render({canvasContext:ctx,viewport:vp}).promise;
+    const c=document.createElement('canvas');c.width=Math.round(w*k);c.height=Math.round(h*k);
+    c.getContext('2d').drawImage(full,Math.round(x*k),Math.round(y*k),c.width,c.height,0,0,c.width,c.height);
+    const blob=await new Promise(r=>c.toBlob(r,'image/png'));
+    S.clip={src:c.toDataURL('image/png'),ratio:c.height/c.width,wPt:w/S.zoom};
+    try{await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]);toast('האזור הועתק. אפשר להדביק עם Ctrl+V בכל מקום');}
+    catch(_){toast('האזור הועתק להדבקה בתוך סימן (Ctrl+V)');}
+  }catch(e){console.error(e);toast('ההעתקה נכשלה');}
+}
+
+/* --- paste: images become pictures on the page, text becomes a text box --- */
+async function pasteBlobOrText(blob,text){
+  if(!S.doc)return;
+  const{P,cx,cy}=visibleCenter();
+  if(blob){try{const n=await normalizeImage(blob);addImage(P,n.src,n.ratio,Math.min(300,n.natW*.75/ (n.natW>1200?2:1)),cx,cy,false);toast('התמונה הודבקה. אפשר לגרור ולשנות גודל');}catch(e){toast(e.message);}return;}
+  if(text&&text.trim()){
+    const size=S.size.text,wPt=Math.min(320,P.vp.width/S.zoom*.8);
+    const[x,y]=toPdf(P,Math.max(4,cx-wPt*S.zoom/2),cy);
+    snapshot();const a={id:S.nextId++,type:'text',page:P.i-1,x,y,w:wPt,size,color:S.color.text,text:text.trim()};
+    S.anns.push(a);drawAnns(P);setTool('select');toast('הטקסט הודבק');
+  }
+}
+document.addEventListener('paste',e=>{
+  const t=e.target;if(t&&(t.isContentEditable||/INPUT|TEXTAREA/.test(t.tagName)))return;
+  if(!S.doc)return;
+  const items=[...(e.clipboardData&&e.clipboardData.items||[])];
+  const im=items.find(i=>i.type.startsWith('image/'));
+  if(im){e.preventDefault();pasteBlobOrText(im.getAsFile(),null);return;}
+  const txt=e.clipboardData&&e.clipboardData.getData('text/plain');
+  if(txt){e.preventDefault();pasteBlobOrText(null,txt);return;}
+  if(S.clip){e.preventDefault();const{P,cx,cy}=visibleCenter();addImage(P,S.clip.src,S.clip.ratio,S.clip.wPt,cx,cy,false);}
+});
+$('pasteBtn').onclick=async()=>{
+  try{
+    if(navigator.clipboard&&navigator.clipboard.read){
+      const items=await navigator.clipboard.read();
+      for(const it of items){const t=it.types.find(x=>x.startsWith('image/'));if(t){pasteBlobOrText(await it.getType(t),null);return;}}
+      for(const it of items){if(it.types.includes('text/plain')){pasteBlobOrText(null,await (await it.getType('text/plain')).text());return;}}
+    }else if(navigator.clipboard&&navigator.clipboard.readText){pasteBlobOrText(null,await navigator.clipboard.readText());return;}
+  }catch(_){}
+  if(S.clip){const{P,cx,cy}=visibleCenter();addImage(P,S.clip.src,S.clip.ratio,S.clip.wPt,cx,cy,false);return;}
+  toast('אין מה להדביק. העתיקו טקסט או תמונה ונסו שוב');
+};
+
+/* --- signatures: draw once, reuse --- */
+const SIG_KEY='siman.signatures';
+const loadSigs=()=>{try{return JSON.parse(localStorage.getItem(SIG_KEY)||'[]');}catch(_){return[];}};
+const saveSigs=a=>{try{localStorage.setItem(SIG_KEY,JSON.stringify(a.slice(0,4)));}catch(_){}};
+const pad=$('sigPad'),pctx=pad.getContext('2d');let sigInk=false;
+function clearPad(){pctx.clearRect(0,0,pad.width,pad.height);sigInk=false;}
+(function(){
+  let drawing=false,last=null;
+  const pos=e=>{const r=pad.getBoundingClientRect();return[(e.clientX-r.left)*pad.width/r.width,(e.clientY-r.top)*pad.height/r.height];};
+  pad.addEventListener('pointerdown',e=>{drawing=true;pad.setPointerCapture(e.pointerId);last=pos(e);pctx.beginPath();pctx.arc(last[0],last[1],2.6,0,7);pctx.fillStyle='#14213D';pctx.fill();sigInk=true;});
+  pad.addEventListener('pointermove',e=>{if(!drawing)return;const evs=e.getCoalescedEvents?e.getCoalescedEvents():[e];
+    pctx.strokeStyle='#14213D';pctx.lineWidth=5.2;pctx.lineCap='round';pctx.lineJoin='round';
+    for(const ev of evs){const p=pos(ev);pctx.beginPath();pctx.moveTo(last[0],last[1]);pctx.lineTo(p[0],p[1]);pctx.stroke();last=p;}});
+  const end=()=>{drawing=false;};pad.addEventListener('pointerup',end);pad.addEventListener('pointercancel',end);
+})();
+function trimPad(){
+  const d=pctx.getImageData(0,0,pad.width,pad.height).data;let x0=pad.width,y0=pad.height,x1=0,y1=0;
+  for(let y=0;y<pad.height;y++)for(let x=0;x<pad.width;x++)if(d[(y*pad.width+x)*4+3]>8){if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y;}
+  if(x1<=x0)return null;const m=8;x0=Math.max(0,x0-m);y0=Math.max(0,y0-m);x1=Math.min(pad.width,x1+m);y1=Math.min(pad.height,y1+m);
+  const c=document.createElement('canvas');c.width=x1-x0;c.height=y1-y0;c.getContext('2d').drawImage(pad,x0,y0,c.width,c.height,0,0,c.width,c.height);
+  return{src:c.toDataURL('image/png'),ratio:c.height/c.width};
+}
+function renderSaved(){
+  const box=$('sigSaved');const sigs=loadSigs();box.innerHTML='';
+  sigs.forEach((sg,k)=>{const b=document.createElement('div');b.className='s';b.title='שימוש בחתימה הזו';
+    b.innerHTML=`<img alt="חתימה שמורה ${k+1}" src="${sg.src}"><button class="x" title="מחיקה" aria-label="מחיקת החתימה">×</button>`;
+    b.onclick=e=>{if(e.target.classList.contains('x')){e.stopPropagation();const a=loadSigs();a.splice(k,1);saveSigs(a);renderSaved();return;}
+      $('sigDlg').close();startPlace(sg.src,sg.ratio,150,true);};
+    box.append(b);});
+  box.classList.toggle('hidden',!sigs.length);
+}
+function openSig(){clearPad();renderSaved();$('sigDlg').showModal();}
+$('sigClear').onclick=clearPad;
+$('sigCancel').onclick=()=>$('sigDlg').close();
+$('sigUse').onclick=()=>{
+  if(!sigInk){toast('חתמו קודם על המשטח');return;}
+  const t=trimPad();if(!t)return;
+  const a=loadSigs();a.unshift(t);saveSigs(a);
+  $('sigDlg').close();startPlace(t.src,t.ratio,150,true);
+};
 
 /* =====================================================================
    PAGES — thumbnails, rotate, move, delete, append another PDF.
@@ -988,13 +1939,15 @@ $('thumbs').addEventListener('click',async e=>{
   if(a==='up'&&i>0)[order[i-1],order[i]]=[order[i],order[i-1]];
   else if(a==='down'&&i<n-1)[order[i+1],order[i]]=[order[i],order[i+1]];
   else if(a==='rot')order[i].rot=90;
-  else if(a==='del'){const has=S.anns.some(x=>x.page===i);if(!confirm(`למחוק את עמוד ${i+1}${has?' יחד עם הסימונים שעליו':''}?`))return;order.splice(i,1);}
+  if(S.hasForm&&!confirm('שינוי עמודים יבטל את שדות הטופס בקובץ (הטקסט שכבר מולא יישאר כפי שהוא מוצג). להמשיך?'))return;
+  if(a==='del'){const has=S.anns.some(x=>x.page===i);if(!confirm(`למחוק את עמוד ${i+1}${has?' יחד עם הסימונים שעליו':''}?`))return;order.splice(i,1);}
   else return;
   await rebuild(order,[]);
 });
 $('mergeBtn').onclick=()=>$('mergeFile').click();
 $('mergeFile').onchange=async e=>{
   const files=[...e.target.files];e.target.value='';if(!files.length)return;
+  if(S.hasForm&&!confirm('הוספת קובץ תבטל את שדות הטופס בקובץ. להמשיך?'))return;
   const extra=[];for(const f of files)extra.push(new Uint8Array(await f.arrayBuffer()));
   const order=S.pages.map((_,k)=>({src:0,i:k,rot:0}));
   busy(true,'קורא את הקבצים…');
@@ -1024,7 +1977,7 @@ async function rebuild(order,extra){
     const keepTop=$('desk').scrollTop;
     const doc=await pdfjs.getDocument({data:bytes.slice(),isEvalSupported:false}).promise;
     if(S.doc)S.doc.destroy();
-    S.doc=doc;S.bytes=new Uint8Array(bytes);setDirty(true);
+    S.doc=doc;S.bytes=new Uint8Array(bytes);setDirty(true);S.hasForm=false;
     const z=S.zoom;await buildPages();S.zoom=z;layout();$('desk').scrollTop=keepTop;
     TR.reset();renderThumbs();
   }catch(e){console.error(e);toast('עדכון העמודים נכשל: '+(e.message||e));}
