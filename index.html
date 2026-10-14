@@ -840,6 +840,9 @@ dialog.sig::backdrop{background:rgba(20,24,33,.45)}
 dialog.split{width:min(620px,94vw)}
 dialog.conv{width:min(560px,94vw)}
 .conv-opts{display:flex;flex-direction:column;gap:10px}
+.conv-scope{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.conv-scope select,.conv-scope input{font:inherit;font-size:14px;color:var(--ink);background:var(--bar);border:1px solid var(--line);border-radius:7px;padding:7px 9px}
+@media (max-width:520px){.conv-scope{grid-template-columns:1fr}}
 .conv-card{display:flex;gap:14px;align-items:center;text-align:start;border:1px solid var(--line);background:var(--bar);color:var(--ink);border-radius:10px;padding:12px 14px;cursor:pointer;font:inherit}
 .conv-card:hover{border-color:var(--blue);background:color-mix(in srgb,var(--blue) 5%,var(--bar))}
 .conv-card .of-ico{width:40px;height:50px;font-size:10px;padding-bottom:6px}
@@ -1037,7 +1040,7 @@ dialog.sig{border-radius:14px}
 <body data-tool="select">
 
 <header class="bar">
-  <div class="brand"><b title="גרסה 2.8.1">סימן</b><span class="ver">2.8.1</span><span class="fname" id="fname"></span></div>
+  <div class="brand"><b title="גרסה 2.9">סימן</b><span class="ver">2.9</span><span class="fname" id="fname"></span></div>
 
   <nav class="tools" id="tools" aria-label="כלים">
     <button class="tool" data-tool="select" aria-pressed="true" title="בחירה וגלילה (V)">
@@ -1245,6 +1248,12 @@ dialog.sig{border-radius:14px}
 <dialog class="sig conv" id="convDlg">
   <div class="sig-in">
     <h2>המרה לקובץ לעריכה</h2>
+    <div class="conv-scope">
+      <label class="field">אילו עמודים להמיר
+        <select id="convScope"><option value="all">כל המסמך</option><option value="cur">העמוד הנוכחי</option><option value="sel">העמודים המסומנים בחלונית "עמודים"</option><option value="range">עמודים לבחירה…</option></select></label>
+      <label class="field hidden" id="convRangeWrap">מספרי עמודים
+        <input id="convRange" dir="ltr" placeholder="למשל 1-3, 5, 8" autocomplete="off"></label>
+    </div>
     <div class="conv-opts">
       <button class="conv-card" data-to="pptx"><span class="of-ico pptx">PPTX</span><span><b>PowerPoint</b><small>כל עמוד הופך לשקף. הרקע, התמונות והעיצוב נשמרים, והטקסט נפתח לעריכה במקומו.</small></span></button>
       <button class="conv-card" data-to="docx"><span class="of-ico docx">DOCX</span><span><b>Word, עיצוב זהה למקור</b><small>כל עמוד נראה בדיוק כמו ב-PDF: לוגואים, קווים, צבעים ומיקום. כל שורת טקסט נפתחת לעריכה במקומה.</small></span></button>
@@ -3174,12 +3183,12 @@ function sampleCanvas(c,vp,L){ // background + text colour of a text block on a 
 }
 async function renderTo(page,scale){const vp=page.getViewport({scale});const c=document.createElement('canvas');c.width=Math.ceil(vp.width);c.height=Math.ceil(vp.height);const ctx=c.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,c.width,c.height);await page.render({canvasContext:ctx,viewport:vp}).promise;return{c,vp};}
 // reads every page of the document as it will be saved (with all edits): text blocks + positions + colours
-async function analyzeForConvert(withBackground,keepDeco,progress){
+async function analyzeForConvert(withBackground,keepDeco,progress,only){
   const built=await buildPdf();
   const d=await pdfjs.getDocument({data:built.slice(),isEvalSupported:false}).promise;
-  const pages=[];
-  for(let i=0;i<d.numPages;i++){
-    progress&&progress(`קורא את עמוד ${i+1} מתוך ${d.numPages}…`);
+  const pages=[];const list=only&&only.length?only.filter(i=>i<d.numPages):[...Array(d.numPages).keys()];
+  for(const[n,i]of list.entries()){
+    progress&&progress(`קורא את עמוד ${i+1} (${n+1} מתוך ${list.length})…`);
     const page=await d.getPage(i+1);const P={i:i+1,page};
     const src=S.pages[i];const ocr=!!(src&&src.ocr);
     const orig=await renderTo(page,2);
@@ -3197,16 +3206,16 @@ async function analyzeForConvert(withBackground,keepDeco,progress){
       b.deco=keepDeco&&!ocr&&!!fn.name&&!COMMON_FONTS.test(fontFace(fn.name)); // optional: text in special fonts stays part of the picture // big text in a special font (titles) stays part of the picture
     }
     const view=page.view;const all=blocks.flatMap(b=>b.lines);
-    pages.push({page,w:view[2]-view[0],h:view[3]-view[1],ox:view[0],oy:view[1],blocks,ocr,orig,colL:all.length?Math.min(...all.map(l=>l.x0)):view[0],colR:all.length?Math.max(...all.map(l=>l.x1)):view[2]});
+    pages.push({idx:i,page,w:view[2]-view[0],h:view[3]-view[1],ox:view[0],oy:view[1],blocks,ocr,orig,colL:all.length?Math.min(...all.map(l=>l.x0)):view[0],colR:all.length?Math.max(...all.map(l=>l.x1)):view[2]});
   }
   if(withBackground){ // the same pages without the text that becomes editable
     const doc=await PDFLib.PDFDocument.load(built,{ignoreEncryption:true});
-    pages.forEach((pg,i)=>{const rects=[];for(const b of pg.blocks)if(!b.deco&&!pg.ocr)for(const l of b.lines)rects.push([l.x0-.5,l.y0-.5,l.x1+.5,l.y1+.5]);
-      if(rects.length)try{removeTextInRects(PDFLib,doc,i,rects);}catch(e){console.warn(e);}});
+    pages.forEach(pg=>{const rects=[];for(const b of pg.blocks)if(!b.deco&&!pg.ocr)for(const l of b.lines)rects.push([l.x0-.5,l.y0-.5,l.x1+.5,l.y1+.5]);
+      if(rects.length)try{removeTextInRects(PDFLib,doc,pg.idx,rects);}catch(e){console.warn(e);}});
     const clean=await doc.save();const dc=await pdfjs.getDocument({data:clean,isEvalSupported:false}).promise;
     for(let i=0;i<pages.length;i++){
-      progress&&progress(`מכין את הרקע של עמוד ${i+1}…`);
-      const r=await renderTo(await dc.getPage(i+1),2);const ctx=r.c.getContext('2d');
+      progress&&progress(`מכין את הרקע של עמוד ${pages[i].idx+1}…`);
+      const r=await renderTo(await dc.getPage(pages[i].idx+1),2);const ctx=r.c.getContext('2d');
       if(pages[i].ocr)for(const b of pages[i].blocks)if(!b.deco)for(const l of b.lines){ // scanned page: paint over the words
         const[a,c]=r.vp.convertToViewportPoint(l.x0,l.y1),[e,f]=r.vp.convertToViewportPoint(l.x1,l.y0);ctx.fillStyle=b.bg;ctx.fillRect(Math.min(a,e)-2,Math.min(c,f)-2,Math.abs(e-a)+4,Math.abs(f-c)+4);}
       // text that isn't visibly drawn (hidden copies behind pictures) must not become a visible text box
@@ -3226,18 +3235,39 @@ async function analyzeForConvert(withBackground,keepDeco,progress){
   d.destroy();
   return pages;
 }
+// "1-3, 5" -> [0,1,2,4]
+function parsePages(t,n){
+  const out=new Set();
+  for(const part of String(t).split(/[,،;\s]+/).filter(Boolean)){
+    const m=/^(\d+)(?:\s*[-–]\s*(\d+))?$/.exec(part);if(!m)return null;
+    let a=+m[1],b=m[2]?+m[2]:a;if(a>b)[a,b]=[b,a];
+    for(let k=a;k<=b;k++)if(k>=1&&k<=n)out.add(k-1);
+  }
+  return out.size?[...out].sort((x,y)=>x-y):null;
+}
+function convIndices(){
+  const n=S.pages.length,v=$('convScope').value;
+  if(v==='cur')return[currentPageIndex()];
+  if(v==='sel')return S.sel&&S.sel.size?[...S.sel].sort((a,b)=>a-b):null;
+  if(v==='range')return parsePages($('convRange').value,n);
+  return S.pages.map((_,i)=>i);
+}
+$('convScope').onchange=()=>{$('convRangeWrap').classList.toggle('hidden',$('convScope').value!=='range');$('convStatus').textContent='';if($('convScope').value==='range')$('convRange').focus();};
 async function convertTo(kind){
   const keep=$('convKeepDeco').checked;
+  const idx=convIndices();
+  if(!idx){$('convStatus').textContent=$('convScope').value==='sel'?'לא סומנו עמודים. סמנו בחלונית "עמודים", או בחרו "עמודים לבחירה".':'כתבו מספרי עמודים, למשל 1-3, 5';return;}
   $('convDlg').close();busy(true,'מכין את ההמרה…');
   try{
     await loadOfficeLibs();
     const layout=kind==='pptx'||kind==='docx';
-    const pages=await analyzeForConvert(layout&&kind!=='docxflow',keep,m=>$('busyMsg').textContent=m);
+    const pages=await analyzeForConvert(layout&&kind!=='docxflow',keep,m=>$('busyMsg').textContent=m,idx);
     $('busyMsg').textContent='בונה את הקובץ…';
     let bytes;
     if(kind==='pptx')bytes=await buildPptx(pages);else if(kind==='docx')bytes=await buildDocxLayout(pages);else if(kind==='docxflow')bytes=await buildDocxFrom(pages);else bytes=await buildXlsxFrom(pages);
     busy(false);
-    const ext=kind==='docxflow'?'docx':kind;const name=`${S.name.replace(/\.pdf$/i,'')}.${ext}`;
+    const ext=kind==='docxflow'?'docx':kind;const part=idx.length===S.pages.length?'':` - ${idx.length===1?'עמוד':'עמודים'} ${rangeLabel(idx)}`;
+    const name=`${S.name.replace(/\.pdf$/i,'')}${part}.${ext}`;
     if(await saveBytes(name,bytes,ext))toast('נשמר: '+name);
   }catch(e){console.error(e);toast('ההמרה נכשלה: '+(e.message||e));}
   finally{busy(false);}
@@ -3359,7 +3389,7 @@ async function buildXlsxFrom(pages){
     const edges=[];for(const r of rows)for(const c of r.cells)edges.push(rtl?c.x1:c.x0);
     edges.sort((a,b)=>rtl?b-a:a-b);const cols=[];for(const e of edges){if(!cols.length||Math.abs(cols[cols.length-1]-e)>12)cols.push(e);}
     const grid=rows.map(r=>{const out=[];for(const c of r.cells){let k=0,bd=1e9;cols.forEach((e,j)=>{const dd=Math.abs((rtl?c.x1:c.x0)-e);if(dd<bd){bd=dd;k=j;}});while(out[k]!==undefined)k++;out[k]=c.text;}return out;});
-    return{name:`עמוד ${pi+1}`,rtl,grid};
+    return{name:`עמוד ${(pg.idx??pi)+1}`,rtl,grid};
   });
   const z=new JSZip(),OX='application/vnd.openxmlformats-officedocument.';
   z.file('[Content_Types].xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="'+OX+'spreadsheetml.sheet.main+xml"/>'+sheets.map((_,k)=>`<Override PartName="/xl/worksheets/sheet${k+1}.xml" ContentType="${OX}spreadsheetml.worksheet+xml"/>`).join('')+'</Types>');
@@ -3374,7 +3404,10 @@ async function buildXlsxFrom(pages){
   });
   return z.generateAsync({type:'uint8array',compression:'DEFLATE'});
 }
-$('convBtn').onclick=()=>{if(S.doc){$('convStatus').textContent='';$('convDlg').showModal();}};
+$('convBtn').onclick=()=>{if(!S.doc)return;$('convStatus').textContent='';
+  const hasSel=S.sel&&S.sel.size;$('convScope').querySelector('[value=sel]').disabled=!hasSel;
+  if(hasSel)$('convScope').value='sel';else if($('convScope').value==='sel')$('convScope').value='all';
+  $('convRangeWrap').classList.toggle('hidden',$('convScope').value!=='range');$('convDlg').showModal();};
 $('convCancel').onclick=()=>$('convDlg').close();
 document.querySelectorAll('.conv-card').forEach(b=>b.onclick=()=>convertTo(b.dataset.to));
 
