@@ -44,6 +44,7 @@ button{font:inherit;color:inherit}
 .bar{background:var(--bar);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;padding:8px 14px;flex-wrap:wrap;position:relative;z-index:5}
 .brand{display:flex;align-items:baseline;gap:10px;min-width:0}
 .brand b{font-size:22px;font-weight:700;letter-spacing:-.01em;background:linear-gradient(transparent 58%,var(--marker) 58%,var(--marker) 92%,transparent 92%);padding:0 3px;color:#1C2333}
+.ver{font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:10px;padding:0 6px}
 .fname{color:var(--muted);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:26ch}
 .tools{display:flex;gap:2px;margin-inline:auto;overflow-x:auto;scrollbar-width:none}
 .tool{border:0;background:none;padding:6px 5px 9px;border-radius:6px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:1px;position:relative;min-width:44px}
@@ -804,6 +805,15 @@ dialog.sig::backdrop{background:rgba(20,24,33,.45)}
 .pg-tools{padding:10px;border-bottom:1px solid var(--line)}
 .pg-tools{display:flex;flex-direction:column;gap:6px}
 .pg-tools .btn{width:100%}
+dialog.split{width:min(620px,94vw)}
+.split-list{max-height:52vh;overflow:auto;display:flex;flex-direction:column;gap:6px;border:1px solid var(--line);border-radius:6px;padding:8px}
+.split-list .sr{display:grid;grid-template-columns:70px 1fr 40px;gap:8px;align-items:center;font-size:13px}
+.split-list input{font:inherit;font-size:14px;color:var(--ink);background:var(--bar);border:1px solid var(--line);border-radius:5px;padding:5px 7px;min-width:0}
+.split-list .ext{color:var(--muted);font-size:12px}
+.sel-row{display:flex;gap:10px;align-items:center;font-size:12px;color:var(--muted)}
+.linkbtn{border:0;background:none;color:var(--blue);cursor:pointer;padding:0;font-size:12px}
+.thumb .tsel{display:flex;align-items:center;gap:4px;font-size:12px;color:var(--muted);cursor:pointer}
+.thumb.sel .tc{outline-color:var(--marker);outline-width:3px}
 .optf select{font:inherit;font-size:13px;color:var(--ink);background:var(--bar);border:1px solid var(--line);border-radius:6px;padding:3px 6px;max-width:210px}
 .thumbs{list-style:none;margin:0;padding:10px 12px 20px;overflow:auto;flex:1;display:flex;flex-direction:column;gap:14px}
 .thumb{display:flex;flex-direction:column;align-items:center;gap:6px}
@@ -878,13 +888,23 @@ dialog.sig::backdrop{background:rgba(20,24,33,.45)}
   .group.zoom .zoomval{display:none}
   .desk{padding:12px 6px 60px}
 }
+#printArea{display:none}
+@media print{
+  html,body{height:auto!important;overflow:visible!important;display:block!important;background:#fff!important}
+  body>*:not(#printArea){display:none!important}
+  #printArea{display:block}
+  #printArea .pp{break-after:page;page-break-after:always;margin:0;height:100vh;width:100vw;display:flex;align-items:center;justify-content:center;overflow:hidden}
+  #printArea .pp:last-child{break-after:auto;page-break-after:auto}
+  #printArea img{max-width:100%;max-height:100%;width:auto;height:auto;display:block}
+  @page{size:auto;margin:0}
+}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
 <body data-tool="select">
 
 <header class="bar">
-  <div class="brand"><b>סימן</b><span class="fname" id="fname"></span></div>
+  <div class="brand"><b title="גרסה 2.3">סימן</b><span class="ver">2.3</span><span class="fname" id="fname"></span></div>
 
   <nav class="tools" id="tools" aria-label="כלים">
     <button class="tool" data-tool="select" aria-pressed="true" title="בחירה וגלילה (V)">
@@ -920,6 +940,7 @@ dialog.sig::backdrop{background:rgba(20,24,33,.45)}
     <button class="btn" id="pgBtn" disabled title="ניהול עמודים">עמודים</button>
     <button class="btn" id="trBtn" disabled title="תרגום המסמך">תרגום</button>
     <button class="btn" id="openBtn">פתיחה</button>
+    <button class="btn" id="printBtn" disabled title="הדפסה (Ctrl+P)">הדפסה</button>
     <button class="btn wide-only" id="saveAsBtn" disabled title="שמירה בשם (Ctrl+Shift+S)">שמירה בשם</button>
     <button class="btn primary" id="saveBtn" disabled title="Ctrl+S">שמירה</button>
     <button class="btn install hidden" id="installBtn" title="התקנת האפליקציה במכשיר">התקנה</button>
@@ -936,6 +957,7 @@ dialog.sig::backdrop{background:rgba(20,24,33,.45)}
     <input type="range" id="size" min="6" max="48" step="1"> <span id="sizeVal"></span></label>
   <label class="hidden optf" id="fontWrap">גופן <select id="fontSel"></select></label>
   <label class="hidden chk" id="boldWrap"><input type="checkbox" id="boldChk"> מודגש</label>
+  <label class="hidden chk" id="paraWrap" title="כבוי: כל לחיצה עורכת שורה אחת בלבד, בלי לשנות שום דבר אחר"><input type="checkbox" id="paraChk"> פסקה שלמה</label>
   <button class="btn hidden" id="ocrBtn" title="זיהוי טקסט בעמוד סרוק כדי לערוך ולתרגם אותו">זיהוי טקסט (OCR)</button>
   <button class="btn hidden" id="pasteBtn" title="הדבקה מהלוח (Ctrl+V)">הדבקה</button>
   <span class="pageinfo" id="pageInfo"></span>
@@ -950,6 +972,10 @@ dialog.sig::backdrop{background:rgba(20,24,33,.45)}
   <div class="pg-tools">
     <button class="btn" id="mergeBtn">הוספת PDF לסוף</button>
     <button class="btn" id="ocrAllBtn" title="זיהוי טקסט בכל העמודים הסרוקים">זיהוי טקסט (OCR)</button>
+    <button class="btn" id="splitAllBtn" title="כל עמוד נשמר כקובץ PDF נפרד">פיצול: כל עמוד לקובץ</button>
+    <button class="btn" id="splitSelBtn" disabled title="כל עמוד מסומן נשמר כקובץ נפרד">שמירת המסומנים, כל עמוד בנפרד</button>
+    <button class="btn" id="saveSelBtn" disabled title="העמודים המסומנים יחד בקובץ אחד">איחוד המסומנים לקובץ אחד</button>
+    <div class="sel-row"><button class="linkbtn" id="selAll">סימון הכל</button><button class="linkbtn" id="selNone">ניקוי</button><span id="selCount"></span></div>
   </div>
   <ol class="thumbs" id="thumbs"></ol>
 </aside>
@@ -993,6 +1019,8 @@ dialog.sig::backdrop{background:rgba(20,24,33,.45)}
       <button class="segb" data-target="en" aria-pressed="false">לאנגלית</button>
       <button class="segb" data-target="none" aria-pressed="false" title="הטקסט של הקובץ כמו שהוא, לעריכה ולעיצוב">בלי תרגום</button>
     </div>
+    <label class="field">אופן התרגום
+      <select id="tpMode"><option value="inplace">בתוך המסמך: שומר על העיצוב המקורי</option><option value="text">כטקסט נפרד (לעריכה ולעיצוב)</option></select></label>
     <label class="field">היקף
       <select id="tpScope"><option value="all">כל המסמך</option><option value="cur">העמוד הנוכחי</option></select></label>
     <div class="tp-actions">
@@ -1042,6 +1070,23 @@ dialog.sig::backdrop{background:rgba(20,24,33,.45)}
     </div>
   </div>
 </dialog>
+<dialog class="sig split" id="splitDlg">
+  <div class="sig-in">
+    <h2>שמירת עמודים כקבצים נפרדים</h2>
+    <p class="fmt-note" id="splitInfo"></p>
+    <div class="sig-row">
+      <button class="btn" id="autoNames" title="מוצא בכל עמוד מספר מזהה, כמו מספר תסקיר או חשבונית, ונותן לפיו שם לקובץ">שמות לפי המספר שבעמוד</button>
+      <button class="btn" id="plainNames">שמות לפי מספר עמוד</button>
+    </div>
+    <div class="split-list" id="splitList"></div>
+    <div class="sig-row">
+      <span class="grow" id="splitStatus"></span>
+      <button class="btn" id="splitCancel">ביטול</button>
+      <button class="btn primary" id="splitGo">שמירה</button>
+    </div>
+  </div>
+</dialog>
+<div id="printArea" aria-hidden="true"></div>
 <div class="toast" id="toast" role="status"></div>
 <div class="busy hidden" id="busy"><div id="busyMsg">רגע…</div></div>
 
@@ -1137,7 +1182,7 @@ async function openFile(file,handle){
     setDirty(false);
     $('fname').textContent=file.name;
     $('empty').classList.add('hidden');
-    ['saveBtn','saveAsBtn','trBtn','pgBtn'].forEach(id=>$(id).disabled=false);
+    ['saveBtn','saveAsBtn','trBtn','pgBtn','printBtn'].forEach(id=>$(id).disabled=false);S.sel=new Set();
     TR.reset();
     S.hasForm=false;try{S.hasForm=!!(await doc.getFieldObjects());}catch(_){}
     await buildPages();
@@ -1294,7 +1339,10 @@ async function pageBlocks(P){
     if(b&&L.dir===b.dir&&!listStart(L.text)&&Math.abs(L.size-b.size)<=b.size*.18&&!L.ocrBreak){
       const gap=b.lastBase-L.base,ov=Math.min(b.x1,L.x1)-Math.max(b.x0,L.x0);
       const lhOk=b.lines.length<2?(gap>=b.size*.9&&gap<=b.size*1.9):Math.abs(gap-b.lh)<=b.size*.3;
-      join=lhOk&&ov>Math.min(b.x1-b.x0,L.x1-L.x0)*.5;
+      const pw=(P.page.view[2]-P.page.view[0])||600;
+      const prev=b.lines[b.lines.length-1],pW=prev.x1-prev.x0,lW=L.x1-L.x0,bW=b.x1-b.x0;
+      const prevFull=pW>=Math.max(pW,lW)*.85&&pW>=bW*.9; // the previous line reached the edge, so this one is its continuation
+      join=lhOk&&prevFull&&ov>Math.min(bW,lW)*.5&&bW>=pw*.3;
     }
     if(join){b.lines.push(L);if(b.lines.length===2)b.lh=b.lastBase-L.base;b.lastBase=L.base;b.x0=Math.min(b.x0,L.x0);b.x1=Math.max(b.x1,L.x1);b.y0=Math.min(b.y0,L.y0);}
     else B.push({lines:[L],dir:L.dir,size:L.size,lh:L.size*1.25,lastBase:L.base,base:L.base,x0:L.x0,x1:L.x1,y0:L.y0,y1:L.y1,font:L.font});
@@ -1327,7 +1375,7 @@ function editEl(P,a){
   const e=document.createElement('div');e.className='et';e.spellcheck=false;e.dir='auto';
   try{e.contentEditable='plaintext-only';}catch(_){e.contentEditable='true';}
   if(e.contentEditable!=='plaintext-only')e.contentEditable='true';
-  const style=()=>Object.assign(e.style,{fontSize:a.size*S.zoom+'px',lineHeight:a.lh*S.zoom+'px',color:a.color,fontWeight:a.bold?700:400,fontFamily:cssFont(a.font),textAlign:a.align==='justify'?'justify':a.align});
+  const style=()=>Object.assign(e.style,{fontSize:a.size*S.zoom+'px',lineHeight:a.lh*S.zoom+'px',color:a.color,fontWeight:a.bold?700:400,fontFamily:cssFont(a.font),textAlign:a.align==='justify'?'justify':a.align,whiteSpace:a.rects.length===1?'pre':'pre-wrap'});
   style();e.textContent=a.text;a._style=style;
   let before=null;
   e.addEventListener('focus',()=>{before=JSON.stringify(S.anns,(k,v)=>k==='_style'?undefined:v);S.lastEdit=a.id;syncFontUI();});
@@ -1348,9 +1396,13 @@ function editEl(P,a){
   drag(grip,'move');drag(rs,'size');
   w.append(grip,e,rs);frag.append(w);return frag;
 }
+// a single line as an editable unit (the safe default)
+function lineUnit(L){return{lines:[L],dir:L.dir,size:L.size,lh:L.size*1.25,base:L.base,x0:L.x0,x1:L.x1,y0:L.y0,y1:L.y1,font:L.font,text:L.text,align:L.dir==='R'?'right':'left'};}
 function blockAt(P,cx,cy){
-  if(!P.blocks)return null;const[px,py]=toPdf(P,cx,cy);
-  return P.blocks.find(b=>px>=b.x0-2&&px<=b.x1+2&&py>=b.y0-1&&py<=b.y1+1)||null;
+  const[px,py]=toPdf(P,cx,cy);const hit=b=>px>=b.x0-2&&px<=b.x1+2&&py>=b.y0-1&&py<=b.y1+1;
+  if(!$('paraChk').checked){const L=(P.lines||[]).find(hit);return L?lineUnit(L):null;}
+  if(!P.blocks)return null;
+  return P.blocks.find(hit)||null;
 }
 const sameBlock=(a,b,P)=>a.type==='edit'&&a.page===P.i-1&&Math.abs(a.rects[0][0]-b.lines[0].x0)<.5&&Math.abs(a.rects[0][1]-b.lines[0].y0)<.5;
 async function hoverLine(P,e){
@@ -1392,7 +1444,7 @@ async function startEdit(P,cx,cy){
     const{bg,fg}=sampleColors(P,B);const fn=fontNameOf(P,B.font);
     snapshot();
     a={id:S.nextId++,type:'edit',page:P.i-1,rects:B.lines.map(l=>[l.x0,l.y0,l.x1,l.y1]),x0:B.x0,x1:B.x1,base:B.base,size:Math.round(B.size*10)/10,lh:B.lh,dir:B.dir,align:B.align,
-       font:P.ocr?'heebo':guessFont(fn.name),bold:fn.bold||/bold|black|heavy|semibold/i.test(fn.name),color:fg,bg,text:B.text,orig:B.text,dx:0,dy:0};
+       font:P.ocr?'heebo':guessFont(fn.name),bold:fn.bold||/bold|black|heavy|semibold/i.test(fn.name)||B.lines.some(l=>l.bold),color:fg,bg,text:B.text,orig:B.text,dx:0,dy:0};
     S.anns.push(a);drawAnns(P);
   }
   if(P.hov){P.hov.remove();P.hov=null;}
@@ -1837,7 +1889,8 @@ async function buildPdf(){
       if(a.text.trim()){
         const f=await getFont(a.font,a.bold),w=a.x1-a.x0;let k=0;
         for(const para of a.text.split('\n')){
-          const lines=wrapLines(para,f,a.size,w);const dir=paraDir(para,a.dir);
+          // a single original line stays a single line (no wrapping), like in the source
+          const lines=a.rects.length===1?[para]:wrapLines(para,f,a.size,w);const dir=paraDir(para,a.dir);
           lines.forEach((ln,j)=>{drawAligned(pg,ln,{x0:a.x0+a.dx,w,y:a.base+a.dy-k*a.lh,font:f,size:a.size,color:hexRgb(a.color),dir,align:a.align,justify:j<lines.length-1});k++;});
         }
       }
@@ -1902,15 +1955,15 @@ window.__buildPdf=buildPdf; // used by automated tests
 
 // returns {handle} when saved through the file system, true when shared/downloaded, false when cancelled
 async function saveBytes(name,bytes,kind){
-  const isTxt=kind==='txt',isDocx=kind==='docx';
+  const isTxt=kind==='txt',isDocx=kind==='docx',isZip=kind==='zip';
   const DOCX_MIME='application/vnd.openxmlformats-officedocument.wordprocessingml.document';
   if(FS){
     try{
-      const h=await showSaveFilePicker({suggestedName:name,types:isTxt?[{description:'טקסט',accept:{'text/plain':['.txt']}}]:isDocx?[{description:'Word',accept:{[DOCX_MIME]:['.docx']}}]:PDF_TYPE});
-      await writeHandle(h,bytes);return (isTxt||isDocx)?true:{handle:h};
+      const h=await showSaveFilePicker({suggestedName:name,types:isTxt?[{description:'טקסט',accept:{'text/plain':['.txt']}}]:isDocx?[{description:'Word',accept:{[DOCX_MIME]:['.docx']}}]:isZip?[{description:'ZIP',accept:{'application/zip':['.zip']}}]:PDF_TYPE});
+      await writeHandle(h,bytes);return (isTxt||isDocx||isZip)?true:{handle:h};
     }catch(e){if(e&&e.name==='AbortError')return false;throw e;}
   }
-  const type=isTxt?'text/plain':isDocx?DOCX_MIME:'application/pdf';
+  const type=isTxt?'text/plain':isDocx?DOCX_MIME:isZip?'application/zip':'application/pdf';
   const file=new File([bytes],name,{type});
   // phones: open the share sheet (save to Files, send by WhatsApp/mail…)
   if(matchMedia('(pointer:coarse)').matches&&navigator.canShare&&navigator.canShare({files:[file]})){
@@ -1932,17 +1985,53 @@ const TR={
 };
 function status(msg,err){const s=$('tpStatus');s.textContent=msg;s.classList.toggle('err',!!err);}
 
+// table borders: is there a vertical dark rule in this pixel range?
+function ruleInPx(data,w,X0,X1,Y0,Y1){
+  X0=Math.max(0,Math.floor(X0));X1=Math.ceil(X1);Y0=Math.max(0,Math.floor(Y0));Y1=Math.ceil(Y1);const H=Y1-Y0+1;
+  if(H<3||X1<X0)return false;
+  for(let x=X0;x<=X1&&x<w;x++){let d=0;for(let y=Y0;y<=Y1;y++){const i=(y*w+x)*4;if(data[i]*.3+data[i+1]*.59+data[i+2]*.11<150)d++;}if(d>=H*.7)return true;}
+  return false;
+}
+async function ruleMap(P){
+  if(P.rc)return P.rc;
+  const vp=P.page.getViewport({scale:1.5});const c=document.createElement('canvas');c.width=Math.ceil(vp.width);c.height=Math.ceil(vp.height);
+  const ctx=c.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,c.width,c.height);
+  try{await P.page.render({canvasContext:ctx,viewport:vp}).promise;}catch(_){}
+  return P.rc={vp,w:c.width,data:ctx.getImageData(0,0,c.width,c.height).data};
+}
+function ruleBetween(rc,x0,x1,yLow,yHigh){
+  const[ax,ay]=rc.vp.convertToViewportPoint(x0,yHigh),[bx,by]=rc.vp.convertToViewportPoint(x1,yLow);
+  return ruleInPx(rc.data,rc.w,Math.min(ax,bx),Math.max(ax,bx),Math.min(ay,by),Math.max(ay,by));
+}
 // lines of the page in reading order, with their box in PDF coordinates
 async function pageLines(P){
   if(P.lines)return P.lines;
   const tc=await P.page.getTextContent({disableCombineTextItems:true});
   const raw=tc.items.filter(it=>'str' in it&&it.str&&it.str.trim());
   if(raw.some(it=>Math.abs(it.transform[1])>.01||Math.abs(it.transform[2])>.01)){P.lines=null;P.tilted=raw;return null;}
-  const items=raw.map(it=>({s:it.str,x:it.transform[4],y:it.transform[5],w:it.width,h:Math.abs(it.transform[3])||it.height||10,font:it.fontName}));
+  const all=raw.map(it=>({s:it.str,x:it.transform[4],y:it.transform[5],w:it.width,h:Math.abs(it.transform[3])||it.height||10,font:it.fontName}));
+  all.sort((a,b)=>b.s.length-a.s.length||b.w-a.w);
+  const items=[],byRow=new Map();
+  for(const it of all){
+    const key=Math.round(it.y/2);const near=[...(byRow.get(key)||[]),...(byRow.get(key-1)||[]),...(byRow.get(key+1)||[])];
+    const dup=near.find(k=>Math.abs(k.y-it.y)<Math.max(1,k.h*.15)&&it.x>=k.x-k.h*.5&&it.x+it.w<=k.x+k.w+k.h*.5&&(k.s.includes(it.s.trim())||k.s.replace(/\s/g,'').includes(it.s.replace(/\s/g,''))));
+    if(dup){dup.dbl=true;continue;}
+    items.push(it);if(!byRow.has(key))byRow.set(key,[]);byRow.get(key).push(it);
+  }
   items.sort((a,b)=>b.y-a.y||a.x-b.x);
   const groups=[];
   for(const it of items){const L=groups[groups.length-1];if(L&&Math.abs(L.y-it.y)<Math.max(2,Math.min(L.h,it.h)*.45))L.items.push(it);else groups.push({y:it.y,h:it.h,items:[it]});}
-  P.lines=groups.map(L=>{
+  const segs=[];const rc=await ruleMap(P);
+  for(const G of groups){
+    const its=G.items.slice().sort((a,b)=>a.x-b.x);const row=[];let cur=[its[0]],end=its[0].x+its[0].w;
+    for(let k=1;k<its.length;k++){const it=its[k];const h=Math.max(it.h,cur[cur.length-1].h);
+      const g=it.x-end;
+      if(g>Math.max(h*1.6,8)||(g>h*.15&&ruleBetween(rc,end,it.x,G.y-h*.15,G.y+h*.75))){row.push({y:G.y,h:G.h,items:cur});cur=[it];end=it.x+it.w;}else{cur.push(it);end=Math.max(end,it.x+it.w);}}
+    row.push({y:G.y,h:G.h,items:cur});
+    if(row.length>1&&paraDir(G.items.map(i=>i.s).join(''),'R')==='R')row.reverse(); // a Hebrew row reads right to left
+    segs.push(...row);
+  }
+  P.lines=segs.map(L=>{
     const rtl=paraDir(L.items.map(x=>x.s).join(''),'R')==='R';
     L.items.sort((a,b)=>rtl?b.x-a.x:a.x-b.x);
     const seq=[];let last=null;
@@ -1962,7 +2051,7 @@ async function pageLines(P){
     const hs=L.items.map(i=>i.h).sort((a,b)=>a-b),h=hs[hs.length>>1];
     const x0=Math.min(...L.items.map(i=>i.x)),x1=Math.max(...L.items.map(i=>i.x+i.w));
     const base=L.items.reduce((t,i)=>t+i.y,0)/L.items.length;
-    return{text:cleanText(txt.replace(/\s+/g,' ').trim()),dir:rtl?'R':'L',x0,x1,y0:base-h*.28,y1:base+h*.9,base,size:h,font:L.items[0].font,y:L.y,h:L.h};
+    return{text:cleanText(txt.replace(/\s+/g,' ').trim()),dir:rtl?'R':'L',x0,x1,y0:base-h*.28,y1:base+h*.9,base,size:h,font:L.items[0].font,y:L.y,h:L.h,bold:L.items.some(i=>i.dbl)};
   });
   return P.lines;
 }
@@ -2067,11 +2156,78 @@ function pageCard(i){
     const list=$('tpResults');const after=[...list.children].find(c=>+c.dataset.i>i);list.insertBefore(el,after||null);}
   return el.querySelector('.tt');
 }
+/* ---- in-place translation: every text piece is replaced where it stands ---- */
+const measureCtx=document.createElement('canvas').getContext('2d');
+function measureW(text,k,bold,sizePt){measureCtx.font=`${bold?700:400} ${sizePt}px ${cssFont(k)}`;return measureCtx.measureText(text).width;}
+function wrapCount(text,k,bold,size,w){
+  let n=0;for(const para of text.split('\n')){let line='';n++;
+    for(const word of para.split(/\s+/)){const t=line?line+' '+word:word;if(line&&measureW(t,k,bold,size)>w){n++;line=word;}else line=t;}}
+  return n;
+}
+function fitEdit(a){ // shrink until the text fits the original number of lines and width
+  const n0=a.rects.length,w=a.x1-a.x0,orig=a.size;
+  for(let g=0;g<12;g++){
+    const n=wrapCount(a.text,a.font,a.bold,a.size,w);
+    const widest=n0===1?measureW(a.text,a.font,a.bold,a.size):0;
+    if(n<=n0&&(n0>1||widest<=w*1.02))break;
+    if(a.size<=orig*.55)break;
+    a.size=Math.round(a.size*.92*10)/10;a.lh*=.92;
+  }
+}
+async function translateInPlace(){
+  const idx=$('tpScope').value==='cur'?[currentPageIndex()]:S.pages.map((_,i)=>i);
+  TR.running=true;TR.stop=false;$('tpGo').disabled=true;$('tpStop').classList.remove('hidden');
+  $('tpResults').innerHTML='';$('tpFoot').classList.add('hidden');$('tpFmt').classList.add('hidden');
+  const target=TR.target;let pagesDone=0,pieces=0,failed=null,noText=0;
+  const fontsReady=document.fonts?Promise.all(Object.keys(FONTS).filter(k=>k!=='alef').flatMap(k=>[`400 12px "SF-${k}"`,`700 12px "SF-${k}"`].map(f=>document.fonts.load(f)))).catch(()=>{}):Promise.resolve();
+  await fontsReady;
+  snapshot();
+  try{
+    for(const i of idx){
+      if(TR.stop||failed)break;
+      const P=S.pages[i];
+      if((P.page.rotate||0)%360)continue;
+      const blocks=await pageBlocks(P);
+      if(!blocks||!blocks.length){noText++;continue;}
+      const units=blocks.filter(b=>/[A-Za-z\u0590-\u05FF\u0400-\u04FF\u0600-\u06FF]/.test(b.text)&&!S.anns.some(a=>sameBlock(a,b,P)));
+      // send the page in numbered pieces so every translation goes back to its own place
+      const chunks=[];let cur=[],len=0;
+      for(const u of units){if(cur.length&&len+u.text.length>5000){chunks.push(cur);cur=[];len=0;}cur.push(u);len+=u.text.length+8;}
+      if(cur.length)chunks.push(cur);
+      for(const ch of chunks){
+        if(TR.stop)break;
+        status(`מתרגם עמוד ${i+1}…`);
+        const text='Translate each numbered line separately. Keep every [number] marker at the start of its line and keep the same count of lines.\n'+ch.map((u,k)=>`[${k+1}] ${u.text}`).join('\n');
+        const r=await callTranslate(text,target);
+        if(r.error){failed=r;break;}
+        const out={};let lastN=null;
+        for(const line of parseTr(r.raw).text.split('\n')){
+          const m=/^\s*\[(\d+)\]\s?(.*)$/.exec(line);
+          if(m){lastN=+m[1];out[lastN]=m[2].trim();}else if(lastN&&line.trim())out[lastN]+=' '+line.trim();
+        }
+        ch.forEach((u,k)=>{
+          const t=out[k+1];if(!t)return;
+          const{bg,fg}=sampleColors(P,u);const fn=fontNameOf(P,u.font);
+          const a={id:S.nextId++,type:'edit',page:i,rects:u.lines.map(l=>[l.x0,l.y0,l.x1,l.y1]),x0:u.x0,x1:u.x1,base:u.base,size:Math.round(u.size*10)/10,lh:u.lh,
+            dir:paraDir(t,target==='en'?'L':'R'),align:u.align,font:P.ocr?'heebo':guessFont(fn.name),bold:fn.bold||/bold|black|heavy|semibold/i.test(fn.name)||u.lines.some(l=>l.bold),color:fg,bg,text:t,orig:u.text,dx:0,dy:0,tr:true};
+          fitEdit(a);S.anns.push(a);pieces++;
+        });
+      }
+      drawAnns(P);pagesDone++;
+    }
+  }catch(e){failed={error:String(e.message||e)};}
+  TR.running=false;$('tpGo').disabled=false;$('tpStop').classList.add('hidden');
+  if(pieces)setDirty(true);
+  if(failed)status(errText(failed),true);
+  else if(!pieces&&noText)status('לא נמצא טקסט. אם המסמך סרוק: "עמודים" ← "זיהוי טקסט (OCR)" ואז לתרגם שוב.',true);
+  else status(`התרגום הוצב בתוך המסמך (${pieces} קטעים ב-${pagesDone} עמודים). אפשר לתקן כל קטע בכלי "עריכה", ואז "שמירה".`);
+}
 async function runTranslate(){
   if(TR.running||!S.doc)return;
   const st=await getSettingsSafe();
   if(TR.target==='none'){await loadOwnText();return;}
   if(!st.hasKey){openSettings(true);status('צריך להזין מפתח API לפני התרגום.',true);return;}
+  if($('tpMode').value==='inplace'){await translateInPlace();return;}
   const idx=$('tpScope').value==='cur'?[currentPageIndex()]:S.pages.map((_,i)=>i);
   TR.running=true;TR.stop=false;$('tpGo').disabled=true;$('tpStop').classList.remove('hidden');
   if($('tpScope').value==='all'){$('tpResults').innerHTML='';TR.pages=[];}
@@ -2330,13 +2486,13 @@ function setTool(t){
   $('pasteBtn').classList.toggle('hidden',t!=='select'||!S.doc);
   if(t!=='place')S.pending=null;
   const sw=$('swatches'),sz=$('sizeWrap'),lbl=$('optLabel');
-  const labels={edit:'לחצו על פסקה כדי לערוך אותה. גוררים מ"⠿" כדי להזיז, מהפס בצד כדי לשנות רוחב. Esc לסיום',redact:'גררו מלבן על מידע רגיש. הטקסט שמתחת יימחק מהקובץ לגמרי ויוחלף בפס שחור',snip:'גררו מלבן סביב האזור שרוצים להעתיק. אחר כך מדביקים ב-Word, בוואטסאפ או בתוך המסמך',place:'לחצו על הדף במקום שבו לשים את '+(S.pending&&S.pending.sig?'החתימה':'התמונה'),select:'בוחרים טקסט להעתקה, ממלאים טפסים, מזיזים תמונות וחתימות',text:'לחצו על הדף כדי לכתוב',highlight:'גררו מלבן על מה שרוצים לסמן',pen:'כתבו או ציירו חופשי',eraser:'לחצו או גררו על סימון כדי למחוק אותו'};
+  const labels={edit:'לחצו על שורה כדי לערוך אותה. Esc לסיום',redact:'גררו מלבן על מידע רגיש. הטקסט שמתחת יימחק מהקובץ לגמרי ויוחלף בפס שחור',snip:'גררו מלבן סביב האזור שרוצים להעתיק. אחר כך מדביקים ב-Word, בוואטסאפ או בתוך המסמך',place:'לחצו על הדף במקום שבו לשים את '+(S.pending&&S.pending.sig?'החתימה':'התמונה'),select:'בוחרים טקסט להעתקה, ממלאים טפסים, מזיזים תמונות וחתימות',text:'לחצו על הדף כדי לכתוב',highlight:'גררו מלבן על מה שרוצים לסמן',pen:'כתבו או ציירו חופשי',eraser:'לחצו או גררו על סימון כדי למחוק אותו'};
   lbl.textContent=labels[t];
   sw.classList.toggle('hidden',!PALETTE[t]);sz.classList.toggle('hidden',!SIZES[t]);
   if(PALETTE[t]){sw.innerHTML='';PALETTE[t].forEach(c=>{const b=document.createElement('button');b.className='sw';b.style.background=c;b.title=c;b.setAttribute('aria-label','צבע '+c);
     b.setAttribute('aria-pressed',S.color[t]===c);b.onclick=()=>{S.color[t]=c;setTool(t);};sw.append(b);});}
   $('fontWrap').classList.toggle('hidden',!(t==='text'||t==='edit'));$('boldWrap').classList.toggle('hidden',!(t==='text'||t==='edit'));
-  $('ocrBtn').classList.toggle('hidden',t!=='edit');
+  $('ocrBtn').classList.toggle('hidden',t!=='edit');$('paraWrap').classList.toggle('hidden',t!=='edit');
   syncFontUI();
   if(SIZES[t]){const r=$('size');r.min=SIZES[t].min;r.max=SIZES[t].max;r.value=S.size[t];$('sizeLabel').textContent=SIZES[t].label+' ';$('sizeVal').textContent=S.size[t];}
 }
@@ -2391,6 +2547,7 @@ addEventListener('keydown',e=>{
   const mod=e.ctrlKey||e.metaKey;
   if(mod&&e.key.toLowerCase()==='s'){e.preventDefault();savePdf(e.shiftKey);return;}
   if(mod&&e.key.toLowerCase()==='o'){e.preventDefault();pickFile();return;}
+  if(mod&&e.key.toLowerCase()==='p'&&S.doc){e.preventDefault();printDoc();return;}
   if(typing)return;
   if(mod&&e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redoAct():undo();return;}
   if(mod&&e.key.toLowerCase()==='y'){e.preventDefault();redoAct();return;}
@@ -2422,17 +2579,34 @@ async function ocrPage(P){
   await P.page.render({canvasContext:ctx,viewport:vp}).promise;
   const w=await getTess();
   const{data}=await w.recognize(c,{},{blocks:true,text:false});
+  const imgData=ctx.getImageData(0,0,c.width,c.height).data;
   const lines=[];
   for(const b of data.blocks||[])for(const para of b.paragraphs||[]){let first=true;for(const l of para.lines||[]){
-    const t=cleanText((l.text||'').replace(/\s+/g,' ').trim());if(!t||(l.confidence!=null&&l.confidence<25)){continue;}
-    const bb=l.bbox;const[xa,ya]=vp.convertToPdfPoint(bb.x0,bb.y0),[xb,yb]=vp.convertToPdfPoint(bb.x1,bb.y1);
+    const t0=cleanText((l.text||'').replace(/\s+/g,' ').trim());if(!t0||(l.confidence!=null&&l.confidence<25)){continue;}
+    // pieces of the line separated by wide gaps (table cells)
+    const words=(l.words||[]).filter(w=>w.text&&w.text.trim()&&!/^[|\[\]{}_~`'".,:;-]+$/.test(w.text.trim())&&!(w.confidence<60&&w.text.trim().length<=2)).sort((a,b)=>a.bbox.x0-b.bbox.x0);
+    const lineH=l.bbox.y1-l.bbox.y0;const pieces=[];
+    for(const w of words){const pc=pieces[pieces.length-1];
+      const g=pc?w.bbox.x0-pc.x1:0;
+      const split=!pc||g>Math.max(lineH*1.6,12)||(g>2&&ruleInPx(imgData,c.width,pc.x1+1,w.bbox.x0-1,l.bbox.y0+lineH*.15,l.bbox.y1-lineH*.15));
+      if(!split){pc.ws.push(w);pc.x1=Math.max(pc.x1,w.bbox.x1);}else pieces.push({ws:[w],x1:w.bbox.x1});}
+    const lineRtl=paraDir(t0,'R')==='R';
+    const parts=pieces.length>1?pieces.map(pc=>{const ws=lineRtl?pc.ws.slice().reverse():pc.ws;return{t:cleanText(ws.map(w=>w.text.trim()).join(' ')),bbox:{x0:Math.min(...pc.ws.map(w=>w.bbox.x0)),x1:Math.max(...pc.ws.map(w=>w.bbox.x1)),y0:l.bbox.y0,y1:l.bbox.y1}};}):[{t:t0,bbox:l.bbox}];
+    if(lineRtl)parts.reverse();
+    for(const part of parts){const t=part.t;if(!t)continue;
+    const bb=part.bbox;const[xa,ya]=vp.convertToPdfPoint(bb.x0,bb.y0),[xb,yb]=vp.convertToPdfPoint(bb.x1,bb.y1);
     const top=Math.max(ya,yb),bot=Math.min(ya,yb);
     let base=bot+(top-bot)*.2;if(l.baseline&&l.baseline.y0!=null){base=vp.convertToPdfPoint(l.baseline.x0,l.baseline.y0)[1];if(base<bot||base>top)base=bot+(top-bot)*.2;}
     const size=Math.max(4,Math.min((top-base)*1.3,(top-bot)*1.05));
-    lines.push({text:t,dir:paraDir(t,'R'),x0:Math.min(xa,xb),x1:Math.max(xa,xb),y0:Math.min(bot,base-size*.28),y1:top,base,size,font:null,y:base,h:size,ocrBreak:first});first=false;}}
-  lines.sort((a,b)=>b.base-a.base);
+    lines.push({text:t,dir:paraDir(t,'R'),x0:Math.min(xa,xb),x1:Math.max(xa,xb),y0:Math.min(bot,base-size*.28),y1:top,base,size,font:null,y:base,h:size,ocrBreak:first||parts.length>1});first=false;}}}
   P.lines=lines;P.blocks=null;P.ocr=true;P.tilted=null;
   return lines.length;
+}
+// share of words that look like real words; low = a garbled text layer from a scanner
+function textQuality(lines){
+  const toks=lines.flatMap(l=>l.text.split(/\s+/)).filter(t=>t.length>=2);if(!toks.length)return 0;
+  const good=toks.filter(t=>/^[\u05D0-\u05EA"'׳״-]+[.,:;!?)]*$/.test(t)&&/[\u05D0-\u05EA]{2}/.test(t)||/^[A-Za-z]{2,}[.,:;]?$/.test(t)&&/[aeiou]/i.test(t)||/^[\d.,:\/%-]+$/.test(t)).length;
+  return good/toks.length;
 }
 async function runOCR(idx){
   if(!S.doc)return;
@@ -2441,7 +2615,7 @@ async function runOCR(idx){
   try{
     for(const i of idx){
       const P=S.pages[i];const has=await pageLines(P);
-      if(has&&has.length&&!P.ocr){skipped++;continue;}
+      if(has&&has.length&&!P.ocr&&textQuality(has)>=.6){skipped++;continue;}
       tessLog=m=>{if(m.status==='recognizing text')$('busyMsg').textContent=`מזהה טקסט… עמוד ${i+1} (${Math.round((m.progress||0)*100)}%)`;};
       found+=await ocrPage(P);done++;
     }
@@ -2592,7 +2766,8 @@ async function renderThumbs(){
   const n=S.pages.length;
   S.pages.forEach((P,i)=>{
     const li=document.createElement('li');li.className='thumb';li.dataset.i=i;
-    li.innerHTML=`<div class="tc" title="מעבר לעמוד ${i+1}"></div><span class="tl">${i+1}</span>
+    li.classList.toggle('sel',S.sel.has(i));
+    li.innerHTML=`<div class="tc" title="מעבר לעמוד ${i+1}"></div><label class="tsel"><input type="checkbox" data-sel="${i}" ${S.sel.has(i)?'checked':''}> עמוד ${i+1}</label>
       <div class="ta"><button data-a="up" title="הזזה למעלה" aria-label="הזזת עמוד ${i+1} למעלה" ${i?'':'disabled'}>↑</button>
       <button data-a="down" title="הזזה למטה" aria-label="הזזת עמוד ${i+1} למטה" ${i<n-1?'':'disabled'}>↓</button>
       <button data-a="rot" title="סיבוב" aria-label="סיבוב עמוד ${i+1}">↻</button>
@@ -2610,7 +2785,15 @@ async function renderThumbs(){
   }
 }
 function markCurrentThumb(){const cur=currentPageIndex();document.querySelectorAll('.thumb').forEach(t=>t.classList.toggle('cur',+t.dataset.i===cur));}
+function updateSel(){
+  const n=S.sel.size;$('selCount').textContent=n?`${n} מסומנים`:'';$('saveSelBtn').disabled=!n;$('splitSelBtn').disabled=!n;
+  document.querySelectorAll('.thumb').forEach(t=>{const i=+t.dataset.i;t.classList.toggle('sel',S.sel.has(i));const c=t.querySelector('[data-sel]');if(c)c.checked=S.sel.has(i);});
+}
+$('thumbs').addEventListener('change',e=>{const c=e.target.closest('[data-sel]');if(!c)return;const i=+c.dataset.sel;c.checked?S.sel.add(i):S.sel.delete(i);updateSel();});
+$('selAll').onclick=()=>{S.sel=new Set(S.pages.map((_,i)=>i));updateSel();};
+$('selNone').onclick=()=>{S.sel=new Set();updateSel();};
 $('thumbs').addEventListener('click',async e=>{
+  if(e.target.closest('.tsel'))return;
   const li=e.target.closest('.thumb');if(!li)return;const i=+li.dataset.i;
   const b=e.target.closest('button');
   if(!b){S.pages[i].el.scrollIntoView({behavior:'smooth',block:'start'});return;}
@@ -2659,11 +2842,128 @@ async function rebuild(order,extra){
     if(S.doc)S.doc.destroy();
     S.doc=doc;S.bytes=new Uint8Array(bytes);setDirty(true);S.hasForm=false;
     const z=S.zoom;await buildPages();S.zoom=z;layout();$('desk').scrollTop=keepTop;
-    TR.reset();renderThumbs();
+    TR.reset();S.sel=new Set();renderThumbs();updateSel();
   }catch(e){console.error(e);toast('עדכון העמודים נכשל: '+(e.message||e));}
   finally{busy(false);}
 }
-$('pgBtn').onclick=()=>{const p=$('pgpanel');const show=p.classList.contains('hidden');p.classList.toggle('hidden',!show);if(show)renderThumbs();setTimeout(fitWidth,0);};
+/* ---------- split / extract pages ---------- */
+const rangeLabel=ix=>{const a=[...ix].sort((x,y)=>x-y).map(i=>i+1);const out=[];for(let k=0;k<a.length;){let j=k;while(j+1<a.length&&a[j+1]===a[j]+1)j++;out.push(j>k?`${a[k]}-${a[j]}`:`${a[k]}`);k=j+1;}return out.join(',');};
+async function exportPages(indices,mode,names){
+  if(!indices.length)return;
+  busy(true,'מכין את הקבצים…');
+  try{
+    const built=await buildPdf();const src=await PDFLib.PDFDocument.load(built);
+    const base=S.name.replace(/\.pdf$/i,'');const files=[];
+    const one=async ix=>{const d=await PDFLib.PDFDocument.create();(await d.copyPages(src,ix)).forEach(p=>d.addPage(p));return d.save();};
+    if(mode==='one')files.push({name:`${base} - עמודים ${rangeLabel(indices)}.pdf`,data:await one(indices)});
+    else for(const i of indices){$('busyMsg').textContent=`מכין עמוד ${i+1}…`;files.push({name:(names&&names[i])||`${base} - עמוד ${i+1}.pdf`,data:await one([i])});}
+    busy(false);
+    if(files.length===1){if(await saveBytes(files[0].name,files[0].data,'pdf'))toast('נשמר');return;}
+    if(window.showDirectoryPicker){
+      let dir;try{dir=await showDirectoryPicker({mode:'readwrite'});}catch(e){if(e&&e.name==='AbortError')return;dir=null;}
+      if(dir){busy(true,'שומר…');for(const f of files){const h=await dir.getFileHandle(f.name,{create:true});await writeHandle(h,f.data);}busy(false);toast(`נשמרו ${files.length} קבצים בתיקייה ${dir.name}`);return;}
+    }
+    if(await saveBytes(`${base} - ${files.length} קבצים.zip`,zip(files),'zip'))toast(`${files.length} הקבצים נשמרו בקובץ ZIP`);
+  }catch(e){console.error(e);toast('הפיצול נכשל: '+(e.message||e));}
+  finally{busy(false);}
+}
+window.__exportPages=exportPages;
+
+/* ---------- separate files with smart names ---------- */
+let splitIdx=[];
+const safeName=t=>t.replace(/[\\/:*?"<>|]+/g,'-').replace(/\s+/g,' ').trim().slice(0,120);
+function openSplit(indices){
+  if(!indices.length)return;splitIdx=indices;
+  $('splitInfo').textContent=`${indices.length} עמודים, כל אחד יישמר כקובץ PDF נפרד. אפשר לשנות כל שם לפני השמירה.`;
+  const base=S.name.replace(/\.pdf$/i,'');
+  $('splitList').innerHTML=indices.map(i=>`<label class="sr"><span>עמוד ${i+1}</span><input data-p="${i}" value="${(base+' - עמוד '+(i+1)).replace(/"/g,'&quot;')}"><span class="ext">.pdf</span></label>`).join('');
+  $('splitStatus').textContent='';$('splitDlg').showModal();
+}
+// finds the document's own number (e.g. inspection / invoice no.) near the top of the page
+async function pageIdName(i){
+  const P=S.pages[i];let lines=await pageLines(P);
+  // scanners often embed a garbled text layer; read the page ourselves in that case
+  if(!lines||!lines.length||(!P.ocr&&textQuality(lines)<.6)){await ocrPage(P);lines=P.lines;}
+  if(!lines||!lines.length)return null;
+  const top=lines.slice().sort((a,b)=>b.base-a.base);
+  const norm=t=>t.replace(/(\d)\s+(?=\d)/g,'$1');
+  let id=null;
+  for(const L of top){
+    if(/קודם|previous/i.test(L.text))continue; // e.g. "תסקיר קודם" is the old report's number
+    const t=norm(L.text),re=/(?<![\d\/.])(\d{2,})\s*\/\s*(\d{2,})(?!\s*[\/.]\s*\d)/g;let m;
+    while((m=re.exec(t))){let a=m[1],b=m[2];
+      if(/^(19|20)\d{2}$/.test(b)&&a.length<=4||/^(19|20)\d{2}$/.test(a)&&b.length<=4||a.length+b.length<6||/(19|20)\d{2}$/.test(a)&&a.length>=6||/(19|20)\d{2}$/.test(b)&&b.length>=6)continue; // dates
+      if(L.dir==='R'&&a.length<b.length)[a,b]=[b,a]; // OCR sometimes reads the number backwards in a Hebrew line
+      id=a+'/'+b;break;}
+    if(id)break;
+  }
+  if(!id){ // second look: just the top of the page, where document numbers usually are
+    try{
+      const v1=P.page.getViewport({scale:1}),sc=Math.min(4,3000/v1.width),vp=P.page.getViewport({scale:sc});
+      const c=document.createElement('canvas');c.width=Math.ceil(vp.width);c.height=Math.ceil(vp.height*.22);
+      const ctx=c.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,c.width,c.height);
+      await P.page.render({canvasContext:ctx,viewport:vp}).promise;
+      const w=await getTess();const{data}=await w.recognize(c);
+      const t=norm((data.text||'').replace(/\n/g,'  '));const re=/(?<![\d\/.])(\d{4,})\s*\/\s*(\d{3,})(?!\s*[\/.]\s*\d)|(?<![\d\/.])(\d{3,4})\s*\/\s*(\d{4,})(?!\s*[\/.]\s*\d)/g;let m;
+      while((m=re.exec(t))){let a=m[1]||m[3],b=m[2]||m[4];if(/(19|20)\d{2}/.test(a+'|'+b)&&(a.length<=4||b.length<=4))continue;if(a.length<b.length)[a,b]=[b,a];id=a+'/'+b;break;}
+    }catch(e){console.warn('top ocr',e);}
+  }
+  if(!id)for(const L of top){const m=norm(L.text).match(/(?:מס['׳"]?|מספר|No\.?|#)\s*:?\s*([A-Z]*\d[\dA-Z\-]{3,})/i);if(m){id=m[1];break;}}
+  if(!id)return null;
+  const head=top.slice(0,Math.max(6,Math.ceil(top.length/3))).map(l=>l.text).join(' ');
+  const kind=['תסקיר','חשבונית','קבלה','הזמנה','תעודת משלוח','תעודה','דוח','הצעת מחיר'].find(k=>head.includes(k))||'';
+  return safeName((kind?kind+' ':'')+id.replace(/\//g,'-'));
+}
+$('autoNames').onclick=async()=>{
+  $('autoNames').disabled=true;const used={};let ok=0;
+  try{
+    for(const i of splitIdx){
+      $('splitStatus').textContent=`מזהה עמוד ${i+1}… ${S.pages[i].lines&&S.pages[i].lines.length?'':'(עמוד סרוק, לוקח כמה שניות)'}`;
+      tessLog=m=>{if(m.status==='recognizing text')$('splitStatus').textContent=`מזהה טקסט בעמוד ${i+1} (${Math.round((m.progress||0)*100)}%)`;};
+      let n=null;try{n=await pageIdName(i);}catch(e){console.warn(e);}
+      if(n){used[n]=(used[n]||0)+1;if(used[n]>1)n+=` (${used[n]})`;const inp=document.querySelector(`#splitList [data-p="${i}"]`);if(inp){inp.value=n;ok++;}}
+    }
+    $('splitStatus').textContent=ok?`נמצא מספר ב-${ok} מתוך ${splitIdx.length} עמודים. כדאי לעבור על השמות.`:'לא נמצא מספר מזהה בעמודים.';
+  }catch(e){$('splitStatus').textContent='הזיהוי נכשל: '+(e.message||e);}
+  finally{tessLog=null;$('autoNames').disabled=false;}
+};
+$('plainNames').onclick=()=>{const base=S.name.replace(/\.pdf$/i,'');document.querySelectorAll('#splitList [data-p]').forEach(inp=>inp.value=`${base} - עמוד ${+inp.dataset.p+1}`);};
+$('splitCancel').onclick=()=>$('splitDlg').close();
+$('splitGo').onclick=async()=>{
+  const names={};const seen={};
+  document.querySelectorAll('#splitList [data-p]').forEach(inp=>{let n=safeName(inp.value)||('עמוד '+(+inp.dataset.p+1));seen[n]=(seen[n]||0)+1;if(seen[n]>1)n+=` (${seen[n]})`;names[+inp.dataset.p]=n+'.pdf';});
+  $('splitDlg').close();await exportPages(splitIdx,'each',names);
+};
+$('splitAllBtn').onclick=()=>openSplit(S.pages.map((_,i)=>i));
+$('saveSelBtn').onclick=()=>exportPages([...S.sel].sort((a,b)=>a-b),'one');
+$('splitSelBtn').onclick=()=>openSplit([...S.sel].sort((a,b)=>a-b));
+
+/* ---------- print: the document as it will be saved, page by page ---------- */
+async function printDoc(){
+  if(!S.doc)return;
+  busy(true,'מכין להדפסה…');
+  const area=$('printArea');area.innerHTML='';
+  try{
+    const bytes=await buildPdf();const d=await pdfjs.getDocument({data:bytes,isEvalSupported:false}).promise;
+    for(let i=1;i<=d.numPages;i++){
+      $('busyMsg').textContent=`מכין להדפסה… עמוד ${i} מתוך ${d.numPages}`;
+      const pg=await d.getPage(i);const vp=pg.getViewport({scale:2.5});
+      const c=document.createElement('canvas');c.width=Math.ceil(vp.width);c.height=Math.ceil(vp.height);
+      const ctx=c.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,c.width,c.height);
+      await pg.render({canvasContext:ctx,viewport:vp}).promise;
+      const img=new Image();img.src=c.toDataURL('image/png');img.alt='';
+      const div=document.createElement('div');div.className='pp';div.append(img);area.append(div);
+      await new Promise(r=>img.decode?img.decode().then(r,r):(img.onload=r));
+    }
+    d.destroy();busy(false);
+    setTimeout(()=>window.print(),50);
+  }catch(e){console.error(e);busy(false);toast('ההדפסה נכשלה: '+(e.message||e));}
+}
+addEventListener('afterprint',()=>{$('printArea').innerHTML='';});
+window.__printDoc=printDoc;
+$('printBtn').onclick=printDoc;
+
+$('pgBtn').onclick=()=>{const p=$('pgpanel');const show=p.classList.contains('hidden');p.classList.toggle('hidden',!show);if(show){renderThumbs();updateSel();}setTimeout(fitWidth,0);};
 $('pgClose').onclick=()=>{$('pgpanel').classList.add('hidden');setTimeout(fitWidth,0);};
 $('desk').addEventListener('scroll',()=>requestAnimationFrame(markCurrentThumb),{passive:true});
 
