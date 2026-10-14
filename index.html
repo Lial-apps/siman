@@ -989,7 +989,7 @@ dialog.sig{border-radius:14px}
 <body data-tool="select">
 
 <header class="bar">
-  <div class="brand"><b title="גרסה 2.4">סימן</b><span class="ver">2.4</span><span class="fname" id="fname"></span></div>
+  <div class="brand"><b title="גרסה 2.4.1">סימן</b><span class="ver">2.4.1</span><span class="fname" id="fname"></span></div>
 
   <nav class="tools" id="tools" aria-label="כלים">
     <button class="tool" data-tool="select" aria-pressed="true" title="בחירה וגלילה (V)">
@@ -2887,13 +2887,16 @@ $('thumbs').addEventListener('click',async e=>{
   if(!b){S.pages[i].el.scrollIntoView({behavior:'smooth',block:'start'});return;}
   const n=S.pages.length;const order=[...Array(n).keys()].map(k=>({src:0,i:k,rot:0}));
   const a=b.dataset.a;
-  if(a==='up'&&i>0)[order[i-1],order[i]]=[order[i],order[i-1]];
-  else if(a==='down'&&i<n-1)[order[i+1],order[i]]=[order[i],order[i+1]];
-  else if(a==='rot')order[i].rot=90;
+  if(!['up','down','rot','del'].includes(a)||(a==='up'&&i===0)||(a==='down'&&i===n-1))return;
   if(S.hasForm&&!confirm('שינוי עמודים יבטל את שדות הטופס בקובץ (הטקסט שכבר מולא יישאר כפי שהוא מוצג). להמשיך?'))return;
-  if(a==='del'){const has=S.anns.some(x=>x.page===i);if(!confirm(`למחוק את עמוד ${i+1}${has?' יחד עם הסימונים שעליו':''}?`))return;order.splice(i,1);}
-  else return;
+  if(a==='up')[order[i-1],order[i]]=[order[i],order[i-1]];
+  else if(a==='down')[order[i+1],order[i]]=[order[i],order[i+1]];
+  else if(a==='rot')order[i].rot=90;
+  else{const has=S.anns.some(x=>x.page===i);if(!confirm(`למחוק את עמוד ${i+1}${has?' יחד עם הסימונים שעליו':''}?`))return;order.splice(i,1);}
   await rebuild(order,[]);
+  // keep the moved page in view in the thumbnail list
+  const to=a==='up'?i-1:a==='down'?i+1:Math.min(i,S.pages.length-1);
+  setTimeout(()=>{const t=document.querySelector(`.thumb[data-i="${to}"]`);if(t)t.scrollIntoView({block:'nearest'});},50);
 });
 $('mergeBtn').onclick=()=>$('mergeFile').click();
 $('mergeFile').onchange=async e=>{
