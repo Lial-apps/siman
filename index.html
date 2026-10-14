@@ -898,13 +898,98 @@ dialog.split{width:min(620px,94vw)}
   #printArea img{max-width:100%;max-height:100%;width:auto;height:auto;display:block}
   @page{size:auto;margin:0}
 }
+/* ============ Siman design: ink-navy chrome, a light-table desk, one highlighter accent ============ */
+:root{--navy:#16213A;--navy-2:#202D4A;--chrome-text:#DCE3EF;--chrome-mute:#9AA7BE;--desk:#E2E7EE;--bar:#FFFFFF;--ink:#16213A;--muted:#5D6982;--line:#D4DBE5;--blue:#2E58CC;--marker:#FFD43B;--paper-shadow:0 1px 0 rgba(22,33,58,.05),0 14px 34px -14px rgba(22,33,58,.35)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--navy:#0D1424;--navy-2:#18223A;--desk:#141B29;--bar:#1B2436;--ink:#E4EAF4;--muted:#9AA6BB;--line:#2D3950;--blue:#86A6FF;--paper-shadow:0 18px 40px -16px rgba(0,0,0,.7)}}
+body{font-family:"SF-heebo","Segoe UI",Arial,sans-serif;letter-spacing:.005em}
+/* top bar */
+.bar{background:var(--navy);color:var(--chrome-text);border-bottom:0;padding:8px 16px;gap:14px}
+.brand{align-items:center;gap:10px}
+.brand b{font-family:"SF-frank","Times New Roman",serif;font-size:28px;line-height:1;color:#fff;background:none;padding:0 2px;position:relative;z-index:0}
+.brand b::after{content:"";position:absolute;inset-inline:-3px;bottom:-4px;height:6px;background:var(--marker);border-radius:3px;transform:skewX(-14deg);z-index:-1;opacity:.95}
+.ver{color:var(--chrome-mute);border-color:rgba(255,255,255,.16)}
+.fname{color:var(--chrome-text);background:rgba(255,255,255,.07);padding:3px 10px;border-radius:999px;font-size:12.5px}
+.fname:empty{display:none}
+.tools{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.07);border-radius:12px;padding:3px}
+.tool{color:var(--chrome-mute);border-radius:9px}
+.tool span{color:inherit}
+.tool:hover{background:rgba(255,255,255,.07);color:#fff}
+.tool[aria-pressed="true"]{color:#fff;background:rgba(255,255,255,.1)}
+.tool[aria-pressed="true"] span{color:#fff;font-weight:500}
+.tool[aria-pressed="true"]::after{background:var(--marker);height:4px;bottom:3px}
+.bar .btn,.bar .icon-btn{background:transparent;border:1px solid rgba(255,255,255,.17);color:var(--chrome-text);border-radius:8px}
+.bar .btn:hover:not(:disabled),.bar .icon-btn:hover{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.3)}
+.bar .btn.primary{background:var(--marker);border-color:var(--marker);color:#16213A;font-weight:600}
+.bar .btn.primary:hover:not(:disabled){background:#FFDD63}
+.bar .btn:disabled{opacity:.35}
+.bar .btn.install{background:transparent;border-color:var(--marker);color:var(--marker)}
+.zoomval{color:var(--chrome-mute)}
+/* contextual strip */
+.opts{background:var(--bar);border-bottom:1px solid var(--line);color:var(--muted)}
+.opts .btn{border-radius:8px}
+/* light-table desk */
+.desk{background-color:var(--desk);background-image:radial-gradient(circle,color-mix(in srgb,var(--ink) 9%,transparent) 1px,transparent 1.3px);background-size:22px 22px}
+.page{box-shadow:var(--paper-shadow);border-radius:2px}
+/* buttons in panels and dialogs */
+.btn{border-radius:8px}
+.btn.primary{background:var(--navy);border-color:var(--navy);color:#fff}
+.btn.primary.big{font-size:16px;padding:10px 26px;border-radius:10px}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .btn.primary{background:var(--blue);border-color:var(--blue);color:#0D1424}}
+/* side panels */
+.pgpanel,.tpanel{background:var(--bar)}
+.pgpanel{width:236px}
+.tp-head{padding:14px 16px}
+.tp-head h2{font-size:16px}
+.pg-tools{padding:8px 10px 10px;gap:2px}
+.act{display:flex;align-items:center;gap:10px;width:100%;border:0;background:none;color:var(--ink);font:inherit;font-size:13.5px;text-align:start;padding:8px 10px;border-radius:8px;cursor:pointer;line-height:1.3}
+.act svg{width:19px;height:19px;flex:none;color:var(--muted)}
+.act:hover:not(:disabled){background:color-mix(in srgb,var(--ink) 6%,transparent)}
+.act:hover:not(:disabled) svg{color:var(--blue)}
+.act:disabled{opacity:.4;cursor:default}
+.grp{margin:10px 10px 2px;font-size:12px;font-weight:500;color:var(--muted)}
+.sel-row{padding:6px 10px 0}
+/* thumbnails */
+.thumbs{gap:18px;padding:14px 14px 24px;background:color-mix(in srgb,var(--desk) 55%,var(--bar))}
+.thumb .tc{border-radius:2px;box-shadow:0 1px 2px rgba(22,33,58,.18),0 6px 14px -8px rgba(22,33,58,.35);outline-offset:3px}
+.thumb.cur .tc{outline-color:var(--blue)}
+.thumb.sel .tc{outline:3px solid var(--marker)}
+.thumb .tsel{font-size:12.5px;color:var(--ink);gap:6px}
+.thumb .tsel input{accent-color:var(--navy);width:15px;height:15px}
+.thumb .ta{background:var(--bar);border:1px solid var(--line);border-radius:999px;padding:2px;gap:0}
+.thumb .ta button{border:0;background:none;border-radius:999px;width:28px;height:24px;color:var(--muted)}
+.thumb .ta button:hover:not(:disabled){background:color-mix(in srgb,var(--ink) 7%,transparent);color:var(--ink)}
+/* empty state: a sheet on the light table */
+.drop{position:relative;background:var(--bar);border:0;border-radius:3px;box-shadow:var(--paper-shadow);gap:12px;width:min(440px,100%);aspect-ratio:1/1.3}
+.drop::before{content:"";position:absolute;top:0;inset-inline-end:0;width:44px;height:44px;background:linear-gradient(225deg,var(--desk) 50%,color-mix(in srgb,var(--ink) 10%,var(--bar)) 50%);border-end-start-radius:4px;box-shadow:-2px 2px 4px rgba(22,33,58,.12)}
+.drop h1{font-family:"SF-frank","Times New Roman",serif;font-size:38px;font-weight:700;color:var(--ink);margin:0;line-height:1.1;position:relative;z-index:1}
+.drop .swipe{width:220px;height:18px;margin-top:-16px;opacity:.85}
+.drop p{color:var(--muted);max-width:32ch;font-size:15px}
+.drop .drop-hint{font-size:13px;margin-top:-4px}
+body.dragging .drop{outline:3px dashed var(--blue);outline-offset:8px}
+/* feedback */
+.toast{background:var(--navy);color:#fff;border-inline-start:4px solid var(--marker);border-radius:10px;box-shadow:0 12px 30px -10px rgba(0,0,0,.45)}
+.busy{background:rgba(13,20,36,.38);backdrop-filter:blur(2px)}
+.busy div{display:flex;align-items:center;gap:12px;border-radius:12px;padding:16px 22px;color:var(--ink)}
+.busy div::before{content:"";width:18px;height:18px;border:2.5px solid var(--line);border-top-color:var(--blue);border-radius:50%;animation:spin .8s linear infinite;flex:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+dialog.sig{border-radius:14px}
+.seg{border-radius:9px}
+@media (max-width:720px){.pgpanel{width:100%}.brand b{font-size:24px}.drop h1{font-size:30px}
+  body{overflow-x:hidden}
+  .bar{padding:6px 10px;gap:8px}
+  .bar>.group{flex-wrap:nowrap;overflow-x:auto;max-width:100%;scrollbar-width:none}
+  .bar>.group:last-of-type{order:4;width:100%}
+  .group.zoom #fitW{display:none}
+  #saveBtn{order:-1}
+  .tools{border-radius:10px}}
+@media (prefers-reduced-motion:reduce){.busy div::before{animation:none}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
 <body data-tool="select">
 
 <header class="bar">
-  <div class="brand"><b title="גרסה 2.3">סימן</b><span class="ver">2.3</span><span class="fname" id="fname"></span></div>
+  <div class="brand"><b title="גרסה 2.4">סימן</b><span class="ver">2.4</span><span class="fname" id="fname"></span></div>
 
   <nav class="tools" id="tools" aria-label="כלים">
     <button class="tool" data-tool="select" aria-pressed="true" title="בחירה וגלילה (V)">
@@ -970,11 +1055,12 @@ dialog.split{width:min(620px,94vw)}
     <button class="icon-btn" id="pgClose" title="סגירה" aria-label="סגירת חלונית העמודים">×</button>
   </div>
   <div class="pg-tools">
-    <button class="btn" id="mergeBtn">הוספת PDF לסוף</button>
-    <button class="btn" id="ocrAllBtn" title="זיהוי טקסט בכל העמודים הסרוקים">זיהוי טקסט (OCR)</button>
-    <button class="btn" id="splitAllBtn" title="כל עמוד נשמר כקובץ PDF נפרד">פיצול: כל עמוד לקובץ</button>
-    <button class="btn" id="splitSelBtn" disabled title="כל עמוד מסומן נשמר כקובץ נפרד">שמירת המסומנים, כל עמוד בנפרד</button>
-    <button class="btn" id="saveSelBtn" disabled title="העמודים המסומנים יחד בקובץ אחד">איחוד המסומנים לקובץ אחד</button>
+    <button class="act" id="mergeBtn"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M12.5 11v6M9.5 14h6"/></svg><span>הוספת PDF לסוף</span></button>
+    <button class="act" id="ocrAllBtn" title="זיהוי טקסט בכל העמודים הסרוקים"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M8 10h8M8 14h5"/></svg><span>זיהוי טקסט בעמודים סרוקים</span></button>
+    <h3 class="grp">שמירת עמודים כקבצים</h3>
+    <button class="act" id="splitAllBtn" title="כל עמוד נשמר כקובץ PDF נפרד"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h7v9H4zM13 11h7v9h-7z"/><path d="M15 4h5v4M9 20H4v-4"/></svg><span>כל עמוד לקובץ נפרד</span></button>
+    <button class="act" id="splitSelBtn" disabled title="כל עמוד מסומן נשמר כקובץ נפרד"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l4 4 10-10"/></svg><span>המסומנים, כל עמוד בנפרד</span></button>
+    <button class="act" id="saveSelBtn" disabled title="העמודים המסומנים יחד בקובץ אחד"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l3 3v15H6z"/><path d="M9 12h6M9 16h6"/></svg><span>המסומנים, יחד בקובץ אחד</span></button>
     <div class="sel-row"><button class="linkbtn" id="selAll">סימון הכל</button><button class="linkbtn" id="selNone">ניקוי</button><span id="selCount"></span></div>
   </div>
   <ol class="thumbs" id="thumbs"></ol>
@@ -982,9 +1068,11 @@ dialog.split{width:min(620px,94vw)}
 <main class="desk" id="desk">
   <div class="empty" id="empty">
     <div class="drop">
-      <h1>גררו לכאן <mark>קובץ PDF</mark></h1>
-      <p>קוראים, מסמנים, כותבים בעברית ושומרים. הקובץ לא יוצא מהמחשב שלכם.</p>
-      <button class="btn primary" id="openBtn2">בחירת קובץ</button>
+      <h1>פתחו קובץ PDF</h1>
+      <svg class="swipe" viewBox="0 0 300 26" preserveAspectRatio="none" aria-hidden="true"><path d="M6 15c46-9 98-11 150-9s92 7 138 2" stroke="#FFD43B" stroke-width="16" stroke-linecap="round" fill="none" opacity=".9"/></svg>
+      <p>קוראים, מסמנים, עורכים טקסט בעברית, ממלאים טפסים, חותמים ומתרגמים. הקובץ נשאר במחשב שלכם.</p>
+      <button class="btn primary big" id="openBtn2">בחירת קובץ</button>
+      <p class="drop-hint">או גררו את הקובץ לכאן</p>
       <p class="ios-hint hidden" id="iosHint">להתקנה באייפון: לוחצים על "שיתוף" ב-Safari ואז "הוסף למסך הבית".</p>
     </div>
   </div>
