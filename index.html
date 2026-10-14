@@ -844,6 +844,8 @@ dialog.conv{width:min(560px,94vw)}
 .conv-scope select,.conv-scope input{font:inherit;font-size:14px;color:var(--ink);background:var(--bar);border:1px solid var(--line);border-radius:7px;padding:7px 9px}
 @media (max-width:520px){.conv-scope{grid-template-columns:1fr}}
 .conv-card{display:flex;gap:14px;align-items:center;text-align:start;border:1px solid var(--line);background:var(--bar);color:var(--ink);border-radius:10px;padding:12px 14px;cursor:pointer;font:inherit}
+.conv-card.smart{border-color:var(--marker);background:color-mix(in srgb,var(--marker) 12%,var(--bar))}
+.badge{font-style:normal;font-size:11px;font-weight:600;background:var(--marker);color:#16213A;border-radius:999px;padding:1px 8px;margin-inline-start:6px;vertical-align:middle}
 .conv-card:hover{border-color:var(--blue);background:color-mix(in srgb,var(--blue) 5%,var(--bar))}
 .conv-card .of-ico{width:40px;height:50px;font-size:10px;padding-bottom:6px}
 .conv-card b{display:block;font-size:15px}
@@ -1040,7 +1042,7 @@ dialog.sig{border-radius:14px}
 <body data-tool="select">
 
 <header class="bar">
-  <div class="brand"><b title="גרסה 2.9">סימן</b><span class="ver">2.9</span><span class="fname" id="fname"></span></div>
+  <div class="brand"><b title="גרסה 3.0">סימן</b><span class="ver">3.0</span><span class="fname" id="fname"></span></div>
 
   <nav class="tools" id="tools" aria-label="כלים">
     <button class="tool" data-tool="select" aria-pressed="true" title="בחירה וגלילה (V)">
@@ -1256,6 +1258,7 @@ dialog.sig{border-radius:14px}
     </div>
     <div class="conv-opts">
       <button class="conv-card" data-to="pptx"><span class="of-ico pptx">PPTX</span><span><b>PowerPoint</b><small>כל עמוד הופך לשקף. הרקע, התמונות והעיצוב נשמרים, והטקסט נפתח לעריכה במקומו.</small></span></button>
+      <button class="conv-card smart" data-to="docxsmart"><span class="of-ico docx">DOCX</span><span><b>Word חכם <em class="badge">מומלץ</em></b><small>בינה מלאכותית קוראת את העמוד ובונה מסמך Word אמיתי: כותרות, פסקאות, רשימות תבליטים, טבלאות, לוגואים וצבעים. נוח לעריכה כמו מסמך שנכתב ב-Word.</small></span></button>
       <button class="conv-card" data-to="docx"><span class="of-ico docx">DOCX</span><span><b>Word, עיצוב זהה למקור</b><small>כל עמוד נראה בדיוק כמו ב-PDF: לוגואים, קווים, צבעים ומיקום. כל שורת טקסט נפתחת לעריכה במקומה.</small></span></button>
       <button class="conv-card" data-to="docxflow"><span class="of-ico docx">DOCX</span><span><b>Word, מסמך רציף</b><small>טקסט וטבלאות שזורמים כמו מסמך רגיל, נוח לכתיבה מחדש ולהעתקה. העיצוב הגרפי לא עובר.</small></span></button>
       <button class="conv-card" data-to="xlsx"><span class="of-ico xlsx">XLSX</span><span><b>Excel</b><small>כל עמוד הופך לגיליון, ושורות הטבלאות מסודרות בעמודות.</small></span></button>
@@ -3260,6 +3263,14 @@ async function convertTo(kind){
   $('convDlg').close();busy(true,'מכין את ההמרה…');
   try{
     await loadOfficeLibs();
+    if(kind==='docxsmart'){
+      if(!TRANSLATE_URL)throw new Error('שרת התרגום לא מוגדר');
+      const bytes=await convertSmart(idx);busy(false);
+      const part=idx.length===S.pages.length?'':` - ${idx.length===1?'עמוד':'עמודים'} ${rangeLabel(idx)}`;
+      const name=`${S.name.replace(/\.pdf$/i,'')}${part}.docx`;
+      if(await saveBytes(name,bytes,'docx'))toast('נשמר: '+name);
+      return;
+    }
     const layout=kind==='pptx'||kind==='docx';
     const pages=await analyzeForConvert(layout&&kind!=='docxflow',keep,m=>$('busyMsg').textContent=m,idx);
     $('busyMsg').textContent='בונה את הקובץ…';
@@ -3321,6 +3332,129 @@ function pageRows(pg){
   for(const r of rows){const rtl=r.cells.filter(c=>c.dir==='R').length>=r.cells.length/2;r.cells.sort((a,b)=>rtl?b.x1-a.x1:a.x0-b.x0);r.rtl=rtl;}
   return rows;
 }
+/* =====================================================================
+   SMART WORD — the page picture + its exact text go to Gemini, which
+   returns the document's structure (headings, paragraphs, real lists,
+   tables, side-by-side header, logos). We build a native Word file from it.
+   ===================================================================== */
+async function aiLayout(imageB64,text){
+  for(let attempt=0;attempt<5;attempt++){
+    const r=await fetch(TRANSLATE_URL,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({mode:'layout',image:imageB64,text})});
+    const d=await r.json().catch(()=>({}));
+    if(r.status===429||r.status===503){
+      if(/per ?day/i.test(JSON.stringify(d)))throw new Error('נגמרה המכסה היומית החינמית. נסו שוב מחר');
+      const info=((d.error&&d.error.details)||[]).find(x=>x.retryDelay);const wait=info?Math.min(60,parseFloat(info.retryDelay)||10):10*(attempt+1);
+      $('busyMsg').textContent=`השירות עמוס, ממתין ${Math.round(wait)} שניות…`;await sleep(wait*1000+500);continue;
+    }
+    if(!r.ok)throw new Error((d.error&&d.error.message)||('HTTP '+r.status));
+    const c=(d.candidates||[])[0];const out=c&&c.content&&(c.content.parts||[]).filter(x=>x.text&&!x.thought).map(x=>x.text).join('');
+    if(!out)throw new Error('לא התקבלה תשובה');
+    const j=JSON.parse(out.replace(/^```(?:json)?\s*|\s*```$/g,''));
+    if(!j||!Array.isArray(j.blocks))throw new Error('תשובה לא תקינה');
+    return j.blocks;
+  }
+  throw new Error('השירות עמוס כרגע');
+}
+function linesForAI(pg){
+  const L=[];const N=v=>Math.max(0,Math.min(1000,Math.round(v)));
+  for(const b of pg.blocks)for(const l of b.lines){
+    if(l.hidden||!l.text.trim())continue;
+    const top=N((pg.oy+pg.h-l.y1)/pg.h*1000),bot=N((pg.oy+pg.h-l.y0)/pg.h*1000),left=N((l.x0-pg.ox)/pg.w*1000),right=N((l.x1-pg.ox)/pg.w*1000);
+    const r0=(l.runs&&l.runs[0])||{};const bold=(l.runs||[]).some(r=>r.bold)||b.bold;
+    const colors=[...new Set((l.runs||[]).map(r=>r.color).filter(Boolean))];
+    const txt=(l.runs&&l.runs.length>1&&colors.length>1)?l.runs.map(r=>`{${r.color}${r.bold?' b':''}}${r.t}`).join(''):l.text;
+    L.push({top,t:`[${top}-${bot}|${left}-${right}] ${Math.round(l.size)} b=${bold?1:0} ${colors.length===1?colors[0]:(r0.color||'#000000')} ${txt}`});
+  }
+  return L.sort((a,b)=>a.top-b.top).map(x=>x.t).join('\n');
+}
+async function buildDocxSmart(pages,progress){
+  const z=new JSZip(),rels=[],media=[],EMU=12700;let imgN=0,numN=2;const nums=[];
+  const isRtl=t=>{let r=0,l=0;for(const c of t){if(RE_R.test(c))r++;else if(RE_LL.test(c))l++;}return r>=l;};
+  const hexOk=c=>/^#[0-9a-f]{6}$/i.test(c||'')?c.slice(1):null;
+  const runXml=(r,base={})=>{
+    const t=String(r.t??'');if(!t)return'';const sz=Math.round((r.size||base.size||11)*2);const col=hexOk(r.c);
+    const segs=[];for(const ch of t){const d=RE_R.test(ch)?'R':RE_LL.test(ch)?'L':null;const l=segs[segs.length-1];if(l&&(d===null||d===l.d))l.t+=ch;else segs.push({d:d||(l?l.d:'R'),t:ch});}
+    return segs.map(g=>`<w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/>${(r.b??base.b)?'<w:b/><w:bCs/>':''}${r.i?'<w:i/><w:iCs/>':''}${r.u?'<w:u w:val="single"/>':''}${col?`<w:color w:val="${col}"/>`:''}<w:sz w:val="${sz}"/><w:szCs w:val="${sz}"/>${g.d==='R'?'<w:rtl/>':''}</w:rPr><w:t xml:space="preserve">${xesc(g.t)}</w:t></w:r>`).join('');
+  };
+  const jcXml=(align,rtl)=>{if(align==='center')return'<w:jc w:val="center"/>';if(align==='justify')return'<w:jc w:val="both"/>';
+    if(align==='left')return rtl?'<w:jc w:val="end"/>':'';if(align==='right')return rtl?'':'<w:jc w:val="end"/>';return'';};
+  const textOf=runs=>(runs||[]).map(r=>r.t||'').join('');
+  const para=(runs,{align,size,b,after=120,extra=''}={})=>{const rtl=isRtl(textOf(runs));
+    return`<w:p><w:pPr>${extra}${rtl?'<w:bidi/>':''}<w:spacing w:after="${after}"/>${jcXml(align,rtl)}</w:pPr>${(runs||[]).map(r=>runXml(r,{size,b})).join('')}</w:p>`;};
+  async function imageXml(pg,box,maxWpt){
+    const[l,t,r,bm]=box.map(v=>Math.max(0,Math.min(1000,+v||0)));if(r-l<5||bm-t<5)return'';
+    const c=pg.canvas,X=Math.round(l/1000*c.width),Y=Math.round(t/1000*c.height),W=Math.round((r-l)/1000*c.width),H=Math.round((bm-t)/1000*c.height);
+    const cc=document.createElement('canvas');cc.width=W;cc.height=H;cc.getContext('2d').drawImage(c,X,Y,W,H,0,0,W,H);
+    const b64=cc.toDataURL('image/png').split(',')[1];imgN++;const id='rIdImg'+imgN;
+    z.file(`word/media/img${imgN}.png`,b64,{base64:true});rels.push(`<Relationship Id="${id}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/img${imgN}.png"/>`);
+    let wpt=(r-l)/1000*pg.w,hpt=(bm-t)/1000*pg.h;if(wpt>maxWpt){hpt*=maxWpt/wpt;wpt=maxWpt;}
+    const cx=Math.round(wpt*EMU),cy=Math.round(hpt*EMU);
+    return`<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:docPr id="${imgN}" name="תמונה ${imgN}"/><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="${imgN}" name="img${imgN}.png"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="${id}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>`;
+  }
+  async function blocksXml(pg,blocks,widthPt,rtlPage){
+    const out=[];
+    for(const bl of blocks||[]){
+      const t=bl.type;
+      if(t==='heading'){const lvl=Math.min(3,Math.max(1,bl.level||1));const sz=[0,18,15,13][lvl];
+        out.push(para(bl.runs,{align:bl.align,size:sz,b:true,after:160,extra:`<w:keepNext/><w:outlineLvl w:val="${lvl-1}"/>`}));}
+      else if(t==='paragraph')out.push(para(bl.runs,{align:bl.align}));
+      else if(t==='list'){
+        let numId=1;if(bl.ordered){numId=++numN;nums.push(numId);}
+        for(const it of bl.items||[]){const lv=Math.min(2,Math.max(0,it.level||0));
+          out.push(para(it.runs,{align:'right',after:60,extra:`<w:numPr><w:ilvl w:val="${lv}"/><w:numId w:val="${numId}"/></w:numPr>`}));}
+      }
+      else if(t==='table'||t==='row'){
+        const rows=t==='row'?[(bl.columns||[]).map(c=>({blocks:c.blocks,width:c.width}))]:(bl.rows||[]);if(!rows.length)continue;
+        const n=Math.max(...rows.map(r=>r.length));if(!n)continue;
+        const ws=t==='row'?(()=>{const w=(bl.columns||[]).map(c=>+c.width||0);const s=w.reduce((a,b)=>a+b,0)||n;return w.map(x=>(x||s/n)/s);})():Array(n).fill(1/n);
+        const tw=Math.round(widthPt*20),border=t==='table'&&bl.borders!==false;
+        let x=`<w:tbl><w:tblPr>${rtlPage?'<w:bidiVisual/>':''}<w:tblW w:w="${tw}" w:type="dxa"/><w:tblLayout w:type="fixed"/><w:tblBorders>${['top','left','bottom','right','insideH','insideV'].map(s=>border?`<w:${s} w:val="single" w:sz="6" w:color="666666"/>`:`<w:${s} w:val="nil"/>`).join('')}</w:tblBorders><w:tblCellMar><w:left w:w="80" w:type="dxa"/><w:right w:w="80" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid>${ws.map(w=>`<w:gridCol w:w="${Math.round(tw*w)}"/>`).join('')}</w:tblGrid>`;
+        for(const row of rows){x+='<w:tr>';
+          for(let c=0;c<n;c++){const cell=row[c]||{};const cw=Math.round(tw*ws[c]);const fill=hexOk(cell.fill);
+            const inner=t==='row'?await blocksXml(pg,cell.blocks,widthPt*ws[c]-10,rtlPage):para(cell.runs,{align:cell.align,after:0});
+            x+=`<w:tc><w:tcPr><w:tcW w:w="${cw}" w:type="dxa"/>${fill?`<w:shd w:val="clear" w:color="auto" w:fill="${fill}"/>`:''}<w:vAlign w:val="center"/></w:tcPr>${inner||'<w:p/>'}</w:tc>`;}
+          x+='</w:tr>';}
+        out.push(x+'</w:tbl><w:p><w:pPr><w:spacing w:after="60"/></w:pPr></w:p>');
+      }
+      else if(t==='image'&&Array.isArray(bl.box)){const im=await imageXml(pg,bl.box,widthPt);if(im){const rtl=rtlPage;out.push(`<w:p><w:pPr>${rtl?'<w:bidi/>':''}<w:spacing w:after="60"/>${jcXml(bl.align||'center',rtl)}</w:pPr>${im}</w:p>`);}}
+    }
+    return out.join('');
+  }
+  const body=[];
+  const pw=pages[0].w,ph=pages[0].h,mar=42;const textW=pw-2*mar;
+  for(const[pi,pg]of pages.entries()){
+    progress&&progress(`בונה את עמוד ${pi+1}…`);
+    if(pi)body.push('<w:p><w:r><w:br w:type="page"/></w:r></w:p>');
+    const rtlPage=isRtl(pg.blocks.map(b=>b.text).join(' '));
+    body.push(await blocksXml(pg,pg.ai,textW,rtlPage));
+  }
+  const lvl=(i,fmt,txt)=>`<w:lvl w:ilvl="${i}"><w:start w:val="1"/><w:numFmt w:val="${fmt}"/><w:lvlText w:val="${txt}"/><w:lvlJc w:val="left"/><w:pPr><w:ind w:start="${360*(i+1)+360}" w:hanging="360"/></w:pPr>${fmt==='bullet'?'<w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/></w:rPr>':''}</w:lvl>`;
+  const numbering=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:abstractNum w:abstractNumId="0">${lvl(0,'bullet','•')}${lvl(1,'bullet','◦')}${lvl(2,'bullet','▪')}</w:abstractNum><w:abstractNum w:abstractNumId="1">${lvl(0,'decimal','%1.')}${lvl(1,'hebrew1','%2.')}${lvl(2,'lowerLetter','%3.')}</w:abstractNum><w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num>${nums.map(n=>`<w:num w:numId="${n}"><w:abstractNumId w:val="1"/><w:lvlOverride w:ilvl="0"><w:startOverride w:val="1"/></w:lvlOverride></w:num>`).join('')}</w:numbering>`;
+  const styles=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/><w:sz w:val="22"/><w:szCs w:val="22"/><w:lang w:val="en-US" w:bidi="he-IL"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:after="120" w:line="276" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style></w:styles>`;
+  z.file('[Content_Types].xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/word/numbering.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"/></Types>');
+  z.file('_rels/.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>');
+  z.file('word/_rels/document.xml.rels',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdStyles" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rIdNum" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/>${rels.join('')}</Relationships>`);
+  z.file('word/styles.xml',styles);z.file('word/numbering.xml',numbering);
+  const W=Math.round(pw*20),H=Math.round(ph*20),M=Math.round(mar*20);
+  z.file('word/document.xml',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><w:body>${body.join('')}<w:sectPr><w:pgSz w:w="${W}" w:h="${H}"${W>H?' w:orient="landscape"':''}/><w:pgMar w:top="${M}" w:right="${M}" w:bottom="${M}" w:left="${M}" w:header="360" w:footer="360" w:gutter="0"/><w:bidi/></w:sectPr></w:body></w:document>`);
+  return z.generateAsync({type:'uint8array',compression:'DEFLATE'});
+}
+async function convertSmart(idx){
+  const pages=await analyzeForConvert(true,false,m=>$('busyMsg').textContent=m,idx); // also gives a text-free picture of each page
+  for(const[n,pg]of pages.entries()){
+    $('busyMsg').textContent=`מנתח את המבנה של עמוד ${pg.idx+1} (${n+1} מתוך ${pages.length})… זה לוקח כמה שניות לעמוד`;
+    // a clean picture of the page for the model and for cutting out logos
+    const r=pg.orig; // the page as it looks (for the model)
+    // logos and signatures are cut from the text-free picture, so no words come along with them
+    const bgImg=new Image();bgImg.src=pg.bgUrl;await bgImg.decode();const bc=document.createElement('canvas');bc.width=bgImg.naturalWidth;bc.height=bgImg.naturalHeight;bc.getContext('2d').drawImage(bgImg,0,0);pg.canvas=bc;
+    const small=document.createElement('canvas');const k=Math.min(1,1400/r.c.width);small.width=Math.round(r.c.width*k);small.height=Math.round(r.c.height*k);
+    small.getContext('2d').drawImage(r.c,0,0,small.width,small.height);
+    pg.ai=await aiLayout(small.toDataURL('image/jpeg',.85).split(',')[1],linesForAI(pg));
+  }
+  return buildDocxSmart(pages,m=>$('busyMsg').textContent=m);
+}
+window.__buildDocxSmart=buildDocxSmart;
+
 async function buildDocxLayout(pages){
   const z=new JSZip(),E=12700,TW=20,rels=[],body=[];
   const run=(t,r,sz)=>{const segs=[];for(const ch of t){const d=RE_R.test(ch)?'R':RE_LL.test(ch)?'L':null;const l=segs[segs.length-1];if(l&&(d===null||d===l.d))l.t+=ch;else segs.push({d:d||(l?l.d:'R'),t:ch});}
