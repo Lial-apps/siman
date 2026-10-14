@@ -1045,7 +1045,7 @@ dialog.sig{border-radius:14px}
 <body data-tool="select">
 
 <header class="bar">
-  <div class="brand"><b title="גרסה 3.1.1">סימן</b><span class="ver">3.1.1</span><span class="fname" id="fname"></span></div>
+  <div class="brand"><b title="גרסה 3.2.1">סימן</b><span class="ver">3.2.1</span><span class="fname" id="fname"></span></div>
 
   <nav class="tools" id="tools" aria-label="כלים">
     <button class="tool" data-tool="select" aria-pressed="true" title="בחירה וגלילה (V)">
@@ -3184,6 +3184,14 @@ function fontFace(raw){
   const map={timesnewroman:'Times New Roman',couriernew:'Courier New',segoeui:'Segoe UI',arial:'Arial',calibri:'Calibri',gisha:'Gisha',david:'David',tahoma:'Tahoma'};
   return map[n.toLowerCase().replace(/[\s-]/g,'')]||n.replace(/([a-z])([A-Z])/g,'$1 $2')||'Arial';
 }
+// is this font installed on this computer? (classic width test against a fallback)
+const fontInstalled=(()=>{const cache={},c=document.createElement('canvas').getContext('2d'),probe='אבגדהוזחטי mmmmmmmmlli 0123456789';
+  return face=>{if(face in cache)return cache[face];let found=false;
+    for(const base of['monospace','serif','sans-serif']){c.font=`40px ${base}`;const w0=c.measureText(probe).width;c.font=`40px "${face}",${base}`;if(Math.abs(c.measureText(probe).width-w0)>.5){found=true;break;}}
+    return cache[face]=found;};})();
+// a font Word can actually use here: the original if installed (or a standard one), otherwise Arial
+const safeFace=f=>f&&(COMMON_FONTS.test(f)||fontInstalled(f))?f:'Arial';
+function textWidthPt(t,face,bold,size){measureCtx.font=`${bold?700:400} ${size}px "${face}",Arial`;return measureCtx.measureText(t).width;}
 function sampleCanvas(c,vp,L){ // background + text colour of a text block on a rendered page
   const[l,t]=vp.convertToViewportPoint(L.x0,L.y1),[r,b]=vp.convertToViewportPoint(L.x1,L.y0);
   const X=Math.max(0,Math.floor(Math.min(l,r))-4),Y=Math.max(0,Math.floor(Math.min(t,b))-4);
@@ -3213,11 +3221,11 @@ async function analyzeForConvert(withBackground,keepDeco,progress,only){
     if(!lines)lines=[];
     P.lines=lines;P.blocks=null;const blocks=lines.length?await pageBlocks(P):[];
     for(const b of blocks){
-      const fn=fontNameOf(P,b.font);b.face=ocr?'Arial':fontFace(fn.name);b.bold=fn.bold||/bold|black|heavy|semibold/i.test(fn.name)||b.lines.some(l=>l.bold);
+      const fn=fontNameOf(P,b.font);b.face=ocr?'Arial':safeFace(fontFace(fn.name));b.bold=fn.bold||/bold|black|heavy|semibold/i.test(fn.name)||b.lines.some(l=>l.bold);
       Object.assign(b,sampleCanvas(orig.c,orig.vp,b));
       for(const l of b.lines)for(const r of (l.runs||[])){
         const it=r.it;if(!it){r.color=b.fg;r.bold=b.bold;r.face=b.face;continue;}
-        const fr=fontNameOf(P,it.font);r.face=ocr?'Arial':fontFace(fr.name)||b.face;r.bold=fr.bold||/bold|black|heavy|semibold/i.test(fr.name)||!!it.dbl;
+        const fr=fontNameOf(P,it.font);r.face=ocr?'Arial':safeFace(fontFace(fr.name))||b.face;r.bold=fr.bold||/bold|black|heavy|semibold/i.test(fr.name)||!!it.dbl;
         r.color=sampleCanvas(orig.c,orig.vp,{x0:it.x,x1:it.x+it.w,y0:it.y-it.h*.25,y1:it.y+it.h*.85}).fg;r.size=it.h;
       }
       b.deco=keepDeco&&!ocr&&!!fn.name&&!COMMON_FONTS.test(fontFace(fn.name)); // optional: text in special fonts stays part of the picture // big text in a special font (titles) stays part of the picture
@@ -3282,7 +3290,7 @@ async function convertTo(kind){
       const res=await convertSmart(idx);const bytes=res.bytes;busy(false);
       const part=idx.length===S.pages.length?'':` - ${idx.length===1?'עמוד':'עמודים'} ${rangeLabel(idx)}`;
       const name=`${S.name.replace(/\.pdf$/i,'')}${part}.docx`;
-      if(await saveBytes(name,bytes,'docx'))toast(res.failed.length?`נשמר. ${res.failed.length===idx.length?'ה-AI לא היה זמין':'בעמודים '+rangeLabel(res.failed)+' ה-AI לא היה זמין'}, ולכן הם נבנו כטקסט פשוט (${res.why})`:'נשמר: '+name);
+      if(await saveBytes(name,bytes,'docx'))toast(res.failed.length?`נשמר. ${res.failed.length===idx.length?'ה-AI לא היה זמין':'בעמודים '+rangeLabel(res.failed)+' ה-AI לא היה זמין'} (${res.why}), אז העמודים נשמרו בעיצוב זהה למקור`:'נשמר: '+name);
       return;
     }
     const layout=kind==='pptx'||kind==='docx';
@@ -3326,7 +3334,8 @@ async function buildPptx(pages){
       const vis=b.lines.filter(l=>!l.hidden),multi=vis.length>1,heb=b.dir==='R';
       let x0=Math.min(...vis.map(l=>l.x0)),x1=Math.max(...vis.map(l=>l.x1));const top=vis[0].y1,bot=vis[vis.length-1].y0;
       if(multi){if(heb)x0=Math.min(x0,pg.colL);else x1=Math.max(x1,pg.colR);}
-      const w=(x1-x0)/72*kx,slack=multi?0:w*.1;
+      let w=(x1-x0)/72*kx,slack=multi?0:w*.1;
+      if(!multi){const need=runs.reduce((t,r)=>t+textWidthPt(r.t,r.face||b.face,r.bold??b.bold,b.size),0)*1.08/72*kx;if(need>w+slack)slack=need-w;}
       const x=(x0-pg.ox)/72*kx,y=(pg.oy+pg.h-top)/72*ky,h=Math.max((top-bot)/72*ky,b.size*1.2/72);
       const al=b.align==='justify'?'justify':b.align==='center'?'center':(heb?'right':'left');
       s.addText(runs.map(r=>({text:r.t,options:{color:(r.color||b.fg).slice(1),bold:r.bold??b.bold,fontFace:r.face||b.face}})),
@@ -3465,26 +3474,27 @@ async function buildDocxSmart(pages,progress){
   }
   const body=[];
   const pw=pages[0].w,ph=pages[0].h,mar=42;const textW=pw-2*mar;
+  // every page is its own section: AI pages get normal margins, exact-look pages get none (their frames sit on the whole page)
+  const sect=(pg,last)=>{const W=Math.round(pg.w*20),H=Math.round(pg.h*20),M=pg.ai?Math.round(mar*20):0;
+    return`<w:sectPr>${last?'':'<w:type w:val="nextPage"/>'}<w:pgSz w:w="${W}" w:h="${H}"${W>H?' w:orient="landscape"':''}/><w:pgMar w:top="${M}" w:right="${M}" w:bottom="${M}" w:left="${M}" w:header="${pg.ai?360:0}" w:footer="${pg.ai?360:0}" w:gutter="0"/><w:bidi/></w:sectPr>`;};
   for(const[pi,pg]of pages.entries()){
     progress&&progress(`בונה את עמוד ${pi+1}…`);
-    if(pi)body.push('<w:p><w:r><w:br w:type="page"/></w:r></w:p>');
+    if(pi)body.push(`<w:p><w:pPr><w:spacing w:after="0" w:line="20" w:lineRule="exact"/>${sect(pages[pi-1],false)}</w:pPr></w:p>`);
     const rtlPage=isRtl(pg.blocks.map(b=>b.text).join(' '));
     if(pg.ai){pg.aiUsed=new Set();body.push(await blocksXml(pg,pg.ai,textW,rtlPage));
       const left=(pg.aiLines||[]).filter(e=>!pg.aiUsed.has(e));
       for(const e of left){const rs=(e.l.runs||[{t:e.l.text,color:e.b.fg,bold:e.b.bold}]).map(r=>({t:r.t,b:r.bold,c:r.color,size:Math.round(e.l.size)}));body.push(para(rs,{align:e.l.dir==='R'?'right':'left'}));}}
-    else{ // no structure for this page: plain paragraphs in reading order, so nothing is lost
-      for(const b of pg.blocks){const runs=blockRuns(b).map(r=>({t:r.t,b:r.bold,c:r.color,size:Math.round(b.size)}));if(runs.length)body.push(para(runs,{align:b.align==='center'?'center':(b.dir==='R'?'right':'left')}));}
-    }
+    else body.push(layoutPageXml(pg,5000+pi,z,rels)); // the AI couldn't read this page: keep its exact look, text still editable
   }
   const lvl=(i,fmt,txt)=>`<w:lvl w:ilvl="${i}"><w:start w:val="1"/><w:numFmt w:val="${fmt}"/><w:lvlText w:val="${txt}"/><w:lvlJc w:val="left"/><w:pPr><w:ind w:start="${360*(i+1)+360}" w:hanging="360"/></w:pPr>${fmt==='bullet'?'<w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/></w:rPr>':''}</w:lvl>`;
   const numbering=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:abstractNum w:abstractNumId="0">${lvl(0,'bullet','•')}${lvl(1,'bullet','◦')}${lvl(2,'bullet','▪')}</w:abstractNum><w:abstractNum w:abstractNumId="1">${lvl(0,'decimal','%1.')}${lvl(1,'hebrew1','%2.')}${lvl(2,'lowerLetter','%3.')}</w:abstractNum><w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num>${nums.map(n=>`<w:num w:numId="${n}"><w:abstractNumId w:val="1"/><w:lvlOverride w:ilvl="0"><w:startOverride w:val="1"/></w:lvlOverride></w:num>`).join('')}</w:numbering>`;
   const styles=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/><w:sz w:val="22"/><w:szCs w:val="22"/><w:lang w:val="en-US" w:bidi="he-IL"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:after="120" w:line="276" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style></w:styles>`;
-  z.file('[Content_Types].xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/word/numbering.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"/></Types>');
+  z.file('[Content_Types].xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/><Default Extension="jpeg" ContentType="image/jpeg"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/word/numbering.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"/></Types>');
   z.file('_rels/.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>');
   z.file('word/_rels/document.xml.rels',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdStyles" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rIdNum" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/>${rels.join('')}</Relationships>`);
   z.file('word/styles.xml',styles);z.file('word/numbering.xml',numbering);
   const W=Math.round(pw*20),H=Math.round(ph*20),M=Math.round(mar*20);
-  z.file('word/document.xml',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><w:body>${body.join('')}<w:sectPr><w:pgSz w:w="${W}" w:h="${H}"${W>H?' w:orient="landscape"':''}/><w:pgMar w:top="${M}" w:right="${M}" w:bottom="${M}" w:left="${M}" w:header="360" w:footer="360" w:gutter="0"/><w:bidi/></w:sectPr></w:body></w:document>`);
+  z.file('word/document.xml',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><w:body>${body.join('')}${sect(pages[pages.length-1],true)}</w:body></w:document>`);
   return z.generateAsync({type:'uint8array',compression:'DEFLATE'});
 }
 async function convertSmart(idx){
@@ -3506,31 +3516,39 @@ async function convertSmart(idx){
 }
 window.__buildDocxSmart=buildDocxSmart;
 
-async function buildDocxLayout(pages){
-  const z=new JSZip(),E=12700,TW=20,rels=[],body=[];
-  const run=(t,r,sz)=>{const segs=[];for(const ch of t){const d=RE_R.test(ch)?'R':RE_LL.test(ch)?'L':null;const l=segs[segs.length-1];if(l&&(d===null||d===l.d))l.t+=ch;else segs.push({d:d||(l?l.d:'R'),t:ch});}
-    return segs.map(g=>`<w:r><w:rPr><w:rFonts w:ascii="${xesc(r.face)}" w:hAnsi="${xesc(r.face)}" w:cs="${xesc(r.face)}"/>${r.bold?'<w:b/><w:bCs/>':''}<w:color w:val="${(r.color||'#000000').slice(1)}"/><w:sz w:val="${sz}"/><w:szCs w:val="${sz}"/>${g.d==='R'?'<w:rtl/>':''}</w:rPr><w:t xml:space="preserve">${xesc(g.t)}</w:t></w:r>`).join('');};
-  pages.forEach((pg,pi)=>{
-    if(pi)body.push('<w:p><w:pPr><w:spacing w:after="0" w:line="20" w:lineRule="exact"/></w:pPr><w:r><w:br w:type="page"/></w:r></w:p>');
-    const id=pi+1,rid='rIdBg'+id,cx=Math.round(pg.w*E),cy=Math.round(pg.h*E);
+// one page exactly as it looks: the page picture behind, every paragraph as a text frame in its place
+function layoutRun(t,r,sz){const segs=[];for(const ch of t){const d=RE_R.test(ch)?'R':RE_LL.test(ch)?'L':null;const l=segs[segs.length-1];if(l&&(d===null||d===l.d))l.t+=ch;else segs.push({d:d||(l?l.d:'R'),t:ch});}
+  return segs.map(g=>`<w:r><w:rPr><w:rFonts w:ascii="${xesc(r.face)}" w:hAnsi="${xesc(r.face)}" w:cs="${xesc(r.face)}"/>${r.bold?'<w:b/><w:bCs/>':''}<w:color w:val="${(r.color||'#000000').slice(1)}"/><w:sz w:val="${sz}"/><w:szCs w:val="${sz}"/>${g.d==='R'?'<w:rtl/>':''}</w:rPr><w:t xml:space="preserve">${xesc(g.t)}</w:t></w:r>`).join('');}
+function layoutPageXml(pg,id,z,rels){
+  const E=12700,TW=20,out=[],run=layoutRun;
+    const rid='rIdBg'+id,cx=Math.round(pg.w*E),cy=Math.round(pg.h*E);
     z.file(`word/media/page${id}.jpeg`,pg.bgUrl.split(',')[1],{base64:true});
     rels.push(`<Relationship Id="${rid}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/page${id}.jpeg"/>`);
-    body.push(`<w:p><w:pPr><w:spacing w:after="0" w:line="20" w:lineRule="exact"/></w:pPr><w:r><w:drawing><wp:anchor distT="0" distB="0" distL="0" distR="0" simplePos="0" relativeHeight="${id}" behindDoc="1" locked="1" layoutInCell="1" allowOverlap="1"><wp:simplePos x="0" y="0"/><wp:positionH relativeFrom="page"><wp:posOffset>0</wp:posOffset></wp:positionH><wp:positionV relativeFrom="page"><wp:posOffset>0</wp:posOffset></wp:positionV><wp:extent cx="${cx}" cy="${cy}"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:wrapNone/><wp:docPr id="${id}" name="עמוד ${id}"/><wp:cNvGraphicFramePr/><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="${id}" name="page${id}.jpeg"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="${rid}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:anchor></w:drawing></w:r></w:p>`);
+    out.push(`<w:p><w:pPr><w:spacing w:after="0" w:line="20" w:lineRule="exact"/></w:pPr><w:r><w:drawing><wp:anchor distT="0" distB="0" distL="0" distR="0" simplePos="0" relativeHeight="${id}" behindDoc="1" locked="1" layoutInCell="1" allowOverlap="1"><wp:simplePos x="0" y="0"/><wp:positionH relativeFrom="page"><wp:posOffset>0</wp:posOffset></wp:positionH><wp:positionV relativeFrom="page"><wp:posOffset>0</wp:posOffset></wp:positionV><wp:extent cx="${cx}" cy="${cy}"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:wrapNone/><wp:docPr id="${id}" name="עמוד ${id}"/><wp:cNvGraphicFramePr/><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="${id}" name="page${id}.jpeg"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="${rid}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:anchor></w:drawing></w:r></w:p>`);
     for(const b of pg.blocks){
       if(b.deco)continue;
       const runs=blockRuns(b);if(!runs.length)continue;
       const vis=b.lines.filter(l=>!l.hidden),multi=vis.length>1,heb=b.dir==='R';
       let x0=Math.min(...vis.map(l=>l.x0)),x1=Math.max(...vis.map(l=>l.x1));
       if(multi){if(heb)x0=Math.min(x0,pg.colL);else x1=Math.max(x1,pg.colR);} // a paragraph flows in the page's text column, as in the original
-      const w=x1-x0,slack=multi?2:Math.max(14,w*.25); // a single line must never wrap
+      let w=x1-x0,slack=multi?2:Math.max(14,w*.25); // a single line must never wrap
+      if(!multi){const need=runs.reduce((t,r)=>t+textWidthPt(r.t,r.face||b.face,r.bold??b.bold,b.size),0)*1.08+6;if(need>w+slack)slack=need-w;}
       const x=Math.round(((heb?x0-slack:x0)-pg.ox)*TW),y=Math.round((pg.oy+pg.h-vis[0].y1)*TW),fw=Math.round((w+slack)*TW);
       const lineH=Math.round((multi?b.lh:b.size*1.18)*TW),sz=Math.max(8,Math.round(b.size*2));
       const jc=b.align==='justify'&&multi?'both':b.align==='center'&&multi?'center':'';
       const hang=Math.round(hangOf(b)*TW);
       const rs=runs.map(r=>run(r.t,{face:r.face||b.face,bold:r.bold??b.bold,color:r.color||b.fg},sz)).join('');
-      body.push(`<w:p><w:pPr><w:framePr w:w="${fw}" w:hRule="auto" w:wrap="none" w:vAnchor="page" w:hAnchor="page" w:x="${Math.max(0,x)}" w:y="${Math.max(0,y)}"/>${heb?'<w:bidi/>':''}<w:spacing w:before="0" w:after="0" w:line="${lineH}" w:lineRule="exact"/>${hang?`<w:ind w:start="${hang}" w:hanging="${hang}"/>`:''}${jc?`<w:jc w:val="${jc}"/>`:''}</w:pPr>${rs}</w:p>`);
+      out.push(`<w:p><w:pPr><w:framePr w:w="${fw}" w:hRule="auto" w:wrap="none" w:vAnchor="page" w:hAnchor="page" w:x="${Math.max(0,x)}" w:y="${Math.max(0,y)}"/>${heb?'<w:bidi/>':''}<w:spacing w:before="0" w:after="0" w:line="${lineH}" w:lineRule="exact"/>${hang?`<w:ind w:start="${hang}" w:hanging="${hang}"/>`:''}${jc?`<w:jc w:val="${jc}"/>`:''}</w:pPr>${rs}</w:p>`);
     }
+  return out.join('');
+}
+async function buildDocxLayout(pages){
+  const z=new JSZip(),TW=20,rels=[],body=[];
+  pages.forEach((pg,pi)=>{
+    if(pi)body.push('<w:p><w:pPr><w:spacing w:after="0" w:line="20" w:lineRule="exact"/></w:pPr><w:r><w:br w:type="page"/></w:r></w:p>');
+    body.push(layoutPageXml(pg,pi+1,z,rels));
   });
+
   const pw=Math.round(pages[0].w*TW),ph=Math.round(pages[0].h*TW);
   z.file('[Content_Types].xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="jpeg" ContentType="image/jpeg"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>');
   z.file('_rels/.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>');
