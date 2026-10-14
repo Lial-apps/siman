@@ -92,6 +92,9 @@ body[data-tool="text"] .iw,body[data-tool="highlight"] .iw,body[data-tool="pen"]
 body[data-tool="snip"] .ann,body[data-tool="redact"] .ann{pointer-events:auto;cursor:crosshair;touch-action:none}
 body[data-tool="redact"] .tw,body[data-tool="redact"] .iw,body[data-tool="redact"] .ew{pointer-events:none}
 .rd{position:absolute;background:#000}
+.wdraft{position:absolute;background:rgba(255,255,255,.75);outline:2px dashed var(--danger)}
+.rd.wipe{outline:1px dashed transparent}
+body[data-tool="eraser"] .rd.wipe:hover{outline-color:var(--danger)}
 .rdraft{position:absolute;background:rgba(0,0,0,.55);outline:1px solid #000}
 .ecov{position:absolute}
 .ew .ers{position:absolute;top:0;bottom:0;width:8px;inset-inline-end:-5px;cursor:ew-resize;opacity:0;background:var(--blue);border-radius:3px;touch-action:none}
@@ -1042,7 +1045,7 @@ dialog.sig{border-radius:14px}
 <body data-tool="select">
 
 <header class="bar">
-  <div class="brand"><b title="גרסה 3.0.1">סימן</b><span class="ver">3.0.1</span><span class="fname" id="fname"></span></div>
+  <div class="brand"><b title="גרסה 3.1">סימן</b><span class="ver">3.1</span><span class="fname" id="fname"></span></div>
 
   <nav class="tools" id="tools" aria-label="כלים">
     <button class="tool" data-tool="select" aria-pressed="true" title="בחירה וגלילה (V)">
@@ -1659,6 +1662,7 @@ function redactEl(P,a){
   const[x1,y1]=toCss(P,a.x1,a.y1),[x2,y2]=toCss(P,a.x2,a.y2);
   const d=document.createElement('div');d.className='rd';d.dataset.id=a.id;
   Object.assign(d.style,{left:Math.min(x1,x2)+'px',top:Math.min(y1,y2)+'px',width:Math.abs(x2-x1)+'px',height:Math.abs(y2-y1)+'px'});
+  if(a.fill){d.style.background=a.fill;d.classList.add('wipe');}
   return d;
 }
 function hlEl(P,a){
@@ -1733,7 +1737,9 @@ function bindAnnEvents(P){
       p.setAttribute('stroke',S.color.pen);p.setAttribute('stroke-width',S.size.pen*S.zoom);P.svg.append(p);
       draft={kind:'ink',pts:[[cx,cy]],el:p};p.setAttribute('d',`M${cx} ${cy} l0.1 0`);return;
     }
-    if(tool==='eraser'){e.preventDefault();P.ann.setPointerCapture(e.pointerId);draft={kind:'erase'};eraseAt(e);}
+    if(tool==='eraser'){e.preventDefault();P.ann.setPointerCapture(e.pointerId);
+      if(eraseAt(e)){draft={kind:'erase'};return;}
+      const d=document.createElement('div');d.className='wdraft';P.hl.append(d);draft={kind:'wipe',sx:cx,sy:cy,el:d};return;}
     if(tool==='edit'){
       if(e.target.closest('.ew'))return;
       e.preventDefault();startEdit(P,cx,cy);return;
@@ -1753,7 +1759,7 @@ function bindAnnEvents(P){
   });
   P.ann.addEventListener('pointermove',e=>{
     if(!draft)return;const[cx,cy]=localXY(P,e);
-    if(draft.kind==='hl'||draft.kind==='snip'||draft.kind==='redact'){Object.assign(draft.el.style,{left:Math.min(cx,draft.sx)+'px',top:Math.min(cy,draft.sy)+'px',width:Math.abs(cx-draft.sx)+'px',height:Math.abs(cy-draft.sy)+'px'});}
+    if(draft.kind==='hl'||draft.kind==='snip'||draft.kind==='redact'||draft.kind==='wipe'){Object.assign(draft.el.style,{left:Math.min(cx,draft.sx)+'px',top:Math.min(cy,draft.sy)+'px',width:Math.abs(cx-draft.sx)+'px',height:Math.abs(cy-draft.sy)+'px'});}
     else if(draft.kind==='ink'){const evs=e.getCoalescedEvents?e.getCoalescedEvents():[e];for(const ev of evs)draft.pts.push(localXY(P,ev));
       draft.el.setAttribute('d',draft.pts.map((p,k)=>(k?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' '));}
     else if(draft.kind==='erase')eraseAt(e);
@@ -1762,6 +1768,13 @@ function bindAnnEvents(P){
   P.ann.addEventListener('pointerleave',()=>{if(P.hov)P.hov.remove();P.hov=null;});
   const finish=e=>{
     if(!draft)return;const d=draft;draft=null;
+    if(d.kind==='wipe'){ // erase the document itself: the area takes the page colour and the text under it is removed
+      const[cx,cy]=localXY(P,e);d.el.remove();
+      if(Math.abs(cx-d.sx)<4||Math.abs(cy-d.sy)<4)return;
+      const[x1,y1]=toPdf(P,d.sx,d.sy),[x2,y2]=toPdf(P,cx,cy);
+      const{bg}=sampleColors(P,{x0:Math.min(x1,x2),x1:Math.max(x1,x2),y0:Math.min(y1,y2),y1:Math.max(y1,y2)});
+      snapshot();S.anns.push({id:S.nextId++,type:'redact',page:P.i-1,x1,y1,x2,y2,fill:bg});drawAnns(P);return;
+    }
     if(d.kind==='redact'){
       const[cx,cy]=localXY(P,e);d.el.remove();
       if(Math.abs(cx-d.sx)<4||Math.abs(cy-d.sy)<4)return;
@@ -1787,7 +1800,8 @@ function bindAnnEvents(P){
 }
 function eraseAt(e){
   const els=document.elementsFromPoint(e.clientX,e.clientY);
-  for(const el of els){const host=el.closest('[data-id]');if(host&&host.closest('.ann')){removeAnn(+host.dataset.id);return;}}
+  for(const el of els){const host=el.closest('[data-id]');if(host&&host.closest('.ann')){removeAnn(+host.dataset.id);return true;}}
+  return false;
 }
 // light point thinning so long strokes stay small
 function simplify(pts,tol){if(pts.length<3)return pts;const out=[pts[0]];for(let k=1;k<pts.length-1;k++){const p=out[out.length-1],q=pts[k];if(Math.hypot(q[0]-p[0],q[1]-p[1])>=tol)out.push(q);}out.push(pts[pts.length-1]);return out;}
@@ -2078,7 +2092,7 @@ async function buildPdf(){
         }
       }
     }else if(a.type==='redact'){
-      pg.drawRectangle({x:Math.min(a.x1,a.x2),y:Math.min(a.y1,a.y2),width:Math.abs(a.x2-a.x1),height:Math.abs(a.y2-a.y1),color:PDFLib.rgb(0,0,0)});
+      pg.drawRectangle({x:Math.min(a.x1,a.x2),y:Math.min(a.y1,a.y2),width:Math.abs(a.x2-a.x1),height:Math.abs(a.y2-a.y1),color:a.fill?hexRgb(a.fill):PDFLib.rgb(0,0,0)});
     }else if(a.type==='img'){
       let im=imgCache.get(a.src);
       if(!im){const bytes=dataUrlBytes(a.src);im=/^data:image\/jpe?g/.test(a.src)?await doc.embedJpg(bytes):await doc.embedPng(bytes);imgCache.set(a.src,im);}
@@ -2699,7 +2713,7 @@ function setTool(t){
   $('pasteBtn').classList.toggle('hidden',t!=='select'||!S.doc);
   if(t!=='place')S.pending=null;
   const sw=$('swatches'),sz=$('sizeWrap'),lbl=$('optLabel');
-  const labels={edit:'לחצו על שורה כדי לערוך אותה. Esc לסיום',redact:'גררו מלבן על מידע רגיש. הטקסט שמתחת יימחק מהקובץ לגמרי ויוחלף בפס שחור',snip:'גררו מלבן סביב האזור שרוצים להעתיק. אחר כך מדביקים ב-Word, בוואטסאפ או בתוך המסמך',place:'לחצו על הדף במקום שבו לשים את '+(S.pending&&S.pending.sig?'החתימה':'התמונה'),select:'',text:'לחצו על הדף כדי לכתוב',highlight:'גררו מלבן על מה שרוצים לסמן',pen:'כתבו או ציירו חופשי',eraser:'לחצו או גררו על סימון כדי למחוק אותו'};
+  const labels={edit:'לחצו על שורה כדי לערוך אותה. Esc לסיום',redact:'גררו מלבן על מידע רגיש. הטקסט שמתחת יימחק מהקובץ לגמרי ויוחלף בפס שחור',snip:'גררו מלבן סביב האזור שרוצים להעתיק. אחר כך מדביקים ב-Word, בוואטסאפ או בתוך המסמך',place:'לחצו על הדף במקום שבו לשים את '+(S.pending&&S.pending.sig?'החתימה':'התמונה'),select:'',text:'לחצו על הדף כדי לכתוב',highlight:'גררו מלבן על מה שרוצים לסמן',pen:'כתבו או ציירו חופשי',eraser:'לוחצים על סימון כדי למחוק אותו. גוררים מלבן על הדף כדי למחוק מה שכתוב שם'};
   lbl.textContent=labels[t];
   sw.classList.toggle('hidden',!PALETTE[t]);sz.classList.toggle('hidden',!SIZES[t]);
   if(PALETTE[t]){sw.innerHTML='';PALETTE[t].forEach(c=>{const b=document.createElement('button');b.className='sw';b.style.background=c;b.title=c;b.setAttribute('aria-label','צבע '+c);
@@ -3361,16 +3375,27 @@ async function aiLayout(imageB64,text,label){
   throw new Error(lastErr||'השירות לא זמין כרגע');
 }
 function linesForAI(pg){
-  const L=[];const N=v=>Math.max(0,Math.min(1000,Math.round(v)));
-  for(const b of pg.blocks)for(const l of b.lines){
-    if(l.hidden||!l.text.trim())continue;
+  const out=[],N=v=>Math.max(0,Math.min(1000,Math.round(v)));pg.aiLines=[];
+  const all=[];for(const b of pg.blocks)for(const l of b.lines)if(!l.hidden&&l.text.trim())all.push({l,b});
+  all.sort((p,q)=>q.l.y1-p.l.y1||(p.l.dir==='R'?q.l.x1-p.l.x1:p.l.x0-q.l.x0));
+  for(const{l,b}of all){
+    pg.aiLines.push({l,b});const n=pg.aiLines.length;
     const top=N((pg.oy+pg.h-l.y1)/pg.h*1000),bot=N((pg.oy+pg.h-l.y0)/pg.h*1000),left=N((l.x0-pg.ox)/pg.w*1000),right=N((l.x1-pg.ox)/pg.w*1000);
-    const r0=(l.runs&&l.runs[0])||{};const bold=(l.runs||[]).some(r=>r.bold)||b.bold;
-    const colors=[...new Set((l.runs||[]).map(r=>r.color).filter(Boolean))];
-    const txt=(l.runs&&l.runs.length>1&&colors.length>1)?l.runs.map(r=>`{${r.color}${r.bold?' b':''}}${r.t}`).join(''):l.text;
-    L.push({top,t:`[${top}-${bot}|${left}-${right}] ${Math.round(l.size)} b=${bold?1:0} ${colors.length===1?colors[0]:(r0.color||'#000000')} ${txt}`});
+    const bold=(l.runs||[]).some(r=>r.bold)||b.bold;
+    out.push(`L${n} [${top}-${bot}|${left}-${right}] ${Math.round(l.size)}pt${bold?' bold':''} ${l.text}`);
   }
-  return L.sort((a,b)=>a.top-b.top).map(x=>x.t).join('\n');
+  return out.join('\n');
+}
+// runs of the given line numbers, joined into one paragraph (colours and bold from the PDF itself)
+function aiRuns(pg,ids,strip){
+  const runs=[];const used=pg.aiUsed||(pg.aiUsed=new Set());
+  (ids||[]).forEach((id,k)=>{const e=pg.aiLines[(+String(id).replace(/\D/g,''))-1];if(!e)return;used.add(e);
+    const rs=(e.l.runs&&e.l.runs.length?e.l.runs:[{t:e.l.text,color:e.b.fg,bold:e.b.bold}]).map(r=>({t:r.t,b:r.bold??e.b.bold,c:r.color||e.b.fg,size:Math.round(e.l.size*10)/10}));
+    if(k&&rs.length)rs[0].t=' '+rs[0].t;runs.push(...rs);});
+  if(strip&&runs.length){ // the list marker is drawn by Word itself
+    runs[0].t=runs[0].t.replace(/^\s*([•·▪◦●■\-–*]+|\.?\d{1,3}[.)]|[א-ת][.)]|\.[א-ת])\s*/,'');
+  }
+  return runs;
 }
 async function buildDocxSmart(pages,progress){
   const z=new JSZip(),rels=[],media=[],EMU=12700;let imgN=0,numN=2;const nums=[];
@@ -3400,13 +3425,14 @@ async function buildDocxSmart(pages,progress){
     const out=[];
     for(const bl of blocks||[]){
       const t=bl.type;
-      if(t==='heading'){const lvl=Math.min(3,Math.max(1,bl.level||1));const sz=[0,18,15,13][lvl];
-        out.push(para(bl.runs,{align:bl.align,size:sz,b:true,after:160,extra:`<w:keepNext/><w:outlineLvl w:val="${lvl-1}"/>`}));}
-      else if(t==='paragraph')out.push(para(bl.runs,{align:bl.align}));
+      const R_=(o,strip)=>o&&o.lines?aiRuns(pg,o.lines,strip):(o&&o.runs)||[];
+      if(t==='heading'){const lvl=Math.min(3,Math.max(1,bl.level||1));
+        out.push(para(R_(bl),{align:bl.align,b:true,after:160,extra:`<w:keepNext/><w:outlineLvl w:val="${lvl-1}"/>`}));}
+      else if(t==='paragraph')out.push(para(R_(bl),{align:bl.align}));
       else if(t==='list'){
         let numId=1;if(bl.ordered){numId=++numN;nums.push(numId);}
         for(const it of bl.items||[]){const lv=Math.min(2,Math.max(0,it.level||0));
-          out.push(para(it.runs,{align:'right',after:60,extra:`<w:numPr><w:ilvl w:val="${lv}"/><w:numId w:val="${numId}"/></w:numPr>`}));}
+          out.push(para(R_(it,true),{align:'right',after:60,extra:`<w:numPr><w:ilvl w:val="${lv}"/><w:numId w:val="${numId}"/></w:numPr>`}));}
       }
       else if(t==='table'||t==='row'){
         const rows=t==='row'?[(bl.columns||[]).map(c=>({blocks:c.blocks,width:c.width}))]:(bl.rows||[]);if(!rows.length)continue;
@@ -3416,7 +3442,7 @@ async function buildDocxSmart(pages,progress){
         let x=`<w:tbl><w:tblPr>${rtlPage?'<w:bidiVisual/>':''}<w:tblW w:w="${tw}" w:type="dxa"/><w:tblLayout w:type="fixed"/><w:tblBorders>${['top','left','bottom','right','insideH','insideV'].map(s=>border?`<w:${s} w:val="single" w:sz="6" w:color="666666"/>`:`<w:${s} w:val="nil"/>`).join('')}</w:tblBorders><w:tblCellMar><w:left w:w="80" w:type="dxa"/><w:right w:w="80" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid>${ws.map(w=>`<w:gridCol w:w="${Math.round(tw*w)}"/>`).join('')}</w:tblGrid>`;
         for(const row of rows){x+='<w:tr>';
           for(let c=0;c<n;c++){const cell=row[c]||{};const cw=Math.round(tw*ws[c]);const fill=hexOk(cell.fill);
-            const inner=t==='row'?await blocksXml(pg,cell.blocks,widthPt*ws[c]-10,rtlPage):para(cell.runs,{align:cell.align,after:0});
+            const inner=t==='row'?await blocksXml(pg,cell.blocks,widthPt*ws[c]-10,rtlPage):para(R_(cell),{align:cell.align,after:0});
             x+=`<w:tc><w:tcPr><w:tcW w:w="${cw}" w:type="dxa"/>${fill?`<w:shd w:val="clear" w:color="auto" w:fill="${fill}"/>`:''}<w:vAlign w:val="center"/></w:tcPr>${inner||'<w:p/>'}</w:tc>`;}
           x+='</w:tr>';}
         out.push(x+'</w:tbl><w:p><w:pPr><w:spacing w:after="60"/></w:pPr></w:p>');
@@ -3431,7 +3457,9 @@ async function buildDocxSmart(pages,progress){
     progress&&progress(`בונה את עמוד ${pi+1}…`);
     if(pi)body.push('<w:p><w:r><w:br w:type="page"/></w:r></w:p>');
     const rtlPage=isRtl(pg.blocks.map(b=>b.text).join(' '));
-    if(pg.ai)body.push(await blocksXml(pg,pg.ai,textW,rtlPage));
+    if(pg.ai){pg.aiUsed=new Set();body.push(await blocksXml(pg,pg.ai,textW,rtlPage));
+      const left=(pg.aiLines||[]).filter(e=>!pg.aiUsed.has(e));
+      for(const e of left){const rs=(e.l.runs||[{t:e.l.text,color:e.b.fg,bold:e.b.bold}]).map(r=>({t:r.t,b:r.bold,c:r.color,size:Math.round(e.l.size)}));body.push(para(rs,{align:e.l.dir==='R'?'right':'left'}));}}
     else{ // no structure for this page: plain paragraphs in reading order, so nothing is lost
       for(const b of pg.blocks){const runs=blockRuns(b).map(r=>({t:r.t,b:r.bold,c:r.color,size:Math.round(b.size)}));if(runs.length)body.push(para(runs,{align:b.align==='center'?'center':(b.dir==='R'?'right':'left')}));}
     }
@@ -3455,7 +3483,7 @@ async function convertSmart(idx){
     const r=pg.orig; // the page as it looks (for the model)
     // logos and signatures are cut from the text-free picture, so no words come along with them
     const bgImg=new Image();bgImg.src=pg.bgUrl;await bgImg.decode();const bc=document.createElement('canvas');bc.width=bgImg.naturalWidth;bc.height=bgImg.naturalHeight;bc.getContext('2d').drawImage(bgImg,0,0);pg.canvas=bc;
-    const small=document.createElement('canvas');const k=Math.min(1,1400/r.c.width);small.width=Math.round(r.c.width*k);small.height=Math.round(r.c.height*k);
+    const small=document.createElement('canvas');const k=Math.min(1,1100/r.c.width);small.width=Math.round(r.c.width*k);small.height=Math.round(r.c.height*k);
     small.getContext('2d').drawImage(r.c,0,0,small.width,small.height);
     try{pg.ai=await aiLayout(small.toDataURL('image/jpeg',.85).split(',')[1],linesForAI(pg),`עמוד ${pg.idx+1}`);}
     catch(e){pg.aiError=e.message;pg.ai=null;}
