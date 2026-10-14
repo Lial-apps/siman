@@ -800,6 +800,38 @@ dialog.sig::backdrop{background:rgba(20,24,33,.45)}
 .sig-saved img{max-height:46px;max-width:140px}
 .sig-saved .x{position:absolute;top:-8px;inset-inline-end:-8px;width:20px;height:20px;border-radius:50%;border:1px solid var(--line);background:var(--bar);font-size:12px;line-height:1;cursor:pointer;padding:0}
 
+/* ---------- Office files ---------- */
+.office{display:flex;justify-content:center;padding:8px 0 40px}
+.of-sheet{background:var(--bar);width:min(860px,100%);border-radius:3px;box-shadow:var(--paper-shadow);padding:28px 32px 32px}
+.of-head{display:flex;align-items:center;gap:16px}
+.of-ico{width:52px;height:64px;flex:none;border-radius:4px;display:grid;place-items:end center;padding-bottom:9px;font-size:12px;font-weight:700;color:#fff;letter-spacing:.04em;background:#C43E1C;position:relative;clip-path:polygon(0 0,72% 0,100% 20%,100% 100%,0 100%)}
+.of-ico.docx{background:#2B579A}.of-ico.xlsx{background:#217346}
+.of-title{flex:1;min-width:0}
+.of-title h2{margin:0;font-size:20px;line-height:1.3;overflow-wrap:anywhere}
+.of-title p{margin:2px 0 0;color:var(--muted);font-size:13.5px}
+.of-pill{flex:none;font-size:13px;font-weight:600;padding:5px 12px;border-radius:999px;background:color-mix(in srgb,var(--ink) 8%,transparent)}
+.of-pill.ok{background:#DDF3E4;color:#14653A}.of-pill.fixed{background:#FFF1B8;color:#6B5200}.of-pill.bad{background:#FBE0DC;color:#9B2A1A}
+.of-log{list-style:none;margin:22px 0 0;padding:0;display:flex;flex-direction:column;gap:6px;font-size:14px}
+.of-log li{display:flex;gap:10px;align-items:baseline;line-height:1.45}
+.of-log li::before{content:"";width:8px;height:8px;border-radius:50%;flex:none;transform:translateY(-1px);background:var(--muted)}
+.of-log li.fix::before{background:#E0A800}.of-log li.ok::before{background:#2E9E5B}.of-log li.err::before{background:#C2362B}.of-log li.warn::before{background:#E07A00}
+.of-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:22px}
+.of-note{color:var(--muted);font-size:13px;margin:10px 0 0}
+.of-sub{font-size:14px;margin:28px 0 10px;color:var(--muted);font-weight:500}
+.of-preview{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}
+.of-card{border:1px solid var(--line);border-radius:8px;padding:12px 14px;font-size:13px;line-height:1.5;min-height:90px;background:color-mix(in srgb,var(--desk) 30%,var(--bar))}
+.of-card b{display:block;font-size:12px;color:var(--muted);font-weight:500;margin-bottom:4px}
+.of-card .t1{font-weight:600;font-size:14px}
+.of-card .imgs{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.of-card img{height:46px;max-width:90px;object-fit:cover;border-radius:3px;border:1px solid var(--line)}
+.of-doc{grid-column:1/-1;font-size:14px;line-height:1.7;max-height:420px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:14px 18px}
+.of-doc p{margin:0 0 6px;unicode-bidi:plaintext;text-align:start}
+.of-doc p.h{font-weight:700;font-size:16px;margin-top:10px}
+.of-table{grid-column:1/-1;overflow:auto;border:1px solid var(--line);border-radius:8px}
+.of-table table{border-collapse:collapse;font-size:13px;min-width:100%}
+.of-table td{border:1px solid var(--line);padding:4px 8px;white-space:nowrap;max-width:220px;overflow:hidden;text-overflow:ellipsis;unicode-bidi:plaintext}
+.of-table caption{caption-side:top;text-align:start;padding:8px 10px;font-weight:600}
+@media (max-width:720px){.of-sheet{padding:18px}.of-head{flex-wrap:wrap}}
 /* ---------- pages panel ---------- */
 .pgpanel{width:190px;flex:none;background:var(--bar);border-inline-end:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
 .pg-tools{padding:10px;border-bottom:1px solid var(--line)}
@@ -962,7 +994,7 @@ body{font-family:"SF-heebo","Segoe UI",Arial,sans-serif;letter-spacing:.005em}
 .drop{position:relative;background:var(--bar);border:0;border-radius:3px;box-shadow:var(--paper-shadow);gap:12px;width:min(440px,100%);aspect-ratio:1/1.3}
 .drop::before{content:"";position:absolute;top:0;inset-inline-end:0;width:44px;height:44px;background:linear-gradient(225deg,var(--desk) 50%,color-mix(in srgb,var(--ink) 10%,var(--bar)) 50%);border-end-start-radius:4px;box-shadow:-2px 2px 4px rgba(22,33,58,.12)}
 .drop h1{font-family:"SF-frank","Times New Roman",serif;font-size:38px;font-weight:700;color:var(--ink);margin:0;line-height:1.1;position:relative;z-index:1}
-.drop .swipe{width:220px;height:18px;margin-top:-16px;opacity:.85}
+.drop .swipe{width:170px;height:18px;margin-top:-16px;opacity:.85}
 .drop p{color:var(--muted);max-width:32ch;font-size:15px}
 .drop .drop-hint{font-size:13px;margin-top:-4px}
 body.dragging .drop{outline:3px dashed var(--blue);outline-offset:8px}
@@ -989,7 +1021,7 @@ dialog.sig{border-radius:14px}
 <body data-tool="select">
 
 <header class="bar">
-  <div class="brand"><b title="גרסה 2.4.1">סימן</b><span class="ver">2.4.1</span><span class="fname" id="fname"></span></div>
+  <div class="brand"><b title="גרסה 2.5">סימן</b><span class="ver">2.5</span><span class="fname" id="fname"></span></div>
 
   <nav class="tools" id="tools" aria-label="כלים">
     <button class="tool" data-tool="select" aria-pressed="true" title="בחירה וגלילה (V)">
@@ -1030,7 +1062,7 @@ dialog.sig{border-radius:14px}
     <button class="btn primary" id="saveBtn" disabled title="Ctrl+S">שמירה</button>
     <button class="btn install hidden" id="installBtn" title="התקנת האפליקציה במכשיר">התקנה</button>
   </div>
-  <input type="file" id="file" accept="application/pdf,.pdf" hidden>
+  <input type="file" id="file" accept="application/pdf,.pdf,.docx,.xlsx,.pptx,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.presentationml.presentation" hidden>
   <input type="file" id="mergeFile" accept="application/pdf,.pdf" hidden multiple>
   <input type="file" id="imgFile" accept="image/*" hidden>
 </header>
@@ -1068,15 +1100,32 @@ dialog.sig{border-radius:14px}
 <main class="desk" id="desk">
   <div class="empty" id="empty">
     <div class="drop">
-      <h1>פתחו קובץ PDF</h1>
+      <h1>פתחו קובץ</h1>
       <svg class="swipe" viewBox="0 0 300 26" preserveAspectRatio="none" aria-hidden="true"><path d="M6 15c46-9 98-11 150-9s92 7 138 2" stroke="#FFD43B" stroke-width="16" stroke-linecap="round" fill="none" opacity=".9"/></svg>
-      <p>קוראים, מסמנים, עורכים טקסט בעברית, ממלאים טפסים, חותמים ומתרגמים. הקובץ נשאר במחשב שלכם.</p>
+      <p>PDF לקריאה, סימון, עריכה, חתימה ותרגום. Word, Excel ו-PowerPoint לבדיקה ולתיקון קבצים שלא נפתחים. הקובץ נשאר במחשב שלכם.</p>
       <button class="btn primary big" id="openBtn2">בחירת קובץ</button>
       <p class="drop-hint">או גררו את הקובץ לכאן</p>
       <p class="ios-hint hidden" id="iosHint">להתקנה באייפון: לוחצים על "שיתוף" ב-Safari ואז "הוסף למסך הבית".</p>
     </div>
   </div>
   <div class="pages" id="pages"></div>
+  <section class="office hidden" id="officeView" aria-live="polite">
+    <div class="of-sheet">
+      <div class="of-head">
+        <div class="of-ico" id="ofIco">PPTX</div>
+        <div class="of-title"><h2 id="ofName"></h2><p id="ofKind"></p></div>
+        <span class="of-pill" id="ofPill"></span>
+      </div>
+      <ul class="of-log" id="ofLog"></ul>
+      <div class="of-actions">
+        <button class="btn primary" id="ofSave">שמירת הקובץ המתוקן</button>
+        <button class="btn" id="ofExtract">חילוץ התוכן לקובץ חדש</button>
+      </div>
+      <p class="of-note" id="ofNote"></p>
+      <h3 class="of-sub" id="ofSub">מה יש בקובץ</h3>
+      <div class="of-preview" id="ofPreview"></div>
+    </div>
+  </section>
 </main>
 
 <aside class="tpanel hidden" id="tpanel" aria-label="תרגום">
@@ -1260,7 +1309,9 @@ function setDirty(v){S.dirty=v;document.title=(v?'• ':'')+(S.name?S.name+' —
 async function openFile(file,handle){
   if(!file)return;
   if(S.dirty&&!confirm('יש שינויים שלא נשמרו. לפתוח קובץ אחר בכל זאת?'))return;
-  if(!/\.pdf$/i.test(file.name)&&file.type!=='application/pdf'){toast('אפשר לפתוח רק קובצי PDF');return;}
+  if(/\.(docx|xlsx|pptx)$/i.test(file.name)){await openOffice(file,handle);return;}
+  if(!/\.pdf$/i.test(file.name)&&file.type!=='application/pdf'){toast('אפשר לפתוח קובצי PDF, Word, Excel ו-PowerPoint');return;}
+  showOfficeView(false);
   busy(true,'פותח את הקובץ…');
   try{
     const bytes=new Uint8Array(await file.arrayBuffer());
@@ -2019,6 +2070,7 @@ async function buildPdf(){
 }
 const FS=!!(window.showSaveFilePicker&&window.showOpenFilePicker);
 const PDF_TYPE=[{description:'PDF',accept:{'application/pdf':['.pdf']}}];
+const OPEN_TYPES=[{description:'PDF, Word, Excel, PowerPoint',accept:{'application/pdf':['.pdf'],'application/vnd.openxmlformats-officedocument.wordprocessingml.document':['.docx'],'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':['.xlsx'],'application/vnd.openxmlformats-officedocument.presentationml.presentation':['.pptx']}}];
 async function writeHandle(h,bytes){
   if(h.queryPermission&&(await h.queryPermission({mode:'readwrite'}))!=='granted'){
     if((await h.requestPermission({mode:'readwrite'}))!=='granted')throw new Error('אין הרשאה לכתוב לקובץ');}
@@ -2043,15 +2095,15 @@ window.__buildPdf=buildPdf; // used by automated tests
 
 // returns {handle} when saved through the file system, true when shared/downloaded, false when cancelled
 async function saveBytes(name,bytes,kind){
-  const isTxt=kind==='txt',isDocx=kind==='docx',isZip=kind==='zip';
+  const isTxt=kind==='txt',isDocx=kind==='docx',isZip=kind==='zip',isOff=kind==='pptx'||kind==='xlsx';
   const DOCX_MIME='application/vnd.openxmlformats-officedocument.wordprocessingml.document';
   if(FS){
     try{
-      const h=await showSaveFilePicker({suggestedName:name,types:isTxt?[{description:'טקסט',accept:{'text/plain':['.txt']}}]:isDocx?[{description:'Word',accept:{[DOCX_MIME]:['.docx']}}]:isZip?[{description:'ZIP',accept:{'application/zip':['.zip']}}]:PDF_TYPE});
-      await writeHandle(h,bytes);return (isTxt||isDocx||isZip)?true:{handle:h};
+      const h=await showSaveFilePicker({suggestedName:name,types:isTxt?[{description:'טקסט',accept:{'text/plain':['.txt']}}]:isDocx?[{description:'Word',accept:{[DOCX_MIME]:['.docx']}}]:isZip?[{description:'ZIP',accept:{'application/zip':['.zip']}}]:isOff?[{description:kind==='pptx'?'PowerPoint':'Excel',accept:{[OFFICE_MIME[kind]]:['.'+kind]}}]:PDF_TYPE});
+      await writeHandle(h,bytes);return (isTxt||isDocx||isZip||isOff)?true:{handle:h};
     }catch(e){if(e&&e.name==='AbortError')return false;throw e;}
   }
-  const type=isTxt?'text/plain':isDocx?DOCX_MIME:isZip?'application/zip':'application/pdf';
+  const type=isTxt?'text/plain':isDocx?DOCX_MIME:isZip?'application/zip':isOff?OFFICE_MIME[kind]:'application/pdf';
   const file=new File([bytes],name,{type});
   // phones: open the share sheet (save to Files, send by WhatsApp/mail…)
   if(matchMedia('(pointer:coarse)').matches&&navigator.canShare&&navigator.canShare({files:[file]})){
@@ -2608,7 +2660,7 @@ $('tools').addEventListener('click',e=>{const b=e.target.closest('.tool');if(!b)
 /* ===================== wiring ===================== */
 async function pickFile(){
   if(window.showOpenFilePicker){
-    try{const[h]=await showOpenFilePicker({types:PDF_TYPE,multiple:false});openFile(await h.getFile(),h);}
+    try{const[h]=await showOpenFilePicker({types:OPEN_TYPES,multiple:false});openFile(await h.getFile(),h);}
     catch(e){if(e&&e.name!=='AbortError')$('file').click();}
   }else $('file').click();
 }
@@ -2959,6 +3011,78 @@ async function exportPages(indices,mode,names){
   finally{busy(false);}
 }
 window.__exportPages=exportPages;
+
+/* =====================================================================
+   OFFICE — open Word / Excel / PowerPoint files, check them, repair them,
+   or pull their content into a brand-new file. Libraries load on demand.
+   ===================================================================== */
+const OFFICE_MIME={pptx:'application/vnd.openxmlformats-officedocument.presentationml.presentation',xlsx:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',docx:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'};
+let officeLibs=null;
+const loadOfficeLibs=()=>officeLibs||(officeLibs=(async()=>{if(!window.JSZip)await loadScript('jszip.min.js');if(!window.PptxGenJS)await loadScript('pptxgen.min.js');if(!window.OFFICE)await loadScript('office.js');})());
+const OF={};
+function showOfficeView(on){
+  $('officeView').classList.toggle('hidden',!on);$('pages').classList.toggle('hidden',on);
+  if(on){$('empty').classList.add('hidden');['saveBtn','saveAsBtn','trBtn','pgBtn','printBtn'].forEach(id=>$(id).disabled=true);$('pgpanel').classList.add('hidden');$('tpanel').classList.add('hidden');}
+}
+async function openOffice(file,handle){
+  busy(true,'בודק את הקובץ…');
+  try{
+    await loadOfficeLibs();
+    const bytes=new Uint8Array(await file.arrayBuffer());
+    const res=await OFFICE.repair(bytes,file.name);
+    if(S.doc){S.doc.destroy();S.doc=null;S.pages=[];$('pages').innerHTML='';}
+    Object.assign(S,{bytes:null,name:file.name,anns:[],hist:[],redo:[]});setDirty(false);
+    Object.assign(OF,{res,name:file.name,handle});
+    $('fname').textContent=file.name;showOfficeView(true);renderOffice();
+  }catch(e){console.error(e);toast('לא הצלחתי לקרוא את הקובץ: '+(e.message||e));}
+  finally{busy(false);}
+}
+function renderOffice(){
+  const r=OF.res,k=r.kind||'docx',K=OFFICE.KIND[k]||{name:'קובץ'};
+  $('ofIco').textContent=(k||'?').toUpperCase();$('ofIco').className='of-ico '+k;
+  $('ofName').textContent=OF.name;$('ofKind').textContent=K.name;
+  const pill=$('ofPill');
+  if(r.fatal&&!r.files.size){pill.textContent='לא ניתן לשחזר';pill.className='of-pill bad';}
+  else if(r.fatal){pill.textContent='פגום, אפשר לחלץ תוכן';pill.className='of-pill bad';}
+  else if(r.changed){pill.textContent='נמצאו תקלות ותוקנו';pill.className='of-pill fixed';}
+  else{pill.textContent='הקובץ תקין';pill.className='of-pill ok';}
+  $('ofLog').innerHTML='';for(const l of r.log){const li=document.createElement('li');li.className=l.lvl;li.textContent=l.msg;$('ofLog').append(li);}
+  $('ofSave').classList.toggle('hidden',!!r.fatal||!r.kind);
+  $('ofSave').textContent=r.changed?'שמירת הקובץ המתוקן':'שמירת עותק';
+  $('ofExtract').classList.toggle('hidden',!r.kind||!r.files.size);
+  $('ofNote').textContent=r.changed?'הקובץ המתוקן נשמר כקובץ חדש, והמקורי לא משתנה. אם הוא עדיין לא נפתח, "חילוץ התוכן" בונה קובץ חדש מהטקסט והתמונות.':(r.fatal?'"חילוץ התוכן" בונה קובץ חדש מכל מה שאפשר היה לקרוא.':'');
+  // preview
+  const pv=$('ofPreview');pv.innerHTML='';
+  let c;try{c=OFFICE.content(r);}catch(e){c={items:[]};}
+  $('ofSub').textContent=k==='pptx'?`מה יש בקובץ: ${c.items.length} שקפים`:k==='xlsx'?`מה יש בקובץ: ${c.items.length} גיליונות`:'מה יש בקובץ';
+  const esc=t=>t.replace(/[&<>]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'})[m]);
+  if(k==='pptx')c.items.forEach((it,n)=>{
+    const d=document.createElement('div');d.className='of-card';
+    const ps=it.paras.slice(0,4);
+    d.innerHTML=`<b>שקף ${n+1}</b>${ps.map((p,j)=>`<div class="${j===0?'t1':''}" dir="auto">${esc(p.t)}</div>`).join('')||'<div>(בלי טקסט)</div>'}`;
+    if(it.images.length){const w=document.createElement('div');w.className='imgs';it.images.slice(0,3).forEach(p=>{const img=document.createElement('img');img.alt='';img.src=URL.createObjectURL(new Blob([r.files.get(p)]));w.append(img);});d.append(w);}
+    pv.append(d);});
+  else if(k==='docx'&&c.items[0]){const d=document.createElement('div');d.className='of-doc';d.innerHTML=c.items[0].paras.filter(p=>p.t.trim()).slice(0,80).map(p=>`<p class="${p.title?'h':''}" dir="auto">${esc(p.t)}</p>`).join('')||'<p>(לא נמצא טקסט)</p>';pv.append(d);}
+  else if(k==='xlsx')c.items.forEach(sh=>{const d=document.createElement('div');d.className='of-table';const rows=sh.rows.slice(0,12);const cols=Math.min(8,Math.max(0,...rows.map(r=>r.length)));
+    d.innerHTML=`<table><caption>${esc(sh.name||'')}</caption>${rows.map(r=>`<tr>${Array.from({length:cols},(_,i)=>`<td dir="auto">${esc(String(r[i]??''))}</td>`).join('')}</tr>`).join('')}</table>`;pv.append(d);});
+  if(!pv.children.length)pv.innerHTML='<p class="of-note">לא נמצא תוכן להצגה.</p>';
+}
+const officeBase=()=>OF.name.replace(/\.(docx|xlsx|pptx)$/i,'');
+$('ofSave').onclick=async()=>{
+  busy(true,'בונה את הקובץ…');
+  try{const out=await OFFICE.build(OF.res);busy(false);
+    const name=`${officeBase()}${OF.res.changed?' - מתוקן':' - עותק'}.${OF.res.kind}`;
+    if(await saveBytes(name,out,OF.res.kind))toast('נשמר: '+name);}
+  catch(e){console.error(e);toast('השמירה נכשלה: '+(e.message||e));}finally{busy(false);}
+};
+$('ofExtract').onclick=async()=>{
+  busy(true,'בונה קובץ חדש מהתוכן…');
+  try{const x=await OFFICE.extractToNew(OF.res);busy(false);
+    const name=`${officeBase()} - תוכן משוחזר.${x.ext}`;
+    if(await saveBytes(name,x.bytes,x.ext))toast('נשמר: '+name);}
+  catch(e){console.error(e);toast('החילוץ נכשל: '+(e.message||e));}finally{busy(false);}
+};
+window.__office=OF;
 
 /* ---------- separate files with smart names ---------- */
 let splitIdx=[];
