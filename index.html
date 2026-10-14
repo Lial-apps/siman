@@ -838,6 +838,13 @@ dialog.sig::backdrop{background:rgba(20,24,33,.45)}
 .pg-tools{display:flex;flex-direction:column;gap:6px}
 .pg-tools .btn{width:100%}
 dialog.split{width:min(620px,94vw)}
+dialog.conv{width:min(560px,94vw)}
+.conv-opts{display:flex;flex-direction:column;gap:10px}
+.conv-card{display:flex;gap:14px;align-items:center;text-align:start;border:1px solid var(--line);background:var(--bar);color:var(--ink);border-radius:10px;padding:12px 14px;cursor:pointer;font:inherit}
+.conv-card:hover{border-color:var(--blue);background:color-mix(in srgb,var(--blue) 5%,var(--bar))}
+.conv-card .of-ico{width:40px;height:50px;font-size:10px;padding-bottom:6px}
+.conv-card b{display:block;font-size:15px}
+.conv-card small{display:block;color:var(--muted);font-size:13px;line-height:1.45;margin-top:2px}
 .split-list{max-height:52vh;overflow:auto;display:flex;flex-direction:column;gap:6px;border:1px solid var(--line);border-radius:6px;padding:8px}
 .split-list .sr{display:grid;grid-template-columns:70px 1fr 40px;gap:8px;align-items:center;font-size:13px}
 .split-list input{font:inherit;font-size:14px;color:var(--ink);background:var(--bar);border:1px solid var(--line);border-radius:5px;padding:5px 7px;min-width:0}
@@ -1021,7 +1028,7 @@ dialog.sig{border-radius:14px}
 <body data-tool="select">
 
 <header class="bar">
-  <div class="brand"><b title="גרסה 2.5">סימן</b><span class="ver">2.5</span><span class="fname" id="fname"></span></div>
+  <div class="brand"><b title="גרסה 2.6">סימן</b><span class="ver">2.6</span><span class="fname" id="fname"></span></div>
 
   <nav class="tools" id="tools" aria-label="כלים">
     <button class="tool" data-tool="select" aria-pressed="true" title="בחירה וגלילה (V)">
@@ -1058,6 +1065,7 @@ dialog.sig{border-radius:14px}
     <button class="btn" id="trBtn" disabled title="תרגום המסמך">תרגום</button>
     <button class="btn" id="openBtn">פתיחה</button>
     <button class="btn" id="printBtn" disabled title="הדפסה (Ctrl+P)">הדפסה</button>
+    <button class="btn" id="convBtn" disabled title="המרה ל-PowerPoint, Word או Excel לעריכה">המרה</button>
     <button class="btn wide-only" id="saveAsBtn" disabled title="שמירה בשם (Ctrl+Shift+S)">שמירה בשם</button>
     <button class="btn primary" id="saveBtn" disabled title="Ctrl+S">שמירה</button>
     <button class="btn install hidden" id="installBtn" title="התקנת האפליקציה במכשיר">התקנה</button>
@@ -1223,6 +1231,18 @@ dialog.sig{border-radius:14px}
     </div>
   </div>
 </dialog>
+<dialog class="sig conv" id="convDlg">
+  <div class="sig-in">
+    <h2>המרה לקובץ לעריכה</h2>
+    <div class="conv-opts">
+      <button class="conv-card" data-to="pptx"><span class="of-ico pptx">PPTX</span><span><b>PowerPoint</b><small>כל עמוד הופך לשקף. הרקע, התמונות והעיצוב נשמרים, והטקסט נפתח לעריכה במקומו.</small></span></button>
+      <button class="conv-card" data-to="docx"><span class="of-ico docx">DOCX</span><span><b>Word</b><small>הטקסט והטבלאות כמסמך רציף לעריכה, עם גודל, הדגשה, צבע ויישור. בלי הרקע והתמונות.</small></span></button>
+      <button class="conv-card" data-to="xlsx"><span class="of-ico xlsx">XLSX</span><span><b>Excel</b><small>כל עמוד הופך לגיליון, ושורות הטבלאות מסודרות בעמודות.</small></span></button>
+    </div>
+    <label class="chk"><input type="checkbox" id="convKeepDeco"> טקסט בגופנים מיוחדים יישאר חלק מהתמונה (לסמן אם הגופנים האלה לא מותקנים במחשב שבו תערכו)</label>
+    <div class="sig-row"><span class="grow" id="convStatus"></span><button class="btn" id="convCancel">ביטול</button></div>
+  </div>
+</dialog>
 <div id="printArea" aria-hidden="true"></div>
 <div class="toast" id="toast" role="status"></div>
 <div class="busy hidden" id="busy"><div id="busyMsg">רגע…</div></div>
@@ -1321,7 +1341,7 @@ async function openFile(file,handle){
     setDirty(false);
     $('fname').textContent=file.name;
     $('empty').classList.add('hidden');
-    ['saveBtn','saveAsBtn','trBtn','pgBtn','printBtn'].forEach(id=>$(id).disabled=false);S.sel=new Set();
+    ['saveBtn','saveAsBtn','trBtn','pgBtn','printBtn','convBtn'].forEach(id=>$(id).disabled=false);S.sel=new Set();
     TR.reset();
     S.hasForm=false;try{S.hasForm=!!(await doc.getFieldObjects());}catch(_){}
     await buildPages();
@@ -1468,7 +1488,7 @@ function guessFont(name){
 function fontNameOf(P,id){try{if(id&&P.page.commonObjs.has(id)){const f=P.page.commonObjs.get(id);return{name:(f&&(f.name||f.loadedName))||'',bold:!!(f&&f.bold)};}}catch(_){}return{name:'',bold:false};}
 
 /* ---------- paragraphs (blocks) built from lines ---------- */
-const listStart=t=>/^\s*(\d+[.)]|[•\-–*·▪◦]|[א-ת][.)])\s/.test(t);
+const listStart=t=>/^\s*(\.?\d+[.)]?|[•\-–*·▪◦]|[א-ת][.)]|\.[א-ת])\s/.test(t);
 async function pageBlocks(P){
   if(P.blocks)return P.blocks;
   const lines=await pageLines(P);if(!lines)return null;
@@ -2143,6 +2163,15 @@ function ruleBetween(rc,x0,x1,yLow,yHigh){
   const[ax,ay]=rc.vp.convertToViewportPoint(x0,yHigh),[bx,by]=rc.vp.convertToViewportPoint(x1,yLow);
   return ruleInPx(rc.data,rc.w,Math.min(ax,bx),Math.max(ax,bx),Math.min(ay,by),Math.max(ay,by));
 }
+// brackets face the right way by context: one that opens sits before a word, one that closes sits after it
+function fixBrackets(t){
+  const pair={'(':')','[':']','{':'}'},rev={')':'(',']':'[','}':'{'};
+  const a=[...t];
+  a.forEach((c,i)=>{const open=pair[c]?c:rev[c];if(!open)return;
+    const before=a[i-1],after=a[i+1];const w=x=>x!==undefined&&/[\p{L}\p{N}"'׳״]/u.test(x);
+    if(!w(before)&&w(after))a[i]=open;else if(w(before)&&!w(after))a[i]=pair[open];});
+  return a.join('');
+}
 // lines of the page in reading order, with their box in PDF coordinates
 async function pageLines(P){
   if(P.lines)return P.lines;
@@ -2154,7 +2183,8 @@ async function pageLines(P){
   const items=[],byRow=new Map();
   for(const it of all){
     const key=Math.round(it.y/2);const near=[...(byRow.get(key)||[]),...(byRow.get(key-1)||[]),...(byRow.get(key+1)||[])];
-    const dup=near.find(k=>Math.abs(k.y-it.y)<Math.max(1,k.h*.15)&&it.x>=k.x-k.h*.5&&it.x+it.w<=k.x+k.w+k.h*.5&&(k.s.includes(it.s.trim())||k.s.replace(/\s/g,'').includes(it.s.replace(/\s/g,''))));
+    // a near-identical copy drawn a hair away (fake bold) — not a short neighbour that happens to share letters
+    const dup=near.find(k=>Math.abs(k.y-it.y)<Math.max(1,k.h*.15)&&Math.abs(k.x-it.x)<Math.max(1.5,k.h*.2)&&it.w>=k.w*.6&&(k.s===it.s||k.s.replace(/\s/g,'').includes(it.s.replace(/\s/g,''))));
     if(dup){dup.dbl=true;continue;}
     items.push(it);if(!byRow.has(key))byRow.set(key,[]);byRow.get(key).push(it);
   }
@@ -2175,12 +2205,24 @@ async function pageLines(P){
     const rtl=paraDir(L.items.map(x=>x.s).join(''),'R')==='R';
     L.items.sort((a,b)=>rtl?b.x-a.x:a.x-b.x);
     const seq=[];let last=null;
-    for(const it of L.items){
+    L.items.forEach((it,k)=>{
       if(last){const gap=rtl?last.x-(it.x+it.w):it.x-(last.x+last.w);seq.push({sep:gap>it.h*.18?' ':''});}
       let str=it.s;
-      if(rtl&&!RE_R.test(str)&&!RE_L.test(str))str=[...str].reverse().map(c=>MIRROR[c]||c).join(''); // lone brackets/punctuation
+      if(/^[()[\]{}<>]$/.test(str.trim())){ // a lone bracket: decide opening/closing by which word it hugs
+        const prev=L.items[k-1],next=L.items[k+1];
+        const gPrev=prev?(rtl?prev.x-(it.x+it.w):it.x-(prev.x+prev.w)):1e9,gNext=next?(rtl?it.x-(next.x+next.w):next.x-(it.x+it.w)):1e9;
+        const pair={'(':')','[':']','{':'}','<':'>'};const open=Object.keys(pair).find(o=>o===str.trim()||pair[o]===str.trim());
+        const isWord=x=>x&&/[\p{L}\p{N}]/u.test(x.s);
+        str=isWord(next)&&!isWord(prev)?open:isWord(prev)&&!isWord(next)?pair[open]:(gNext<gPrev?open:pair[open]);
+      }else if(rtl&&!RE_R.test(str)&&!RE_L.test(str)){ // other lone punctuation, e.g. ")." — reading order, brackets by context
+        const prev=L.items[k-1],next=L.items[k+1],isWord=x=>x&&/[\p{L}\p{N}]/u.test(x.s);
+        const ch=[...str].reverse(),pair={'(':')','[':']','{':'}','<':'>'},close=Object.fromEntries(Object.entries(pair).map(([a,b])=>[b,a]));
+        ch.forEach((c,j)=>{const open=pair[c]?c:close[c];if(!open)return;
+          if(j===0&&isWord(prev))ch[j]=pair[open];else if(j===ch.length-1&&isWord(next))ch[j]=open;else ch[j]=MIRROR[c]||c;});
+        str=ch.join('');
+      }
       seq.push({tok:str,ltr:!RE_R.test(str)&&RE_L.test(str)});last=it;
-    }
+    });
     if(rtl){ // English words / numbers inside a Hebrew line read left-to-right
       for(let a=0;a<seq.length;a+=2){
         if(!seq[a].ltr)continue;let b=a;while(b+2<seq.length&&seq[b+2].ltr)b+=2;
@@ -2188,10 +2230,11 @@ async function pageLines(P){
       }
     }
     let txt='';for(const x of seq){if('sep' in x){if(x.sep&&!/\s$/.test(txt))txt+=' ';}else txt+=x.tok;}
+    txt=fixBrackets(txt);
     const hs=L.items.map(i=>i.h).sort((a,b)=>a-b),h=hs[hs.length>>1];
     const x0=Math.min(...L.items.map(i=>i.x)),x1=Math.max(...L.items.map(i=>i.x+i.w));
     const base=L.items.reduce((t,i)=>t+i.y,0)/L.items.length;
-    return{text:cleanText(txt.replace(/\s+/g,' ').trim()),dir:rtl?'R':'L',x0,x1,y0:base-h*.28,y1:base+h*.9,base,size:h,font:L.items[0].font,y:L.y,h:L.h,bold:L.items.some(i=>i.dbl)};
+    return{text:cleanText(txt.replace(/\s+/g,' ').trim()),dir:rtl?'R':'L',x0,x1,y0:base-h*.28,y1:base+h*.9,base,size:h,font:(()=>{const w={};for(const i of L.items)w[i.font]=(w[i.font]||0)+i.s.length;return Object.keys(w).sort((a,b)=>w[b]-w[a])[0];})(),y:L.y,h:L.h,bold:L.items.some(i=>i.dbl)};
   });
   return P.lines;
 }
@@ -3022,7 +3065,7 @@ const loadOfficeLibs=()=>officeLibs||(officeLibs=(async()=>{if(!window.JSZip)awa
 const OF={};
 function showOfficeView(on){
   $('officeView').classList.toggle('hidden',!on);$('pages').classList.toggle('hidden',on);
-  if(on){$('empty').classList.add('hidden');['saveBtn','saveAsBtn','trBtn','pgBtn','printBtn'].forEach(id=>$(id).disabled=true);$('pgpanel').classList.add('hidden');$('tpanel').classList.add('hidden');}
+  if(on){$('empty').classList.add('hidden');['saveBtn','saveAsBtn','trBtn','pgBtn','printBtn','convBtn'].forEach(id=>$(id).disabled=true);$('pgpanel').classList.add('hidden');$('tpanel').classList.add('hidden');}
 }
 async function openOffice(file,handle){
   busy(true,'בודק את הקובץ…');
@@ -3083,6 +3126,178 @@ $('ofExtract').onclick=async()=>{
   catch(e){console.error(e);toast('החילוץ נכשל: '+(e.message||e));}finally{busy(false);}
 };
 window.__office=OF;
+
+/* =====================================================================
+   CONVERT — PDF to an editable PowerPoint / Word / Excel file
+   ===================================================================== */
+const COMMON_FONTS=/^(arial|calibri|gisha|david|times ?new ?roman|times|tahoma|segoe ?ui|verdana|miriam|narkisim|frank ?ruehl|aharoni|rubik|heebo|assistant|alef|noto ?sans ?hebrew|helvetica|cambria|georgia|levenim ?mt|guttman.*|varela ?round|open ?sans|courier ?new)$/i;
+function fontFace(raw){
+  let n=(raw||'').replace(/^[A-Z]{6}\+/,'').replace(/(PSMT|MT|PS)$/,'').replace(/[-,](Bold|Italic|BoldItalic|Regular)$/i,'').replace(/-/g,' ');
+  const map={timesnewroman:'Times New Roman',couriernew:'Courier New',segoeui:'Segoe UI',arial:'Arial',calibri:'Calibri',gisha:'Gisha',david:'David',tahoma:'Tahoma'};
+  return map[n.toLowerCase().replace(/[\s-]/g,'')]||n.replace(/([a-z])([A-Z])/g,'$1 $2')||'Arial';
+}
+function sampleCanvas(c,vp,L){ // background + text colour of a text block on a rendered page
+  const[l,t]=vp.convertToViewportPoint(L.x0,L.y1),[r,b]=vp.convertToViewportPoint(L.x1,L.y0);
+  const X=Math.max(0,Math.floor(Math.min(l,r))-4),Y=Math.max(0,Math.floor(Math.min(t,b))-4);
+  const W=Math.min(c.width-X,Math.ceil(Math.abs(r-l))+8),H=Math.min(c.height-Y,Math.ceil(Math.abs(b-t))+8);
+  if(W<3||H<3)return{bg:'#ffffff',fg:'#000000'};
+  const d=c.getContext('2d').getImageData(X,Y,W,H).data,px=(x,y)=>{const i=(y*W+x)*4;return[d[i],d[i+1],d[i+2]];};
+  const count=new Map();const add=(x,y)=>{const q=px(x,y).map(v=>v>>3<<3).join();count.set(q,(count.get(q)||0)+1);};
+  for(let x=0;x<W;x++){add(x,0);add(x,H-1);}for(let y=0;y<H;y++){add(0,y);add(W-1,y);}
+  const bg=[...count.entries()].sort((a,b)=>b[1]-a[1])[0][0].split(',').map(Number);
+  let best=0;for(let y=3;y<H-3;y++)for(let x=3;x<W-3;x++){const p=px(x,y);best=Math.max(best,Math.abs(p[0]-bg[0])+Math.abs(p[1]-bg[1])+Math.abs(p[2]-bg[2]));}
+  const acc=[0,0,0];let n=0;for(let y=3;y<H-3;y++)for(let x=3;x<W-3;x++){const p=px(x,y);if(Math.abs(p[0]-bg[0])+Math.abs(p[1]-bg[1])+Math.abs(p[2]-bg[2])>best*.8){acc[0]+=p[0];acc[1]+=p[1];acc[2]+=p[2];n++;}}
+  const hex=a=>'#'+a.map(v=>Math.max(0,Math.min(255,Math.round(v))).toString(16).padStart(2,'0')).join('');
+  return{bg:hex(bg),fg:n?hex(acc.map(v=>v/n)):'#000000'};
+}
+async function renderTo(page,scale){const vp=page.getViewport({scale});const c=document.createElement('canvas');c.width=Math.ceil(vp.width);c.height=Math.ceil(vp.height);const ctx=c.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,c.width,c.height);await page.render({canvasContext:ctx,viewport:vp}).promise;return{c,vp};}
+// reads every page of the document as it will be saved (with all edits): text blocks + positions + colours
+async function analyzeForConvert(withBackground,keepDeco,progress){
+  const built=await buildPdf();
+  const d=await pdfjs.getDocument({data:built.slice(),isEvalSupported:false}).promise;
+  const pages=[];
+  for(let i=0;i<d.numPages;i++){
+    progress&&progress(`קורא את עמוד ${i+1} מתוך ${d.numPages}…`);
+    const page=await d.getPage(i+1);const P={i:i+1,page};
+    const src=S.pages[i];const ocr=!!(src&&src.ocr);
+    const orig=await renderTo(page,2);
+    let lines=ocr?src.lines:await pageLines(P);
+    if(!lines)lines=[];
+    P.lines=lines;P.blocks=null;const blocks=lines.length?await pageBlocks(P):[];
+    for(const b of blocks){
+      const fn=fontNameOf(P,b.font);b.face=ocr?'Arial':fontFace(fn.name);b.bold=fn.bold||/bold|black|heavy|semibold/i.test(fn.name)||b.lines.some(l=>l.bold);
+      Object.assign(b,sampleCanvas(orig.c,orig.vp,b));
+      b.deco=keepDeco&&!ocr&&!!fn.name&&!COMMON_FONTS.test(fontFace(fn.name)); // optional: text in special fonts stays part of the picture // big text in a special font (titles) stays part of the picture
+    }
+    const view=page.view;pages.push({page,w:view[2]-view[0],h:view[3]-view[1],ox:view[0],oy:view[1],blocks,ocr,orig});
+  }
+  if(withBackground){ // the same pages without the text that becomes editable
+    const doc=await PDFLib.PDFDocument.load(built,{ignoreEncryption:true});
+    pages.forEach((pg,i)=>{const rects=[];for(const b of pg.blocks)if(!b.deco&&!pg.ocr)for(const l of b.lines)rects.push([l.x0-.5,l.y0-.5,l.x1+.5,l.y1+.5]);
+      if(rects.length)try{removeTextInRects(PDFLib,doc,i,rects);}catch(e){console.warn(e);}});
+    const clean=await doc.save();const dc=await pdfjs.getDocument({data:clean,isEvalSupported:false}).promise;
+    for(let i=0;i<pages.length;i++){
+      progress&&progress(`מכין את הרקע של עמוד ${i+1}…`);
+      const r=await renderTo(await dc.getPage(i+1),2);const ctx=r.c.getContext('2d');
+      if(pages[i].ocr)for(const b of pages[i].blocks)if(!b.deco)for(const l of b.lines){ // scanned page: paint over the words
+        const[a,c]=r.vp.convertToViewportPoint(l.x0,l.y1),[e,f]=r.vp.convertToViewportPoint(l.x1,l.y0);ctx.fillStyle=b.bg;ctx.fillRect(Math.min(a,e)-2,Math.min(c,f)-2,Math.abs(e-a)+4,Math.abs(f-c)+4);}
+      // text that isn't visibly drawn (hidden copies behind pictures) must not become a visible text box
+      const oc=pages[i].orig.c.getContext('2d');
+      for(const b of pages[i].blocks)for(const l of b.lines){
+        if(b.deco||pages[i].ocr)continue;
+        const[a,c]=r.vp.convertToViewportPoint(l.x0,l.y1),[e,f]=r.vp.convertToViewportPoint(l.x1,l.y0);
+        const X=Math.max(0,Math.floor(Math.min(a,e))),Y=Math.max(0,Math.floor(Math.min(c,f))),W=Math.max(1,Math.min(r.c.width-X,Math.ceil(Math.abs(e-a)))),H=Math.max(1,Math.min(r.c.height-Y,Math.ceil(Math.abs(f-c))));
+        const A=oc.getImageData(X,Y,W,H).data,B=ctx.getImageData(X,Y,W,H).data;let changed=0;
+        for(let k=0;k<A.length;k+=4)if(Math.abs(A[k]-B[k])+Math.abs(A[k+1]-B[k+1])+Math.abs(A[k+2]-B[k+2])>60)changed++;
+        l.hidden=changed<W*H*.004;
+      }
+      pages[i].bgUrl=r.c.toDataURL('image/jpeg',.9);
+    }
+    dc.destroy();
+  }
+  d.destroy();
+  return pages;
+}
+async function convertTo(kind){
+  const keep=$('convKeepDeco').checked;
+  $('convDlg').close();busy(true,'מכין את ההמרה…');
+  try{
+    await loadOfficeLibs();
+    const pages=await analyzeForConvert(kind==='pptx',keep,m=>$('busyMsg').textContent=m);
+    $('busyMsg').textContent='בונה את הקובץ…';
+    let bytes;
+    if(kind==='pptx')bytes=await buildPptx(pages);else if(kind==='docx')bytes=await buildDocxFrom(pages);else bytes=await buildXlsxFrom(pages);
+    busy(false);
+    const name=`${S.name.replace(/\.pdf$/i,'')}.${kind}`;
+    if(await saveBytes(name,bytes,kind))toast('נשמר: '+name);
+  }catch(e){console.error(e);toast('ההמרה נכשלה: '+(e.message||e));}
+  finally{busy(false);}
+}
+window.__convertTo=convertTo;
+async function buildPptx(pages){
+  const pptx=new PptxGenJS();const W=pages[0].w/72,H=pages[0].h/72;
+  pptx.defineLayout({name:'PDF',width:W,height:H});pptx.layout='PDF';
+  for(const pg of pages){
+    const s=pptx.addSlide();const kx=W/(pg.w/72),ky=H/(pg.h/72);
+    s.background={data:pg.bgUrl.replace(/^data:/,'')};
+    for(const b of pg.blocks){
+      if(b.deco)continue;
+      for(const l of b.lines){ // one box per line keeps the layout exact
+        if(l.hidden)continue;
+        const heb=l.dir==='R';
+        const x=(l.x0-pg.ox)/72*kx,y=(pg.oy+pg.h-l.y1)/72*ky,w=(l.x1-l.x0)/72*kx,h=Math.max((l.y1-l.y0)/72*ky,l.size*1.15/72);
+        const slack=w*.08;
+        const al=b.lines.length>1&&b.align==='center'?'center':(heb?'right':'left');
+        s.addText(l.text,{x:heb?x-slack:x,y,w:w+slack,h,fontSize:Math.round(l.size*Math.min(kx,ky)*10)/10,fontFace:b.face,bold:b.bold,color:b.fg.slice(1),
+          align:al,rtlMode:heb,lang:heb?'he-IL':'en-US',valign:'top',margin:0,wrap:false,paraSpaceBefore:0,paraSpaceAfter:0,isTextBox:true});
+      }
+    }
+  }
+  return new Uint8Array(await pptx.write({outputType:'arraybuffer'}));
+}
+const xesc=t=>String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+// rows of a page: blocks on the same baseline form one row (table cells)
+function pageRows(pg){
+  const rows=[];
+  for(const b of pg.blocks){const r=rows.find(r=>Math.abs(r.base-b.base)<Math.max(2,b.size*.35));if(r)r.cells.push(b);else rows.push({base:b.base,cells:[b]});}
+  rows.sort((a,b)=>b.base-a.base);
+  for(const r of rows){const rtl=r.cells.filter(c=>c.dir==='R').length>=r.cells.length/2;r.cells.sort((a,b)=>rtl?b.x1-a.x1:a.x0-b.x0);r.rtl=rtl;}
+  return rows;
+}
+async function buildDocxFrom(pages){
+  const body=[];
+  const run=(t,b,sz)=>{const segs=[];for(const ch of t){const d=RE_R.test(ch)?'R':RE_LL.test(ch)?'L':null;const l=segs[segs.length-1];if(l&&(d===null||d===l.d))l.t+=ch;else segs.push({d:d||(l?l.d:'R'),t:ch});}
+    return segs.map(g=>`<w:r><w:rPr><w:rFonts w:ascii="${xesc(b.face)}" w:hAnsi="${xesc(b.face)}" w:cs="${xesc(b.face)}"/>${b.bold?'<w:b/><w:bCs/>':''}<w:color w:val="${b.fg.slice(1)}"/><w:sz w:val="${sz}"/><w:szCs w:val="${sz}"/>${g.d==='R'?'<w:rtl/>':''}</w:rPr><w:t xml:space="preserve">${xesc(g.t)}</w:t></w:r>`).join('');};
+  const para=(b)=>{const rtl=b.dir==='R';const al=b.align||'start';const jc=al==='center'?'center':al==='justify'?'both':al==='right'?(rtl?'left':'right'):al==='left'?(rtl?'right':'left'):'';
+    return `<w:p><w:pPr>${rtl?'<w:bidi/>':''}<w:spacing w:after="80"/>${jc?`<w:jc w:val="${jc}"/>`:''}</w:pPr>${run(b.text,b,Math.max(12,Math.round(b.size*2)))}</w:p>`;};
+  pages.forEach((pg,pi)=>{
+    if(pi)body.push('<w:p><w:r><w:br w:type="page"/></w:r></w:p>');
+    const rows=pageRows(pg);
+    for(let k=0;k<rows.length;){
+      // two or more consecutive multi-cell rows = a table
+      let e=k;while(e<rows.length&&rows[e].cells.length>=2)e++;
+      if(e-k>=2){
+        const n=Math.max(...rows.slice(k,e).map(r=>r.cells.length));const rtl=rows[k].rtl;
+        body.push(`<w:tbl><w:tblPr>${rtl?'<w:bidiVisual/>':''}<w:tblW w:w="5000" w:type="pct"/><w:tblBorders>${['top','left','bottom','right','insideH','insideV'].map(x=>`<w:${x} w:val="single" w:sz="4" w:color="999999"/>`).join('')}</w:tblBorders></w:tblPr><w:tblGrid>${Array(n).fill('<w:gridCol/>').join('')}</w:tblGrid>`+
+          rows.slice(k,e).map(r=>`<w:tr>${Array.from({length:n},(_,c)=>`<w:tc><w:tcPr><w:tcW w:w="0" w:type="auto"/></w:tcPr>${r.cells[c]?para(r.cells[c]):'<w:p/>'}</w:tc>`).join('')}</w:tr>`).join('')+'</w:tbl><w:p/>');
+        k=e;continue;
+      }
+      for(const c of rows[k].cells)body.push(para(c));k++;
+    }
+  });
+  const z=new JSZip();
+  z.file('[Content_Types].xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>');
+  z.file('_rels/.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>');
+  const pw=Math.round(pages[0].w*20),ph=Math.round(pages[0].h*20);
+  z.file('word/document.xml',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${body.join('')}<w:sectPr><w:pgSz w:w="${pw}" w:h="${ph}"${pw>ph?' w:orient="landscape"':''}/><w:pgMar w:top="900" w:right="900" w:bottom="900" w:left="900" w:header="400" w:footer="400" w:gutter="0"/><w:bidi/></w:sectPr></w:body></w:document>`);
+  return z.generateAsync({type:'uint8array',compression:'DEFLATE'});
+}
+async function buildXlsxFrom(pages){
+  const colName=i=>{let s='';i++;while(i){const m=(i-1)%26;s=String.fromCharCode(65+m)+s;i=Math.floor((i-1)/26);}return s;};
+  const sheets=pages.map((pg,pi)=>{
+    const rows=pageRows(pg);const rtl=rows.filter(r=>r.rtl).length>=rows.length/2;
+    // columns: cluster the cell edges that face the reading start
+    const edges=[];for(const r of rows)for(const c of r.cells)edges.push(rtl?c.x1:c.x0);
+    edges.sort((a,b)=>rtl?b-a:a-b);const cols=[];for(const e of edges){if(!cols.length||Math.abs(cols[cols.length-1]-e)>12)cols.push(e);}
+    const grid=rows.map(r=>{const out=[];for(const c of r.cells){let k=0,bd=1e9;cols.forEach((e,j)=>{const dd=Math.abs((rtl?c.x1:c.x0)-e);if(dd<bd){bd=dd;k=j;}});while(out[k]!==undefined)k++;out[k]=c.text;}return out;});
+    return{name:`עמוד ${pi+1}`,rtl,grid};
+  });
+  const z=new JSZip(),OX='application/vnd.openxmlformats-officedocument.';
+  z.file('[Content_Types].xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="'+OX+'spreadsheetml.sheet.main+xml"/>'+sheets.map((_,k)=>`<Override PartName="/xl/worksheets/sheet${k+1}.xml" ContentType="${OX}spreadsheetml.worksheet+xml"/>`).join('')+'</Types>');
+  z.file('_rels/.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>');
+  z.file('xl/workbook.xml',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${sheets.map((s,k)=>`<sheet name="${xesc(s.name)}" sheetId="${k+1}" r:id="rId${k+1}"/>`).join('')}</sheets></workbook>`);
+  z.file('xl/_rels/workbook.xml.rels',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${sheets.map((_,k)=>`<Relationship Id="rId${k+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${k+1}.xml"/>`).join('')}</Relationships>`);
+  sheets.forEach((sh,k)=>{
+    const ncol=Math.max(1,...sh.grid.map(r=>r.length));
+    const cols=Array.from({length:ncol},(_,j)=>{const w=Math.min(60,Math.max(8,...sh.grid.map(r=>(r[j]||'').length+2)));return`<col min="${j+1}" max="${j+1}" width="${w}" customWidth="1"/>`;}).join('');
+    const rows=sh.grid.map((r,ri)=>`<row r="${ri+1}">${r.map((v,ci)=>{if(v===undefined||v==='')return'';const num=v.replace(/,/g,'');return/^-?\d+(\.\d+)?$/.test(num)&&num.length<15?`<c r="${colName(ci)}${ri+1}"><v>${num}</v></c>`:`<c r="${colName(ci)}${ri+1}" t="inlineStr"><is><t xml:space="preserve">${xesc(v)}</t></is></c>`;}).join('')}</row>`).join('');
+    z.file(`xl/worksheets/sheet${k+1}.xml`,`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"${sh.rtl?' rightToLeft="1"':''}/></sheetViews><cols>${cols}</cols><sheetData>${rows}</sheetData></worksheet>`);
+  });
+  return z.generateAsync({type:'uint8array',compression:'DEFLATE'});
+}
+$('convBtn').onclick=()=>{if(S.doc){$('convStatus').textContent='';$('convDlg').showModal();}};
+$('convCancel').onclick=()=>$('convDlg').close();
+document.querySelectorAll('.conv-card').forEach(b=>b.onclick=()=>convertTo(b.dataset.to));
 
 /* ---------- separate files with smart names ---------- */
 let splitIdx=[];
