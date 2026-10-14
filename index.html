@@ -847,7 +847,9 @@ dialog.conv{width:min(560px,94vw)}
 .conv-scope select,.conv-scope input{font:inherit;font-size:14px;color:var(--ink);background:var(--bar);border:1px solid var(--line);border-radius:7px;padding:7px 9px}
 @media (max-width:520px){.conv-scope{grid-template-columns:1fr}}
 .conv-card{display:flex;gap:14px;align-items:center;text-align:start;border:1px solid var(--line);background:var(--bar);color:var(--ink);border-radius:10px;padding:12px 14px;cursor:pointer;font:inherit}
-.conv-card.smart{border-color:var(--marker);background:color-mix(in srgb,var(--marker) 12%,var(--bar))}
+.conv-more{margin-top:2px}
+.conv-more summary{cursor:pointer;font-size:13px;color:var(--muted);padding:4px 0}
+.conv-more .conv-opts{margin-top:8px}
 .badge{font-style:normal;font-size:11px;font-weight:600;background:var(--marker);color:#16213A;border-radius:999px;padding:1px 8px;margin-inline-start:6px;vertical-align:middle}
 .conv-card:hover{border-color:var(--blue);background:color-mix(in srgb,var(--blue) 5%,var(--bar))}
 .conv-card .of-ico{width:40px;height:50px;font-size:10px;padding-bottom:6px}
@@ -1045,7 +1047,7 @@ dialog.sig{border-radius:14px}
 <body data-tool="select">
 
 <header class="bar">
-  <div class="brand"><b title="גרסה 3.2.1">סימן</b><span class="ver">3.2.1</span><span class="fname" id="fname"></span></div>
+  <div class="brand"><b title="גרסה 3.3">סימן</b><span class="ver">3.3</span><span class="fname" id="fname"></span></div>
 
   <nav class="tools" id="tools" aria-label="כלים">
     <button class="tool" data-tool="select" aria-pressed="true" title="בחירה וגלילה (V)">
@@ -1260,14 +1262,26 @@ dialog.sig{border-radius:14px}
         <input id="convRange" dir="ltr" placeholder="למשל 1-3, 5, 8" autocomplete="off"></label>
     </div>
     <div class="conv-opts">
-      <button class="conv-card" data-to="pptx"><span class="of-ico pptx">PPTX</span><span><b>PowerPoint</b><small>כל עמוד הופך לשקף. הרקע, התמונות והעיצוב נשמרים, והטקסט נפתח לעריכה במקומו.</small></span></button>
-      <button class="conv-card smart" data-to="docxsmart"><span class="of-ico docx">DOCX</span><span><b>Word חכם <em class="badge">מומלץ</em></b><small>בינה מלאכותית קוראת את העמוד ובונה מסמך Word אמיתי: כותרות, פסקאות, רשימות תבליטים, טבלאות, לוגואים וצבעים. נוח לעריכה כמו מסמך שנכתב ב-Word.</small></span></button>
-      <button class="conv-card" data-to="docx"><span class="of-ico docx">DOCX</span><span><b>Word, עיצוב זהה למקור</b><small>כל עמוד נראה בדיוק כמו ב-PDF: לוגואים, קווים, צבעים ומיקום. כל שורת טקסט נפתחת לעריכה במקומה.</small></span></button>
-      <button class="conv-card" data-to="docxflow"><span class="of-ico docx">DOCX</span><span><b>Word, מסמך רציף</b><small>טקסט וטבלאות שזורמים כמו מסמך רגיל, נוח לכתיבה מחדש ולהעתקה. העיצוב הגרפי לא עובר.</small></span></button>
-      <button class="conv-card" data-to="xlsx"><span class="of-ico xlsx">XLSX</span><span><b>Excel</b><small>כל עמוד הופך לגיליון, ושורות הטבלאות מסודרות בעמודות.</small></span></button>
+      <button class="conv-card main" data-to="docx"><span class="of-ico docx">DOCX</span><span><b>Word</b><small>נראה בדיוק כמו ה-PDF, והטקסט נפתח לעריכה. מהיר, והקובץ לא יוצא מהמחשב.</small></span></button>
+      <button class="conv-card main" data-to="pptx"><span class="of-ico pptx">PPTX</span><span><b>PowerPoint</b><small>כל עמוד הופך לשקף, העיצוב נשמר והטקסט נפתח לעריכה.</small></span></button>
+      <button class="conv-card main" data-to="xlsx"><span class="of-ico xlsx">XLSX</span><span><b>Excel</b><small>כל עמוד הופך לגיליון, ושורות הטבלאות מסודרות בעמודות.</small></span></button>
     </div>
+    <details class="conv-more">
+      <summary>סוגים נוספים של Word</summary>
+      <div class="conv-opts">
+        <button class="conv-card" data-to="docxsmart"><span class="of-ico docx">AI</span><span><b>Word חכם (בינה מלאכותית)</b><small>מסמך Word "אמיתי" עם כותרות, רשימות וטבלאות שזורמות. לוקח 10–30 שניות לעמוד, והעמוד נשלח ל-Google.</small></span></button>
+        <button class="conv-card" data-to="docxflow"><span class="of-ico docx">TXT</span><span><b>Word, טקסט רציף</b><small>רק הטקסט והטבלאות, בלי העיצוב. נוח להעתקה ולכתיבה מחדש.</small></span></button>
+      </div>
+    </details>
     <label class="chk"><input type="checkbox" id="convKeepDeco"> טקסט בגופנים מיוחדים יישאר חלק מהתמונה (לסמן אם הגופנים האלה לא מותקנים במחשב שבו תערכו)</label>
     <div class="sig-row"><span class="grow" id="convStatus"></span><button class="btn" id="convCancel">ביטול</button></div>
+  </div>
+</dialog>
+<dialog class="sig ready" id="readyDlg">
+  <div class="sig-in">
+    <h2>הקובץ מוכן</h2>
+    <p class="fmt-note" id="readyName"></p>
+    <div class="sig-row"><span class="grow"></span><button class="btn" id="readyCancel">ביטול</button><button class="btn primary" id="readySave">שמירה</button></div>
   </div>
 </dialog>
 <div id="printArea" aria-hidden="true"></div>
@@ -2152,14 +2166,23 @@ async function savePdf(saveAs){
 window.__buildPdf=buildPdf; // used by automated tests
 
 // returns {handle} when saved through the file system, true when shared/downloaded, false when cancelled
+// after a long job the browser no longer counts the original click, and refuses to open the save window
+const needsGesture=e=>e&&(e.name==='SecurityError'||e.name==='NotAllowedError'||/user gesture|user activation/i.test(e.message||''));
+function askToSave(name){return new Promise(res=>{const d=$('readyDlg');$('readyName').textContent=name;
+  const done=v=>{d.close();$('readySave').onclick=$('readyCancel').onclick=null;res(v);};
+  $('readySave').onclick=()=>done(true);$('readyCancel').onclick=()=>done(false);d.oncancel=()=>done(false);d.showModal();$('readySave').focus();});}
 async function saveBytes(name,bytes,kind){
+  if(FS&&!(navigator.userActivation&&navigator.userActivation.isActive)){if(!await askToSave(name))return false;}
   const isTxt=kind==='txt',isDocx=kind==='docx',isZip=kind==='zip',isOff=kind==='pptx'||kind==='xlsx';
   const DOCX_MIME='application/vnd.openxmlformats-officedocument.wordprocessingml.document';
   if(FS){
     try{
       const h=await showSaveFilePicker({suggestedName:name,types:isTxt?[{description:'טקסט',accept:{'text/plain':['.txt']}}]:isDocx?[{description:'Word',accept:{[DOCX_MIME]:['.docx']}}]:isZip?[{description:'ZIP',accept:{'application/zip':['.zip']}}]:isOff?[{description:kind==='pptx'?'PowerPoint':'Excel',accept:{[OFFICE_MIME[kind]]:['.'+kind]}}]:PDF_TYPE});
       await writeHandle(h,bytes);return (isTxt||isDocx||isZip||isOff)?true:{handle:h};
-    }catch(e){if(e&&e.name==='AbortError')return false;throw e;}
+    }catch(e){
+      if(e&&e.name==='AbortError')return false;
+      if(needsGesture(e)){if(!await askToSave(name))return false;return saveBytes(name,bytes,kind);}
+      throw e;}
   }
   const type=isTxt?'text/plain':isDocx?DOCX_MIME:isZip?'application/zip':isOff?OFFICE_MIME[kind]:'application/pdf';
   const file=new File([bytes],name,{type});
@@ -3217,6 +3240,7 @@ async function analyzeForConvert(withBackground,keepDeco,progress,only){
     const page=await d.getPage(i+1);const P={i:i+1,page};
     const src=S.pages[i];const ocr=!!(src&&src.ocr);
     const orig=await renderTo(page,2);
+    P.rc={vp:orig.vp,w:orig.c.width,data:orig.c.getContext('2d').getImageData(0,0,orig.c.width,orig.c.height).data}; // reuse this render for table-line detection
     let lines=ocr?src.lines:await pageLines(P);
     if(!lines)lines=[];
     P.lines=lines;P.blocks=null;const blocks=lines.length?await pageBlocks(P):[];
@@ -3499,17 +3523,17 @@ async function buildDocxSmart(pages,progress){
 }
 async function convertSmart(idx){
   const pages=await analyzeForConvert(true,false,m=>$('busyMsg').textContent=m,idx); // also gives a text-free picture of each page
-  for(const[n,pg]of pages.entries()){
-    $('busyMsg').textContent=`עמוד ${pg.idx+1} (${n+1} מתוך ${pages.length}): ה-AI קורא את המבנה… בדרך כלל 10–30 שניות`;
-    // a clean picture of the page for the model and for cutting out logos
-    const r=pg.orig; // the page as it looks (for the model)
-    // logos and signatures are cut from the text-free picture, so no words come along with them
+  let done=0;const queue=pages.slice();
+  const prep=async pg=>{
+    const r=pg.orig;
     const bgImg=new Image();bgImg.src=pg.bgUrl;await bgImg.decode();const bc=document.createElement('canvas');bc.width=bgImg.naturalWidth;bc.height=bgImg.naturalHeight;bc.getContext('2d').drawImage(bgImg,0,0);pg.canvas=bc;
-    const small=document.createElement('canvas');const k=Math.min(1,1100/r.c.width);small.width=Math.round(r.c.width*k);small.height=Math.round(r.c.height*k);
+    const small=document.createElement('canvas');const k=Math.min(1,1000/r.c.width);small.width=Math.round(r.c.width*k);small.height=Math.round(r.c.height*k);
     small.getContext('2d').drawImage(r.c,0,0,small.width,small.height);
-    try{pg.ai=await aiLayout(small.toDataURL('image/jpeg',.85).split(',')[1],linesForAI(pg),`עמוד ${pg.idx+1}`);}
-    catch(e){pg.aiError=e.message;pg.ai=null;}
-  }
+    try{pg.ai=await aiLayout(small.toDataURL('image/jpeg',.82).split(',')[1],linesForAI(pg),`עמוד ${pg.idx+1}`);}catch(e){pg.aiError=e.message;pg.ai=null;}
+    done++;$('busyMsg').textContent=`ה-AI קורא את העמודים… ${done} מתוך ${pages.length} מוכנים`;
+  };
+  $('busyMsg').textContent=`ה-AI קורא את העמודים… 0 מתוך ${pages.length} מוכנים`;
+  await Promise.all(Array.from({length:Math.min(3,pages.length)},async()=>{while(queue.length)await prep(queue.shift());})); // three pages at a time
   const bytes=await buildDocxSmart(pages,m=>$('busyMsg').textContent=m);
   const failed=pages.filter(p=>!p.ai).map(p=>p.idx);
   return{bytes,failed,why:(pages.find(p=>p.aiError)||{}).aiError||''};
