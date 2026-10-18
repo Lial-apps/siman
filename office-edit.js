@@ -355,5 +355,103 @@ async function exportXlsx(src,map,items){
   return{bytes:await zip.generateAsync({type:'uint8array',compression:'DEFLATE'}),placed,exact:true};
 }
 
-window.OFFICE_EDIT={toPdf,exportDocx,exportXlsx};
+
+/* ------------------------------------------------------------ old Word (.doc, 97–2003) */
+// Reads the text and tables of a binary .doc and builds a clean .docx from them.
+// Formatting, pictures, headers and footers of the old file are not carried over.
+function docText(bytes){
+  if(!window.XLSX||!XLSX.CFB)throw new Error('רכיב הקריאה לא נטען');
+  let cfb;try{cfb=XLSX.CFB.read(bytes,{type:'array'});}catch(e){throw new Error('הקובץ לא נראה כמו מסמך Word');}
+  const wd=XLSX.CFB.find(cfb,'WordDocument');if(!wd)throw new Error('הקובץ לא נראה כמו מסמך Word');
+  const W=Uint8Array.from(wd.content),dv=new DataView(W.buffer);
+  if(dv.getUint16(0,true)!==0xA5EC)throw new Error('הקובץ לא נראה כמו מסמך Word');
+  const nFib=dv.getUint16(2,true),flags=dv.getUint16(0x0A,true);
+  if(nFib<101)throw new Error('זה קובץ Word 6/95 ישן מאוד. פתחו ושמרו אותו כ-DOCX ב-Word');
+  if(flags&0x0100)throw new Error('הקובץ מוגן בסיסמה. הסירו את הסיסמה ב-Word ונסו שוב');
+  const tbl=XLSX.CFB.find(cfb,(flags&0x0200)?'1Table':'0Table');if(!tbl)throw new Error('חסר חלק בקובץ');
+  const T=Uint8Array.from(tbl.content),tv=new DataView(T.buffer);
+  const ccpText=dv.getInt32(76,true),fcClx=dv.getUint32(418,true),lcbClx=dv.getUint32(422,true);
+  let p=fcClx;const end=fcClx+lcbClx;
+  while(p<end&&T[p]===1){p+=3+tv.getUint16(p+1,true);}       // skip Prc
+  if(T[p]!==2)throw new Error('לא הצלחתי לקרוא את הטקסט בקובץ');
+  const lcb=tv.getUint32(p+1,true),plc=p+5,n=(lcb-4)/12;
+  const cp=i=>tv.getUint32(plc+i*4,true);
+  const dec1252=new TextDecoder('windows-1252'),dec16=new TextDecoder('utf-16le');
+  let out='';
+  for(let i=0;i<n&&out.length<ccpText;i++){
+    const a=cp(i),b=cp(i+1),pcd=plc+(n+1)*4+i*8;let fc=tv.getUint32(pcd+2,true);
+    const len=Math.min(b-a,ccpText-out.length);if(len<=0)continue;
+    if(fc&0x40000000){fc=(fc&~0x40000000)/2;out+=dec1252.decode(W.subarray(fc,fc+len));}
+    else out+=dec16.decode(W.subarray(fc,fc+len*2));
+  }
+  // field codes: keep only the shown result
+  let clean='';const st=[];
+  for(const ch of out){
+    if(ch==='\x13'){st.push(0);continue;}
+    if(ch==='\x14'){if(st.length)st[st.length-1]=1;continue;}
+    if(ch==='\x15'){st.pop();continue;}
+    if(st.some(v=>v===0))continue;
+    if('\x01\x02\x05\x08\x1f'.includes(ch))continue;
+    clean+=ch==='\x1e'?'-':ch;
+  }
+  return clean;
+}
+function docBlocks(t){
+  const blocks=[];let row=[],table=null,cols=0,cur='',prev='';
+  const endTable=()=>{if(table){blocks.push({t:'table',rows:table});table=null;cols=0;}};
+  for(const ch of t){
+    if(ch==='\x07'){
+      const rowEnd=prev==='\x07'&&cur===''&&(cols?row.length>=cols:true)&&row.length>0;
+      if(rowEnd){if(!table)table=[];if(!cols)cols=row.length;table.push(row);row=[];}
+      else{row.push((row.pending||[]).concat(cur));row.pending=null;}
+      cur='';prev=ch;continue;
+    }
+    if(ch==='\r'){
+      if(row.length||(table&&row.pending)){(row.pending=row.pending||[]).push(cur);}  // a paragraph inside a cell
+      else{endTable();blocks.push({t:'p',text:cur});}
+      cur='';prev=ch;continue;
+    }
+    cur+=ch;prev=ch;
+  }
+  if(row.length){if(!table)table=[];table.push(row);}
+  endTable();
+  if(cur)blocks.push({t:'p',text:cur});
+  return blocks;
+}
+function wPara(text,opts){
+  const rtl=HEB.test(text)||(!text.trim()&&opts.rtl);
+  const runs=[];
+  String(text).split(/(\x0b|\x0c|\t)/).forEach(seg=>{
+    if(seg==='\x0b')runs.push('<w:r><w:br/></w:r>');
+    else if(seg==='\x0c')runs.push('<w:r><w:br w:type="page"/></w:r>');
+    else if(seg==='\t')runs.push('<w:r><w:tab/></w:r>');
+    else if(seg)runs.push(`<w:r>${rtl?'<w:rPr><w:rtl/></w:rPr>':''}<w:t xml:space="preserve">${esc(seg)}</w:t></w:r>`);
+  });
+  return`<w:p><w:pPr>${rtl?'<w:bidi/>':''}<w:jc w:val="${rtl?'right':'left'}"/></w:pPr>${runs.join('')}</w:p>`;
+}
+async function docToDocx(bytes){
+  const blocks=docBlocks(docText(bytes));
+  const heb=blocks.some(b=>b.t==='p'?HEB.test(b.text):b.rows.some(r=>r.some(c=>c.some(x=>HEB.test(x)))));
+  let body='',paras=0,tables=0;
+  for(const b of blocks){
+    if(b.t==='p'){body+=wPara(b.text,{rtl:heb});paras++;continue;}
+    tables++;const n=Math.max(...b.rows.map(r=>r.length)),w=Math.floor(5000/n);
+    const bd=k=>`<w:${k} w:val="single" w:sz="4" w:space="0" w:color="808080"/>`;
+    body+=`<w:tbl><w:tblPr>${heb?'<w:bidiVisual/>':''}<w:tblW w:w="5000" w:type="pct"/><w:tblBorders>${['top','left','bottom','right','insideH','insideV'].map(bd).join('')}</w:tblBorders><w:tblLayout w:type="autofit"/></w:tblPr><w:tblGrid>${'<w:gridCol/>'.repeat(n)}</w:tblGrid>`;
+    for(const r of b.rows){body+='<w:tr>';for(let i=0;i<n;i++){const c=r[i]||[''];body+=`<w:tc><w:tcPr><w:tcW w:w="${w}" w:type="pct"/></w:tcPr>${c.map(x=>wPara(x,{rtl:heb})).join('')}</w:tc>`;}body+='</w:tr>';}
+    body+='</w:tbl>';
+  }
+  body+=wPara('',{rtl:heb});
+  if(!paras&&!tables)throw new Error('לא נמצא טקסט בקובץ');
+  const zip=new JSZip();
+  zip.file('[Content_Types].xml',`${XML_HEAD}<Types xmlns="${NS.ct}"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/></Types>`);
+  zip.file('_rels/.rels',`${XML_HEAD}<Relationships xmlns="${NS.rel}"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`);
+  zip.file('word/_rels/document.xml.rels',`${XML_HEAD}<Relationships xmlns="${NS.rel}"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`);
+  const font=heb?'Arial':'Calibri';
+  zip.file('word/styles.xml',`${XML_HEAD}<w:styles xmlns:w="${NS.w}"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="${font}" w:hAnsi="${font}" w:cs="Arial" w:eastAsia="${font}"/><w:sz w:val="24"/><w:szCs w:val="24"/><w:lang w:val="en-US" w:bidi="he-IL"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:after="120" w:line="276" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style></w:styles>`);
+  zip.file('word/document.xml',`${XML_HEAD}<w:document xmlns:w="${NS.w}" xmlns:r="${NS.r}"><w:body>${body}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="708" w:footer="708" w:gutter="0"/>${heb?'<w:bidi/>':''}</w:sectPr></w:body></w:document>`);
+  return{bytes:await zip.generateAsync({type:'uint8array',compression:'DEFLATE'}),paras,tables};
+}
+
+window.OFFICE_EDIT={toPdf,exportDocx,exportXlsx,docToDocx};
 })();
