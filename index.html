@@ -1042,12 +1042,123 @@ dialog.sig{border-radius:14px}
   .tools{border-radius:10px}}
 @media (prefers-reduced-motion:reduce){.busy div::before{animation:none}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+/* ============ v3.4 — friendlier chrome, a welcoming first screen, share sheet ============ */
+:root{--desk:#E9EDF3;--wa:#1FA855;--sky:#2F7BEA;--violet:#6A5AE0;--green:#1E8E5A}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--desk:#121925}}
+/* top bar: a touch of depth, roomier tools */
+.bar{background:linear-gradient(180deg,color-mix(in srgb,var(--navy) 88%,#3A4E7E) 0%,var(--navy) 100%);box-shadow:0 1px 0 rgba(255,255,255,.04) inset,0 6px 18px -12px rgba(13,20,36,.6);padding:9px 14px;gap:10px}
+.bar .group{gap:5px}
+.bar .btn{padding:6px 10px}
+@media (max-width:1400px) and (min-width:721px){.bar .btn.share .lbl{display:none}.bar .btn.share{padding:6px 9px}.zoomval{display:none}}
+.tools{padding:3px;border-radius:14px}
+.tool{transition:background .15s,color .15s}
+.tool[aria-pressed="true"]{background:rgba(255,255,255,.13)}
+.bar .btn{display:inline-flex;align-items:center;gap:7px;transition:background .15s,border-color .15s}
+.bar .btn svg{width:17px;height:17px;flex:none}
+.bar .btn.share{border-color:rgba(255,212,59,.55);color:#fff}
+.bar .btn.share svg{color:var(--marker)}
+.bar .btn.share:hover:not(:disabled){background:rgba(255,212,59,.12);border-color:var(--marker)}
+#setBtn{position:relative}
+#setBtn.set::after{content:"";position:absolute;top:5px;inset-inline-end:5px;width:7px;height:7px;border-radius:50%;background:var(--marker);box-shadow:0 0 0 2px var(--navy)}
+/* contextual strip */
+.opts{min-height:44px;gap:14px;box-shadow:0 1px 0 var(--line)}
+.btn.paste{display:inline-flex;align-items:center;gap:7px;background:var(--marker);border-color:var(--marker);color:#16213A;font-weight:600;border-radius:999px;padding:6px 14px 6px 16px}
+.btn.paste svg{width:17px;height:17px}
+.btn.paste:hover{background:#FFDD63;border-color:#FFDD63}
+.btn.paste.pop{animation:pop .45s cubic-bezier(.3,1.6,.5,1)}
+@keyframes pop{0%{transform:scale(.6);opacity:0}100%{transform:scale(1);opacity:1}}
+/* save menu becomes a bottom sheet on phones (the bar scrolls sideways there) */
+@media (max-width:720px){.menu{position:fixed;top:auto;inset-inline:10px;bottom:calc(10px + env(safe-area-inset-bottom,0px));min-width:0;padding:8px;border-radius:14px}
+  .menu button{padding:12px}}
+
+/* ---------- first screen ---------- */
+.empty{overflow:auto;place-items:center;padding:clamp(18px,4vw,48px)}
+.welcome{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);gap:clamp(28px,5vw,72px);align-items:center;width:min(1040px,100%)}
+.wl-text{display:flex;flex-direction:column;align-items:flex-start;text-align:start}
+.wl-hi{margin:0 0 8px;font-size:15px;font-weight:600;color:var(--blue)}
+.wl-text h1{font-family:"SF-frank","Times New Roman",serif;font-weight:700;font-size:clamp(34px,4.6vw,54px);line-height:1.08;letter-spacing:-.01em;margin:0;max-width:13ch;color:var(--ink);position:relative;z-index:1;text-wrap:balance}
+.wl-text .swipe{width:min(300px,70%);height:22px;margin-top:-18px;margin-inline-start:-6px;position:relative;z-index:0}
+.wl-text .swipe path{stroke-dasharray:320;stroke-dashoffset:320;animation:swipe .9s .25s cubic-bezier(.6,.05,.3,1) forwards;opacity:.9}
+@keyframes swipe{to{stroke-dashoffset:0}}
+.wl-sub{margin:18px 0 0;font-size:17px;line-height:1.6;color:var(--muted);max-width:40ch}
+.wl-cta{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-top:26px}
+.wl-cta .btn.primary.big{font-size:17px;padding:13px 32px;border-radius:12px;box-shadow:0 10px 22px -12px color-mix(in srgb,var(--navy) 80%,transparent);transition:transform .15s,box-shadow .15s}
+.wl-cta .btn.primary.big:hover{transform:translateY(-1px);box-shadow:0 14px 26px -12px color-mix(in srgb,var(--navy) 85%,transparent)}
+.wl-cta .drop-hint{font-size:14px;color:var(--muted)}
+.wl-list{list-style:none;margin:34px 0 0;padding:20px 0 0;border-top:1px solid var(--line);display:grid;grid-template-columns:1fr 1fr;gap:12px 28px;width:100%;max-width:560px}
+.wl-list li{display:flex;align-items:center;gap:10px;font-size:14.5px;color:var(--ink)}
+.wl-list svg{width:20px;height:20px;flex:none;fill:none;stroke:var(--blue);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.ios-hint{margin:18px 0 0;color:var(--muted)}
+/* the sample sheet */
+.wl-art{width:100%;max-width:360px;justify-self:center;aspect-ratio:300/390;padding:0;transform:rotate(-2.5deg);
+  box-shadow:var(--paper-shadow),14px 16px 0 -6px color-mix(in srgb,var(--bar) 70%,var(--desk)),14px 16px 0 -5px var(--line)}
+.wl-art svg{width:100%;height:100%;display:block}
+.wl-art .ln{fill:color-mix(in srgb,var(--ink) 13%,transparent)}
+.wl-art .hlb{fill:var(--marker);opacity:.8}
+.wl-art .pen{fill:none;stroke:var(--sky);stroke-width:3;stroke-linecap:round}
+.wl-art .box{fill:none;stroke:color-mix(in srgb,var(--ink) 30%,transparent);stroke-width:1.5;stroke-dasharray:4 4}
+.wl-art .sigp{fill:none;stroke:var(--ink);stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+.wl-art .sigl{stroke:color-mix(in srgb,var(--ink) 25%,transparent);stroke-width:1.5}
+body.dragging .wl-art{outline:3px dashed var(--blue);outline-offset:10px}
+body.dragging .welcome::after{content:"שחררו כדי לפתוח";position:fixed;inset-inline:0;bottom:40px;text-align:center;font-weight:600;color:var(--blue)}
+@media (max-width:820px){
+  .welcome{grid-template-columns:1fr;gap:28px}
+  .wl-art{order:-1;max-width:170px;transform:rotate(-3deg)}
+  .wl-text{align-items:center;text-align:center}
+  .wl-text h1{max-width:none}
+  .wl-text .swipe{margin-inline:auto}
+  .wl-sub{font-size:16px}
+  .wl-cta{justify-content:center;flex-direction:column;gap:10px}
+  .wl-list{grid-template-columns:1fr 1fr;gap:10px 16px;text-align:start}
+  .wl-list li{font-size:13.5px}}
+@media (max-width:420px){.wl-list{grid-template-columns:1fr}}
+
+/* ---------- dialogs ---------- */
+dialog.sig{border-radius:18px;box-shadow:0 30px 60px -20px rgba(13,20,36,.45)}
+dialog.sig::backdrop{background:rgba(13,20,36,.42);backdrop-filter:blur(3px)}
+dialog.sig[open]{animation:dlgIn .2s ease-out}
+@keyframes dlgIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.sig-in{padding:20px 22px}
+/* share sheet */
+dialog.sheet{width:min(580px,94vw)}
+.sh-head{display:flex;align-items:center;gap:10px}
+.sh-head h2{margin-inline-end:auto}
+.sh-file{margin:-4px 0 0;font-size:13.5px;color:var(--muted);overflow-wrap:anywhere}
+.sh-grp{margin:6px 0 -2px;font-size:13px;font-weight:600;color:var(--muted)}
+.sh-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.sh-grid.two{grid-template-columns:1fr 1fr}
+.sh{display:flex;flex-direction:column;align-items:center;gap:5px;text-align:center;border:1px solid var(--line);background:var(--bar);color:var(--ink);font:inherit;border-radius:14px;padding:14px 8px 12px;cursor:pointer;transition:border-color .15s,background .15s,transform .1s}
+.sh:hover:not(:disabled){border-color:color-mix(in srgb,var(--blue) 55%,var(--line));background:color-mix(in srgb,var(--blue) 4%,var(--bar))}
+.sh:active:not(:disabled){transform:scale(.97)}
+.sh:disabled{opacity:.45;cursor:default}
+.sh b{font-size:14.5px;font-weight:600}
+.sh small{font-size:12px;color:var(--muted);line-height:1.35;overflow-wrap:anywhere}
+.sh-ic{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;color:#fff;background:var(--navy)}
+.sh-ic svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.sh-ic.mail{background:var(--sky)}.sh-ic.me{background:var(--navy)}.sh-ic.wa{background:var(--wa)}
+.sh-ic.ad{background:linear-gradient(160deg,#36A3F7,#1F6FE0)}.sh-ic.qs{background:var(--violet)}
+.sh-ic.more{background:color-mix(in srgb,var(--ink) 12%,var(--bar));color:var(--ink)}
+.sh-ic.dr{background:var(--green)}.sh-ic.ic{background:linear-gradient(160deg,#5AC8FA,#3478F6)}
+dialog.wait .sh{cursor:progress}
+dialog.wait .sh .sh-ic{opacity:.55}
+.sh-status{margin:0;min-height:1.4em;font-size:13.5px;color:var(--muted)}
+.sh-status a{color:var(--blue);font-weight:600}
+#setDlg .field input{font-size:15px;padding:9px 11px;border-radius:9px}
+@media (max-width:560px){
+  dialog.sheet{width:100%;max-width:100%;margin:auto 0 0;border-radius:20px 20px 0 0;padding-bottom:env(safe-area-inset-bottom,0px)}
+  dialog.sheet[open]{animation:sheetIn .25s ease-out}
+  .sh-grid{grid-template-columns:repeat(3,1fr);gap:6px}
+  .sh{padding:12px 4px 10px}
+  .sh small{display:none}}
+@keyframes sheetIn{from{transform:translateY(40px);opacity:.4}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){.wl-text .swipe path{animation:none;stroke-dashoffset:0}.btn.paste.pop,dialog.sig[open],dialog.sheet[open]{animation:none}}
+
 </style>
 </head>
 <body data-tool="select">
 
 <header class="bar">
-  <div class="brand"><b title="גרסה 3.3">סימן</b><span class="ver">3.3</span><span class="fname" id="fname"></span></div>
+  <div class="brand"><b title="גרסה 3.4">סימן</b><span class="ver">3.4</span><span class="fname" id="fname"></span></div>
 
   <nav class="tools" id="tools" aria-label="כלים">
     <button class="tool" data-tool="select" aria-pressed="true" title="בחירה וגלילה (V)">
@@ -1087,8 +1198,10 @@ dialog.sig{border-radius:14px}
     <button class="btn" id="convBtn" disabled title="המרה ל-PowerPoint, Word או Excel לעריכה">המרה</button>
     <div class="split-btn">
       <button class="btn primary" id="saveBtn" disabled title="שמירה (Ctrl+S)">שמירה</button><button class="btn primary caret" id="saveMenuBtn" disabled aria-haspopup="menu" aria-expanded="false" aria-label="עוד אפשרויות שמירה" title="עוד אפשרויות שמירה">▾</button>
-      <div class="menu hidden" id="saveMenu" role="menu"><button role="menuitem" id="saveAsBtn" disabled>שמירה בשם… <kbd>Ctrl+Shift+S</kbd></button></div>
+      <div class="menu hidden" id="saveMenu" role="menu"><button role="menuitem" id="saveAsBtn" disabled>שמירה בשם… <kbd>Ctrl+Shift+S</kbd></button><button role="menuitem" id="driveMenuBtn" disabled>שמירה ב-Google Drive</button><button role="menuitem" id="icloudMenuBtn" disabled>שמירה ב-iCloud Drive</button></div>
     </div>
+    <button class="btn share" id="shareBtn" disabled title="שליחה במייל, בוואטסאפ, ב-AirDrop או בשיתוף מהיר"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.3 10.8l7.4-4.4M8.3 13.2l7.4 4.4"/></svg><span class="lbl">שיתוף</span></button>
+    <button class="icon-btn" id="setBtn" title="הגדרות: השם והמייל שלך" aria-label="הגדרות"><svg viewBox="0 0 24 24" aria-hidden="true" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="8.5" r="3.6"/><path d="M4.5 20c1.2-3.6 4-5.4 7.5-5.4s6.3 1.8 7.5 5.4"/></svg></button>
     <button class="btn install hidden" id="installBtn" title="התקנת האפליקציה במכשיר">התקנה</button>
   </div>
   <input type="file" id="file" accept="application/pdf,.pdf,.docx,.xlsx,.pptx,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.presentationml.presentation" hidden>
@@ -1105,7 +1218,7 @@ dialog.sig{border-radius:14px}
   <label class="hidden chk" id="boldWrap"><input type="checkbox" id="boldChk"> מודגש</label>
   <label class="hidden chk" id="paraWrap" title="כבוי: כל לחיצה עורכת שורה אחת בלבד, בלי לשנות שום דבר אחר"><input type="checkbox" id="paraChk"> פסקה שלמה</label>
   <button class="btn hidden" id="ocrBtn" title="זיהוי טקסט בעמוד סרוק כדי לערוך ולתרגם אותו">זיהוי טקסט (OCR)</button>
-  <button class="btn hidden" id="pasteBtn" title="הדבקה מהלוח (Ctrl+V)">הדבקה</button>
+  <button class="btn paste hidden" id="pasteBtn" title="הדבקה (Ctrl+V)"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 11h6M9 15h4"/></svg><span id="pasteLbl">הדבקה</span></button>
   <span class="pageinfo" id="pageInfo"></span>
 </div>
 
@@ -1128,13 +1241,43 @@ dialog.sig{border-radius:14px}
 </aside>
 <main class="desk" id="desk">
   <div class="empty" id="empty">
-    <div class="drop">
-      <h1>פתחו קובץ</h1>
-      <svg class="swipe" viewBox="0 0 300 26" preserveAspectRatio="none" aria-hidden="true"><path d="M6 15c46-9 98-11 150-9s92 7 138 2" stroke="#FFD43B" stroke-width="16" stroke-linecap="round" fill="none" opacity=".9"/></svg>
-      <p>PDF לקריאה, סימון, עריכה, חתימה ותרגום. Word, Excel ו-PowerPoint לבדיקה ולתיקון קבצים שלא נפתחים. הקובץ נשאר במחשב שלכם.</p>
-      <button class="btn primary big" id="openBtn2">בחירת קובץ</button>
-      <p class="drop-hint">או גררו את הקובץ לכאן</p>
-      <p class="ios-hint hidden" id="iosHint">להתקנה באייפון: לוחצים על "שיתוף" ב-Safari ואז "הוסף למסך הבית".</p>
+    <div class="welcome">
+      <div class="wl-text">
+        <p class="wl-hi hidden" id="wlHi"></p>
+        <h1>לסמן, לחתום ולשלוח בלי להדפיס אף דף</h1>
+        <svg class="swipe" viewBox="0 0 300 26" preserveAspectRatio="none" aria-hidden="true"><path d="M6 15c46-9 98-11 150-9s92 7 138 2" stroke="#FFD43B" stroke-width="16" stroke-linecap="round" fill="none"/></svg>
+        <p class="wl-sub">סימן פותח PDF, Word, Excel ו-PowerPoint ישר בדפדפן. הקובץ נשאר אצלכם במכשיר ולא עולה לשום שרת.</p>
+        <div class="wl-cta">
+          <button class="btn primary big" id="openBtn2">בחירת קובץ</button>
+          <span class="drop-hint">או גררו קובץ לכאן</span>
+        </div>
+        <ul class="wl-list">
+          <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4l6 6-8 8H6v-6z"/><path d="M4 21h9"/></svg>מרקר, עט והערות</li>
+          <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7V5h10v2M9 5v12M7 17h4"/><path d="M14 19l1-3 5-5 2 2-5 5z"/></svg>עריכת הטקסט שכבר בקובץ</li>
+          <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17c2-4 4-9 6-9s-1 9 1 9 3-5 5-5-1 5 1 5 3-2 4-3"/><path d="M3 21h18"/></svg>חתימה ומילוי טפסים</li>
+          <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h9M8.5 3v2M6 5c0 4 3 7 6 8M11 5c0 4-3 7-6 8"/><path d="M13 21l4-9 4 9M14.5 18h5"/></svg>תרגום לעברית ולאנגלית</li>
+          <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M10 13h5M10 17h5"/></svg>המרה ל-Word, Excel ו-PowerPoint</li>
+          <li><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.3 10.8l7.4-4.4M8.3 13.2l7.4 4.4"/></svg>שיתוף בוואטסאפ, במייל ובענן</li>
+        </ul>
+        <p class="ios-hint hidden" id="iosHint">להתקנה באייפון: לוחצים על "שיתוף" ב-Safari ואז "הוסף למסך הבית".</p>
+      </div>
+      <div class="drop wl-art" aria-hidden="true">
+        <svg viewBox="0 0 300 390">
+          <rect class="ln" x="34" y="44" width="150" height="12" rx="3"/>
+          <rect class="hlb" x="28" y="76" width="236" height="20" rx="3"/>
+          <rect class="ln" x="34" y="80" width="224" height="9" rx="3"/>
+          <rect class="ln" x="34" y="104" width="208" height="9" rx="3"/>
+          <rect class="ln" x="34" y="128" width="226" height="9" rx="3"/>
+          <rect class="ln" x="34" y="152" width="170" height="9" rx="3"/>
+          <rect class="ln" x="34" y="190" width="220" height="9" rx="3"/>
+          <rect class="ln" x="34" y="214" width="196" height="9" rx="3"/>
+          <ellipse class="pen" cx="208" cy="219" rx="42" ry="15" transform="rotate(-4 208 219)"/>
+          <rect class="ln" x="34" y="238" width="214" height="9" rx="3"/>
+          <rect class="box" x="34" y="282" width="110" height="26" rx="4"/>
+          <path class="sigp" d="M168 322c10-18 18-40 26-40s-4 40 4 40 12-22 20-22-4 22 4 22 12-8 18-12"/>
+          <path class="sigl" d="M160 334h112"/>
+        </svg>
+      </div>
     </div>
   </div>
   <div class="pages" id="pages"></div>
@@ -1284,6 +1427,40 @@ dialog.sig{border-radius:14px}
     <div class="sig-row"><span class="grow"></span><button class="btn" id="readyCancel">ביטול</button><button class="btn primary" id="readySave">שמירה</button></div>
   </div>
 </dialog>
+<dialog class="sig sheet" id="shareDlg" aria-labelledby="shareTitle">
+  <div class="sig-in">
+    <div class="sh-head"><h2 id="shareTitle">שיתוף ושמירה</h2><button class="icon-btn" id="shareClose" aria-label="סגירה">×</button></div>
+    <p class="sh-file" id="shareName"></p>
+    <h3 class="sh-grp">שליחה</h3>
+    <div class="sh-grid">
+      <button class="sh" data-share="mail"><span class="sh-ic mail"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M4 7l8 6 8-6"/></svg></span><b>מייל</b><small id="shMailHint">שליחת הקובץ כקובץ מצורף</small></button>
+      <button class="sh" data-share="me"><span class="sh-ic me"><svg viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.6"/><path d="M4.5 20c1.2-3.6 4-5.4 7.5-5.4s6.3 1.8 7.5 5.4"/></svg></span><b>שליחה אליי</b><small id="shMeHint">למייל שהגדרת</small></button>
+      <button class="sh" data-share="whatsapp"><span class="sh-ic wa"><svg viewBox="0 0 24 24"><path d="M4 20l1.3-4A8 8 0 1 1 8.4 19z"/><path d="M9 8.6c0 3.5 2.9 6.4 6.4 6.4l1.2-1.6-2-1-1 .8a4.4 4.4 0 0 1-2.8-2.8l.8-1-1-2z"/></svg></span><b>וואטסאפ</b><small id="shWaHint">וואטסאפ ווב או האפליקציה</small></button>
+      <button class="sh" data-share="airdrop"><span class="sh-ic ad"><svg viewBox="0 0 24 24"><path d="M6.3 16.5a8 8 0 1 1 11.4 0M8.8 14a4.6 4.6 0 1 1 6.4 0"/><path d="M12 13l-3.5 8h7z"/></svg></span><b>AirDrop</b><small id="shAdHint">לאייפון, אייפד ומק שליד</small></button>
+      <button class="sh" data-share="quick"><span class="sh-ic qs"><svg viewBox="0 0 24 24"><path d="M13 3L5 13h6l-1 8 8-10h-6z"/></svg></span><b>שיתוף מהיר</b><small id="shQsHint">Quick Share לאנדרואיד שליד</small></button>
+      <button class="sh" data-share="more"><span class="sh-ic more"><svg viewBox="0 0 24 24"><circle cx="6" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="18" cy="12" r="1.6"/></svg></span><b>עוד אפליקציות</b><small id="shMoreHint">כל מה שמותקן במכשיר</small></button>
+    </div>
+    <h3 class="sh-grp">שמירה בענן</h3>
+    <div class="sh-grid two">
+      <button class="sh" data-share="drive"><span class="sh-ic dr"><svg viewBox="0 0 24 24"><path d="M8.5 3.5h7l6 10.5-3.5 6h-12L2.5 14z"/><path d="M8.5 3.5L15 14.5h6.5M2.5 14l6.3-0M12 9l-5.7 11"/></svg></span><b>Google Drive</b><small id="shDrHint">לתיקייה "סימן" שלך</small></button>
+      <button class="sh" data-share="icloud"><span class="sh-ic ic"><svg viewBox="0 0 24 24"><path d="M7 18.5h10.5a4 4 0 0 0 .5-8 6 6 0 0 0-11.4 1.6A3.3 3.3 0 0 0 7 18.5z"/></svg></span><b>iCloud Drive</b><small id="shIcHint">דרך "שמירה בקבצים"</small></button>
+    </div>
+    <p class="sh-status" id="shareStatus" role="status"></p>
+  </div>
+</dialog>
+<dialog class="sig" id="setDlg" aria-labelledby="setTitle">
+  <form class="sig-in" method="dialog" id="setForm">
+    <h2 id="setTitle">הגדרות</h2>
+    <label class="field">השם שלך
+      <input id="setName" autocomplete="name" maxlength="40" placeholder="לברכה בפתיחה ולחתימה במייל"></label>
+    <label class="field">המייל שלך
+      <input id="setMail" type="email" dir="ltr" autocomplete="email" placeholder="name@example.com"></label>
+    <label class="chk"><input type="checkbox" id="setCc"> לשים אותי בהעתק בכל שליחה במייל</label>
+    <p class="fmt-note">המייל משמש לשליחה אליך, להעתק במיילים ולהתחברות מהירה ל-Google Drive. הוא נשמר רק במכשיר הזה.</p>
+    <p class="sh-status" id="setStatus" role="status"></p>
+    <div class="sig-row"><span class="grow"></span><button type="button" class="btn" id="setCancel">ביטול</button><button type="submit" class="btn primary" id="setSave">שמירה</button></div>
+  </form>
+</dialog>
 <div id="printArea" aria-hidden="true"></div>
 <div class="toast" id="toast" role="status"></div>
 <div class="busy hidden" id="busy"><div id="busyMsg">רגע…</div></div>
@@ -1382,7 +1559,7 @@ async function openFile(file,handle){
     setDirty(false);
     $('fname').textContent=file.name;
     $('empty').classList.add('hidden');
-    ['saveBtn','saveAsBtn','saveMenuBtn','trBtn','pgBtn','printBtn','convBtn'].forEach(id=>$(id).disabled=false);S.sel=new Set();
+    ['saveBtn','saveAsBtn','saveMenuBtn','trBtn','pgBtn','printBtn','convBtn','shareBtn','driveMenuBtn','icloudMenuBtn'].forEach(id=>$(id).disabled=false);S.sel=new Set();
     TR.reset();
     S.hasForm=false;try{S.hasForm=!!(await doc.getFieldObjects());}catch(_){}
     await buildPages();
@@ -2168,7 +2345,7 @@ window.__buildPdf=buildPdf; // used by automated tests
 // returns {handle} when saved through the file system, true when shared/downloaded, false when cancelled
 // after a long job the browser no longer counts the original click, and refuses to open the save window
 const needsGesture=e=>e&&(e.name==='SecurityError'||e.name==='NotAllowedError'||/user gesture|user activation/i.test(e.message||''));
-function askToSave(name){return new Promise(res=>{const d=$('readyDlg');$('readyName').textContent=name;
+function askToSave(name,label){return new Promise(res=>{const d=$('readyDlg');$('readyName').textContent=name;$('readySave').textContent=label||'שמירה';
   const done=v=>{d.close();$('readySave').onclick=$('readyCancel').onclick=null;res(v);};
   $('readySave').onclick=()=>done(true);$('readyCancel').onclick=()=>done(false);d.oncancel=()=>done(false);d.showModal();$('readySave').focus();});}
 async function saveBytes(name,bytes,kind){
@@ -2733,7 +2910,7 @@ $('tpCopy').onclick=async()=>{try{await navigator.clipboard.writeText(translatio
 function setTool(t){
   S.tool=t;document.body.dataset.tool=t;
   document.querySelectorAll('.tool[data-tool]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.tool===t));
-  $('pasteBtn').classList.toggle('hidden',t!=='select'||!S.doc);
+  updatePaste();
   if(t!=='place')S.pending=null;
   const sw=$('swatches'),sz=$('sizeWrap'),lbl=$('optLabel');
   const labels={edit:'לחצו על שורה כדי לערוך אותה. Esc לסיום',redact:'גררו מלבן על מידע רגיש. הטקסט שמתחת יימחק מהקובץ לגמרי ויוחלף בפס שחור',snip:'גררו מלבן סביב האזור שרוצים להעתיק. אחר כך מדביקים ב-Word, בוואטסאפ או בתוך המסמך',place:'לחצו על הדף במקום שבו לשים את '+(S.pending&&S.pending.sig?'החתימה':'התמונה'),select:'',text:'לחצו על הדף כדי לכתוב',highlight:'גררו מלבן על מה שרוצים לסמן',pen:'כתבו או ציירו חופשי',eraser:'לוחצים על סימון כדי למחוק אותו. גוררים מלבן על הדף כדי למחוק מה שכתוב שם'};
@@ -2811,7 +2988,7 @@ addEventListener('keydown',e=>{
   const k=e.code.replace('Key','').toLowerCase();
   if(!mod&&map[k]){setTool(map[k]);}
 });
-addEventListener('beforeunload',e=>{if(S.dirty){e.preventDefault();e.returnValue='';}});
+addEventListener('beforeunload',e=>{if(S.dirty&&!S.noWarn){e.preventDefault();e.returnValue='';}});
 let rT;addEventListener('resize',()=>{clearTimeout(rT);rT=setTimeout(updatePageInfo,150);});
 setTool('select');
 
@@ -2930,9 +3107,9 @@ async function snipRegion(P,x,y,w,h){
     const c=document.createElement('canvas');c.width=Math.round(w*k);c.height=Math.round(h*k);
     c.getContext('2d').drawImage(full,Math.round(x*k),Math.round(y*k),c.width,c.height,0,0,c.width,c.height);
     const blob=await new Promise(r=>c.toBlob(r,'image/png'));
-    S.clip={src:c.toDataURL('image/png'),ratio:c.height/c.width,wPt:w/S.zoom};
-    try{await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]);toast('האזור הועתק. אפשר להדביק עם Ctrl+V בכל מקום');}
-    catch(_){toast('האזור הועתק להדבקה בתוך סימן (Ctrl+V)');}
+    S.clip={src:c.toDataURL('image/png'),ratio:c.height/c.width,wPt:w/S.zoom};S.copied='image';updatePaste(true);
+    try{await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]);toast(IS_TOUCH?'האזור הועתק. לוחצים "הדבקה" כדי לשים אותו בדף, או מדביקים באפליקציה אחרת':'האזור הועתק. אפשר להדביק עם Ctrl+V או בכפתור "הדבקה"');}
+    catch(_){toast('האזור הועתק. לוחצים "הדבקה" כדי לשים אותו בדף');}
   }catch(e){console.error(e);toast('ההעתקה נכשלה');}
 }
 
@@ -2959,6 +3136,8 @@ document.addEventListener('paste',e=>{
   if(S.clip){e.preventDefault();const{P,cx,cy}=visibleCenter();addImage(P,S.clip.src,S.clip.ratio,S.clip.wPt,cx,cy,false);}
 });
 $('pasteBtn').onclick=async()=>{
+  if(S.copied==='text'&&S.copiedText){pasteBlobOrText(null,S.copiedText);return;}
+  if(S.copied==='image'&&S.clip){const{P,cx,cy}=visibleCenter();addImage(P,S.clip.src,S.clip.ratio,S.clip.wPt,cx,cy,false);toast('האזור הודבק. אפשר לגרור ולשנות גודל');return;}
   try{
     if(navigator.clipboard&&navigator.clipboard.read){
       const items=await navigator.clipboard.read();
@@ -3136,7 +3315,7 @@ const loadOfficeLibs=()=>officeLibs||(officeLibs=(async()=>{if(!window.JSZip)awa
 const OF={};
 function showOfficeView(on){
   $('officeView').classList.toggle('hidden',!on);$('pages').classList.toggle('hidden',on);
-  if(on){$('empty').classList.add('hidden');['saveBtn','saveAsBtn','saveMenuBtn','trBtn','pgBtn','printBtn','convBtn'].forEach(id=>$(id).disabled=true);$('pgpanel').classList.add('hidden');$('tpanel').classList.add('hidden');}
+  if(on){$('empty').classList.add('hidden');['saveBtn','saveAsBtn','saveMenuBtn','trBtn','pgBtn','printBtn','convBtn','shareBtn','driveMenuBtn','icloudMenuBtn'].forEach(id=>$(id).disabled=true);$('pgpanel').classList.add('hidden');$('tpanel').classList.add('hidden');}
 }
 async function openOffice(file,handle){
   busy(true,'בודק את הקובץ…');
@@ -3735,6 +3914,208 @@ $('printBtn').onclick=printDoc;
 $('pgBtn').onclick=()=>{const p=$('pgpanel');const show=p.classList.contains('hidden');p.classList.toggle('hidden',!show);if(show){renderThumbs();updateSel();}setTimeout(fitWidth,0);};
 $('pgClose').onclick=()=>{$('pgpanel').classList.add('hidden');setTimeout(fitWidth,0);};
 $('desk').addEventListener('scroll',()=>requestAnimationFrame(markCurrentThumb),{passive:true});
+
+/* =====================================================================
+   USER SETTINGS · SHARE (mail, WhatsApp, AirDrop, Quick Share) ·
+   CLOUD (Google Drive, iCloud Drive) · PASTE only after a copy
+   ===================================================================== */
+// Google Drive: paste the OAuth "Web client ID" from Google Cloud here (see the setup notes).
+// Empty = Drive still works through the phone's share sheet / the Drive folder on the computer.
+const GDRIVE_CLIENT_ID='';
+
+const UA=navigator.userAgent;
+const IS_APPLE_TOUCH=/iphone|ipad|ipod/i.test(UA)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+const IS_MAC=/Macintosh/i.test(UA)&&!IS_APPLE_TOUCH;
+const IS_APPLE=IS_APPLE_TOUCH||IS_MAC;
+const IS_ANDROID=/android/i.test(UA);
+const IS_TOUCH=matchMedia('(pointer:coarse)').matches;
+
+/* --- user settings (this device only) --- */
+const USER_KEY='siman.user';
+let USER={name:'',mail:'',cc:false};
+try{USER={...USER,...JSON.parse(localStorage.getItem(USER_KEY)||'{}')};}catch(_){}
+const validMail=m=>/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(m);
+function applyUser(){
+  const hi=$('wlHi');hi.textContent=USER.name?`שלום, ${USER.name}`:'';hi.classList.toggle('hidden',!USER.name);
+  $('setBtn').title=USER.mail?`הגדרות · ${USER.mail}`:'הגדרות: השם והמייל שלך';
+  $('setBtn').classList.toggle('set',!!USER.mail);
+}
+let setAfter=null;
+function openSettings(then){
+  setAfter=then||null;
+  $('setName').value=USER.name;$('setMail').value=USER.mail;$('setCc').checked=!!USER.cc;$('setStatus').textContent='';
+  $('setDlg').showModal();(USER.mail?$('setName'):$('setMail')).focus();
+}
+$('setBtn').onclick=()=>openSettings();
+$('setCancel').onclick=()=>{setAfter=null;$('setDlg').close();};
+$('setForm').addEventListener('submit',e=>{
+  const mail=$('setMail').value.trim(),name=$('setName').value.trim();
+  if(mail&&!validMail(mail)){e.preventDefault();$('setStatus').textContent='כתובת המייל לא תקינה. בדקו שיש בה @ ונקודה.';$('setMail').focus();return;}
+  USER={name,mail,cc:$('setCc').checked&&!!mail};
+  try{localStorage.setItem(USER_KEY,JSON.stringify(USER));}catch(_){}
+  if(gTok&&mail!==gTokMail){gTok=null;}
+  applyUser();toast('ההגדרות נשמרו');
+  const f=setAfter;setAfter=null;if(f)setTimeout(f,0);
+});
+applyUser();
+
+/* --- the file to send: built once when the sheet opens, so taps keep the browser's "user gesture" --- */
+const SH={file:null,job:null};
+function fileName(){const n=S.name||'מסמך.pdf';return /\.pdf$/i.test(n)?n:n+'.pdf';}
+function canShareFile(f){try{return !!(navigator.share&&navigator.canShare&&navigator.canShare({files:[f]}));}catch(_){return false;}}
+function downloadFile(f){const a=document.createElement('a');a.href=URL.createObjectURL(f);a.download=f.name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),8000);}
+function shStatus(msg,html){const s=$('shareStatus');if(html)s.innerHTML=msg;else s.textContent=msg;}
+function shareHints(){
+  const native=!!navigator.share;
+  const set=(id,txt)=>{$(id).textContent=txt;};
+  const btn=k=>document.querySelector(`.sh[data-share="${k}"]`);
+  set('shMeHint',USER.mail?USER.mail:'קודם מגדירים את המייל שלך');
+  set('shWaHint',IS_TOUCH?'בוחרים שיחה ושולחים':'נפתח וואטסאפ ווב והקובץ יורד');
+  const ad=IS_APPLE&&native;btn('airdrop').disabled=!ad;
+  set('shAdHint',ad?'לאייפון, אייפד ומק שליד':'זמין רק באייפון, אייפד ומק');
+  const qs=(IS_ANDROID||/Windows/i.test(UA))&&native;btn('quick').disabled=!qs;
+  set('shQsHint',!qs?'זמין באנדרואיד ובווינדוס':IS_ANDROID?'Quick Share למכשיר שליד':'שיתוף בקרבת מקום של Windows');
+  btn('more').disabled=!native;set('shMoreHint',native?'כל מה שמותקן במכשיר':'הדפדפן הזה לא תומך');
+  set('shDrHint',GDRIVE_CLIENT_ID?'לתיקייה "סימן" ב-Drive שלך':IS_TOUCH?'דרך תפריט השיתוף':'לתיקיית Drive במחשב');
+  set('shIcHint',IS_APPLE_TOUCH?'דרך "שמירה בקבצים"':IS_MAC?'לתיקיית iCloud Drive':'לתיקיית iCloud במחשב');
+}
+function openShare(focusKey){
+  if(!S.bytes)return;
+  closeSaveMenu&&closeSaveMenu();
+  document.activeElement&&document.activeElement.blur&&document.activeElement.blur();
+  SH.file=null;shareHints();
+  $('shareName').textContent=fileName();
+  const d=$('shareDlg');d.classList.add('wait');shStatus('מכין את הקובץ…');d.showModal();
+  if(GDRIVE_CLIENT_ID)loadGIS().catch(()=>{});
+  const job=SH.job=buildPdf().then(bytes=>{
+    if(SH.job!==job)return;
+    SH.file=new File([bytes],fileName(),{type:'application/pdf'});
+    d.classList.remove('wait');shStatus('');
+    if(focusKey){const b=document.querySelector(`.sh[data-share="${focusKey}"]`);b&&b.focus();}
+  }).catch(e=>{console.error(e);shStatus('הכנת הקובץ נכשלה: '+(e.message||e));});
+}
+$('shareBtn').onclick=()=>openShare();
+$('driveMenuBtn').onclick=()=>openShare('drive');
+$('icloudMenuBtn').onclick=()=>openShare('icloud');
+$('shareClose').onclick=()=>$('shareDlg').close();
+$('shareDlg').addEventListener('close',()=>{SH.job=null;});
+$('shareDlg').addEventListener('click',e=>{if(e.target===$('shareDlg'))$('shareDlg').close();});
+
+async function nativeShare(f,extra){
+  try{await navigator.share({files:[f],title:f.name,...(extra||{})});return true;}
+  catch(e){if(e&&e.name==='AbortError')return false;
+    if(needsGesture(e)&&await askToSave(f.name,'שיתוף')){try{await navigator.share({files:[f],title:f.name,...(extra||{})});return true;}catch(_){}}
+    throw e;}
+}
+const mailBody=()=>`מצורף הקובץ ${fileName()}.\n\n${USER.name?USER.name+'\n':''}נשלח מסימן · lial-apps.github.io/siman`;
+function mailto(to){
+  const q=[`subject=${encodeURIComponent(fileName().replace(/\.pdf$/i,''))}`,`body=${encodeURIComponent(mailBody())}`];
+  if(USER.cc&&USER.mail&&to!==USER.mail)q.push('cc='+encodeURIComponent(USER.mail));
+  return `mailto:${to?encodeURIComponent(to).replace('%40','@'):''}?${q.join('&')}`;
+}
+
+const ACTIONS={
+  async mail(f){
+    if(canShareFile(f)){if(await nativeShare(f,{text:mailBody()}))done('נפתח תפריט השיתוף. בוחרים את אפליקציית המייל');return;}
+    downloadFile(f);openMailto(mailto(''));
+    done('הקובץ ירד למחשב ונפתח מייל חדש. גררו אליו את הקובץ מתיקיית ההורדות');
+  },
+  async me(f){
+    if(!USER.mail){$('shareDlg').close();openSettings(()=>openShare('me'));return;}
+    if(canShareFile(f)&&IS_TOUCH){
+      try{await navigator.clipboard.writeText(USER.mail);}catch(_){}
+      if(await nativeShare(f,{text:mailBody()}))done(`בוחרים מייל ומדביקים בשדה הנמען: ${USER.mail} (הכתובת כבר הועתקה)`);return;}
+    downloadFile(f);openMailto(mailto(USER.mail));
+    done(`נפתח מייל אל ${USER.mail}. גררו אליו את הקובץ שירד לתיקיית ההורדות`);
+  },
+  async whatsapp(f){
+    if(IS_TOUCH&&canShareFile(f)){if(await nativeShare(f))done('בוחרים וואטסאפ ואת השיחה');return;}
+    const w=window.open('https://web.whatsapp.com/','siman_wa');
+    downloadFile(f);
+    done(w?'וואטסאפ ווב נפתח בלשונית חדשה. פותחים שיחה וגוררים אליה את הקובץ מההורדות':'הקובץ ירד. פתחו את web.whatsapp.com וגררו אותו לשיחה (הדפדפן חסם חלון חדש)');
+  },
+  async airdrop(f){if(await nativeShare(f))done('בוחרים AirDrop ואת המכשיר שליד');},
+  async quick(f){if(await nativeShare(f))done(IS_ANDROID?'בוחרים "שיתוף מהיר" (Quick Share) ואת המכשיר':'בוחרים "שיתוף בקרבת מקום" ואת המחשב שליד');},
+  async more(f){if(await nativeShare(f))done('');},
+  async drive(f){
+    if(GDRIVE_CLIENT_ID){
+      const tok=await driveToken();
+      shStatus('מעלה ל-Google Drive…');$('shareDlg').classList.add('wait');
+      try{const r=await driveUpload(f,tok);$('shareDlg').classList.remove('wait');
+        shStatus(`נשמר ב-Google Drive, בתיקייה "סימן". <a href="${r.webViewLink}" target="_blank" rel="noopener">פתיחה ב-Drive</a>`,true);}
+      finally{$('shareDlg').classList.remove('wait');}
+      return;}
+    if(IS_TOUCH&&canShareFile(f)){if(await nativeShare(f))done('בוחרים Drive בתפריט השיתוף');return;}
+    await pickAndWrite(f,'בחלון השמירה בחרו את התיקייה Google Drive (מופיעה כשמותקן Drive למחשב)');
+  },
+  async icloud(f){
+    if(IS_APPLE_TOUCH&&canShareFile(f)){shStatus('בתפריט בוחרים "שמירה בקבצים" ואז iCloud Drive');if(await nativeShare(f))done('בוחרים "שמירה בקבצים" ← iCloud Drive');return;}
+    await pickAndWrite(f,IS_MAC?'בחלון השמירה בחרו iCloud Drive בצד':'בחלון השמירה בחרו את התיקייה iCloud Drive (מופיעה כשמותקן iCloud למחשב)');
+  }
+};
+async function pickAndWrite(f,hint){
+  if(FS){
+    shStatus(hint);
+    try{const h=await showSaveFilePicker({suggestedName:f.name,types:PDF_TYPE,startIn:'documents'});
+      await writeHandle(h,new Uint8Array(await f.arrayBuffer()));done('נשמר: '+h.name);}
+    catch(e){if(e&&e.name==='AbortError'){shStatus('');return;}throw e;}
+    return;}
+  downloadFile(f);done('הקובץ ירד. העבירו אותו לתיקיית הענן שלכם מתוך ההורדות');
+}
+function openMailto(u){S.noWarn=true;location.href=u;setTimeout(()=>{S.noWarn=false;},2000);}
+function done(msg){$('shareDlg').close();if(msg)toast(msg);}
+document.querySelectorAll('.sh[data-share]').forEach(b=>b.addEventListener('click',async()=>{
+  const k=b.dataset.share;
+  if(!SH.file){shStatus('עוד רגע, הקובץ בהכנה…');return;}
+  try{await ACTIONS[k](SH.file);}
+  catch(e){console.error(e);$('shareDlg').classList.remove('wait');
+    shStatus(e&&e.name==='AbortError'?'':(k==='drive'?'השמירה ב-Drive נכשלה: ':'השיתוף נכשל: ')+(e.message||e));}
+}));
+
+/* --- Google Drive (drive.file scope: the app sees only files it created) --- */
+let gisP=null,gTok=null,gTokExp=0,gTokMail='';
+function loadGIS(){return gisP||(gisP=new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://accounts.google.com/gsi/client';s.async=true;
+  s.onload=()=>res();s.onerror=()=>{gisP=null;rej(new Error('אין חיבור ל-Google'));};document.head.append(s);}));}
+function driveToken(){return new Promise((res,rej)=>{
+  if(gTok&&Date.now()<gTokExp-60000)return res(gTok);
+  if(!(window.google&&google.accounts&&google.accounts.oauth2)){loadGIS().catch(()=>{});return rej(new Error('Google עדיין נטען. נסו שוב בעוד רגע'));}
+  const c=google.accounts.oauth2.initTokenClient({client_id:GDRIVE_CLIENT_ID,scope:'https://www.googleapis.com/auth/drive.file',login_hint:USER.mail||undefined,
+    callback:r=>{if(r.error)return rej(new Error(r.error_description||r.error));gTok=r.access_token;gTokMail=USER.mail;gTokExp=Date.now()+(+r.expires_in||3600)*1000;res(gTok);},
+    error_callback:e=>{const ab=e&&(e.type==='popup_closed');const err=new Error(ab?'החלון נסגר':e&&e.type==='popup_failed_to_open'?'הדפדפן חסם את חלון ההתחברות':'ההתחברות ל-Google נכשלה');if(ab)err.name='AbortError';rej(err);}});
+  c.requestAccessToken();
+});}
+async function gfetch(url,opt,tok){const r=await fetch(url,{...opt,headers:{Authorization:'Bearer '+tok,...(opt&&opt.headers||{})}});
+  if(r.status===401){gTok=null;throw new Error('ההתחברות פגה. נסו שוב');}
+  if(!r.ok)throw new Error('Google השיב '+r.status);return r.json();}
+let gFolder=null;
+async function driveFolder(tok){
+  if(gFolder)return gFolder;
+  const q=encodeURIComponent("name='סימן' and mimeType='application/vnd.google-apps.folder' and trashed=false");
+  const j=await gfetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id)&spaces=drive`,{},tok);
+  if(j.files&&j.files[0])return gFolder=j.files[0].id;
+  const c=await gfetch('https://www.googleapis.com/drive/v3/files?fields=id',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'סימן',mimeType:'application/vnd.google-apps.folder'})},tok);
+  return gFolder=c.id;
+}
+async function driveUpload(f,tok){
+  const parent=await driveFolder(tok);
+  const fd=new FormData();
+  fd.append('metadata',new Blob([JSON.stringify({name:f.name,mimeType:f.type,parents:[parent]})],{type:'application/json'}));
+  fd.append('file',f);
+  return gfetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink',{method:'POST',body:fd},tok);
+}
+
+/* --- paste appears only after something was copied --- */
+function updatePaste(fresh){
+  const b=$('pasteBtn');
+  const on=!!S.doc&&!!S.copied&&S.tool!=='place'&&!$('pages').classList.contains('hidden');
+  b.classList.toggle('hidden',!on);
+  $('pasteLbl').textContent=S.copied==='image'?'הדבקת האזור שהועתק':'הדבקת הטקסט שהועתק';
+  if(on&&fresh){b.classList.remove('pop');void b.offsetWidth;b.classList.add('pop');}
+}
+document.addEventListener('copy',()=>{
+  const sel=getSelection();if(!sel||sel.isCollapsed||!sel.toString().trim())return;
+  const n=sel.anchorNode;if(n&&$('pages').contains(n)){S.copied='text';S.copiedText=sel.toString();updatePaste(true);}
+});
 
 /* =====================================================================
    PWA — offline cache, install button, open PDFs from the OS
