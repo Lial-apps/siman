@@ -1151,6 +1151,20 @@ dialog.wait .sh .sh-ic{opacity:.55}
   .sh{padding:12px 4px 10px}
   .sh small{display:none}}
 @keyframes sheetIn{from{transform:translateY(40px);opacity:.4}to{transform:none;opacity:1}}
+@media (min-width:561px){.sh-grid:not(.two){grid-template-columns:repeat(4,1fr)}}
+.btn.del{display:inline-flex;align-items:center;gap:6px;border-radius:999px;color:var(--danger);border-color:color-mix(in srgb,var(--danger) 40%,var(--line))}
+.btn.del svg{width:16px;height:16px}
+.btn.del:hover{background:color-mix(in srgb,var(--danger) 8%,var(--bar));border-color:var(--danger)}
+.sh-file,#fmtName{unicode-bidi:plaintext;text-align:start}
+.sh-fmt{margin-top:-2px}
+.sh-fmt .segb{padding:8px}
+dialog.reg{width:min(440px,94vw)}
+dialog.reg .sig-in{padding:28px 28px 22px;gap:14px}
+dialog.reg h2{font-family:"SF-frank","Times New Roman",serif;font-size:30px;line-height:1.1}
+dialog.reg .reg-sub{margin:-6px 0 4px;color:var(--muted);font-size:15px}
+dialog.reg .field input{font-size:16px;padding:10px 12px;border-radius:10px}
+dialog.reg .btn.big{width:100%;font-size:16px;padding:12px}
+dialog.reg::backdrop{background:color-mix(in srgb,var(--navy) 70%,transparent);backdrop-filter:blur(6px)}
 @media (prefers-reduced-motion:reduce){.wl-text .swipe path{animation:none;stroke-dashoffset:0}.btn.paste.pop,dialog.sig[open],dialog.sheet[open]{animation:none}}
 
 </style>
@@ -1158,7 +1172,7 @@ dialog.wait .sh .sh-ic{opacity:.55}
 <body data-tool="select">
 
 <header class="bar">
-  <div class="brand"><b title="גרסה 3.4">סימן</b><span class="ver">3.4</span><span class="fname" id="fname"></span></div>
+  <div class="brand"><b title="גרסה 3.7">סימן</b><span class="ver">3.7</span><span class="fname" id="fname"></span></div>
 
   <nav class="tools" id="tools" aria-label="כלים">
     <button class="tool" data-tool="select" aria-pressed="true" title="בחירה וגלילה (V)">
@@ -1219,6 +1233,7 @@ dialog.wait .sh .sh-ic{opacity:.55}
   <label class="hidden chk" id="paraWrap" title="כבוי: כל לחיצה עורכת שורה אחת בלבד, בלי לשנות שום דבר אחר"><input type="checkbox" id="paraChk"> פסקה שלמה</label>
   <button class="btn hidden" id="ocrBtn" title="זיהוי טקסט בעמוד סרוק כדי לערוך ולתרגם אותו">זיהוי טקסט (OCR)</button>
   <button class="btn paste hidden" id="pasteBtn" title="הדבקה (Ctrl+V)"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 11h6M9 15h4"/></svg><span id="pasteLbl">הדבקה</span></button>
+  <button class="btn del hidden" id="delSelBtn" title="מחיקת הפריט המסומן (Delete)"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg>מחיקה</button>
   <span class="pageinfo" id="pageInfo"></span>
 </div>
 
@@ -1246,7 +1261,7 @@ dialog.wait .sh .sh-ic{opacity:.55}
         <p class="wl-hi hidden" id="wlHi"></p>
         <h1>לסמן, לחתום ולשלוח בלי להדפיס אף דף</h1>
         <svg class="swipe" viewBox="0 0 300 26" preserveAspectRatio="none" aria-hidden="true"><path d="M6 15c46-9 98-11 150-9s92 7 138 2" stroke="#FFD43B" stroke-width="16" stroke-linecap="round" fill="none"/></svg>
-        <p class="wl-sub">סימן פותח PDF, Word, Excel ו-PowerPoint ישר בדפדפן. הקובץ נשאר אצלכם במכשיר ולא עולה לשום שרת.</p>
+        <p class="wl-sub">סימן פותח PDF, Word ו-Excel לסימון, חתימה ושליחה ישר בדפדפן, ומתקן קבצי PowerPoint שלא נפתחים. הקובץ נשאר אצלכם במכשיר.</p>
         <div class="wl-cta">
           <button class="btn primary big" id="openBtn2">בחירת קובץ</button>
           <span class="drop-hint">או גררו קובץ לכאן</span>
@@ -1431,11 +1446,13 @@ dialog.wait .sh .sh-ic{opacity:.55}
   <div class="sig-in">
     <div class="sh-head"><h2 id="shareTitle">שיתוף ושמירה</h2><button class="icon-btn" id="shareClose" aria-label="סגירה">×</button></div>
     <p class="sh-file" id="shareName"></p>
+    <div class="seg sh-fmt hidden" id="shFmt" role="group" aria-label="לשלוח בתור"><button class="segb" data-fmt="pdf" aria-pressed="true">PDF חתום</button><button class="segb" data-fmt="office" aria-pressed="false" id="shFmtOf">Word לעריכה</button></div>
     <h3 class="sh-grp">שליחה</h3>
     <div class="sh-grid">
       <button class="sh" data-share="mail"><span class="sh-ic mail"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M4 7l8 6 8-6"/></svg></span><b>מייל</b><small id="shMailHint">שליחת הקובץ כקובץ מצורף</small></button>
       <button class="sh" data-share="me"><span class="sh-ic me"><svg viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.6"/><path d="M4.5 20c1.2-3.6 4-5.4 7.5-5.4s6.3 1.8 7.5 5.4"/></svg></span><b>שליחה אליי</b><small id="shMeHint">למייל שהגדרת</small></button>
-      <button class="sh" data-share="whatsapp"><span class="sh-ic wa"><svg viewBox="0 0 24 24"><path d="M4 20l1.3-4A8 8 0 1 1 8.4 19z"/><path d="M9 8.6c0 3.5 2.9 6.4 6.4 6.4l1.2-1.6-2-1-1 .8a4.4 4.4 0 0 1-2.8-2.8l.8-1-1-2z"/></svg></span><b>וואטסאפ</b><small id="shWaHint">וואטסאפ ווב או האפליקציה</small></button>
+      <button class="sh" data-share="whatsapp"><span class="sh-ic wa"><svg viewBox="0 0 24 24"><path d="M4 20l1.3-4A8 8 0 1 1 8.4 19z"/><path d="M9 8.6c0 3.5 2.9 6.4 6.4 6.4l1.2-1.6-2-1-1 .8a4.4 4.4 0 0 1-2.8-2.8l.8-1-1-2z"/></svg></span><b id="shWaTitle">וואטסאפ</b><small id="shWaHint">בוחרים שיחה ושולחים</small></button>
+      <button class="sh desk-only" data-share="wadesk"><span class="sh-ic wa"><svg viewBox="0 0 24 24"><path d="M4 20l1.3-4A8 8 0 1 1 8.4 19z"/><path d="M9 8.6c0 3.5 2.9 6.4 6.4 6.4l1.2-1.6-2-1-1 .8a4.4 4.4 0 0 1-2.8-2.8l.8-1-1-2z"/></svg></span><b>וואטסאפ למחשב</b><small id="shWdHint">האפליקציה המותקנת</small></button>
       <button class="sh" data-share="airdrop"><span class="sh-ic ad"><svg viewBox="0 0 24 24"><path d="M6.3 16.5a8 8 0 1 1 11.4 0M8.8 14a4.6 4.6 0 1 1 6.4 0"/><path d="M12 13l-3.5 8h7z"/></svg></span><b>AirDrop</b><small id="shAdHint">לאייפון, אייפד ומק שליד</small></button>
       <button class="sh" data-share="quick"><span class="sh-ic qs"><svg viewBox="0 0 24 24"><path d="M13 3L5 13h6l-1 8 8-10h-6z"/></svg></span><b>שיתוף מהיר</b><small id="shQsHint">Quick Share לאנדרואיד שליד</small></button>
       <button class="sh" data-share="more"><span class="sh-ic more"><svg viewBox="0 0 24 24"><circle cx="6" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="18" cy="12" r="1.6"/></svg></span><b>עוד אפליקציות</b><small id="shMoreHint">כל מה שמותקן במכשיר</small></button>
@@ -1448,13 +1465,38 @@ dialog.wait .sh .sh-ic{opacity:.55}
     <p class="sh-status" id="shareStatus" role="status"></p>
   </div>
 </dialog>
+<dialog class="sig reg" id="regDlg" aria-labelledby="regTitle">
+  <form class="sig-in" method="dialog" id="regForm" novalidate>
+    <h2 id="regTitle">ברוכים הבאים לסימן</h2>
+    <p class="reg-sub">לפני שמתחילים, נרשמים עם מייל. זה לוקח עשר שניות.</p>
+    <label class="field">המייל שלך
+      <input id="regMail" type="email" dir="ltr" autocomplete="email" placeholder="name@example.com" required></label>
+    <label class="field">השם שלך (לא חובה)
+      <input id="regName" autocomplete="name" maxlength="40"></label>
+    <label class="chk"><input type="checkbox" id="regNews" checked> אפשר לשלוח לי עדכונים על סימן</label>
+    <p class="sh-status" id="regStatus" role="status"></p>
+    <button type="submit" class="btn primary big" id="regGo">כניסה לסימן</button>
+    <p class="fmt-note">המייל משמש לשליחת קבצים אליך ולחשבון שלך בסימן. הקבצים עצמם לא עולים לשום שרת.</p>
+  </form>
+</dialog>
+<dialog class="sig conv" id="fmtDlg" aria-labelledby="fmtTitle">
+  <div class="sig-in">
+    <h2 id="fmtTitle">איך לשמור?</h2>
+    <p class="fmt-note" id="fmtName"></p>
+    <div class="conv-opts">
+      <button class="conv-card main" data-fmt="pdf"><span class="of-ico">PDF</span><span><b>PDF חתום ומסומן</b><small>כל הסימונים, החתימות וההשחרות בדיוק כמו על המסך. הכי מתאים לשליחה.</small></span></button>
+      <button class="conv-card main" data-fmt="office"><span class="of-ico docx" id="fmtIco">DOCX</span><span><b id="fmtOfTitle">Word לעריכה</b><small id="fmtOfText"></small></span></button>
+    </div>
+    <div class="sig-row"><span class="grow"></span><button class="btn" id="fmtCancel">ביטול</button></div>
+  </div>
+</dialog>
 <dialog class="sig" id="setDlg" aria-labelledby="setTitle">
-  <form class="sig-in" method="dialog" id="setForm">
+  <form class="sig-in" method="dialog" id="setForm" novalidate>
     <h2 id="setTitle">הגדרות</h2>
     <label class="field">השם שלך
       <input id="setName" autocomplete="name" maxlength="40" placeholder="לברכה בפתיחה ולחתימה במייל"></label>
     <label class="field">המייל שלך
-      <input id="setMail" type="email" dir="ltr" autocomplete="email" placeholder="name@example.com"></label>
+      <input id="setMail" type="email" dir="ltr" autocomplete="email" placeholder="name@example.com" required></label>
     <label class="chk"><input type="checkbox" id="setCc"> לשים אותי בהעתק בכל שליחה במייל</label>
     <p class="fmt-note">המייל משמש לשליחה אליך, להעתק במיילים ולהתחברות מהירה ל-Google Drive. הוא נשמר רק במכשיר הזה.</p>
     <p class="sh-status" id="setStatus" role="status"></p>
@@ -1546,6 +1588,7 @@ function setDirty(v){S.dirty=v;document.title=(v?'• ':'')+(S.name?S.name+' —
 /* ===================== open ===================== */
 async function openFile(file,handle){
   if(!file)return;
+  if(typeof needReg==='function'&&needReg()){pendingOpen={f:file,h:handle};showReg();return;}
   if(S.dirty&&!confirm('יש שינויים שלא נשמרו. לפתוח קובץ אחר בכל זאת?'))return;
   if(/\.(docx|xlsx|pptx)$/i.test(file.name)){await openOffice(file,handle);return;}
   if(!/\.pdf$/i.test(file.name)&&file.type!=='application/pdf'){toast('אפשר לפתוח קובצי PDF, Word, Excel ו-PowerPoint');return;}
@@ -1555,16 +1598,18 @@ async function openFile(file,handle){
     const bytes=new Uint8Array(await file.arrayBuffer());
     const doc=await pdfjs.getDocument({data:bytes.slice(),isEvalSupported:false}).promise;
     if(S.doc)S.doc.destroy();
-    Object.assign(S,{bytes,name:file.name,doc,anns:[],hist:[],redo:[],nextId:1,handle:handle||null});
+    Object.assign(S,{bytes,name:file.name,doc,anns:[],hist:[],redo:[],nextId:1,handle:handle||null});pickAnn(null);
+    S.office=S.pendingOffice||null;S.pendingOffice=null;
     setDirty(false);
-    $('fname').textContent=file.name;
+    $('fname').textContent=S.office?S.office.name:file.name;
     $('empty').classList.add('hidden');
     ['saveBtn','saveAsBtn','saveMenuBtn','trBtn','pgBtn','printBtn','convBtn','shareBtn','driveMenuBtn','icloudMenuBtn'].forEach(id=>$(id).disabled=false);S.sel=new Set();
+    $('convBtn').disabled=!!S.office;
     TR.reset();
     S.hasForm=false;try{S.hasForm=!!(await doc.getFieldObjects());}catch(_){}
     await buildPages();
     setTool(S.tool);
-    if(S.hasForm)toast('יש בקובץ שדות טופס. לחצו עליהם כדי למלא');
+    if(S.hasForm&&!S.office)toast('יש בקובץ שדות טופס. לחצו עליהם כדי למלא');
     fitWidth();
     if(!$('tpanel').classList.contains('hidden'))detect();
     if(!$('pgpanel').classList.contains('hidden'))renderThumbs();
@@ -1670,6 +1715,19 @@ function snapshot(){S.hist.push(JSON.stringify(S.anns,(k,v)=>k==='_style'?undefi
 function undo(){
   if(!S.hist.length){toast('אין מה לבטל');return;}
   S.redo.push(JSON.stringify(S.anns));S.anns=JSON.parse(S.hist.pop());S.pages.forEach(drawAnns);setDirty(true);
+  if(S.picked&&!S.anns.some(a=>a.id===S.picked))pickAnn(null);
+}
+/* --- the picked item (pasted picture, signature or text box): Delete removes it --- */
+function pickAnn(id){
+  S.picked=id||null;
+  let st=document.getElementById('pickStyle');if(!st){st=document.createElement('style');st.id='pickStyle';document.head.append(st);}
+  st.textContent=id?`.iw[data-id="${id}"],.tw[data-id="${id}"]{outline:2px solid var(--blue)!important;outline-offset:2px}.iw[data-id="${id}"] .rs{opacity:1}`:'';
+  const b=document.getElementById('delSelBtn');if(b)b.classList.toggle('hidden',!id);
+}
+function deletePicked(){
+  const id=S.picked;if(!id)return false;
+  const a=S.anns.find(x=>x.id===id);pickAnn(null);if(!a)return false;
+  removeAnn(id);toast((a.type==='img'?(a.sig?'החתימה נמחקה':'התמונה נמחקה'):'הטקסט נמחק')+'. Ctrl+Z מחזיר');return true;
 }
 function redoAct(){if(!S.redo.length)return;S.hist.push(JSON.stringify(S.anns));S.anns=JSON.parse(S.redo.pop());S.pages.forEach(drawAnns);}
 function removeAnn(id){const k=S.anns.findIndex(a=>a.id===id);if(k<0)return;snapshot();const a=S.anns.splice(k,1)[0];drawAnns(S.pages[a.page]);}
@@ -1836,12 +1894,12 @@ function imgEl(P,a){
   w.append(img,rs);
   const drag=(el,resize)=>el.addEventListener('pointerdown',e=>{
     if(S.tool!=='select')return;
-    e.preventDefault();e.stopPropagation();el.setPointerCapture(e.pointerId);snapshot();
+    e.preventDefault();e.stopPropagation();el.setPointerCapture(e.pointerId);pickAnn(a.id);let moved=false;
     const[sx,sy]=localXY(P,e);const ox=parseFloat(w.style.left),oy=parseFloat(w.style.top),ow=parseFloat(w.style.width),oh=parseFloat(w.style.height);
-    const mv=ev=>{const[cx,cy]=localXY(P,ev);
+    const mv=ev=>{const[cx,cy]=localXY(P,ev);if(!moved){if(Math.abs(cx-sx)+Math.abs(cy-sy)<2)return;moved=true;snapshot();}
       if(resize){const nw=Math.max(20,ow-(cx-sx));const nh=nw*oh/ow;w.style.width=nw+'px';w.style.height=nh+'px';w.style.left=ox+ow-nw+'px';}
       else{w.style.left=ox+cx-sx+'px';w.style.top=oy+cy-sy+'px';}};
-    const up=()=>{el.removeEventListener('pointermove',mv);el.removeEventListener('pointerup',up);
+    const up=()=>{el.removeEventListener('pointermove',mv);el.removeEventListener('pointerup',up);if(!moved)return;
       const[px,py]=toPdf(P,parseFloat(w.style.left),parseFloat(w.style.top));a.x=px;a.y=py;
       a.w=parseFloat(w.style.width)/S.zoom;a.h=parseFloat(w.style.height)/S.zoom;};
     el.addEventListener('pointermove',mv);el.addEventListener('pointerup',up);
@@ -1879,7 +1937,7 @@ function textEl(P,a){
   tx.style.width=a.w*S.zoom+'px';tx.style.fontSize=a.size*S.zoom+'px';tx.style.color=a.color;tx.style.fontFamily=cssFont(a.font);tx.style.fontWeight=a.bold?700:400;
   tx.textContent=a.text;
   let before=null;
-  tx.addEventListener('focus',()=>{before=JSON.stringify(S.anns);S.lastText=a.id;syncFontUI();if(S.tool==='text'||S.tool==='select'){S.color.text=a.color;}});
+  tx.addEventListener('focus',()=>{pickAnn(null);before=JSON.stringify(S.anns);S.lastText=a.id;syncFontUI();if(S.tool==='text'||S.tool==='select'){S.color.text=a.color;}});
   tx.addEventListener('input',()=>{a.text=tx.innerText.replace(/\n$/,'');setDirty(true);});
   tx.addEventListener('blur',()=>{
     if(!a.text.trim()){const k=S.anns.indexOf(a);if(k>=0){S.anns.splice(k,1);w.remove();}return;}
@@ -1889,10 +1947,10 @@ function textEl(P,a){
   new ResizeObserver(()=>{if(tx.offsetWidth)a.w=tx.offsetWidth/S.zoom;}).observe(tx);
   // drag
   grip.addEventListener('pointerdown',e=>{
-    e.preventDefault();e.stopPropagation();grip.setPointerCapture(e.pointerId);snapshot();
+    e.preventDefault();e.stopPropagation();grip.setPointerCapture(e.pointerId);pickAnn(a.id);let moved=false;
     const[sx,sy]=localXY(P,e);const ox=parseFloat(w.style.left),oy=parseFloat(w.style.top);
-    const mv=ev=>{const[cx,cy]=localXY(P,ev);w.style.left=ox+cx-sx+'px';w.style.top=oy+cy-sy+'px';};
-    const up=()=>{grip.removeEventListener('pointermove',mv);grip.removeEventListener('pointerup',up);
+    const mv=ev=>{const[cx,cy]=localXY(P,ev);if(!moved){if(Math.abs(cx-sx)+Math.abs(cy-sy)<2)return;moved=true;snapshot();}w.style.left=ox+cx-sx+'px';w.style.top=oy+cy-sy+'px';};
+    const up=()=>{grip.removeEventListener('pointermove',mv);grip.removeEventListener('pointerup',up);if(!moved)return;
       const[px,py]=toPdf(P,parseFloat(w.style.left),parseFloat(w.style.top));a.x=px;a.y=py;};
     grip.addEventListener('pointermove',mv);grip.addEventListener('pointerup',up);
   });
@@ -2326,15 +2384,16 @@ async function writeHandle(h,bytes){
   const w=await h.createWritable();await w.write(bytes);await w.close();
 }
 const removalNote=()=>S.lastRemoval&&S.lastRemoval.hidden?` (${S.lastRemoval.hidden} קטעים הוסתרו ולא נמחקו לגמרי)`:'';
-async function savePdf(saveAs){
+async function savePdf(saveAs,asPdf){
   if(!S.bytes)return;
+  if(S.office&&!asPdf){openFmt(saveAs);return;}
   document.activeElement&&document.activeElement.blur&&document.activeElement.blur();
   busy(true,'שומר…');
   try{
     const out=await buildPdf();
     busy(false);
     if(FS&&S.handle&&!saveAs){await writeHandle(S.handle,out);setDirty(false);toast('נשמר: '+S.name+removalNote());return;}
-    const name=S.handle?S.name:S.name.replace(/\.pdf$/i,'')+' - ערוך.pdf';
+    const name=S.handle?S.name:S.name.replace(/\.pdf$/i,'')+(S.office?' - חתום.pdf':' - ערוך.pdf');
     const r=await saveBytes(name,out,'pdf');
     if(r){if(r.handle){S.handle=r.handle;S.name=r.handle.name;$('fname').textContent=S.name;}setDirty(false);toast('הקובץ נשמר'+removalNote());}
   }catch(e){if(e&&e.name==='AbortError')return;console.error(e);toast('השמירה נכשלה: '+(e.message||e));}
@@ -2951,7 +3010,7 @@ async function pickFile(){
     catch(e){if(e&&e.name!=='AbortError')$('file').click();}
   }else $('file').click();
 }
-$('openBtn').onclick=$('openBtn2').onclick=pickFile;
+$('openBtn').onclick=$('openBtn2').onclick=()=>{if(needReg()){showReg();return;}pickFile();};
 $('file').onchange=e=>{openFile(e.target.files[0]);e.target.value='';};
 $('saveBtn').onclick=()=>savePdf(false);
 $('saveAsBtn').onclick=()=>{closeSaveMenu();savePdf(true);};
@@ -2980,6 +3039,8 @@ addEventListener('keydown',e=>{
   if(mod&&e.key.toLowerCase()==='o'){e.preventDefault();pickFile();return;}
   if(mod&&e.key.toLowerCase()==='p'&&S.doc){e.preventDefault();printDoc();return;}
   if(typing)return;
+  if((e.key==='Delete'||e.key==='Backspace')&&!mod&&S.picked){e.preventDefault();deletePicked();return;}
+  if(e.key==='Escape'&&S.picked){pickAnn(null);return;}
   if(mod&&e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redoAct():undo();return;}
   if(mod&&e.key.toLowerCase()==='y'){e.preventDefault();redoAct();return;}
   if(mod&&(e.key==='='||e.key==='+')){e.preventDefault();setZoom(S.zoom*1.2);return;}
@@ -2988,6 +3049,7 @@ addEventListener('keydown',e=>{
   const k=e.code.replace('Key','').toLowerCase();
   if(!mod&&map[k]){setTool(map[k]);}
 });
+document.addEventListener('pointerdown',e=>{if(S.picked&&!e.target.closest('.iw,.tw .grip,#delSelBtn'))pickAnn(null);},true);
 addEventListener('beforeunload',e=>{if(S.dirty&&!S.noWarn){e.preventDefault();e.returnValue='';}});
 let rT;addEventListener('resize',()=>{clearTimeout(rT);rT=setTimeout(updatePageInfo,150);});
 setTool('select');
@@ -3073,8 +3135,9 @@ function addImage(P,src,ratio,wPt,cx,cy,sig){
   const left=Math.max(0,cx-wCss/2),top=Math.max(0,cy-hCss/2);
   const[x,y]=toPdf(P,left,top);
   snapshot();
-  S.anns.push({id:S.nextId++,type:'img',page:P.i-1,x,y,w:wCss/S.zoom,h:hCss/S.zoom,src,sig:!!sig});
-  drawAnns(P);setTool('select');
+  const id=S.nextId++;
+  S.anns.push({id,type:'img',page:P.i-1,x,y,w:wCss/S.zoom,h:hCss/S.zoom,src,sig:!!sig});
+  drawAnns(P);setTool('select');pickAnn(id);
 }
 // any image -> PNG/JPEG data URL (pdf-lib embeds only these), scaled down if huge
 function normalizeImage(blob){
@@ -3117,12 +3180,12 @@ async function snipRegion(P,x,y,w,h){
 async function pasteBlobOrText(blob,text){
   if(!S.doc)return;
   const{P,cx,cy}=visibleCenter();
-  if(blob){try{const n=await normalizeImage(blob);addImage(P,n.src,n.ratio,Math.min(300,n.natW*.75/ (n.natW>1200?2:1)),cx,cy,false);toast('התמונה הודבקה. אפשר לגרור ולשנות גודל');}catch(e){toast(e.message);}return;}
+  if(blob){try{const n=await normalizeImage(blob);addImage(P,n.src,n.ratio,Math.min(300,n.natW*.75/ (n.natW>1200?2:1)),cx,cy,false);toast('התמונה הודבקה. Delete מוחק, Ctrl+Z מבטל');}catch(e){toast(e.message);}return;}
   if(text&&text.trim()){
     const size=S.size.text,wPt=Math.min(320,P.vp.width/S.zoom*.8);
     const[x,y]=toPdf(P,Math.max(4,cx-wPt*S.zoom/2),cy);
     snapshot();const a={id:S.nextId++,type:'text',page:P.i-1,x,y,w:wPt,size,color:S.color.text,text:text.trim()};
-    S.anns.push(a);drawAnns(P);setTool('select');toast('הטקסט הודבק');
+    S.anns.push(a);drawAnns(P);setTool('select');pickAnn(a.id);toast('הטקסט הודבק. Delete מוחק, Ctrl+Z מבטל');
   }
 }
 document.addEventListener('paste',e=>{
@@ -3135,9 +3198,10 @@ document.addEventListener('paste',e=>{
   if(txt){e.preventDefault();pasteBlobOrText(null,txt);return;}
   if(S.clip){e.preventDefault();const{P,cx,cy}=visibleCenter();addImage(P,S.clip.src,S.clip.ratio,S.clip.wPt,cx,cy,false);}
 });
+$('delSelBtn').onclick=()=>deletePicked();
 $('pasteBtn').onclick=async()=>{
   if(S.copied==='text'&&S.copiedText){pasteBlobOrText(null,S.copiedText);return;}
-  if(S.copied==='image'&&S.clip){const{P,cx,cy}=visibleCenter();addImage(P,S.clip.src,S.clip.ratio,S.clip.wPt,cx,cy,false);toast('האזור הודבק. אפשר לגרור ולשנות גודל');return;}
+  if(S.copied==='image'&&S.clip){const{P,cx,cy}=visibleCenter();addImage(P,S.clip.src,S.clip.ratio,S.clip.wPt,cx,cy,false);toast('האזור הודבק. Delete מוחק, Ctrl+Z מבטל');return;}
   try{
     if(navigator.clipboard&&navigator.clipboard.read){
       const items=await navigator.clipboard.read();
@@ -3270,6 +3334,7 @@ async function rebuild(order,extra){
     }
     const bytes=await out.save();
     const map=new Map();order.forEach((o,k)=>{if(o.src===0)map.set(o.i,k);});
+    if(S.office)S.office.map.pages=order.map(o=>o.src===0&&!o.rot?S.office.map.pages[o.i]:null);
     snapshot();
     S.anns=S.anns.filter(a=>map.has(a.page)).map(a=>({...a,page:map.get(a.page)}));
     S.hist=[];S.redo=[]; // page changes are not undoable; keep history consistent
@@ -3323,8 +3388,22 @@ async function openOffice(file,handle){
     await loadOfficeLibs();
     const bytes=new Uint8Array(await file.arrayBuffer());
     const res=await OFFICE.repair(bytes,file.name);
+    if((res.kind==='docx'||res.kind==='xlsx')&&!res.fatal){
+      try{
+        const src=res.changed?await OFFICE.build(res):bytes;
+        busy(true,'מכין את הקובץ לסימון…');
+        await loadEditLibs(res.kind);
+        const r=await OFFICE_EDIT.toPdf(res.kind,src,m=>busy(true,m));
+        const base=file.name.replace(/\.(docx|xlsx)$/i,'');
+        S.pendingOffice={kind:res.kind,bytes:src,map:r.map,name:file.name,base,fixed:!!res.changed};
+        busy(false);setDirty(false);showOfficeView(false);
+        await openFile(new File([r.pdf],base+'.pdf',{type:'application/pdf'}));
+        if(S.office)toast(res.changed?'הקובץ היה פגום ותוקן. אפשר לסמן, לחתום ולשתף':`ה-${OF_LABEL[res.kind]} נפתח לסימון וחתימה. בשמירה בוחרים PDF או ${OF_LABEL[res.kind]}`);
+        return;
+      }catch(e){console.warn('office render',e);S.pendingOffice=null;}
+    }
     if(S.doc){S.doc.destroy();S.doc=null;S.pages=[];$('pages').innerHTML='';}
-    Object.assign(S,{bytes:null,name:file.name,anns:[],hist:[],redo:[]});setDirty(false);
+    Object.assign(S,{bytes:null,name:file.name,anns:[],hist:[],redo:[],office:null});setDirty(false);
     Object.assign(OF,{res,name:file.name,handle});
     $('fname').textContent=file.name;showOfficeView(true);renderOffice();
   }catch(e){console.error(e);toast('לא הצלחתי לקרוא את הקובץ: '+(e.message||e));}
@@ -3376,6 +3455,92 @@ $('ofExtract').onclick=async()=>{
   catch(e){console.error(e);toast('החילוץ נכשל: '+(e.message||e));}finally{busy(false);}
 };
 window.__office=OF;
+
+/* =====================================================================
+   WORD & EXCEL ON THE DESK — the file opens as pages for marking and
+   signing; saving offers a signed PDF or the original Word/Excel file
+   with the signatures, pictures and text written into it.
+   ===================================================================== */
+const editLibs={};
+const loadEditLibs=k=>editLibs[k]||(editLibs[k]=(async()=>{
+  if(!window.JSZip)await loadScript('jszip.min.js');
+  if(!window.html2canvas)await loadScript('html2canvas.min.js');
+  if(k==='docx'&&!window.docx)await loadScript('docx-preview.min.js');
+  if(k==='xlsx'&&!window.XLSX)await loadScript('xlsx.mini.min.js');
+  if(!window.OFFICE_EDIT)await loadScript('office-edit.js');
+})().catch(e=>{editLibs[k]=null;throw e;}));
+const OF_LABEL={docx:'Word',xlsx:'Excel'};
+const officeOutName=()=>`${S.office.base} - ערוך.${S.office.kind}`;
+async function dataBytes(url){return new Uint8Array(await (await fetch(url)).arrayBuffer());}
+// marks on the desk → positions on the original page (CSS px of the rendered page)
+async function officeItems(){
+  const items=[];const notes=new Set();
+  for(const P of S.pages){
+    const pm=S.office.map.pages[P.i-1];
+    const mine=S.anns.filter(a=>a.page===P.i-1);if(!mine.length)continue;
+    if(!pm){notes.add('pages');continue;}
+    const v1=P.page.getViewport({scale:1}),k=pm.w/v1.width;
+    const src=(x,y)=>{const[vx,vy]=v1.convertToViewportPoint(x,y);return[vx*pm.w/v1.width,vy*pm.h/v1.height];};
+    const Z=2,oc=document.createElement('canvas');oc.width=Math.ceil(pm.w*Z);oc.height=Math.ceil(pm.h*Z);
+    const g=oc.getContext('2d');g.scale(Z,Z);
+    let bb=null;const grow=(x1,y1,x2,y2)=>{bb=bb?[Math.min(bb[0],x1),Math.min(bb[1],y1),Math.max(bb[2],x2),Math.max(bb[3],y2)]:[x1,y1,x2,y2];};
+    for(const a of mine){
+      if(a.type==='img'){const[l,t]=src(a.x,a.y);const m=/^data:image\/(png|jpe?g)/i.exec(a.src||'');
+        items.push({page:P.i-1,type:'img',x:l,y:t,w:a.w*k,h:a.h*k,bytes:await dataBytes(a.src),ext:m&&/jpe?g/i.test(m[1])?'jpeg':'png'});}
+      else if(a.type==='text'){if(!(a.text||'').trim())continue;const[l,t]=src(a.x,a.y);const n=String(a.text).split('\n').length;
+        items.push({page:P.i-1,type:'text',x:l,y:t,w:Math.max(30,a.w*k),h:n*a.size*k*1.35,text:a.text,size:a.size,color:a.color,bold:!!a.bold,font:a.font||'alef'});}
+      else if(a.type==='hl'||a.type==='redact'){
+        const[x1,y1]=src(a.x1,a.y1),[x2,y2]=src(a.x2,a.y2);const l=Math.min(x1,x2),t=Math.min(y1,y2),w=Math.abs(x2-x1),h=Math.abs(y2-y1);
+        g.globalAlpha=a.type==='hl'?.42:1;g.fillStyle=a.type==='hl'?a.color:(a.fill||'#000');g.fillRect(l,t,w,h);g.globalAlpha=1;grow(l,t,l+w,t+h);
+        if(a.type==='redact')notes.add('redact');}
+      else if(a.type==='ink'&&a.pts&&a.pts.length){
+        g.strokeStyle=a.color;g.lineWidth=a.w*k;g.lineCap=g.lineJoin='round';g.beginPath();
+        a.pts.forEach((p,j)=>{const[x,y]=src(p[0],p[1]);j?g.lineTo(x,y):g.moveTo(x,y);grow(x-a.w*k,y-a.w*k,x+a.w*k,y+a.w*k);});
+        if(a.pts.length===1){const[x,y]=src(a.pts[0][0],a.pts[0][1]);g.lineTo(x+.1,y);}g.stroke();}
+      else if(a.type==='edit')notes.add('edit');
+    }
+    if(bb){
+      const x=Math.max(0,Math.floor(bb[0])),y=Math.max(0,Math.floor(bb[1])),w=Math.min(pm.w,Math.ceil(bb[2]))-x,h=Math.min(pm.h,Math.ceil(bb[3]))-y;
+      if(w>0&&h>0){const c=document.createElement('canvas');c.width=Math.ceil(w*Z);c.height=Math.ceil(h*Z);
+        c.getContext('2d').drawImage(oc,x*Z,y*Z,w*Z,h*Z,0,0,c.width,c.height);
+        const blob=await new Promise(r=>c.toBlob(r,'image/png'));
+        items.push({page:P.i-1,type:'img',x,y,w,h,bytes:new Uint8Array(await blob.arrayBuffer()),ext:'png'});}
+    }
+  }
+  return{items,notes};
+}
+async function buildOfficeFile(){
+  await loadEditLibs(S.office.kind);
+  document.activeElement&&document.activeElement.blur&&document.activeElement.blur();
+  const{items,notes}=await officeItems();
+  const fn=S.office.kind==='docx'?OFFICE_EDIT.exportDocx:OFFICE_EDIT.exportXlsx;
+  const r=await fn(S.office.bytes,S.office.map,items);
+  const msgs=[];
+  if(notes.has('redact'))msgs.push(`ב-${OF_LABEL[S.office.kind]} ההשחרה רק מכסה את הטקסט. למחיקה אמיתית שמרו כ-PDF`);
+  if(notes.has('edit'))msgs.push('עריכת טקסט קיים נשמרת רק ב-PDF');
+  if(notes.has('pages'))msgs.push('סימונים בעמודים שסובבו או נוספו נשמרים רק ב-PDF');
+  if(S.office.kind==='docx'&&!r.exact&&items.length)msgs.push('בדקו את מיקום החתימות ב-Word');
+  return{file:new File([r.bytes],officeOutName(),{type:OFFICE_MIME[S.office.kind]}),msgs};
+}
+async function saveOffice(){
+  busy(true,`בונה את קובץ ה-${OF_LABEL[S.office.kind]}…`);
+  try{
+    const{file,msgs}=await buildOfficeFile();busy(false);
+    if(await saveBytes(file.name,new Uint8Array(await file.arrayBuffer()),S.office.kind)){setDirty(false);toast(['נשמר: '+file.name,...msgs].join('. '));}
+  }catch(e){if(e&&e.name==='AbortError')return;console.error(e);toast('השמירה נכשלה: '+(e.message||e));}
+  finally{busy(false);}
+}
+function openFmt(saveAs){
+  const k=S.office.kind;
+  $('fmtName').textContent=S.office.name;$('fmtIco').textContent=k.toUpperCase();$('fmtIco').className='of-ico '+k;
+  $('fmtOfTitle').textContent=`${OF_LABEL[k]} לעריכה`;
+  $('fmtOfText').textContent=`הקובץ המקורי עם החתימות, התמונות והטקסט שהוספת. ממשיך להיפתח לעריכה ב-${OF_LABEL[k]}.`;
+  const d=$('fmtDlg');d.dataset.saveas=saveAs?'1':'';d.showModal();
+}
+document.querySelectorAll('#fmtDlg [data-fmt]').forEach(b=>b.onclick=()=>{const d=$('fmtDlg'),sa=!!d.dataset.saveas;d.close();
+  if(b.dataset.fmt==='pdf')savePdf(sa,true);else saveOffice();});
+$('fmtCancel').onclick=()=>$('fmtDlg').close();
+$('fmtDlg').addEventListener('click',e=>{if(e.target===$('fmtDlg'))$('fmtDlg').close();});
 
 /* =====================================================================
    CONVERT — PDF to an editable PowerPoint / Word / Excel file
@@ -3950,18 +4115,46 @@ $('setBtn').onclick=()=>openSettings();
 $('setCancel').onclick=()=>{setAfter=null;$('setDlg').close();};
 $('setForm').addEventListener('submit',e=>{
   const mail=$('setMail').value.trim(),name=$('setName').value.trim();
-  if(mail&&!validMail(mail)){e.preventDefault();$('setStatus').textContent='כתובת המייל לא תקינה. בדקו שיש בה @ ונקודה.';$('setMail').focus();return;}
-  USER={name,mail,cc:$('setCc').checked&&!!mail};
+  if(!validMail(mail)){e.preventDefault();$('setStatus').textContent=mail?'כתובת המייל לא תקינה. בדקו שיש בה @ ונקודה.':'צריך מייל כדי להשתמש בסימן.';$('setMail').focus();return;}
+  const changed=mail!==USER.mail;
+  USER={...USER,name,mail,cc:$('setCc').checked};
   try{localStorage.setItem(USER_KEY,JSON.stringify(USER));}catch(_){}
   if(gTok&&mail!==gTokMail){gTok=null;}
-  applyUser();toast('ההגדרות נשמרו');
+  applyUser();toast('ההגדרות נשמרו');if(changed)registerUser('update');
   const f=setAfter;setAfter=null;if(f)setTimeout(f,0);
 });
 applyUser();
 
+/* --- mandatory sign-up on first use --- */
+// optional: an address that records new users (e.g. the Cloudflare worker + '/register'). Empty = kept on this device only.
+const REGISTER_URL='';
+function registerUser(kind){
+  if(!REGISTER_URL)return;
+  fetch(REGISTER_URL,{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({kind,mail:USER.mail,name:USER.name,news:!!USER.news,lang:navigator.language,platform:IS_ANDROID?'android':IS_APPLE_TOUCH?'ios':IS_MAC?'mac':/Windows/i.test(UA)?'windows':'other',at:new Date().toISOString()})}).catch(()=>{});
+}
+function needReg(){return !validMail(USER.mail||'');}
+function showReg(){
+  const d=$('regDlg');if(d.open)return;
+  $('regMail').value=USER.mail||'';$('regName').value=USER.name||'';$('regStatus').textContent='';
+  d.showModal();setTimeout(()=>$('regMail').focus(),50);
+}
+$('regDlg').addEventListener('cancel',e=>e.preventDefault()); // Esc does not skip sign-up
+$('regForm').addEventListener('submit',e=>{
+  const mail=$('regMail').value.trim();
+  if(!validMail(mail)){e.preventDefault();$('regStatus').textContent=mail?'כתובת המייל לא תקינה. בדקו שיש בה @ ונקודה.':'כתבו את המייל שלכם כדי להמשיך.';$('regMail').focus();return;}
+  USER={...USER,mail,name:$('regName').value.trim(),news:$('regNews').checked};
+  try{localStorage.setItem(USER_KEY,JSON.stringify(USER));}catch(_){}
+  applyUser();registerUser('signup');
+  toast(USER.name?`נעים להכיר, ${USER.name}`:'נרשמת לסימן');
+  if(pendingOpen){const p=pendingOpen;pendingOpen=null;setTimeout(()=>openFile(p.f,p.h),0);}
+});
+let pendingOpen=null;
+if(needReg())showReg();
+
 /* --- the file to send: built once when the sheet opens, so taps keep the browser's "user gesture" --- */
-const SH={file:null,job:null};
-function fileName(){const n=S.name||'מסמך.pdf';return /\.pdf$/i.test(n)?n:n+'.pdf';}
+const SH={file:null,job:null,fmt:'pdf'};
+function fileName(){if(S.office&&SH.fmt==='office')return officeOutName();const n=S.name||'מסמך.pdf';return /\.pdf$/i.test(n)?n:n+'.pdf';}
 function canShareFile(f){try{return !!(navigator.share&&navigator.canShare&&navigator.canShare({files:[f]}));}catch(_){return false;}}
 function downloadFile(f){const a=document.createElement('a');a.href=URL.createObjectURL(f);a.download=f.name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),8000);}
 function shStatus(msg,html){const s=$('shareStatus');if(html)s.innerHTML=msg;else s.textContent=msg;}
@@ -3970,7 +4163,9 @@ function shareHints(){
   const set=(id,txt)=>{$(id).textContent=txt;};
   const btn=k=>document.querySelector(`.sh[data-share="${k}"]`);
   set('shMeHint',USER.mail?USER.mail:'קודם מגדירים את המייל שלך');
-  set('shWaHint',IS_TOUCH?'בוחרים שיחה ושולחים':'נפתח וואטסאפ ווב והקובץ יורד');
+  set('shWaTitle',IS_TOUCH?'וואטסאפ':'וואטסאפ ווב');
+  set('shWaHint',IS_TOUCH?'בוחרים שיחה ושולחים':'בדפדפן, הקובץ יורד ונגרר לשיחה');
+  document.querySelector('.sh[data-share="wadesk"]').classList.toggle('hidden',IS_TOUCH);
   const ad=IS_APPLE&&native;btn('airdrop').disabled=!ad;
   set('shAdHint',ad?'לאייפון, אייפד ומק שליד':'זמין רק באייפון, אייפד ומק');
   const qs=(IS_ANDROID||/Windows/i.test(UA))&&native;btn('quick').disabled=!qs;
@@ -3983,18 +4178,30 @@ function openShare(focusKey){
   if(!S.bytes)return;
   closeSaveMenu&&closeSaveMenu();
   document.activeElement&&document.activeElement.blur&&document.activeElement.blur();
+  if(!S.office)SH.fmt='pdf';
+  $('shFmt').classList.toggle('hidden',!S.office);
+  if(S.office){$('shFmtOf').textContent=`${OF_LABEL[S.office.kind]} לעריכה`;$('shFmt').querySelectorAll('.segb').forEach(b=>b.setAttribute('aria-pressed',b.dataset.fmt===SH.fmt));}
+  const d=$('shareDlg');if(!d.open)d.showModal();
+  if(GDRIVE_CLIENT_ID)loadGIS().catch(()=>{});
+  prepShare(focusKey);
+}
+function prepShare(focusKey){
+  const d=$('shareDlg');
   SH.file=null;shareHints();
   $('shareName').textContent=fileName();
-  const d=$('shareDlg');d.classList.add('wait');shStatus('מכין את הקובץ…');d.showModal();
-  if(GDRIVE_CLIENT_ID)loadGIS().catch(()=>{});
-  const job=SH.job=buildPdf().then(bytes=>{
+  d.classList.add('wait');shStatus('מכין את הקובץ…');
+  const make=S.office&&SH.fmt==='office'?buildOfficeFile().then(r=>{SH.msgs=r.msgs;return r.file;})
+    :buildPdf().then(bytes=>{SH.msgs=[];return new File([bytes],fileName(),{type:'application/pdf'});});
+  const job=SH.job=make.then(f=>{
     if(SH.job!==job)return;
-    SH.file=new File([bytes],fileName(),{type:'application/pdf'});
-    d.classList.remove('wait');shStatus('');
+    SH.file=f;
+    d.classList.remove('wait');shStatus(SH.msgs.join('. '));
     if(focusKey){const b=document.querySelector(`.sh[data-share="${focusKey}"]`);b&&b.focus();}
   }).catch(e=>{console.error(e);shStatus('הכנת הקובץ נכשלה: '+(e.message||e));});
 }
 $('shareBtn').onclick=()=>openShare();
+$('shFmt').querySelectorAll('.segb').forEach(b=>b.onclick=()=>{if(SH.fmt===b.dataset.fmt)return;SH.fmt=b.dataset.fmt;
+  $('shFmt').querySelectorAll('.segb').forEach(x=>x.setAttribute('aria-pressed',x===b));prepShare();});
 $('driveMenuBtn').onclick=()=>openShare('drive');
 $('icloudMenuBtn').onclick=()=>openShare('icloud');
 $('shareClose').onclick=()=>$('shareDlg').close();
@@ -4030,9 +4237,20 @@ const ACTIONS={
   },
   async whatsapp(f){
     if(IS_TOUCH&&canShareFile(f)){if(await nativeShare(f))done('בוחרים וואטסאפ ואת השיחה');return;}
+    if(IS_TOUCH){downloadFile(f);done('הקובץ ירד למכשיר. בוואטסאפ לוחצים על אטב ← מסמך, ובוחרים אותו מההורדות');return;}
     const w=window.open('https://web.whatsapp.com/','siman_wa');
     downloadFile(f);
     done(w?'וואטסאפ ווב נפתח בלשונית חדשה. פותחים שיחה וגוררים אליה את הקובץ מההורדות':'הקובץ ירד. פתחו את web.whatsapp.com וגררו אותו לשיחה (הדפדפן חסם חלון חדש)');
+  },
+  async wadesk(f){
+    // Windows / Mac share sheet lists the installed WhatsApp app, and then the file goes in attached
+    if(canShareFile(f)){shStatus('בתפריט שנפתח בוחרים WhatsApp');if(await nativeShare(f))done('בוחרים את השיחה ושולחים');return;}
+    downloadFile(f);
+    let left=false;const onBlur=()=>{left=true;};addEventListener('blur',onBlur,{once:true});
+    S.noWarn=true;location.href='whatsapp://send?text='+encodeURIComponent('מצרף את '+f.name);setTimeout(()=>{S.noWarn=false;},2000);
+    setTimeout(()=>{removeEventListener('blur',onBlur);
+      if(left)done('וואטסאפ למחשב נפתח. בוחרים שיחה וגוררים אליה את הקובץ מההורדות');
+      else shStatus('לא הצלחתי לפתוח את וואטסאפ למחשב. אם הוא לא מותקן, אפשר <a href="https://www.whatsapp.com/download" target="_blank" rel="noopener">להוריד אותו</a> או לבחור "וואטסאפ ווב".',true);},1500);
   },
   async airdrop(f){if(await nativeShare(f))done('בוחרים AirDrop ואת המכשיר שליד');},
   async quick(f){if(await nativeShare(f))done(IS_ANDROID?'בוחרים "שיתוף מהיר" (Quick Share) ואת המכשיר':'בוחרים "שיתוף בקרבת מקום" ואת המחשב שליד');},
@@ -4056,7 +4274,8 @@ const ACTIONS={
 async function pickAndWrite(f,hint){
   if(FS){
     shStatus(hint);
-    try{const h=await showSaveFilePicker({suggestedName:f.name,types:PDF_TYPE,startIn:'documents'});
+    try{const ty=/\.pdf$/i.test(f.name)?PDF_TYPE:[{description:f.name.split('.').pop().toUpperCase(),accept:{[f.type]:['.'+f.name.split('.').pop()]}}];
+      const h=await showSaveFilePicker({suggestedName:f.name,types:ty,startIn:'documents'});
       await writeHandle(h,new Uint8Array(await f.arrayBuffer()));done('נשמר: '+h.name);}
     catch(e){if(e&&e.name==='AbortError'){shStatus('');return;}throw e;}
     return;}
@@ -4067,6 +4286,7 @@ function done(msg){$('shareDlg').close();if(msg)toast(msg);}
 document.querySelectorAll('.sh[data-share]').forEach(b=>b.addEventListener('click',async()=>{
   const k=b.dataset.share;
   if(!SH.file){shStatus('עוד רגע, הקובץ בהכנה…');return;}
+  if(['airdrop','quick','more'].includes(k)&&!canShareFile(SH.file)){shStatus(`הדפדפן הזה משתף ככה רק PDF. בחרו "PDF חתום" למעלה, או שמרו את קובץ ה-${S.office?OF_LABEL[S.office.kind]:''} ושלחו אותו מהאפליקציה.`);return;}
   try{await ACTIONS[k](SH.file);}
   catch(e){console.error(e);$('shareDlg').classList.remove('wait');
     shStatus(e&&e.name==='AbortError'?'':(k==='drive'?'השמירה ב-Drive נכשלה: ':'השיתוף נכשל: ')+(e.message||e));}
