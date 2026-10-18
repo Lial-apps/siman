@@ -1,5 +1,5 @@
 // סימן — service worker: works offline, picks up new versions automatically
-const CACHE = 'siman-v16';
+const CACHE = 'siman-v17';
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './pdf.min.js', './pdf.worker.min.js',
   './pdf-lib.min.js', './fontkit.umd.min.js', './icon-192.png', './icon-512.png', './icon-maskable-512.png', './jszip.min.js', './pptxgen.min.js', './office.js', './office-edit.js', './docx-preview.min.js', './html2canvas.min.js', './xlsx.mini.min.js'];
 

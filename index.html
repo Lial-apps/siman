@@ -1143,6 +1143,7 @@ dialog.wait .sh{cursor:progress}
 dialog.wait .sh .sh-ic{opacity:.55}
 .sh-status{margin:0;min-height:1.4em;font-size:13.5px;color:var(--muted)}
 .sh-status a{color:var(--blue);font-weight:600}
+.sh-status .btn{margin-top:8px;display:block}
 #setDlg .field input{font-size:15px;padding:9px 11px;border-radius:9px}
 @media (max-width:560px){
   dialog.sheet{width:100%;max-width:100%;margin:auto 0 0;border-radius:20px 20px 0 0;padding-bottom:env(safe-area-inset-bottom,0px)}
@@ -1172,7 +1173,7 @@ dialog.reg::backdrop{background:color-mix(in srgb,var(--navy) 70%,transparent);b
 <body data-tool="select">
 
 <header class="bar">
-  <div class="brand"><b title="גרסה 3.7">סימן</b><span class="ver">3.7</span><span class="fname" id="fname"></span></div>
+  <div class="brand"><b title="גרסה 3.7.1">סימן</b><span class="ver">3.7.1</span><span class="fname" id="fname"></span></div>
 
   <nav class="tools" id="tools" aria-label="כלים">
     <button class="tool" data-tool="select" aria-pressed="true" title="בחירה וגלילה (V)">
@@ -4186,7 +4187,7 @@ function openShare(focusKey){
   prepShare(focusKey);
 }
 function prepShare(focusKey){
-  const d=$('shareDlg');
+  const d=$('shareDlg');SH.waFallback=false;
   SH.file=null;shareHints();
   $('shareName').textContent=fileName();
   d.classList.add('wait');shStatus('מכין את הקובץ…');
@@ -4208,11 +4209,24 @@ $('shareClose').onclick=()=>$('shareDlg').close();
 $('shareDlg').addEventListener('close',()=>{SH.job=null;});
 $('shareDlg').addEventListener('click',e=>{if(e.target===$('shareDlg'))$('shareDlg').close();});
 
+// true = shared, false = the person closed the menu; throws {shareFail} when the system menu can't take this file
 async function nativeShare(f,extra){
-  try{await navigator.share({files:[f],title:f.name,...(extra||{})});return true;}
-  catch(e){if(e&&e.name==='AbortError')return false;
-    if(needsGesture(e)&&await askToSave(f.name,'שיתוף')){try{await navigator.share({files:[f],title:f.name,...(extra||{})});return true;}catch(_){}}
-    throw e;}
+  const data={files:[f],title:f.name,...(extra||{})};
+  const live=!navigator.userActivation||navigator.userActivation.isActive;
+  try{await navigator.share(data);return true;}
+  catch(e){
+    if(e&&e.name==='AbortError')return false;
+    // only a lost click deserves a second try; a refused file type would just fail again
+    if(!live&&needsGesture(e)&&await askToSave(f.name,'שיתוף')){
+      try{await navigator.share(data);return true;}catch(e2){if(e2&&e2.name==='AbortError')return false;e=e2;}}
+    console.warn('share',e);
+    throw Object.assign(new Error('תפריט השיתוף של המכשיר לא קיבל את הקובץ'),{shareFail:true});
+  }
+}
+// share through the system menu, or run the fallback when the menu refuses the file
+async function shareOr(f,extra,fallback){
+  try{return await nativeShare(f,extra);}
+  catch(e){if(!e.shareFail)throw e;await fallback();return null;}
 }
 const mailBody=()=>`מצורף הקובץ ${fileName()}.\n\n${USER.name?USER.name+'\n':''}נשלח מסימן · lial-apps.github.io/siman`;
 function mailto(to){
@@ -4223,7 +4237,8 @@ function mailto(to){
 
 const ACTIONS={
   async mail(f){
-    if(canShareFile(f)){if(await nativeShare(f,{text:mailBody()}))done('נפתח תפריט השיתוף. בוחרים את אפליקציית המייל');return;}
+    const fb=()=>{downloadFile(f);openMailto(mailto(''));done('הקובץ ירד ונפתח מייל חדש. גררו אליו את הקובץ מתיקיית ההורדות');};
+    if(canShareFile(f)){if(await shareOr(f,{text:mailBody()},fb))done('בוחרים את אפליקציית המייל');return;}
     downloadFile(f);openMailto(mailto(''));
     done('הקובץ ירד למחשב ונפתח מייל חדש. גררו אליו את הקובץ מתיקיית ההורדות');
   },
@@ -4231,30 +4246,36 @@ const ACTIONS={
     if(!USER.mail){$('shareDlg').close();openSettings(()=>openShare('me'));return;}
     if(canShareFile(f)&&IS_TOUCH){
       try{await navigator.clipboard.writeText(USER.mail);}catch(_){}
-      if(await nativeShare(f,{text:mailBody()}))done(`בוחרים מייל ומדביקים בשדה הנמען: ${USER.mail} (הכתובת כבר הועתקה)`);return;}
+      if(await shareOr(f,{text:mailBody()},()=>{downloadFile(f);openMailto(mailto(USER.mail));done(`נפתח מייל אל ${USER.mail}. מצרפים אליו את הקובץ שירד`);}))done(`בוחרים מייל ומדביקים בשדה הנמען: ${USER.mail} (הכתובת כבר הועתקה)`);return;}
     downloadFile(f);openMailto(mailto(USER.mail));
     done(`נפתח מייל אל ${USER.mail}. גררו אליו את הקובץ שירד לתיקיית ההורדות`);
   },
   async whatsapp(f){
-    if(IS_TOUCH&&canShareFile(f)){if(await nativeShare(f))done('בוחרים וואטסאפ ואת השיחה');return;}
+    const fbTouch=()=>{downloadFile(f);done('הקובץ ירד למכשיר. בוואטסאפ לוחצים על אטב ← מסמך, ובוחרים אותו מההורדות');};
+    if(IS_TOUCH&&canShareFile(f)){if(await shareOr(f,null,fbTouch))done('בוחרים וואטסאפ ואת השיחה');return;}
     if(IS_TOUCH){downloadFile(f);done('הקובץ ירד למכשיר. בוואטסאפ לוחצים על אטב ← מסמך, ובוחרים אותו מההורדות');return;}
     const w=window.open('https://web.whatsapp.com/','siman_wa');
     downloadFile(f);
     done(w?'וואטסאפ ווב נפתח בלשונית חדשה. פותחים שיחה וגוררים אליה את הקובץ מההורדות':'הקובץ ירד. פתחו את web.whatsapp.com וגררו אותו לשיחה (הדפדפן חסם חלון חדש)');
   },
   async wadesk(f){
-    // Windows / Mac share sheet lists the installed WhatsApp app, and then the file goes in attached
-    if(canShareFile(f)){shStatus('בתפריט שנפתח בוחרים WhatsApp');if(await nativeShare(f))done('בוחרים את השיחה ושולחים');return;}
-    downloadFile(f);
-    let left=false;const onBlur=()=>{left=true;};addEventListener('blur',onBlur,{once:true});
-    S.noWarn=true;location.href='whatsapp://send?text='+encodeURIComponent('מצרף את '+f.name);setTimeout(()=>{S.noWarn=false;},2000);
-    setTimeout(()=>{removeEventListener('blur',onBlur);
-      if(left)done('וואטסאפ למחשב נפתח. בוחרים שיחה וגוררים אליה את הקובץ מההורדות');
-      else shStatus('לא הצלחתי לפתוח את וואטסאפ למחשב. אם הוא לא מותקן, אפשר <a href="https://www.whatsapp.com/download" target="_blank" rel="noopener">להוריד אותו</a> או לבחור "וואטסאפ ווב".',true);},1500);
+    // Windows / Mac share menu lists the installed WhatsApp app, and the file goes in attached.
+    // When that menu refuses the file, fall back to: download it + open the WhatsApp app (on a fresh click).
+    if(canShareFile(f)&&!SH.waFallback){
+      shStatus('בתפריט השיתוף של המחשב בוחרים WhatsApp');
+      const r=await shareOr(f,null,async()=>{SH.waFallback=true;});
+      if(r){done('בוחרים את השיחה ושולחים');return;}
+      if(r===false){shStatus('');return;}
+      shStatus('תפריט השיתוף של המחשב לא קיבל את הקובץ. <button class="btn primary" id="waGo" type="button">הורדת הקובץ ופתיחת וואטסאפ למחשב</button>',true);
+      $('waGo').onclick=()=>waDeskOpen(f);
+      return;
+    }
+    waDeskOpen(f);
   },
-  async airdrop(f){if(await nativeShare(f))done('בוחרים AirDrop ואת המכשיר שליד');},
-  async quick(f){if(await nativeShare(f))done(IS_ANDROID?'בוחרים "שיתוף מהיר" (Quick Share) ואת המכשיר':'בוחרים "שיתוף בקרבת מקום" ואת המחשב שליד');},
-  async more(f){if(await nativeShare(f))done('');},
+
+  async airdrop(f){if(await shareOr(f,null,()=>refused(f)))done('בוחרים AirDrop ואת המכשיר שליד');},
+  async quick(f){if(await shareOr(f,null,()=>refused(f)))done(IS_ANDROID?'בוחרים "שיתוף מהיר" (Quick Share) ואת המכשיר':'בוחרים "שיתוף בקרבת מקום" ואת המחשב שליד');},
+  async more(f){if(await shareOr(f,null,()=>refused(f)))done('');},
   async drive(f){
     if(GDRIVE_CLIENT_ID){
       const tok=await driveToken();
@@ -4263,11 +4284,11 @@ const ACTIONS={
         shStatus(`נשמר ב-Google Drive, בתיקייה "סימן". <a href="${r.webViewLink}" target="_blank" rel="noopener">פתיחה ב-Drive</a>`,true);}
       finally{$('shareDlg').classList.remove('wait');}
       return;}
-    if(IS_TOUCH&&canShareFile(f)){if(await nativeShare(f))done('בוחרים Drive בתפריט השיתוף');return;}
+    if(IS_TOUCH&&canShareFile(f)){if(await shareOr(f,null,()=>{downloadFile(f);done('הקובץ ירד. מעלים אותו מאפליקציית Drive ← הוספה ← העלאה');}))done('בוחרים Drive בתפריט השיתוף');return;}
     await pickAndWrite(f,'בחלון השמירה בחרו את התיקייה Google Drive (מופיעה כשמותקן Drive למחשב)');
   },
   async icloud(f){
-    if(IS_APPLE_TOUCH&&canShareFile(f)){shStatus('בתפריט בוחרים "שמירה בקבצים" ואז iCloud Drive');if(await nativeShare(f))done('בוחרים "שמירה בקבצים" ← iCloud Drive');return;}
+    if(IS_APPLE_TOUCH&&canShareFile(f)){shStatus('בתפריט בוחרים "שמירה בקבצים" ואז iCloud Drive');if(await shareOr(f,null,()=>{downloadFile(f);done('הקובץ ירד. מעבירים אותו מההורדות ל-iCloud Drive באפליקציית "קבצים"');}))done('בוחרים "שמירה בקבצים" ← iCloud Drive');return;}
     await pickAndWrite(f,IS_MAC?'בחלון השמירה בחרו iCloud Drive בצד':'בחלון השמירה בחרו את התיקייה iCloud Drive (מופיעה כשמותקן iCloud למחשב)');
   }
 };
@@ -4282,6 +4303,19 @@ async function pickAndWrite(f,hint){
   downloadFile(f);done('הקובץ ירד. העבירו אותו לתיקיית הענן שלכם מתוך ההורדות');
 }
 function openMailto(u){S.noWarn=true;location.href=u;setTimeout(()=>{S.noWarn=false;},2000);}
+function waDeskOpen(f){
+  downloadFile(f);
+  let left=false;const onBlur=()=>{left=true;};addEventListener('blur',onBlur,{once:true});
+  S.noWarn=true;location.href='whatsapp://send?text='+encodeURIComponent('מצרף את '+f.name);setTimeout(()=>{S.noWarn=false;},2000);
+  shStatus('הקובץ ירד. פותח את וואטסאפ למחשב…');
+  setTimeout(()=>{removeEventListener('blur',onBlur);
+    if(left||!document.hasFocus())done('וואטסאפ למחשב נפתח. בוחרים שיחה וגוררים אליה את הקובץ מההורדות');
+    else shStatus('הקובץ ירד, אבל וואטסאפ למחשב לא נפתח. אם הוא לא מותקן אפשר <a href="https://www.whatsapp.com/download" target="_blank" rel="noopener">להוריד אותו</a>, או לבחור "וואטסאפ ווב".',true);},1800);
+}
+function refused(f){
+  shStatus(`תפריט השיתוף של המכשיר לא מקבל קובץ ${f.name.split('.').pop().toUpperCase()}. <a href="#" id="shDl">הורדת הקובץ</a> ושליחה מהאפליקציה${S.office&&SH.fmt==='office'?', או בחירה ב-"PDF חתום" למעלה':''}.`,true);
+  const a=document.getElementById('shDl');if(a)a.onclick=e=>{e.preventDefault();downloadFile(f);done('הקובץ ירד לתיקיית ההורדות');};
+}
 function done(msg){$('shareDlg').close();if(msg)toast(msg);}
 document.querySelectorAll('.sh[data-share]').forEach(b=>b.addEventListener('click',async()=>{
   const k=b.dataset.share;
