@@ -1,20 +1,113 @@
 {
-  "name": "סימן — עורך PDF",
+  "id": "/siman/",
+  "name": "סימן",
   "short_name": "סימן",
-  "description": "עורך PDF בעברית: קריאה, סימון, כתיבה, ניהול עמודים ותרגום",
+  "description": "לסמן, לחתום, לתרגם ולשלוח מסמכים — PDF, Word ו-Excel. הקבצים נשארים במכשיר שלכם.",
   "lang": "he",
   "dir": "rtl",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#DCE0E6",
-  "theme_color": "#1C2333",
+  "orientation": "any",
+  "background_color": "#202125",
+  "theme_color": "#202125",
+  "categories": [
+    "productivity",
+    "business",
+    "utilities"
+  ],
+  "launch_handler": {
+    "client_mode": [
+      "focus-existing",
+      "auto"
+    ]
+  },
   "icons": [
-    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
-    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "screenshot-wide-1.png",
+      "sizes": "1366x820",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "מה נסמן היום? מסך הפתיחה של סימן"
+    },
+    {
+      "src": "screenshot-wide-2.png",
+      "sizes": "1366x820",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "סימון וחתימה על הסכם"
+    },
+    {
+      "src": "screenshot-wide-3.png",
+      "sizes": "1366x820",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "שורת הפקודה: כותבים מה לעשות"
+    },
+    {
+      "src": "screenshot-narrow-1.png",
+      "sizes": "412x915",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "סימן בטלפון"
+    }
   ],
   "file_handlers": [
-    { "action": "./", "accept": { "application/pdf": [".pdf"] } }
-  ]
+    {
+      "action": "./",
+      "accept": {
+        "application/pdf": [
+          ".pdf"
+        ]
+      }
+    },
+    {
+      "action": "./",
+      "accept": {
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [
+          ".docx"
+        ],
+        "application/msword": [
+          ".doc"
+        ]
+      }
+    },
+    {
+      "action": "./",
+      "accept": {
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [
+          ".xlsx"
+        ]
+      }
+    },
+    {
+      "action": "./",
+      "accept": {
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation": [
+          ".pptx"
+        ]
+      }
+    }
+  ],
+  "prefer_related_applications": false
 }
