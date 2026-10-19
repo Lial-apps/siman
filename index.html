@@ -1158,6 +1158,14 @@ dialog.wait .sh .sh-ic{opacity:.55}
 .btn.del:hover{background:color-mix(in srgb,var(--danger) 8%,var(--bar));border-color:var(--danger)}
 .sh-file,#fmtName{unicode-bidi:plaintext;text-align:start}
 .sh-fmt{margin-top:-2px}
+.sh-name{display:flex;flex-direction:column;gap:4px;margin:-4px 0 0}
+.sh-name-lbl{font-size:12.5px;color:var(--muted)}
+.sh-name-box{display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:9px;background:var(--bar);padding:0 10px}
+.sh-name-box:focus-within{border-color:var(--blue);box-shadow:0 0 0 3px color-mix(in srgb,var(--blue) 18%,transparent)}
+.sh-name-box input{flex:1;min-width:0;border:0;background:transparent;font:inherit;font-size:14.5px;color:var(--ink);padding:9px 0;outline:none;unicode-bidi:plaintext;text-align:start}
+.sh-ext{color:var(--muted);font-size:13.5px;flex:none}
+.sh-name-hint{font-size:12px;color:var(--muted);min-height:0}
+.sh-name-hint:empty{display:none}
 .sh-fmt .segb{padding:8px}
 dialog.reg{width:min(440px,94vw)}
 dialog.reg .sig-in{padding:28px 28px 22px;gap:14px}
@@ -1173,7 +1181,7 @@ dialog.reg::backdrop{background:color-mix(in srgb,var(--navy) 70%,transparent);b
 <body data-tool="select">
 
 <header class="bar">
-  <div class="brand"><b title="גרסה 3.8">סימן</b><span class="ver">3.8</span><span class="fname" id="fname"></span></div>
+  <div class="brand"><b title="גרסה 3.9">סימן</b><span class="ver">3.9</span><span class="fname" id="fname"></span></div>
 
   <nav class="tools" id="tools" aria-label="כלים">
     <button class="tool" data-tool="select" aria-pressed="true" title="בחירה וגלילה (V)">
@@ -1446,7 +1454,9 @@ dialog.reg::backdrop{background:color-mix(in srgb,var(--navy) 70%,transparent);b
 <dialog class="sig sheet" id="shareDlg" aria-labelledby="shareTitle">
   <div class="sig-in">
     <div class="sh-head"><h2 id="shareTitle">שיתוף ושמירה</h2><button class="icon-btn" id="shareClose" aria-label="סגירה">×</button></div>
-    <p class="sh-file" id="shareName"></p>
+    <label class="sh-name" for="shareName"><span class="sh-name-lbl">שם הקובץ</span>
+      <span class="sh-name-box"><input id="shareName" type="text" dir="auto" maxlength="120" spellcheck="false" autocomplete="off" aria-describedby="shNameHint"><span class="sh-ext" id="shareExt" dir="ltr">.pdf</span></span></label>
+    <small class="sh-name-hint" id="shNameHint"></small>
     <div class="seg sh-fmt hidden" id="shFmt" role="group" aria-label="לשלוח בתור"><button class="segb" data-fmt="pdf" aria-pressed="true">PDF חתום</button><button class="segb" data-fmt="office" aria-pressed="false" id="shFmtOf">Word לעריכה</button></div>
     <h3 class="sh-grp">שליחה</h3>
     <div class="sh-grid">
@@ -2544,6 +2554,7 @@ async function pageLines(P){
   return P.lines;
 }
 async function pageText(i){
+  if(S.office&&S.office.kind==='docx')return i===0?await officeDocText():'';
   const P=S.pages[i];const lines=await pageLines(P);
   if(!lines){let out='';for(const it of P.tilted){out+=it.str;if(it.hasEOL)out+='\n';}return cleanText(out).replace(/[ \t]+\n/g,'\n').replace(/\n{3,}/g,'\n\n').trim();}
   const out=[];let prev=null;
@@ -2579,7 +2590,7 @@ async function detect(){
   $('tpLang').textContent=LANG_HE[TR.src]||TR.src||'לא ידועה';
   setTarget(TR.src==='he'?'en':'he');
 }
-function setTarget(t){TR.target=t;document.querySelectorAll('.segb').forEach(b=>b.setAttribute('aria-pressed',b.dataset.target===t));}
+function setTarget(t){TR.target=t;document.querySelectorAll('.segb[data-target]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.target===t));}
 function currentPageIndex(){const m=/(\d+)/.exec($('pageInfo').textContent);return m?+m[1]-1:0;}
 
 function trSystem(target){
@@ -2715,6 +2726,8 @@ async function runTranslate(){
   const st=await getSettingsSafe();
   if(TR.target==='none'){await loadOwnText();return;}
   if(!st.hasKey){openSettings(true);status('צריך להזין מפתח API לפני התרגום.',true);return;}
+  if(S.office&&S.office.kind==='docx'){await translateOfficeDocx();return;}
+  if(S.office){status('תרגום קובצי Excel עוד לא נתמך. אפשר לשמור כ-PDF, לפתוח אותו ולתרגם.',true);return;}
   if($('tpMode').value==='inplace'){await translateInPlace();return;}
   const idx=$('tpScope').value==='cur'?[currentPageIndex()]:S.pages.map((_,i)=>i);
   TR.running=true;TR.stop=false;$('tpGo').disabled=true;$('tpStop').classList.remove('hidden');
@@ -2746,7 +2759,7 @@ async function runTranslate(){
   $('tpFoot').classList.toggle('hidden',!TR.pages.some(p=>p&&p.text));$('tpFmt').classList.toggle('hidden',!TR.pages.some(p=>p&&p.text));
 }
 async function loadOwnText(){
-  const idx=$('tpScope').value==='cur'?[currentPageIndex()]:S.pages.map((_,i)=>i);
+  const idx=S.office&&S.office.kind==='docx'?[0]:$('tpScope').value==='cur'?[currentPageIndex()]:S.pages.map((_,i)=>i);
   if($('tpScope').value==='all'){$('tpResults').innerHTML='';TR.pages=[];}
   let n=0;
   for(const i of idx){const el=pageCard(i);const text=await pageText(i);
@@ -2754,6 +2767,119 @@ async function loadOwnText(){
     TR.pages[i]={text,target:'none'};renderTT(el,i);n++;}
   status(n?'הטקסט מוכן לעריכה. לוחצים עליו כדי לתקן, ומעצבים למטה.':'לא נמצא טקסט בקובץ.',!n);
   $('tpFoot').classList.toggle('hidden',!n);$('tpFmt').classList.toggle('hidden',!n);
+}
+/* ---- Word: the translation goes into the .docx itself, so the design stays and it still opens in Word ---- */
+const W_NS='http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+const DOCX_TEXT_PARTS=/^word\/(document|header\d*|footer\d*|footnotes|endnotes)\.xml$/;
+const wKids=(el,name)=>[...el.childNodes].filter(n=>n.nodeType===1&&n.namespaceURI===W_NS&&n.localName===name);
+const wKid=(el,name)=>wKids(el,name)[0]||null;
+function wUp(el,name){for(let n=el.parentNode;n&&n.nodeType===1;n=n.parentNode)if(n.localName===name&&(name==='Fallback'||n.namespaceURI===W_NS))return n;return null;}
+function wEl(dom,name,val){const e=dom.createElementNS(W_NS,'w:'+name);if(val!==undefined)e.setAttributeNS(W_NS,'w:val',val);return e;}
+// put a child in its schema place: before the first sibling that must come after it
+function wInsert(parent,el,after){const ref=[...parent.childNodes].find(n=>n.nodeType===1&&after.includes(n.localName));parent.insertBefore(el,ref||null);}
+async function docxParas(zip){
+  const parts=[],paras=[];
+  const names=Object.keys(zip.files).filter(n=>DOCX_TEXT_PARTS.test(n)).sort((a,b)=>(a!=='word/document.xml')-(b!=='word/document.xml')||a.localeCompare(b));
+  for(const path of names){
+    const dom=new DOMParser().parseFromString(await zip.file(path).async('string'),'application/xml');
+    if(dom.getElementsByTagName('parsererror').length)continue;
+    parts.push({path,dom});
+    for(const p of dom.getElementsByTagNameNS(W_NS,'p')){
+      if(wUp(p,'Fallback'))continue; // the old-Word copy of a text box; Word shows the other one
+      const ts=[...p.getElementsByTagNameNS(W_NS,'t')].filter(t=>wUp(t,'p')===p&&!wUp(t,'Fallback'));
+      if(ts.length)paras.push({dom,p,ts,text:ts.map(t=>t.textContent).join('')});
+    }
+  }
+  return{parts,paras};
+}
+async function officeDocText(){
+  const o=S.office;if(o._text!==undefined)return o._text;
+  try{if(!window.JSZip)await loadScript('jszip.min.js');
+    const{paras}=await docxParas(await JSZip.loadAsync(o.bytes));
+    o._text=cleanText(paras.map(x=>x.text).join('\n')).replace(/\n{3,}/g,'\n\n').trim();}
+  catch(e){console.warn('docx text',e);o._text='';}
+  return o._text;
+}
+const P_AFTER_BIDI=['adjustRightInd','snapToGrid','spacing','ind','contextualSpacing','mirrorIndents','suppressOverlap','jc','textDirection','textAlignment','textboxTightWrap','outlineLvl','divId','cnfStyle','rPr','sectPr','pPrChange'];
+const TBL_AFTER_BIDI=['tblStyleRowBandSize','tblStyleColBandSize','tblW','jc','tblCellSpacing','tblInd','tblBorders','shd','tblLayout','tblCellMar','tblLook','tblCaption','tblDescription','tblPrChange'];
+function setParaDir(dom,p,rtl){
+  let pPr=wKid(p,'pPr');if(!pPr){pPr=wEl(dom,'pPr');p.insertBefore(pPr,p.firstChild);}
+  let b=wKid(pPr,'bidi');
+  if(!b){b=wEl(dom,'bidi');wInsert(pPr,b,P_AFTER_BIDI);}
+  if(rtl)b.removeAttributeNS(W_NS,'val');else b.setAttributeNS(W_NS,'w:val','0');
+  // a side alignment follows the new direction; centred and justified stay
+  const jc=wKid(pPr,'jc');if(jc&&/^(left|right|start|end)$/.test(jc.getAttributeNS(W_NS,'val')||''))pPr.removeChild(jc);
+}
+function fixRun(dom,r,rtl){
+  const rPr=wKid(r,'rPr');if(!rPr)return;
+  if(!rtl)wKids(rPr,'rtl').forEach(e=>rPr.removeChild(e));
+  // Hebrew uses the "complex script" size and bold, English the normal ones: keep both the same
+  for(const[a,b]of[['b','bCs'],['i','iCs'],['sz','szCs']]){
+    const A=wKid(rPr,a),B=wKid(rPr,b);
+    if(A&&!B){const c=A.cloneNode(true);const e=wEl(dom,b);for(const at of[...c.attributes])e.setAttributeNode(at.cloneNode(true));A.after(e);}
+    else if(B&&!A){const e=wEl(dom,a);for(const at of[...B.attributes])e.setAttributeNode(at.cloneNode(true));rPr.insertBefore(e,B);}
+  }
+}
+function setTableDir(dom,rtl){
+  for(const tblPr of dom.getElementsByTagNameNS(W_NS,'tblPr')){
+    const b=wKid(tblPr,'bidiVisual');
+    if(!rtl&&b)tblPr.removeChild(b);
+    else if(rtl&&!b)wInsert(tblPr,wEl(dom,'bidiVisual'),TBL_AFTER_BIDI);
+  }
+}
+async function translateOfficeDocx(){
+  const target=TR.target,rtl=target==='he';
+  if(S.anns.length&&!confirm('התרגום יוצר קובץ Word חדש, והסימונים והחתימות שהוספת לא יעברו אליו. להמשיך?'))return;
+  TR.running=true;TR.stop=false;$('tpGo').disabled=true;$('tpStop').classList.remove('hidden');
+  $('tpResults').innerHTML='';$('tpFoot').classList.add('hidden');$('tpFmt').classList.add('hidden');
+  let failed=null,msg='';
+  try{
+    if(!window.JSZip)await loadScript('jszip.min.js');
+    const zip=await JSZip.loadAsync(S.office.bytes);
+    const{parts,paras}=await docxParas(zip);
+    const units=paras.filter(x=>/\p{L}/u.test(x.text));
+    if(!units.length){status('לא נמצא טקסט בקובץ ה-Word.',true);return;}
+    const chunks=[];let cur=[],len=0;
+    for(const u of units){if(cur.length&&len+u.text.length>4500){chunks.push(cur);cur=[];len=0;}cur.push(u);len+=u.text.length+8;}
+    if(cur.length)chunks.push(cur);
+    let done=0;
+    for(const ch of chunks){
+      if(TR.stop)break;
+      status(`מתרגם את המסמך… ${Math.round(done/units.length*100)}%`);
+      const text='Translate each numbered line separately. Keep every [number] marker at the start of its line and keep the same count of lines.\n'+ch.map((u,k)=>`[${k+1}] ${u.text}`).join('\n');
+      const r=await callTranslate(text,target);
+      if(r.error){failed=r;break;}
+      const out={};let lastN=null;
+      for(const line of parseTr(r.raw).text.split('\n')){
+        const m=/^\s*\[(\d+)\]\s?(.*)$/.exec(line);
+        if(m){lastN=+m[1];out[lastN]=m[2].trim();}else if(lastN&&line.trim())out[lastN]+=' '+line.trim();
+      }
+      ch.forEach((u,k)=>{if(out[k+1])u.tr=out[k+1];});
+      done+=ch.length;
+    }
+    if(failed){status(errText(failed),true);if(failed.error==='NO_KEY'||failed.status===401)openSettings(true);return;}
+    if(TR.stop){status('התרגום נעצר. הקובץ לא שונה.');return;}
+    let n=0;
+    for(const u of units){
+      if(!u.tr)continue;
+      const[first,...rest]=u.ts;
+      first.textContent=u.tr;first.setAttributeNS('http://www.w3.org/XML/1998/namespace','xml:space','preserve');
+      rest.forEach(t=>{t.textContent='';});
+      setParaDir(u.dom,u.p,rtl);
+      new Set(u.ts.map(t=>t.parentNode)).forEach(r=>fixRun(u.dom,r,rtl));
+      n++;
+    }
+    const head='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n';
+    for(const{path,dom}of parts){setTableDir(dom,rtl);zip.file(path,head+new XMLSerializer().serializeToString(dom.documentElement));}
+    const bytes=await zip.generateAsync({type:'uint8array',compression:'DEFLATE'});
+    const name=`${S.office.base} - ${rtl?'עברית':'English'}.docx`;
+    msg=`התרגום הושלם (${n} פסקאות${n<units.length?`, ${units.length-n} לא תורגמו`:''}). זה קובץ Word חדש: אפשר לסמן ולחתום, ובשמירה לבחור Word או PDF.`;
+    setDirty(false);
+    await openFile(new File([bytes],name,{type:OFFICE_MIME.docx}));
+    if(S.office){S.office.plain=true;$('tpLang').textContent=LANG_HE[target];setTarget(rtl?'en':'he');}
+  }catch(e){console.error(e);failed=true;status('התרגום נכשל: '+(e.message||e),true);}
+  finally{TR.running=false;$('tpGo').disabled=false;$('tpStop').classList.add('hidden');}
+  if(msg)status(msg);
 }
 function translatedPages(){return TR.pages.map((p,i)=>p&&p.text?{i,text:p.text}:null).filter(Boolean);}
 function baseName(){return S.name.replace(/\.pdf$/i,'')+(TR.target==='en'?' - English':TR.target==='none'?' - ערוך':' - עברית');}
@@ -2958,7 +3084,7 @@ bindExt(document);
 $('trBtn').onclick=()=>{const p=$('tpanel');const show=p.classList.contains('hidden');p.classList.toggle('hidden',!show);
   if(show&&$('tpLang').textContent==='בודק…')detect();setTimeout(fitWidth,0);};
 $('tpClose').onclick=()=>{$('tpanel').classList.add('hidden');setTimeout(fitWidth,0);};
-document.querySelectorAll('.segb').forEach(b=>b.onclick=()=>setTarget(b.dataset.target));
+document.querySelectorAll('.segb[data-target]').forEach(b=>b.onclick=()=>setTarget(b.dataset.target));
 $('tpGo').onclick=runTranslate;
 document.querySelectorAll('.segb').forEach(b=>b.addEventListener('click',()=>{$('tpGo').textContent=b.dataset.target==='none'?'טעינת הטקסט':'תרגום';}));
 $('tpStop').onclick=()=>{TR.stop=true;status('עוצר…');};
@@ -3489,7 +3615,7 @@ const loadEditLibs=k=>editLibs[k]||(editLibs[k]=(async()=>{
   if(!window.OFFICE_EDIT)await loadScript('office-edit.js');
 })().catch(e=>{editLibs[k]=null;throw e;}));
 const OF_LABEL={docx:'Word',xlsx:'Excel'};
-const officeOutName=()=>`${S.office.base} - ערוך.${S.office.kind}`;
+const officeOutName=()=>`${S.office.base}${S.office.plain?'':' - ערוך'}.${S.office.kind}`;
 async function dataBytes(url){return new Uint8Array(await (await fetch(url)).arrayBuffer());}
 // marks on the desk → positions on the original page (CSS px of the rendered page)
 async function officeItems(){
@@ -3999,7 +4125,7 @@ $('convBtn').onclick=()=>{if(!S.doc)return;$('convStatus').textContent='';
   if(hasSel)$('convScope').value='sel';else if($('convScope').value==='sel')$('convScope').value='all';
   $('convRangeWrap').classList.toggle('hidden',$('convScope').value!=='range');$('convDlg').showModal();};
 $('convCancel').onclick=()=>$('convDlg').close();
-document.querySelectorAll('.conv-card').forEach(b=>b.onclick=()=>convertTo(b.dataset.to));
+document.querySelectorAll('#convDlg .conv-card[data-to]').forEach(b=>b.onclick=()=>convertTo(b.dataset.to)); // only the convert window: the save window has its own cards
 
 /* ---------- separate files with smart names ---------- */
 let splitIdx=[];
@@ -4172,8 +4298,18 @@ let pendingOpen=null;
 if(needReg())showReg();
 
 /* --- the file to send: built once when the sheet opens, so taps keep the browser's "user gesture" --- */
-const SH={file:null,job:null,fmt:'pdf'};
-function fileName(){if(S.office&&SH.fmt==='office')return officeOutName();const n=S.name||'מסמך.pdf';return /\.pdf$/i.test(n)?n:n+'.pdf';}
+const SH={file:null,job:null,fmt:'pdf',base:null,forBytes:null};
+function defaultShareName(){if(S.office&&SH.fmt==='office')return officeOutName();const n=S.name||'מסמך.pdf';return /\.pdf$/i.test(n)?n:n+'.pdf';}
+const shareExt=()=>{const n=defaultShareName(),d=n.lastIndexOf('.');return d>0?n.slice(d):'.pdf';};
+// the name the person typed (without the extension), or the automatic one
+const cleanBase=t=>String(t||'').replace(/[\\/:*?"<>|\u0000-\u001f]/g,'').replace(/\s+/g,' ').trim().replace(/[. ]+$/,'').slice(0,120);
+function fileName(){const ext=shareExt();const b=SH.base&&cleanBase(SH.base);return b?b+ext:defaultShareName();}
+function fillShareName(){
+  const ext=shareExt(),n=fileName();
+  $('shareName').value=n.slice(0,n.length-ext.length);$('shareExt').textContent=ext;
+  $('shNameHint').textContent=WIN_DESK?'בתפריט השיתוף של Windows שם בעברית נשלח באותיות לועזיות. במייל, בוואטסאפ ובשמירה השם נשאר כמו שכתבתם.':'';
+}
+function renameShareFile(){if(SH.file&&SH.file.name!==fileName())SH.file=new File([SH.file],fileName(),{type:SH.file.type});}
 function canShareFile(f){try{return !!(navigator.share&&navigator.canShare&&navigator.canShare({files:[f]}));}catch(_){return false;}}
 function downloadFile(f){const a=document.createElement('a');a.href=URL.createObjectURL(f);a.download=f.name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),8000);}
 function shStatus(msg,html){const s=$('shareStatus');if(html)s.innerHTML=msg;else s.textContent=msg;}
@@ -4198,6 +4334,7 @@ function openShare(focusKey){
   closeSaveMenu&&closeSaveMenu();
   document.activeElement&&document.activeElement.blur&&document.activeElement.blur();
   if(!S.office)SH.fmt='pdf';
+  if(SH.forBytes!==S.bytes){SH.base=null;SH.forBytes=S.bytes;} // a new document starts with its own name
   $('shFmt').classList.toggle('hidden',!S.office);
   if(S.office){$('shFmtOf').textContent=`${OF_LABEL[S.office.kind]} לעריכה`;$('shFmt').querySelectorAll('.segb').forEach(b=>b.setAttribute('aria-pressed',b.dataset.fmt===SH.fmt));}
   const d=$('shareDlg');if(!d.open)d.showModal();
@@ -4207,18 +4344,21 @@ function openShare(focusKey){
 function prepShare(focusKey){
   const d=$('shareDlg');SH.waFallback=false;
   SH.file=null;shareHints();
-  $('shareName').textContent=fileName();
+  fillShareName();
   d.classList.add('wait');shStatus('מכין את הקובץ…');
   const make=S.office&&SH.fmt==='office'?buildOfficeFile().then(r=>{SH.msgs=r.msgs;return r.file;})
     :buildPdf().then(bytes=>{SH.msgs=[];return new File([bytes],fileName(),{type:'application/pdf'});});
   const job=SH.job=make.then(f=>{
     if(SH.job!==job)return;
-    SH.file=f;
+    SH.file=f;renameShareFile();
     d.classList.remove('wait');shStatus(SH.msgs.join('. '));
     if(focusKey){const b=document.querySelector(`.sh[data-share="${focusKey}"]`);b&&b.focus();}
   }).catch(e=>{console.error(e);shStatus('הכנת הקובץ נכשלה: '+(e.message||e));});
 }
 $('shareBtn').onclick=()=>openShare();
+$('shareName').addEventListener('input',()=>{SH.base=$('shareName').value;renameShareFile();});
+$('shareName').addEventListener('change',()=>{if(!cleanBase(SH.base))SH.base=null;fillShareName();renameShareFile();});
+$('shareName').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('shareName').blur();}});
 $('shFmt').querySelectorAll('.segb').forEach(b=>b.onclick=()=>{if(SH.fmt===b.dataset.fmt)return;SH.fmt=b.dataset.fmt;
   $('shFmt').querySelectorAll('.segb').forEach(x=>x.setAttribute('aria-pressed',x===b));prepShare();});
 $('driveMenuBtn').onclick=()=>openShare('drive');
