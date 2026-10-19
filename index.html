@@ -1181,7 +1181,7 @@ dialog.reg::backdrop{background:color-mix(in srgb,var(--navy) 70%,transparent);b
 <body data-tool="select">
 
 <header class="bar">
-  <div class="brand"><b title="גרסה 3.9">סימן</b><span class="ver">3.9</span><span class="fname" id="fname"></span></div>
+  <div class="brand"><b title="גרסה 3.9.1">סימן</b><span class="ver">3.9.1</span><span class="fname" id="fname"></span></div>
 
   <nav class="tools" id="tools" aria-label="כלים">
     <button class="tool" data-tool="select" aria-pressed="true" title="בחירה וגלילה (V)">
@@ -4307,7 +4307,7 @@ function fileName(){const ext=shareExt();const b=SH.base&&cleanBase(SH.base);ret
 function fillShareName(){
   const ext=shareExt(),n=fileName();
   $('shareName').value=n.slice(0,n.length-ext.length);$('shareExt').textContent=ext;
-  $('shNameHint').textContent=WIN_DESK?'בתפריט השיתוף של Windows שם בעברית נשלח באותיות לועזיות. במייל, בוואטסאפ ובשמירה השם נשאר כמו שכתבתם.':'';
+  $('shNameHint').textContent=WIN_DESK&&winLatin&&/[^\x20-\x7E]/.test(n)?'Windows לא מקבל בתפריט השיתוף שם בעברית, ולכן שם כזה יישלח שם באותיות לועזיות. לשם מדויק כתבו אותו באנגלית, או בחרו "וואטסאפ ווב" או "מייל".':'';
 }
 function renameShareFile(){if(SH.file&&SH.file.name!==fileName())SH.file=new File([SH.file],fileName(),{type:SH.file.type});}
 function canShareFile(f){try{return !!(navigator.share&&navigator.canShare&&navigator.canShare({files:[f]}));}catch(_){return false;}}
@@ -4375,8 +4375,23 @@ function latinName(n){
   return(b||'siman')+ext;
 }
 const WIN_DESK=/Windows/i.test(UA)&&!IS_TOUCH;
+// Windows: first try the name as written (Hebrew included); only if Windows refuses it, send it in Latin letters
+const WIN_LATIN_KEY='siman.winLatin';
+let winLatin=(()=>{try{return localStorage.getItem(WIN_LATIN_KEY)==='1';}catch(_){return false;}})();
 async function nativeShare(f,extra){
-  if(WIN_DESK&&/[^\x20-\x7E]/.test(f.name))f=new File([f],latinName(f.name),{type:f.type});
+  if(WIN_DESK&&/[^\x20-\x7E]/.test(f.name)){
+    if(!winLatin){
+      try{await navigator.share({files:[f],title:f.name,...(extra||{})});return true;}
+      catch(e){
+        if(e&&e.name==='AbortError')return false;
+        console.warn('share with Hebrew name',e);
+        winLatin=true;try{localStorage.setItem(WIN_LATIN_KEY,'1');}catch(_){}
+        const lf=new File([f],latinName(f.name),{type:f.type});
+        if(!await askToSave(lf.name,'שיתוף'))return false;
+        f=lf;
+      }
+    }else f=new File([f],latinName(f.name),{type:f.type});
+  }
   const data={files:[f],title:f.name,...(extra||{})};
   const live=!navigator.userActivation||navigator.userActivation.isActive;
   try{await navigator.share(data);return true;}
