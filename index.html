@@ -1274,7 +1274,7 @@ body:has(#wed) .busy,body:has(#xed) .busy{z-index:1000}body:has(#wed) .toast,bod
 </dialog>
 
 <header class="bar">
-  <div class="brand"><b title="גרסה 4.3">סימן</b><span class="ver">4.3</span><span class="fname" id="fname"></span></div>
+  <div class="brand"><b title="גרסה 4.3.1">סימן</b><span class="ver">4.3.1</span><span class="fname" id="fname"></span></div>
 
   <nav class="tools" id="tools" aria-label="כלים">
     <button class="tool" data-tool="select" aria-pressed="true" title="בחירה וגלילה (V)">
@@ -2529,8 +2529,12 @@ const OPEN_TYPES=[{description:'PDF, Word, Excel, PowerPoint',accept:{'applicati
 async function writeHandle(h,bytes){
   if(h.queryPermission&&(await h.queryPermission({mode:'readwrite'}))!=='granted'){
     if((await h.requestPermission({mode:'readwrite'}))!=='granted')throw new Error('אין הרשאה לכתוב לקובץ');}
-  const w=await h.createWritable();await w.write(bytes);await w.close();
+  const w=await h.createWritable();
+  try{await w.write(bytes);await w.close();}catch(e){try{await w.abort();}catch(_){}throw e;}
 }
+// the file is open in another program (Acrobat, Edge, Word…) or sits in a place that can't be changed
+const isLocked=e=>!!e&&(e.name==='NoModificationAllowedError'||e.name==='InvalidModificationError'||/modifications are not allowed|not allowed to modify/i.test(e.message||''));
+const LOCKED_MSG='הקובץ פתוח כרגע בתוכנה אחרת (למשל Acrobat או הדפדפן), או שהוא בתיקייה שאי אפשר לשנות. אפשר לשמור אותו בשם אחר';
 const removalNote=()=>S.lastRemoval&&S.lastRemoval.hidden?` (${S.lastRemoval.hidden} קטעים הוסתרו ולא נמחקו לגמרי)`:'';
 async function savePdf(saveAs,asPdf){
   if(!S.bytes)return;
@@ -2540,10 +2544,14 @@ async function savePdf(saveAs,asPdf){
   try{
     const out=await buildPdf();
     busy(false);
-    if(FS&&S.handle&&!saveAs){await writeHandle(S.handle,out);setDirty(false);toast('נשמר: '+S.name+removalNote());return;}
-    const name=S.handle?S.name:S.name.replace(/\.pdf$/i,'')+(S.office?' - חתום.pdf':' - ערוך.pdf');
+    let locked=false;
+    if(FS&&S.handle&&!saveAs){
+      try{await writeHandle(S.handle,out);setDirty(false);toast('נשמר: '+S.name+removalNote());return;}
+      catch(e){if(!isLocked(e))throw e;locked=true;toast(LOCKED_MSG);}
+    }
+    const name=S.handle&&!locked?S.name:S.name.replace(/\.pdf$/i,'')+(S.office?' - חתום.pdf':' - ערוך.pdf');
     const r=await saveBytes(name,out,'pdf');
-    if(r){if(r.handle){S.handle=r.handle;S.name=r.handle.name;$('fname').textContent=dispName(S.name);}setDirty(false);toast('הקובץ נשמר'+removalNote());}
+    if(r){if(r.handle){S.handle=r.handle;S.name=r.handle.name;$('fname').textContent=dispName(S.name);}setDirty(false);toast((locked?'הקובץ המקורי פתוח בתוכנה אחרת, לכן נשמר בשם חדש: '+dispName(r.handle?r.handle.name:name):'הקובץ נשמר')+removalNote());}
   }catch(e){if(e&&e.name==='AbortError')return;console.error(e);toast('השמירה נכשלה: '+(e.message||e));}
   finally{busy(false);}
 }
@@ -2565,6 +2573,7 @@ async function saveBytes(name,bytes,kind){
       await writeHandle(h,bytes);return (isTxt||isDocx||isZip||isOff)?true:{handle:h};
     }catch(e){
       if(e&&e.name==='AbortError')return false;
+      if(isLocked(e)){toast(LOCKED_MSG);if(!await askToSave(name.replace(/(\.[a-z0-9]+)$/i,' (עותק)$1')))return false;return saveBytes(name.replace(/(\.[a-z0-9]+)$/i,' (עותק)$1'),bytes,kind);}
       if(needsGesture(e)){if(!await askToSave(name))return false;return saveBytes(name,bytes,kind);}
       throw e;}
   }
