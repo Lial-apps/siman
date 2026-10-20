@@ -204,7 +204,13 @@ function readSheet(files,path,sst){
   let maxR=0,maxC=0;for(const c of cells.values()){if(c.r>maxR)maxR=c.r;if(c.c>maxC)maxC=c.c;}
   for(const m of merges){maxR=Math.max(maxR,m.r2);maxC=Math.max(maxC,m.c2);}
   const pane=kid(sv,'pane');
-  return{path,doc,root,rtl:!!sv&&sv.getAttribute('rightToLeft')==='1',grid:!sv||sv.getAttribute('showGridLines')!=='0',
+  const pm=kid(root,'pageMargins'),ps=kid(root,'pageSetup'),po=kid(root,'printOptions'),spr=kid(kid(root,'sheetPr'),'pageSetUpPr');
+  const at=(e,a,d)=>e&&e.getAttribute(a)!==null&&e.getAttribute(a)!==''?e.getAttribute(a):d;
+  const page={l:+at(pm,'left',.7),r:+at(pm,'right',.7),t:+at(pm,'top',.75),b:+at(pm,'bottom',.75),h:+at(pm,'header',.3),f:+at(pm,'footer',.3),
+    orient:at(ps,'orientation','portrait'),paper:+at(ps,'paperSize',9),scale:+at(ps,'scale',100),fit:at(spr,'fitToPage','0')==='1'||at(spr,'fitToPage','0')==='true',
+    fw:+at(ps,'fitToWidth',1),fh:+at(ps,'fitToHeight',1),grid:/^(1|true)$/.test(at(po,'gridLines','')),hc:/^(1|true)$/.test(at(po,'horizontalCentered',''))};
+  return{path,doc,root,page,headings:!sv||sv.getAttribute('showRowColHeaders')!=='0',formulas:!!sv&&sv.getAttribute('showFormulas')==='1',
+    rtl:!!sv&&sv.getAttribute('rightToLeft')==='1',grid:!sv||sv.getAttribute('showGridLines')!=='0',
     defH,defW,cols,rows,cells,merges,maxR,maxC,
     freeze:pane&&pane.getAttribute('state')==='frozen'?{r:+pane.getAttribute('ySplit')||0,c:+pane.getAttribute('xSplit')||0}:null};
 }
@@ -219,11 +225,14 @@ async function prepare(bytes){
   if(!stR){addRel(files,wbPart,RT_STY,'styles.xml');ctOverride(files,'xl/styles.xml',OX+'spreadsheetml.styles+xml');}
   const sst=readSst(files,ssR&&resolveTarget(wbPart,ssR.target));sst.hadPart=!!ssR;
   const wp=kid(wbDoc.documentElement,'workbookPr');const d1904=!!wp&&/^(1|true)$/.test(wp.getAttribute('date1904')||'');
-  const sheets=[];
-  for(const s of kids(kid(wbDoc.documentElement,'sheets'),'sheet')){
+  const sheets=[];let wi=-1;
+  const dns=[...wbDoc.getElementsByTagNameNS(S,'definedName')];
+  for(const s of kids(kid(wbDoc.documentElement,'sheets'),'sheet')){wi++;
     const rid=s.getAttributeNS(NS.r,'id');const rel=wr.find(r=>r.id===rid);if(!rel||rel.type!==RT_SHEET)continue;
     const path=resolveTarget(wbPart,rel.target);if(!files.has(path))continue;
-    const sh=readSheet(files,path,sst);sh.name=s.getAttribute('name');sh.hidden=s.getAttribute('state')==='hidden'||s.getAttribute('state')==='veryHidden';sh.el=s;sheets.push(sh);
+    const sh=readSheet(files,path,sst);sh.name=s.getAttribute('name');sh.wbIndex=wi;
+    const pa=dns.find(d=>d.getAttribute('name')==='_xlnm.Print_Area'&&+d.getAttribute('localSheetId')===wi);
+    if(pa){const m=/!?\$?([A-Z]{1,3})\$?(\d+)(?::\$?([A-Z]{1,3})\$?(\d+))?/.exec(pa.textContent.split(',')[0].split('!').pop());if(m)sh.printArea=parseRange(m[0].replace(/[$!]/g,''));}sh.hidden=s.getAttribute('state')==='hidden'||s.getAttribute('state')==='veryHidden';sh.el=s;sheets.push(sh);
   }
   if(!sheets.length)throw new Error('לא נמצאו גיליונות בקובץ');
   let heb=false;for(const sh of sheets){if(sh.rtl){heb=true;break;}for(const c of sh.cells.values())if(typeof c.v==='string'&&HEB.test(c.v)){heb=true;break;}if(heb)break;}
@@ -474,6 +483,13 @@ const ICO={
   grow:'<path d="M3 16l4.5-12L12 16M4.6 12h5.8"/><path d="M14 7l2-2.5L18 7"/>',shrink:'<path d="M3 16l4.5-12L12 16M4.6 12h5.8"/><path d="M14 4.5l2 2.5 2-2.5"/>',
   zin:'<circle cx="8.5" cy="8.5" r="5"/><path d="M12.5 12.5L17 17M6.5 8.5h4M8.5 6.5v4"/>',zout:'<circle cx="8.5" cy="8.5" r="5"/><path d="M12.5 12.5L17 17M6.5 8.5h4"/>',
   grid:'<rect x="3" y="3" width="14" height="14"/><path d="M3 7.7h14M3 12.3h14M7.7 3v14M12.3 3v14"/>',sortAZ:'<path d="M4 4h5M4 9h4M4 14h3"/><path d="M14 3v13M11 13l3 3 3-3"/>',sortZA:'<path d="M4 4h3M4 9h4M4 14h5"/><path d="M14 3v13M11 13l3 3 3-3"/>',
+  margins:'<rect x="4" y="2.5" width="12" height="15" rx="1"/><path d="M4 6h12M4 14h12M7 2.5v15M13 2.5v15" stroke-dasharray="1.5 1.5"/>',
+  orient:'<rect x="2.5" y="6" width="15" height="10" rx="1"/><path d="M6 2.5h5M11 2.5l-1.5-1M11 2.5l-1.5 1"/>',paper:'<path d="M5 2.5h7l3.5 3.5v11.5H5z"/><path d="M12 2.5V6h3.5"/>',
+  fit:'<rect x="3" y="3" width="14" height="14" rx="1"/><path d="M7 7l6 6M13 7v6H7"/>',area:'<rect x="3" y="4" width="14" height="12" rx="1" stroke-dasharray="2 1.5"/><path d="M7 9h6M7 12h4"/>',
+  areaX:'<rect x="3" y="4" width="14" height="12" rx="1" stroke-dasharray="2 1.5"/><path d="M8 8l4 4M12 8l-4 4"/>',hcenter:'<path d="M3 4h14M5.5 8h9M3 12h14M5.5 16h9"/><path d="M10 2v16" stroke-dasharray="1 1.5"/>',
+  print:'<path d="M5.5 7V3h9v4"/><rect x="3" y="7" width="14" height="7" rx="1.5"/><path d="M6 12h8v5H6z"/>',heads:'<rect x="3" y="3" width="14" height="14" rx="1"/><path d="M3 7h14M7 3v14"/><path d="M10 5h1M14 5h1M4.5 10v1M4.5 14v1"/>',
+  fx:'<path d="M9 4c-2 0-2.5 1.5-2.8 3L5 16c-.3 1.5-1 2-2 2M3.5 9h6"/><path d="M11 9l5 6M16 9l-5 6"/>',pbreak:'<rect x="3" y="3" width="14" height="14" rx="1"/><path d="M10 3v14M3 10h14" stroke-dasharray="2 1.5"/>',
+  freeze:'<rect x="3" y="3" width="14" height="14" rx="1"/><path d="M3 7.5h14M7.5 3v14" stroke-width="2.2"/>',
   caret:'<path d="M6 8l4 4 4-4"/>',addSheet:'<path d="M10 4v12M4 10h12"/>'
 };
 const ic=n=>`<svg viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${ICO[n]||''}</svg>`;
@@ -500,9 +516,18 @@ function ribbonHtml(){return `
  ${G('תאים',`<div class="row">${B('rowIns',ic('rowIns'),'הוספת שורה מעל')}${B('colIns',ic('colIns'),'הוספת עמודה לפני')}</div><div class="row">${B('rowDel',ic('rowDel'),'מחיקת שורות')}${B('colDel',ic('colDel'),'מחיקת עמודות')}</div>`)}
  ${G('עריכה',BL('sum','sum','סכום','סכום אוטומטי (Alt+=)')+`<div class="col">${B('sortAZ',ic('sortAZ'),'מיון מהקטן לגדול')}${B('sortZA',ic('sortZA'),'מיון מהגדול לקטן')}${B('clear',ic('clear'),'ניקוי העיצוב')}</div>`+BL('find','find','חיפוש','חיפוש (Ctrl+F)'))}
 </div>
+<div class="xpanel" data-panel="layout" hidden>
+ ${G('הגדרת עמוד',BL('marginsMenu','margins','שוליים','שולי העמוד','data-pop="margins"')+BL('orientMenu','orient','כיוון','לאורך או לרוחב','data-pop="orient"')+BL('paperMenu','paper','גודל','גודל הנייר','data-pop="paper"'))}
+ ${G('התאמה לעמוד',BL('fitMenu','fit','התאמה','כמה עמודים יודפסו','data-pop="fit"')+'<div class="col" style="justify-content:center"><label class="num">קנה מידה<input type="number" min="10" max="400" step="5" data-in="scale" dir="ltr"> %</label></div>')}
+ ${G('אזור הדפסה',BL('paSet','area','הגדרה','הדפסה רק של התאים המסומנים')+BL('paClear','areaX','ניקוי','ביטול אזור ההדפסה'))}
+ ${G('אפשרויות',BL('printGrid','grid','קווי רשת בהדפסה','הדפסת קווי הרשת','data-toggle')+BL('centerH','hcenter','מרכוז בדף','מרכוז הטבלה לרוחב הדף','data-toggle'))}
+ ${G('הדפסה',BL('print','print','הדפסה','הדפסה (Ctrl+P)'))}
+</div>
 <div class="xpanel" data-panel="view" hidden>
- ${G('זום',B('zout',ic('zout'),'הקטנה')+'<span class="zv" id="xeZoomV">100%</span>'+B('zin',ic('zin'),'הגדלה')+'<button type="button" class="xb txt" data-cmd="z100">100%</button>')}
- ${G('הצגה',BL('gridlines','grid','קווי רשת','הצגת קווי הרשת','data-toggle aria-pressed="true"'))}
+ ${G('זום',B('zout',ic('zout'),'הקטנה')+'<span class="zv" id="xeZoomV">100%</span>'+B('zin',ic('zin'),'הגדלה')+'<button type="button" class="xb txt" data-cmd="z100">100%</button><button type="button" class="xb txt" data-cmd="zsel">לפי הבחירה</button>')}
+ ${G('הצגה',BL('gridlines','grid','קווי רשת','הצגת קווי הרשת','data-toggle aria-pressed="true"')+BL('headings','heads','כותרות','מספרי השורות ואותיות העמודות','data-toggle aria-pressed="true"')+BL('formulas','fx','נוסחאות','הצגת הנוסחאות במקום התוצאות','data-toggle')+BL('breaks','pbreak','גבולות עמוד','הצגת המקום שבו כל עמוד מודפס נגמר','data-toggle'))}
+ ${G('חלון',BL('freezeMenu','freeze','הקפאה','הקפאת שורות ועמודות כך שיישארו במקום בגלילה','data-pop="freeze"'))}
+ ${G('הדפסה',BL('print','print','הדפסה','הדפסה (Ctrl+P)'))}
 </div>`;}
 function shellHtml(){return `
 <div class="xe-top">
@@ -514,7 +539,7 @@ function shellHtml(){return `
   <button type="button" class="xe-tb pri" id="xeSave" title="שמירה כקובץ Excel (Ctrl+S)">שמירה</button>
   <button type="button" class="xe-x" id="xeClose" aria-label="סגירת העורך" title="סגירה">×</button>
 </div>
-<div class="xe-tabs" role="tablist"><button type="button" role="tab" data-tab="home" aria-selected="true">בית</button><button type="button" role="tab" data-tab="view" aria-selected="false">תצוגה</button></div>
+<div class="xe-tabs" role="tablist"><button type="button" role="tab" data-tab="home" aria-selected="true">בית</button><button type="button" role="tab" data-tab="layout" aria-selected="false">פריסה</button><button type="button" role="tab" data-tab="view" aria-selected="false">תצוגה</button></div>
 <div class="xe-ribbon" id="xeRibbon">${ribbonHtml()}</div>
 <div class="xe-fbar"><input id="xeRef" class="xe-ref" aria-label="כתובת התא" dir="ltr" spellcheck="false"><span class="xe-fx">fx</span><input id="xeFx" class="xe-fxin" aria-label="תוכן התא" dir="auto" spellcheck="false" autocomplete="off"></div>
 <div class="xe-wrap" id="xeWrap" tabindex="0" aria-label="תאי הגיליון"><table class="xe-grid" id="xeGrid"></table><textarea class="xe-edit" id="xeEdit" hidden spellcheck="false" aria-label="עריכת תא"></textarea></div>
@@ -522,6 +547,7 @@ function shellHtml(){return `
   <button type="button" class="xb" data-cmd="zout" aria-label="הקטנה">−</button><input type="range" id="xeZoom" min="50" max="200" step="10" value="100" aria-label="זום"><button type="button" class="xb" data-cmd="zin" aria-label="הגדלה">+</button></div>
 <div class="xe-find" id="xeFind" hidden><input id="xeFindIn" placeholder="חיפוש בגיליון" dir="auto" aria-label="חיפוש"><button type="button" class="xb" id="xeFindNext" aria-label="הבא">▼</button><button type="button" class="xb" id="xeFindX" aria-label="סגירה">×</button></div>
 <div class="xe-pop" id="xePop" hidden></div>
+<div id="xePrint"></div>
 <div class="xe-dlg" id="xeDlg" hidden><div class="xe-dlg-in" role="dialog" aria-modal="true"></div></div>`;}
 const CSS=`
 #xed{--xn:var(--navy,#16213A);--xm:var(--marker,#FFD43B);--xg:#217346;--xl:var(--line,#D4DBE5);--xt:var(--ink,#16213A);--xmu:var(--muted,#5D6982);
@@ -578,7 +604,7 @@ const CSS=`
 #xed .xe-grid thead th.corner{inset-inline-start:0;z-index:3}
 #xed .xe-grid th.on{background:#D7E6DC;color:#14532D;font-weight:700}
 #xed .xe-grid th .rz{position:absolute;top:0;bottom:0;inset-inline-end:-3px;width:6px;cursor:col-resize;z-index:4}
-#xed .xe-grid td.xin{background-color:rgba(33,115,70,.12)!important}
+#xed .xe-grid tr:not(.fzr)>td.xin:not(.fz){background-color:rgba(33,115,70,.12)!important}
 #xed .xe-grid td.xact{outline:2px solid var(--xg);outline-offset:-2px;z-index:1}
 #xed .xe-grid tr.sp td{border:0;padding:0;height:auto}
 #xed .xe-edit{position:absolute;z-index:5;margin:0;border:2px solid var(--xg);padding:1px 3px;font:11pt Arial,sans-serif;resize:none;overflow:hidden;background:#fff;box-sizing:border-box;outline:none;-webkit-user-select:text;user-select:text;white-space:pre}
@@ -603,6 +629,16 @@ const CSS=`
 #xed .xe-dlg-in .acts{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
 #xed .xe-dlg-in .acts button{border-radius:8px;padding:8px 16px;border:1px solid var(--xl);background:#fff;cursor:pointer}
 #xed .xe-dlg-in .acts .pri{background:var(--xn);color:#fff;border-color:var(--xn)}#xed .xe-dlg-in .acts .warn{background:#C0392B;color:#fff;border-color:#C0392B}
+#xed .xg-b:has(> .num){flex-direction:column;align-items:stretch;justify-content:center}
+#xed .num{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--xmu)}#xed .num input{width:56px;height:26px;border:1px solid #CBD3DF;border-radius:6px;padding:0 5px;font:inherit;color:var(--xt)}
+#xed .xe-grid td.pbc{border-inline-end:1.5px dashed #2E58CC!important}#xed .xe-grid td.pbr{border-bottom:1.5px dashed #2E58CC!important}
+#xed .xe-grid td.fz{background-color:#fff}#xed .xe-grid tr.fzr td.xin,#xed .xe-grid td.fz.xin{background-image:linear-gradient(rgba(33,115,70,.14),rgba(33,115,70,.14))}#xed .xe-grid tr.fzr td,#xed .xe-grid tr.fzr th{background-color:#fff}
+#xed .xe-grid tr.fzr th{background:#F3F5F8}#xed .xe-grid td.fzl{box-shadow:inset -1px 0 0 #8E9AB3}#xed .xe-grid tr.fzlast td{border-bottom:1.5px solid #8E9AB3}
+#xed .xe-grid td.fzedge{border-inline-end:1.5px solid #8E9AB3}
+#xed #xePrint{display:none}
+@media print{html>body>*:not(#xed){display:none!important}html>body>#xed{position:static!important;display:block!important;background:#fff!important;inset:auto!important}#xed>*:not(#xePrint){display:none!important}#xed #xePrint{display:block!important}
+  #xePrint table{border-collapse:collapse;table-layout:fixed;font:11pt Arial,sans-serif;color:#000}#xePrint td{padding:0 3px;white-space:nowrap;overflow:hidden;vertical-align:bottom;line-height:1.2}
+  #xePrint td.w{white-space:pre-wrap}#xePrint.pg td{border:1px solid #BFBFBF}#xePrint td>div{overflow:hidden}}
 #xed .xe-load{position:absolute;inset:0;display:grid;place-items:center;color:var(--xmu);font-size:15px;background:#fff;z-index:6}
 @media (max-width:760px){#xed .xe-sub,#xed .xe-state,#xed .xg-l{display:none}#xed .xe-tb{padding:6px 9px;font-size:13px}#xed #xeDesk{display:none}}`;
 
@@ -622,6 +658,7 @@ const cellAt=(sh,r,c)=>sh.cells.get(key(r,c));
 const valueOf=(si,r,c)=>{const v=X.calc.value(si,r,c);return v;};
 function display(si,cell,r,c){
   if(!cell)return{t:'',num:false};
+  if(cell.f&&X.st.sheets[si].formulas)return{t:'='+cell.f,num:false};
   let v=cell.f&&!cell.array?valueOf(si,r,c):(cell.t==='e'?ERR(cell.v):cell.v);
   if(v===null||v===undefined)return{t:'',num:false};
   if(isErr(v))return{t:v.e,num:false,err:true};
@@ -643,36 +680,67 @@ function cssOf(s){
   const o={td,h:d.h,wrap:d.wrap||d.h==='justify',indent:d.indent,bg:!!d.bg};c.set(s,o);return o;
 }
 const escH=s=>String(s).replace(/[&<>]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'})[m]);
-function render(){
-  const sh=cur(),g=geo(sh),wrap=q('xeWrap'),z=X.zoom;
-  const top=Math.max(0,wrap.scrollTop/z-24),vh=wrap.clientHeight/z;
-  let r0=0,lo=0,hi=g.rows;while(lo<hi){const m=(lo+hi)>>1;if(g.top[m+1]<=top)lo=m+1;else hi=m;}r0=Math.max(0,lo-8);
-  let r1=r0;while(r1<g.rows&&g.top[r1]<top+vh+200)r1++;r1=Math.min(g.rows-1,r1+8);
-  X.win={r0,r1};
-  const vis=[];for(let c=0;c<g.cols;c++)if(g.cw[c]>4||!(sh.cols.get(c)||{}).hidden)vis.push(c);
-  const visSet=new Set(vis);
-  let h=`<colgroup><col style="width:46px">${vis.map(c=>`<col style="width:${g.cw[c]}px">`).join('')}</colgroup>`;
-  h+=`<thead><tr><th class="corner" data-all="1"></th>${vis.map(c=>`<th data-col="${c}">${colName(c)}<i class="rz" data-rz="${c}"></i></th>`).join('')}</tr></thead><tbody>`;
-  if(g.top[r0]>0)h+=`<tr class="sp"><td colspan="${vis.length+1}" style="height:${g.top[r0]}px"></td></tr>`;
-  const ms=sh.merges.filter(m=>m.r2>=r0&&m.r1<=r1);
-  const covered=new Map();
-  for(const m of ms){const a=Math.max(m.r1,r0);for(let r=a;r<=Math.min(m.r2,r1);r++)for(let c=m.c1;c<=m.c2;c++)covered.set(key(r,c),r===a&&c===m.c1?m:true);}
-  for(let r=r0;r<=r1;r++){
-    const rh=g.top[r+1]-g.top[r];if(!rh)continue;
-    h+=`<tr style="height:${rh}px"><th data-row="${r}">${r+1}</th>`;
+// the HTML for rows ra..rb; o: {lead, headH, left, fc, fr, brk, print}
+function rowsHtml(sh,g,ra,rb,vis,o){
+  let h='';const covered=new Map();
+  for(const m of sh.merges)if(m.r2>=ra&&m.r1<=rb){const a=Math.max(m.r1,ra);for(let r=a;r<=Math.min(m.r2,rb);r++)for(let c=m.c1;c<=m.c2;c++)covered.set(key(r,c),r===a&&c===m.c1?m:true);}
+  const lastVisFz=o.fc?vis.filter(c=>c<o.fc).pop():-1;
+  for(let r=ra;r<=rb;r++){
+    const rh=g.top[r+1]-g.top[r];if(!rh)continue;const fzr=r<o.fr;
+    const tops=fzr?`position:sticky;top:${o.headH+g.top[r]}px;z-index:2;`:'';
+    h+=`<tr style="height:${rh}px"${fzr?` class="fzr${r===o.fr-1?' fzlast':''}"`:''}>`;
+    if(o.lead)h+=`<th data-row="${r}"${fzr?` style="${tops}z-index:4"`:''}>${r+1}</th>`;
     for(const c of vis){
       const cv=covered.get(key(r,c));if(cv===true)continue;
-      let span='',mr=r,mc=c;
-      if(cv){mr=cv.r1;mc=cv.c1;let rs=0;for(let x=Math.max(cv.r1,r0);x<=Math.min(cv.r2,r1);x++)if(rowPx(sh,x))rs++;const cs=vis.filter(x=>x>=cv.c1&&x<=cv.c2).length;span=`${rs>1?` rowspan="${rs}"`:''}${cs>1?` colspan="${cs}"`:''}`;}
+      let span='',mr=r,mc=c,lastC=c;
+      if(cv){mr=cv.r1;mc=cv.c1;lastC=cv.c2;let rs=0;for(let x=Math.max(cv.r1,ra);x<=Math.min(cv.r2,rb);x++)if(rowPx(sh,x))rs++;const cs=vis.filter(x=>x>=cv.c1&&x<=cv.c2).length;span=`${rs>1?` rowspan="${rs}"`:''}${cs>1?` colspan="${cs}"`:''}`;}
+      const cls=[];let st='';
+      if(c<o.fc){cls.push('fz');st+=`position:sticky;inset-inline-start:${o.lead+o.left.get(c)}px;z-index:${fzr?3:1};`;if(c===lastVisFz)cls.push('fzedge');if(fzr)st+=`top:${o.headH+g.top[r]}px;`;}
+      else if(fzr)st+=tops;
+      if(o.brk){if(o.brk.cols.has(lastC))cls.push('pbc');if(o.brk.rows.has(cv?Math.min(cv.r2,rb):r))cls.push('pbr');}
+      const da=o.print?'':` data-r="${r}" data-c="${c}"${cv?` data-mr="${mr}" data-mc="${mc}"`:''}`;
       const cell=cellAt(sh,mr,mc);
-      if(!cell){h+=`<td data-r="${r}" data-c="${c}"${cv?` data-mr="${mr}" data-mc="${mc}"`:''}${span}></td>`;continue;}
-      const ds=display(X.si,cell,mr,mc),css=cssOf(cell.s);
-      let al=css.h&&css.h!=='general'?({left:'left',right:'right',center:'center',centerContinuous:'center',fill:'start',justify:'justify',distributed:'center'}[css.h]||'start'):(ds.num?(sh.rtl?'left':'right'):ds.bool||ds.err?'center':'start');
+      if(!cell){h+=`<td${da}${span}${cls.length?` class="${cls.join(' ')}"`:''}${st?` style="${st}"`:''}></td>`;continue;}
+      const ds=display(X.st.sheets.indexOf(sh),cell,mr,mc),css=cssOf(cell.s);
+      const al=css.h&&css.h!=='general'?({left:'left',right:'right',center:'center',centerContinuous:'center',fill:'start',justify:'justify',distributed:'center'}[css.h]||'start'):(ds.num?(sh.rtl?'left':'right'):ds.bool||ds.err?'center':'start');
       const pad=css.indent?`padding-inline-start:${css.indent*9}px;`:'';
-      h+=`<td data-r="${r}" data-c="${c}"${cv?` data-mr="${mr}" data-mc="${mc}"`:''}${span} class="${ds.t||css.bg?'v':''}${css.wrap?' w':''}" style="${css.td}"><div dir="${ds.num?'ltr':'auto'}" style="text-align:${al};${pad}">${escH(ds.t)}</div></td>`;
+      if(ds.t||css.bg)cls.push('v');if(css.wrap)cls.push('w');
+      h+=`<td${da}${span}${cls.length?` class="${cls.join(' ')}"`:''} style="${css.td}${st}"><div dir="${ds.num?'ltr':'auto'}" style="text-align:${al};${pad}">${escH(ds.t)}</div></td>`;
     }
     h+='</tr>';
   }
+  return h;
+}
+const PAPER={1:['Letter',8.5,11],5:['Legal',8.5,14],8:['A3',11.69,16.54],9:['A4',8.27,11.69],11:['A5',5.83,8.27]};
+function printArea(sh){return sh.printArea||{r1:0,c1:0,r2:Math.max(0,sh.maxR),c2:Math.max(0,sh.maxC)};}
+function pageBreaks(sh){
+  const g=geo(sh),p=sh.page;let [,w,h]=PAPER[p.paper]||PAPER[9];if(p.orient==='landscape')[w,h]=[h,w];
+  const pw=(w-p.l-p.r)*96,ph=(h-p.t-p.b)*96;const A=printArea(sh);
+  let tw=0;for(let c=A.c1;c<=A.c2;c++)tw+=c<g.cols?g.cw[c]:colPx(sh,c);const th=(A.r2+1<=g.rows?g.top[A.r2+1]:g.top[g.rows])-g.top[Math.min(A.r1,g.rows)];
+  let scale=p.fit?Math.min(1,p.fw?pw/Math.max(1,tw):1,p.fh?ph/Math.max(1,th):1):(p.scale||100)/100;
+  const ew=pw/scale,eh=ph/scale;const cols=new Set(),rows=new Set();
+  let acc=0;for(let c=A.c1;c<=A.c2;c++){const x=colPx(sh,c);if(acc+x>ew&&acc>0){cols.add(c-1);acc=0;}acc+=x;}cols.add(A.c2);
+  acc=0;for(let r=A.r1;r<=A.r2;r++){const x=rowPx(sh,r);if(acc+x>eh&&acc>0){rows.add(r-1);acc=0;}acc+=x;}rows.add(A.r2);
+  return{cols,rows,scale,pages:cols.size*rows.size,w,h};
+}
+function render(){
+  const sh=cur(),g=geo(sh),wrap=q('xeWrap'),z=X.zoom;
+  const lead=sh.headings!==false?46:0,headH=lead?22:0;
+  const fr=sh.freeze?Math.min(sh.freeze.r,g.rows):0,fc=sh.freeze?sh.freeze.c:0;
+  const pos=wrap.scrollTop/z+g.top[fr];
+  let lo=fr,hi=g.rows;while(lo<hi){const m=(lo+hi)>>1;if(g.top[m+1]<=pos)lo=m+1;else hi=m;}const r0=Math.max(fr,lo-8);
+  let r1=r0;const vh=wrap.clientHeight/z;while(r1<g.rows&&g.top[r1]<pos+vh+200)r1++;r1=Math.min(g.rows-1,r1+8);
+  X.win={r0,r1};
+  const vis=[];for(let c=0;c<g.cols;c++)if(g.cw[c]>4||!(sh.cols.get(c)||{}).hidden)vis.push(c);
+  const left=new Map();let acc=0;for(const c of vis){if(c>=fc)break;left.set(c,acc);acc+=g.cw[c];}
+  const brk=sh.breaks?pageBreaks(sh):null;X.brk=brk;
+  const o={lead,headH,left,fc,fr,brk};
+  let h=`<colgroup>${lead?'<col style="width:46px">':''}${vis.map(c=>`<col style="width:${g.cw[c]}px">`).join('')}</colgroup>`;
+  if(lead)h+=`<thead><tr><th class="corner" data-all="1"></th>${vis.map(c=>`<th data-col="${c}"${c<fc?` style="inset-inline-start:${lead+left.get(c)}px;z-index:5"`:''}>${colName(c)}<i class="rz" data-rz="${c}"></i></th>`).join('')}</tr></thead>`;
+  h+='<tbody>';
+  if(fr)h+=rowsHtml(sh,g,0,fr-1,vis,o);
+  const gap=g.top[r0]-g.top[fr];if(gap>0)h+=`<tr class="sp"><td colspan="${vis.length+1}" style="height:${gap}px"></td></tr>`;
+  h+=rowsHtml(sh,g,r0,r1,vis,o);
   const rest=g.top[g.rows]-g.top[r1+1];if(rest>0)h+=`<tr class="sp"><td colspan="${vis.length+1}" style="height:${rest}px"></td></tr>`;
   h+='</tbody>';
   const grid=q('xeGrid');grid.innerHTML=h;grid.style.direction=sh.rtl?'rtl':'ltr';grid.classList.toggle('nogrid',!sh.grid);grid.style.zoom=z;
@@ -703,9 +771,12 @@ function select(r,c,extend){
 }
 function scrollToCell(r,c){
   const sh=cur(),g=geo(sh),wrap=q('xeWrap'),z=X.zoom;
-  const y=g.top[r]*z,h=(g.top[r+1]-g.top[r])*z,head=24*z;
-  if(y<wrap.scrollTop)wrap.scrollTop=y;else if(y+h+head>wrap.scrollTop+wrap.clientHeight)wrap.scrollTop=y+h+head-wrap.clientHeight+4;
-  render();const td=tdOf(r,c);if(td){const tr=td.getBoundingClientRect(),wr=wrap.getBoundingClientRect();const lead=46*z;
+  const fr=sh.freeze?sh.freeze.r:0,fc=sh.freeze?sh.freeze.c:0;
+  const head=((sh.headings!==false?22:0)+g.top[Math.min(fr,g.rows)])*z;
+  if(r>=fr){const y=(g.top[r]-g.top[Math.min(fr,g.rows)])*z,h=(g.top[r+1]-g.top[r])*z;
+    if(y<wrap.scrollTop)wrap.scrollTop=y;else if(y+h+head>wrap.scrollTop+wrap.clientHeight)wrap.scrollTop=y+h+head-wrap.clientHeight+4;}
+  render();const td=c>=fc?tdOf(r,c):null;if(td){const tr=td.getBoundingClientRect(),wr=wrap.getBoundingClientRect();
+    let lead=(sh.headings!==false?46:0)*z;for(let x=0;x<fc;x++)lead+=colPx(sh,x)*z;
     if(sh.rtl){if(tr.right>wr.right-lead)wrap.scrollLeft+=tr.right-(wr.right-lead);else if(tr.left<wr.left)wrap.scrollLeft-=wr.left-tr.left+(wrap.offsetWidth-wrap.clientWidth);}
     else{if(tr.left<wr.left+lead)wrap.scrollLeft-=wr.left+lead-tr.left;else if(tr.right>wr.right)wrap.scrollLeft+=tr.right-wr.right+(wrap.offsetWidth-wrap.clientWidth);}}
 }
@@ -963,7 +1034,26 @@ function openPop(kind,btn){
   if(X.popFor===btn){closePop();return;}
   if(kind==='color')pop(btn,`<h4>צבע גופן</h4>${pal(COLORS,'אוטומטי (שחור)')}`,v=>setColor(v==='none'?null:v));
   else if(kind==='fill')pop(btn,`<h4>צבע מילוי</h4>${pal(FILLS,'ללא מילוי')}`,v=>setFill(v==='none'?null:v));
+  else if(kind==='margins'){const M=[['normal','רגילים','1.91 למעלה ולמטה, 1.78 בצדדים',.75,.7],['wide','רחבים','2.54 מכל צד',1,1],['narrow','צרים','1.91 למעלה ולמטה, 0.64 בצדדים',.75,.25]];
+    pop(btn,M.map(m=>`<button type="button" class="mi" data-v="${m[0]}"><b>${m[1]}</b><small style="margin-inline-start:auto;color:#5D6982">${m[2]} ס״מ</small></button>`).join('')+'<div class="sep"></div><button type="button" class="mi" data-v="custom">שוליים מותאמים…</button>',v=>{
+      if(v==='custom')return marginsDialog();const m=M.find(x=>x[0]===v);setPage({t:m[3],b:m[3],l:m[4],r:m[4]});});}
+  else if(kind==='orient'){const l=cur().page.orient==='landscape';pop(btn,`<button type="button" class="mi"${!l?' style="background:#EEF2F8"':''} data-v="portrait">לאורך</button><button type="button" class="mi"${l?' style="background:#EEF2F8"':''} data-v="landscape">לרוחב</button>`,v=>setPage({orient:v}));}
+  else if(kind==='paper')pop(btn,[9,1,5,11,8].map(k=>`<button type="button" class="mi" data-v="${k}"><b>${PAPER[k][0]}</b><small style="margin-inline-start:auto;color:#5D6982">${(PAPER[k][1]*2.54).toFixed(1)} × ${(PAPER[k][2]*2.54).toFixed(1)} ס״מ</small></button>`).join(''),v=>setPage({paper:+v}));
+  else if(kind==='fit')pop(btn,[['none','בלי התאמה','מודפס בגודל הרגיל'],['w','כל העמודות בעמוד אחד','לרוחב עמוד אחד'],['all','כל הגיליון בעמוד אחד','מוקטן כדי להיכנס לעמוד']].map(x=>`<button type="button" class="mi" data-v="${x[0]}"><b>${x[1]}</b><small style="margin-inline-start:auto;color:#5D6982">${x[2]}</small></button>`).join(''),v=>{
+    if(v==='none')setPage({fit:false,scale:100});else if(v==='w')setPage({fit:true,fw:1,fh:0});else setPage({fit:true,fw:1,fh:1});});
+  else if(kind==='freeze')pop(btn,[['top','הקפאת השורה העליונה'],['first','הקפאת העמודה הראשונה'],['here','הקפאה עד התא הנבחר'],['none','ביטול ההקפאה']].map(x=>`<button type="button" class="mi" data-v="${x[0]}">${x[1]}</button>`).join(''),v=>{
+    const sh=cur();sh.freeze=v==='top'?{r:1,c:0}:v==='first'?{r:0,c:1}:v==='here'?{r:X.act.r,c:X.act.c}:null;if(sh.freeze&&!sh.freeze.r&&!sh.freeze.c)sh.freeze=null;
+    sh.viewDirty=true;touch();q('xeWrap').scrollTop=0;render();});
   else if(kind==='borders')pop(btn,[['all','כל הגבולות'],['outside','גבולות חיצוניים'],['thick','גבול חיצוני עבה'],['top','גבול עליון'],['bottom','גבול תחתון'],['dbottom','גבול תחתון כפול'],['none','בלי גבולות']].map(([v,l])=>`<button type="button" class="mi" data-v="${v}">${l}</button>`).join(''),v=>borders(v));
+}
+function marginsDialog(){
+  const p=cur().page;const cm=v=>(v*2.54).toFixed(2);
+  dialog(`<h3>שוליים מותאמים (ס״מ)</h3><div style="display:grid;grid-template-columns:auto 1fr;gap:8px 12px;align-items:center;margin-top:8px">
+    ${[['t','למעלה'],['b','למטה'],['r','ימין'],['l','שמאל']].map(([k,l])=>`<label for="xeM${k}" style="font-size:13px;color:#5D6982">${l}</label><input id="xeM${k}" type="number" step="0.1" min="0" dir="ltr" value="${cm(p[k])}" style="height:34px;border:1px solid #CBD3DF;border-radius:8px;padding:0 10px;font:inherit">`).join('')}</div>
+    <div class="acts"><button type="button" data-a="x">ביטול</button><button type="button" class="pri" data-a="ok">אישור</button></div>`,a=>{});
+  const inn=q('xeDlg').firstElementChild;const vals={};
+  inn.querySelectorAll('input').forEach(i=>i.oninput=()=>{vals[i.id.slice(3)]=Math.max(0,(+i.value||0)/2.54);});
+  inn.onclick=e=>{const b=e.target.closest('[data-a]');if(!b)return;const ok=b.dataset.a==='ok';q('xeDlg').hidden=true;X.dlgOpen=false;inn.innerHTML='';if(ok&&Object.keys(vals).length)setPage(vals);q('xeWrap').focus();};
 }
 function dialog(html,onAct){
   const d=q('xeDlg'),inn=d.firstElementChild;inn.innerHTML=html;d.hidden=false;X.dlgOpen=true;
@@ -986,10 +1076,14 @@ function updateUI(){
   const f=rb.querySelector('[data-in=font]');if(![...f.options].some(o=>o.value===d.font.name))f.append(new Option(d.font.name,d.font.name));f.value=d.font.name;
   const z=rb.querySelector('[data-in=size]');if(document.activeElement!==z)z.value=d.font.sz;
   const fm=rb.querySelector('[data-in=fmt]');const known=FMTS.find(x=>x[0]===d.fmt);fm.value=known?d.fmt:'__custom';
+  press('gridlines',sh.grid);press('headings',sh.headings!==false);press('formulas',sh.formulas);press('breaks',sh.breaks);press('printGrid',sh.page.grid);press('centerH',sh.page.hc);
+  const sc=rb.querySelector('[data-in=scale]');if(sc&&document.activeElement!==sc)sc.value=sh.page.fit?'':Math.round(sh.page.scale||100);
+  rb.querySelector('[data-cmd=paClear]').disabled=!sh.printArea;
   rb.querySelector('[data-cmd=undo]').disabled=X.hi<0;rb.querySelector('[data-cmd=redo]').disabled=X.hi>=X.hist.length-1;
   // sum, average and count of the selection
   let n=0,sum=0,cnt=0;if((s.r2-s.r1+1)*(s.c2-s.c1+1)>1){for(const c of sh.cells.values())if(c.r>=s.r1&&c.r<=s.r2&&c.c>=s.c1&&c.c<=s.c2){const v=c.f?valueOf(X.si,c.r,c.c):c.v;if(v!==null&&v!==''&&v!==undefined)cnt++;if(typeof v==='number'){n++;sum+=v;}}}
-  q('xeStat').textContent=n>1?`ממוצע: ${fmtGeneral(+(sum/n).toFixed(10))}   ספירה: ${cnt}   סכום: ${fmtGeneral(+sum.toFixed(10))}`:(cnt>1?`ספירה: ${cnt}`:'');
+  const pages=sh.breaks&&X.brk?`עמודים להדפסה: ${X.brk.pages}   `:'';
+  q('xeStat').textContent=pages+(n>1?`ממוצע: ${fmtGeneral(+(sum/n).toFixed(10))}   ספירה: ${cnt}   סכום: ${fmtGeneral(+sum.toFixed(10))}`:(cnt>1?`ספירה: ${cnt}`:''));
 }
 function buildTabs(){
   const box=q('xeSheets');box.innerHTML='';
@@ -1005,7 +1099,7 @@ function addSheet(){
   const rid=addRel(st.files,st.wbPart,RT_SHEET,path.replace(/^xl\//,''));
   const sheetsEl=kid(st.wbDoc.documentElement,'sheets');const ids=kids(sheetsEl,'sheet').map(s=>+s.getAttribute('sheetId')||0);
   const el=sNew(st.wbDoc,'sheet',{name:base+n,sheetId:Math.max(0,...ids)+1});el.setAttributeNS(NS.r,'r:id',rid);sheetsEl.append(el);X.wbDirty=true;
-  const sh=readSheet(st.files,path,st.sst);sh.name=base+n;sh.el=el;sh.dirty=true;st.sheets.push(sh);X.dirty=true;markDirty();switchSheet(st.sheets.length-1);
+  const sh=readSheet(st.files,path,st.sst);sh.name=base+n;sh.el=el;sh.wbIndex=kids(sheetsEl,'sheet').length-1;sh.dirty=true;st.sheets.push(sh);X.dirty=true;markDirty();switchSheet(st.sheets.length-1);
 }
 
 /* ---------- commands ---------- */
@@ -1027,8 +1121,30 @@ const CMD={
   clear:()=>{change(()=>{eachSelCell(c=>{c.s=0;c.mod=true;});X.st.st.css=null;});},
   find:()=>{q('xeFind').hidden=false;q('xeFindIn').focus();q('xeFindIn').select();},
   zin:()=>setZoom(X.zoom+.1),zout:()=>setZoom(X.zoom-.1),z100:()=>setZoom(1),
+  zsel:()=>{const sh=cur(),g=geo(sh),s=X.sel,w=q('xeWrap');let tw=0;for(let c=s.c1;c<=s.c2;c++)tw+=g.cw[c]||colPx(sh,c);const th=g.top[Math.min(s.r2+1,g.rows)]-g.top[s.r1];
+    setZoom(Math.min((w.clientWidth-60)/Math.max(40,tw),(w.clientHeight-40)/Math.max(20,th)));select(s.r1,s.c1);},
+  headings:()=>{const sh=cur();sh.headings=sh.headings===false;sh.viewDirty=true;touch();render();},
+  formulas:()=>{const sh=cur();sh.formulas=!sh.formulas;sh.viewDirty=true;touch();render();},
+  breaks:()=>{const sh=cur();sh.breaks=!sh.breaks;render();},
+  printGrid:()=>{const sh=cur();sh.page.grid=!sh.page.grid;sh.pageDirty=true;touch();updateUI();},
+  centerH:()=>{const sh=cur();sh.page.hc=!sh.page.hc;sh.pageDirty=true;touch();updateUI();},
+  paSet:()=>{const sh=cur();const s=X.sel;if(s.r1===s.r2&&s.c1===s.c2)return hint('סמנו קודם את התאים שיודפסו');sh.printArea={...s};sh.paDirty=true;sh.breaks=true;touch();render();hint('אזור ההדפסה: '+rangeStr(s));},
+  paClear:()=>{const sh=cur();if(!sh.printArea)return;sh.printArea=null;sh.paDirty=true;touch();render();},
+  print:printSheet,
   gridlines:()=>{const sh=cur();sh.grid=!sh.grid;sh.gridChanged=true;sh.dirty=true;X.dirty=true;markDirty();render();X.root.querySelectorAll('[data-cmd=gridlines]').forEach(b=>b.setAttribute('aria-pressed',sh.grid));}
 };
+function touch(){const sh=cur();sh.dirty=true;X.dirty=true;markDirty();}
+function setPage(ch){const sh=cur();Object.assign(sh.page,ch);sh.pageDirty=true;touch();if(!sh.breaks)sh.breaks=true;render();}
+function printSheet(){
+  const sh=cur(),g=geo(sh),A=printArea(sh),b=pageBreaks(sh),p=sh.page;
+  const vis=[];for(let c=A.c1;c<=A.c2;c++)if(colPx(sh,c)>4)vis.push(c);
+  const o={lead:0,headH:0,left:new Map(),fc:0,fr:0,brk:null,print:true};
+  const box=q('xePrint');box.className=p.grid?'pg':'';
+  box.innerHTML=`<table style="direction:${sh.rtl?'rtl':'ltr'};zoom:${b.scale};${p.hc?'margin:0 auto':''}"><colgroup>${vis.map(c=>`<col style="width:${colPx(sh,c)}px">`).join('')}</colgroup><tbody>${rowsHtml(sh,g,A.r1,A.r2,vis,o)}</tbody></table>`;
+  let st=document.getElementById('xePrintPage');if(!st){st=document.createElement('style');st.id='xePrintPage';document.head.append(st);}
+  st.textContent=`@page{size:${b.w}in ${b.h}in;margin:${p.t}in ${p.r}in ${p.b}in ${p.l}in}`;
+  setTimeout(()=>{print();setTimeout(()=>{if(X)q('xePrint').innerHTML='';},500);},50);
+}
 function setZoom(z){X.zoom=Math.max(.5,Math.min(2,Math.round(z*10)/10));q('xeZoomV').textContent=Math.round(X.zoom*100)+'%';q('xeZoom').value=Math.round(X.zoom*100);render();}
 
 /* ---------- events ---------- */
@@ -1041,6 +1157,8 @@ function wire(){
   rb.querySelector('[data-in=font]').onchange=e=>{style({font:{name:e.target.value}});wrap.focus();};
   const sz=rb.querySelector('[data-in=size]');const apply=()=>{const v=parseFloat(sz.value);if(v>0)style({font:{sz:v}});};
   sz.onchange=apply;sz.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();apply();wrap.focus();}};
+  const sc=rb.querySelector('[data-in=scale]');sc.onchange=()=>{const v=Math.max(10,Math.min(400,+sc.value||100));setPage({fit:false,scale:v});};
+  sc.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();sc.onchange();wrap.focus();}};
   rb.querySelector('[data-in=fmt]').onchange=e=>{if(e.target.value!=='__custom')setFmt(e.target.value);wrap.focus();};
   // grid
   let drag=false;
@@ -1098,6 +1216,7 @@ function onKey(e){
   const mod=(e.ctrlKey||e.metaKey)&&!e.altKey,c=e.code,k=e.key;const run=(f,...a)=>{e.preventDefault();f(...a);};
   if(mod&&c==='KeyS')return run(doSave);
   if(mod&&c==='KeyF')return run(CMD.find);
+  if(mod&&c==='KeyP')return run(printSheet);
   if(k==='Escape'&&!q('xePop').hidden)return run(closePop);
   const rtl=cur().rtl;
   const editor=t===q('xeEdit');
@@ -1132,6 +1251,8 @@ function onKey(e){
 }
 
 /* ------------------------------------------------------------ saving */
+const SHEET_ORDER=['sheetPr','dimension','sheetViews','sheetFormatPr','cols','sheetData','sheetCalcPr','sheetProtection','protectedRanges','scenarios','autoFilter','sortState','dataConsolidate','customSheetViews','mergeCells','phoneticPr','conditionalFormatting','dataValidations','hyperlinks','printOptions','pageMargins','pageSetup','headerFooter','rowBreaks','colBreaks','customProperties','cellWatches','ignoredErrors','smartTags','drawing','legacyDrawing','legacyDrawingHF','drawingHF','picture','oleObjects','controls','webPublishItems','tableParts','extLst'];
+function insertOrdered(root,el){const i=SHEET_ORDER.indexOf(el.localName);const nx=kids(root).find(c=>SHEET_ORDER.indexOf(c.localName)>i);root.insertBefore(el,nx||null);}
 const SHEET_AFTER_MERGE=['phoneticPr','conditionalFormatting','dataValidations','hyperlinks','printOptions','pageMargins','pageSetup','headerFooter','rowBreaks','colBreaks','customProperties','cellWatches','ignoredErrors','smartTags','drawing','legacyDrawing','legacyDrawingHF','picture','oleObjects','controls','webPublishItems','tableParts','extLst'];
 function numStr(v){if(!isFinite(v))return'0';return String(v);}
 function sheetXml(si,ctx){
@@ -1147,7 +1268,29 @@ function sheetXml(si,ctx){
   if(sh.merges.length){const me=sNew(d,'mergeCells',{count:sh.merges.length});for(const m of sh.merges)me.append(sNew(d,'mergeCell',{ref:rangeStr(m)}));
     const after=kids(root).find(e=>SHEET_AFTER_MERGE.includes(e.localName));root.insertBefore(me,after||null);}
   const dim=kid(root,'dimension');if(dim)dim.setAttribute('ref',sh.cells.size?`A1:${refOf(sh.maxR,sh.maxC)}`:'A1');
-  if(sh.gridChanged){const sv=kid(kid(root,'sheetViews'),'sheetView');if(sv){if(sh.grid)sv.removeAttribute('showGridLines');else sv.setAttribute('showGridLines','0');}}
+  if(sh.gridChanged||sh.viewDirty){
+    let svs=kid(root,'sheetViews');if(!svs){svs=sNew(d,'sheetViews');insertOrdered(root,svs);}
+    let sv=kid(svs,'sheetView');if(!sv){sv=sNew(d,'sheetView',{workbookViewId:0});svs.append(sv);}
+    if(sh.grid)sv.removeAttribute('showGridLines');else sv.setAttribute('showGridLines','0');
+    if(sh.headings!==false)sv.removeAttribute('showRowColHeaders');else sv.setAttribute('showRowColHeaders','0');
+    if(sh.formulas)sv.setAttribute('showFormulas','1');else sv.removeAttribute('showFormulas');
+    if(sh.viewDirty){for(const e of kids(sv,'pane','selection'))sv.removeChild(e);
+      if(sh.freeze){const f=sh.freeze;const pn=sNew(d,'pane',{xSplit:f.c||null,ySplit:f.r||null,topLeftCell:refOf(f.r,f.c),activePane:f.r&&f.c?'bottomRight':f.r?'bottomLeft':'topRight',state:'frozen'});sv.insertBefore(pn,sv.firstChild);}}
+  }
+  if(sh.pageDirty){
+    const p=sh.page;
+    let po=kid(root,'printOptions');if(p.grid||p.hc){if(!po){po=sNew(d,'printOptions');insertOrdered(root,po);}
+      if(p.grid)po.setAttribute('gridLines','1');else po.removeAttribute('gridLines');if(p.hc)po.setAttribute('horizontalCentered','1');else po.removeAttribute('horizontalCentered');}
+    else if(po){po.removeAttribute('gridLines');po.removeAttribute('horizontalCentered');if(!po.attributes.length)root.removeChild(po);}
+    let pm=kid(root,'pageMargins');if(!pm){pm=sNew(d,'pageMargins');insertOrdered(root,pm);}
+    for(const [k,a] of [['l','left'],['r','right'],['t','top'],['b','bottom'],['h','header'],['f','footer']])pm.setAttribute(a,+(+p[k]).toFixed(4));
+    let ps=kid(root,'pageSetup');if(!ps){ps=sNew(d,'pageSetup');insertOrdered(root,ps);}
+    ps.setAttribute('paperSize',p.paper);ps.setAttribute('orientation',p.orient);
+    if(p.fit){ps.setAttribute('fitToWidth',p.fw);ps.setAttribute('fitToHeight',p.fh);ps.removeAttribute('scale');}
+    else{ps.setAttribute('scale',Math.round(p.scale||100));ps.removeAttribute('fitToWidth');ps.removeAttribute('fitToHeight');}
+    let spr=kid(root,'sheetPr');if(!spr){spr=sNew(d,'sheetPr');root.insertBefore(spr,root.firstElementChild);}
+    let pp=kid(spr,'pageSetUpPr');if(p.fit){if(!pp){pp=sNew(d,'pageSetUpPr');spr.append(pp);}pp.setAttribute('fitToPage','1');}else if(pp)pp.removeAttribute('fitToPage');
+  }
   let s=ser(d);if(!/^<\?xml/.test(s))s=XML_HEAD+s;
   // rows
   const byRow=new Map();for(const c of sh.cells.values()){if(!byRow.has(c.r))byRow.set(c.r,[]);byRow.get(c.r).push(c);}
@@ -1202,6 +1345,15 @@ async function buildXlsx(){
   }
   if(X.styleDirty){const S2=st.st;for(const [el,n] of [[S2.fontsEl,'font'],[S2.fillsEl,'fill'],[S2.bordersEl,'border'],[S2.xfsEl,'xf']])el.setAttribute('count',kids(el,n).length);
     const nf=kid(S2.root,'numFmts');if(nf)nf.setAttribute('count',kids(nf,'numFmt').length);put(files,S2.path,ser(S2.doc));}
+  for(const sh of st.sheets)if(sh.paDirty){
+    const root=st.wbDoc.documentElement;let dn=kid(root,'definedNames');
+    const old=[...st.wbDoc.getElementsByTagNameNS(S,'definedName')].find(e=>e.getAttribute('name')==='_xlnm.Print_Area'&&+e.getAttribute('localSheetId')===sh.wbIndex);
+    if(old)old.parentNode.removeChild(old);
+    if(sh.printArea){if(!dn){dn=sNew(st.wbDoc,'definedNames');const after=kids(root).find(e=>['calcPr','oleSize','customWorkbookViews','pivotCaches','smartTagPr','smartTagTypes','webPublishing','fileRecoveryPr','webPublishObjects','extLst'].includes(e.localName));root.insertBefore(dn,after||null);}
+      const a=sh.printArea,nm=/^[A-Za-z_][\w.]*$/.test(sh.name)?sh.name:`'${sh.name.replace(/'/g,"''")}'`;
+      const e=sNew(st.wbDoc,'definedName',{name:'_xlnm.Print_Area',localSheetId:sh.wbIndex});e.textContent=`${nm}!$${colName(a.c1)}$${a.r1+1}:$${colName(a.c2)}$${a.r2+1}`;dn.append(e);}
+    else if(dn&&!kids(dn,'definedName').length)root.removeChild(dn);
+    X.wbDirty=true;}
   const fchg=X.formulaTouched||X.structChanged;
   if(fchg||X.wbDirty){
     const root=st.wbDoc.documentElement;if(fchg){let cp=kid(root,'calcPr');if(!cp){cp=sNew(st.wbDoc,'calcPr',{calcId:191029});const after=kids(root).find(e=>['oleSize','customWorkbookViews','pivotCaches','smartTagPr','smartTagTypes','webPublishing','fileRecoveryPr','webPublishObjects','extLst'].includes(e.localName));root.insertBefore(cp,after||null);}cp.setAttribute('fullCalcOnLoad','1');}
