@@ -1246,10 +1246,37 @@ const CMD={
   print:printDoc
 };
 function updatePainter(){E.root.querySelectorAll('[data-cmd=painter]').forEach(b=>b.setAttribute('aria-pressed',!!E.painter));}
-function printDoc(){
-  const pg=E.page;let st=document.getElementById('wePrintPage');if(!st){st=document.createElement('style');st.id='wePrintPage';document.head.append(st);}
-  const cm=t=>(t/567).toFixed(2)+'cm';st.textContent=`@page{size:${cm(pg.w)} ${cm(pg.h)};margin:${cm(pg.top)} ${cm(pg.right)} ${cm(pg.bottom)} ${cm(pg.left)}}`;
-  hideImgBox();const sel=getSelection();if(sel)sel.removeAllRanges();E.body.blur();setTimeout(()=>print(),50);
+
+// printing happens in a separate frame that holds only the document, so nothing else on the page can hide it
+async function printFrame(html,title){
+  const old=document.getElementById('smPrintFrame');if(old)old.remove();
+  const fr=document.createElement('iframe');fr.id='smPrintFrame';fr.setAttribute('aria-hidden','true');fr.title=title||'';
+  fr.style.cssText='position:fixed;right:0;bottom:0;width:1px;height:1px;border:0;opacity:0;pointer-events:none';
+  document.body.append(fr);const d=fr.contentDocument;d.open();d.write(html);d.close();
+  try{await Promise.race([d.fonts&&d.fonts.ready,new Promise(r=>setTimeout(r,2500))]);}catch(_){}
+  await Promise.all([...d.images].map(i=>i.complete?0:new Promise(r=>{i.onload=i.onerror=r;setTimeout(r,3000);})));
+  await new Promise(r=>setTimeout(r,60));
+  const w=fr.contentWindow;w.addEventListener('afterprint',()=>setTimeout(()=>fr.remove(),300));
+  if(window.__smPrintHook)window.__smPrintHook(w);else{w.focus();w.print();}
+}
+async function printDoc(){
+  const pg=E.page;hideImgBox();const sel=getSelection();if(sel)sel.removeAllRanges();E.body.blur();
+  const cm=t=>(t/567).toFixed(2)+'cm';
+  const fonts=CSS.slice(0,CSS.indexOf('#wed{'));
+  const styles=[...q('weStyles').querySelectorAll('style')].map(x=>x.textContent).join('\n');
+  const notes=q('weNotes').innerHTML;
+  const html=`<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><base href="${esc(location.href)}"><title>${esc(fileName())}</title><style>${fonts}
+${styles}
+@page{size:${cm(pg.w)} ${cm(pg.h)};margin:${cm(pg.top)} ${cm(pg.right)} ${cm(pg.bottom)} ${cm(pg.left)}}
+html,body{margin:0;padding:0;background:#fff}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.doc{color:#000;overflow-wrap:break-word;line-height:normal;text-align:start}
+.doc img{max-width:100%}.doc table{border-collapse:collapse}
+.doc .we-pb{display:block;height:0;border:0;margin:0;break-after:page}
+.doc .we-tab{display:inline-block;width:36pt;white-space:pre}
+.doc hr{border:0;border-top:1px solid #000;margin:6pt 0}
+.notes{border-top:1px solid #999;margin-top:18px;padding-top:6px;font-size:10pt}
+</style></head><body><div class="doc ${P}" style="${esc(E.body.getAttribute('style')||'')}">${E.body.innerHTML}</div>${notes?`<div class="notes ${P}">${notes}</div>`:''}</body></html>`;
+  await printFrame(html,fileName());
 }
 function sanitize(html){
   const d=new DOMParser().parseFromString(html,'text/html');

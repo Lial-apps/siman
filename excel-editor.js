@@ -1135,15 +1135,33 @@ const CMD={
 };
 function touch(){const sh=cur();sh.dirty=true;X.dirty=true;markDirty();}
 function setPage(ch){const sh=cur();Object.assign(sh.page,ch);sh.pageDirty=true;touch();if(!sh.breaks)sh.breaks=true;render();}
-function printSheet(){
+
+// printing happens in a separate frame that holds only the document, so nothing else on the page can hide it
+async function printFrame(html,title){
+  const old=document.getElementById('smPrintFrame');if(old)old.remove();
+  const fr=document.createElement('iframe');fr.id='smPrintFrame';fr.setAttribute('aria-hidden','true');fr.title=title||'';
+  fr.style.cssText='position:fixed;right:0;bottom:0;width:1px;height:1px;border:0;opacity:0;pointer-events:none';
+  document.body.append(fr);const d=fr.contentDocument;d.open();d.write(html);d.close();
+  try{await Promise.race([d.fonts&&d.fonts.ready,new Promise(r=>setTimeout(r,2500))]);}catch(_){}
+  await Promise.all([...d.images].map(i=>i.complete?0:new Promise(r=>{i.onload=i.onerror=r;setTimeout(r,3000);})));
+  await new Promise(r=>setTimeout(r,60));
+  const w=fr.contentWindow;w.addEventListener('afterprint',()=>setTimeout(()=>fr.remove(),300));
+  if(window.__smPrintHook)window.__smPrintHook(w);else{w.focus();w.print();}
+}
+async function printSheet(){
+  if(X.editing)commitEdit();
   const sh=cur(),g=geo(sh),A=printArea(sh),b=pageBreaks(sh),p=sh.page;
   const vis=[];for(let c=A.c1;c<=A.c2;c++)if(colPx(sh,c)>4)vis.push(c);
   const o={lead:0,headH:0,left:new Map(),fc:0,fr:0,brk:null,print:true};
-  const box=q('xePrint');box.className=p.grid?'pg':'';
-  box.innerHTML=`<table style="direction:${sh.rtl?'rtl':'ltr'};zoom:${b.scale};${p.hc?'margin:0 auto':''}"><colgroup>${vis.map(c=>`<col style="width:${colPx(sh,c)}px">`).join('')}</colgroup><tbody>${rowsHtml(sh,g,A.r1,A.r2,vis,o)}</tbody></table>`;
-  let st=document.getElementById('xePrintPage');if(!st){st=document.createElement('style');st.id='xePrintPage';document.head.append(st);}
-  st.textContent=`@page{size:${b.w}in ${b.h}in;margin:${p.t}in ${p.r}in ${p.b}in ${p.l}in}`;
-  setTimeout(()=>{print();setTimeout(()=>{if(X)q('xePrint').innerHTML='';},500);},50);
+  const table=`<table style="direction:${sh.rtl?'rtl':'ltr'};zoom:${b.scale};${p.hc?'margin:0 auto':''}"><colgroup>${vis.map(c=>`<col style="width:${colPx(sh,c)}px">`).join('')}</colgroup><tbody>${rowsHtml(sh,g,A.r1,A.r2,vis,o)}</tbody></table>`;
+  const html=`<!doctype html><html lang="he" dir="${sh.rtl?'rtl':'ltr'}"><head><meta charset="utf-8"><base href="${esc(location.href)}"><title>${esc(fileName())}</title><style>
+@page{size:${b.w}in ${b.h}in;margin:${p.t}in ${p.r}in ${p.b}in ${p.l}in}
+html,body{margin:0;padding:0;background:#fff}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+table{border-collapse:collapse;table-layout:fixed;font:11pt Arial,sans-serif;color:#000}
+td{padding:0 3px;white-space:nowrap;overflow:hidden;vertical-align:bottom;line-height:1.2;${p.grid?'border:1px solid #BFBFBF;':''}}
+td.w{white-space:pre-wrap}td>div{overflow:hidden}tr{break-inside:avoid}
+</style></head><body>${table}</body></html>`;
+  await printFrame(html,fileName());
 }
 function setZoom(z){X.zoom=Math.max(.5,Math.min(2,Math.round(z*10)/10));q('xeZoomV').textContent=Math.round(X.zoom*100)+'%';q('xeZoom').value=Math.round(X.zoom*100);render();}
 
