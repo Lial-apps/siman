@@ -492,7 +492,7 @@ const ICO={
   freeze:'<rect x="3" y="3" width="14" height="14" rx="1"/><path d="M3 7.5h14M7.5 3v14" stroke-width="2.2"/>',
   caret:'<path d="M6 8l4 4 4-4"/>',addSheet:'<path d="M10 4v12M4 10h12"/>'
 };
-const ic=n=>`<svg viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${ICO[n]||''}</svg>`;
+const ic=n=>`<svg viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICO[n]||''}</svg>`;
 const B=(cmd,icon,title,extra='')=>`<button type="button" class="xb" data-cmd="${cmd}" title="${title}" aria-label="${title}" ${extra}>${icon}</button>`;
 const BL=(cmd,icon,label,title,extra='')=>`<button type="button" class="xb big" data-cmd="${cmd}" title="${title||label}" ${extra}>${ic(icon)}<span>${label}</span></button>`;
 const G=(label,inner)=>`<div class="xg"><div class="xg-b">${inner}</div><div class="xg-l">${label}</div></div>`;
@@ -640,7 +640,8 @@ const CSS=`
   #xePrint table{border-collapse:collapse;table-layout:fixed;font:11pt Arial,sans-serif;color:#000}#xePrint td{padding:0 3px;white-space:nowrap;overflow:hidden;vertical-align:bottom;line-height:1.2}
   #xePrint td.w{white-space:pre-wrap}#xePrint.pg td{border:1px solid #BFBFBF}#xePrint td>div{overflow:hidden}}
 #xed .xe-load{position:absolute;inset:0;display:grid;place-items:center;color:var(--xmu);font-size:15px;background:#fff;z-index:6}
-@media (max-width:760px){#xed .xe-sub,#xed .xe-state,#xed .xg-l{display:none}#xed .xe-tb{padding:6px 9px;font-size:13px}#xed #xeDesk{display:none}}`;
+@media (max-width:760px){#xed .xe-sub,#xed .xe-state,#xed .xg-l{display:none}#xed .xe-tb{padding:6px 9px;font-size:13px}#xed #xeDesk{display:none}}
+#xed .xb{color:#0F1A30}#xed .xg-l{color:#3E4A63!important;font-weight:500}#xed .xb:disabled{opacity:.45}@media (forced-colors:active){#xed .xb svg{forced-color-adjust:auto}}`;
 
 /* ------------------------------------------------------------ runtime */
 let X=null;

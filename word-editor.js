@@ -356,7 +356,7 @@ const ICO={
   clear:'<path d="M5 15l3.5-11h3L15 15M6.3 11h7.4"/><path d="M13 13l4 4M17 13l-4 4"/>',
   caret:'<path d="M6 8l4 4 4-4"/>'
 };
-const ic=n=>`<svg viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${ICO[n]||''}</svg>`;
+const ic=n=>`<svg viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICO[n]||''}</svg>`;
 const B=(cmd,icon,title,extra='')=>`<button type="button" class="wb" data-cmd="${cmd}" title="${title}" aria-label="${title}" ${extra}>${icon}</button>`;
 const BL=(cmd,icon,label,title,extra='')=>`<button type="button" class="wb big" data-cmd="${cmd}" title="${title||label}" ${extra}>${ic(icon)}<span>${label}</span></button>`;
 const G=(label,inner,cls='')=>`<div class="wg ${cls}"><div class="wg-b">${inner}</div><div class="wg-l">${label}</div></div>`;
@@ -614,7 +614,8 @@ const CSS=`
   .we-body .we-pb{break-after:page;border:0;margin:0}.we-body .we-pb::after{display:none}
   .we-marks .we-body p::after{display:none}
   .we-body{caret-color:transparent!important}
-}`;
+}
+#wed .wb{color:#0F1A30}#wed .wg-l{color:#3E4A63!important;font-weight:500}#wed .wb:disabled{opacity:.45}@media (forced-colors:active){#wed .wb svg{forced-color-adjust:auto}}`;
 
 /* ------------------------------------------------------------ runtime */
 let E=null;
