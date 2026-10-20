@@ -1255,6 +1255,11 @@ dialog.cmd-dlg[open]{animation:cmdIn .16s ease-out}
 @media (pointer:coarse){.qa kbd{display:none}}
 @media (prefers-reduced-motion:reduce){.intro{display:none}dialog.cmd-dlg[open]{animation:none}.qa{transition:none}}
 
+
+/* Word editor */
+body:has(#wed) .busy{z-index:1000}body:has(#wed) .toast{z-index:1001}
+.of-ico.sign{background:#16213A;font-size:20px;padding-bottom:12px;letter-spacing:0}
+.btn.wedit{border-color:#2B579A;color:#2B579A;font-weight:600}
 </style>
 </head>
 <body data-tool="select">
@@ -1269,7 +1274,7 @@ dialog.cmd-dlg[open]{animation:cmdIn .16s ease-out}
 </dialog>
 
 <header class="bar">
-  <div class="brand"><b title="גרסה 4.1">סימן</b><span class="ver">4.1</span><span class="fname" id="fname"></span></div>
+  <div class="brand"><b title="גרסה 4.2">סימן</b><span class="ver">4.2</span><span class="fname" id="fname"></span></div>
 
   <nav class="tools" id="tools" aria-label="כלים">
     <button class="tool" data-tool="select" aria-pressed="true" title="בחירה וגלילה (V)">
@@ -1307,6 +1312,7 @@ dialog.cmd-dlg[open]{animation:cmdIn .16s ease-out}
     <button class="btn" id="openBtn">פתיחה</button>
     <button class="btn" id="printBtn" disabled title="הדפסה (Ctrl+P)">הדפסה</button>
     <button class="btn" id="convBtn" disabled title="המרה ל-PowerPoint, Word או Excel לעריכה">המרה</button>
+    <button class="btn wedit hidden" id="wordEditBtn" title="עריכת המסמך כמו ב-Word: גופנים, הדגשה, קו תחתי, רשימות וטבלאות">עריכת Word</button>
     <div class="split-btn">
       <button class="btn primary" id="saveBtn" disabled title="שמירה (Ctrl+S)">שמירה</button><button class="btn primary caret" id="saveMenuBtn" disabled aria-haspopup="menu" aria-expanded="false" aria-label="עוד אפשרויות שמירה" title="עוד אפשרויות שמירה">▾</button>
       <div class="menu hidden" id="saveMenu" role="menu"><button role="menuitem" id="saveAsBtn" disabled>שמירה בשם… <kbd>Ctrl+Shift+S</kbd></button><button role="menuitem" id="driveMenuBtn" disabled>שמירה ב-Google Drive</button><button role="menuitem" id="icloudMenuBtn" disabled>שמירה ב-iCloud Drive</button></div>
@@ -1359,7 +1365,7 @@ dialog.cmd-dlg[open]{animation:cmdIn .16s ease-out}
         <p class="wl-hi hidden" id="wlHi"></p>
         <h1>מה נסמן היום?</h1>
         <svg class="swipe" viewBox="0 0 300 26" preserveAspectRatio="none" aria-hidden="true"><path d="M6 15c46-9 98-11 150-9s92 7 138 2" stroke="#FFD43B" stroke-width="16" stroke-linecap="round" fill="none"/></svg>
-        <p class="wl-sub">סימן פותח PDF, Word (גם DOC ישן) ו-Excel לסימון, חתימה ושליחה ישר בדפדפן, ומתקן קבצי PowerPoint שלא נפתחים. הקובץ נשאר אצלכם במכשיר.</p>
+        <p class="wl-sub">סימן פותח PDF, Word (גם DOC ישן) ו-Excel לסימון, חתימה ושליחה ישר בדפדפן, עורך מסמכי Word כמו ב-Word, ומתקן קבצי PowerPoint שלא נפתחים. הקובץ נשאר אצלכם במכשיר.</p>
         <div class="wl-cta">
           <button class="btn primary big" id="openBtn2">בחירת קובץ</button>
           <span class="drop-hint">או גררו קובץ לכאן</span>
@@ -1369,11 +1375,13 @@ dialog.cmd-dlg[open]{animation:cmdIn .16s ease-out}
           <button class="qa" data-qa="tr"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h9M8.5 3v2M6 5c0 4 3 7 6 8M11 5c0 4-3 7-6 8"/><path d="M13 21l4-9 4 9M14.5 18h5"/></svg>לתרגם קובץ</button>
           <button class="qa" data-qa="pages"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3" width="7" height="8" rx="1"/><rect x="13" y="3" width="7" height="8" rx="1"/><rect x="4" y="13" width="7" height="8" rx="1"/><path d="M16.5 14v6M13.5 17h6"/></svg>לאחד או לפצל</button>
           <button class="qa" data-qa="conv"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M10 13h5M10 17h5"/></svg>להמיר ל-Word</button>
+          <button class="qa" data-qa="newdoc"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M12.5 11v6M9.5 14h6"/></svg>מסמך Word חדש</button>
           <button class="qa ghost" data-qa="cmd"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>משהו אחר?<kbd dir="ltr">Ctrl K</kbd></button>
         </div>
         <ul class="wl-list">
           <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4l6 6-8 8H6v-6z"/><path d="M4 21h9"/></svg>מרקר, עט והערות</li>
           <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7V5h10v2M9 5v12M7 17h4"/><path d="M14 19l1-3 5-5 2 2-5 5z"/></svg>עריכת הטקסט שכבר בקובץ</li>
+          <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M10 12h5M10 15.5h5M10 19h3"/></svg>עריכת Word כמו ב-Word</li>
           <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17c2-4 4-9 6-9s-1 9 1 9 3-5 5-5-1 5 1 5 3-2 4-3"/><path d="M3 21h18"/></svg>חתימה ומילוי טפסים</li>
           <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h9M8.5 3v2M6 5c0 4 3 7 6 8M11 5c0 4-3 7-6 8"/><path d="M13 21l4-9 4 9M14.5 18h5"/></svg>תרגום לעברית ולאנגלית</li>
           <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M10 13h5M10 17h5"/></svg>המרה ל-Word, Excel ו-PowerPoint</li>
@@ -1598,6 +1606,17 @@ dialog.cmd-dlg[open]{animation:cmdIn .16s ease-out}
     <div class="sig-row"><span class="grow"></span><button class="btn" id="fmtCancel">ביטול</button></div>
   </div>
 </dialog>
+<dialog class="sig conv" id="docModeDlg" aria-labelledby="docModeTitle">
+  <div class="sig-in">
+    <h2 id="docModeTitle">מה עושים עם המסמך?</h2>
+    <p class="fmt-note" id="docModeName"></p>
+    <div class="conv-opts">
+      <button class="conv-card main" data-mode="edit"><span class="of-ico docx">DOCX</span><span><b>עריכת המסמך</b><small>כמו ב-Word: גופנים, גודל, הדגשה, קו תחתי, צבעים, רשימות, טבלאות ותמונות. נשמר כקובץ Word.</small></span></button>
+      <button class="conv-card main" data-mode="desk"><span class="of-ico sign">✍</span><span><b>סימון, חתימה ושליחה</b><small>מרקר, עט, חתימה ומילוי טפסים. בשמירה בוחרים PDF חתום או קובץ Word.</small></span></button>
+    </div>
+    <div class="sig-row"><span class="grow"></span><button class="btn" id="docModeCancel">ביטול</button></div>
+  </div>
+</dialog>
 <dialog class="sig" id="setDlg" aria-labelledby="setTitle">
   <form class="sig-in" method="dialog" id="setForm" novalidate>
     <h2 id="setTitle">הגדרות</h2>
@@ -1717,6 +1736,7 @@ async function openFile(file,handle){
     $('empty').classList.add('hidden');
     ['saveBtn','saveAsBtn','saveMenuBtn','trBtn','pgBtn','printBtn','convBtn','shareBtn','driveMenuBtn','icloudMenuBtn'].forEach(id=>$(id).disabled=false);S.sel=new Set();
     $('convBtn').disabled=!!S.office;
+    $('wordEditBtn').classList.toggle('hidden',!(S.office&&S.office.kind==='docx'));
     TR.reset();
     S.hasForm=false;try{S.hasForm=!!(await doc.getFieldObjects());}catch(_){}
     await buildPages();
@@ -3623,7 +3643,7 @@ let officeLibs=null;
 const loadOfficeLibs=()=>officeLibs||(officeLibs=(async()=>{if(!window.JSZip)await loadScript('jszip.min.js');if(!window.PptxGenJS)await loadScript('pptxgen.min.js');if(!window.OFFICE)await loadScript('office.js');})());
 const OF={};
 function showOfficeView(on){
-  $('officeView').classList.toggle('hidden',!on);$('pages').classList.toggle('hidden',on);
+  $('officeView').classList.toggle('hidden',!on);if(on)$('wordEditBtn').classList.add('hidden');$('pages').classList.toggle('hidden',on);
   if(on){$('empty').classList.add('hidden');['saveBtn','saveAsBtn','saveMenuBtn','trBtn','pgBtn','printBtn','convBtn','shareBtn','driveMenuBtn','icloudMenuBtn'].forEach(id=>$(id).disabled=true);$('pgpanel').classList.add('hidden');$('tpanel').classList.add('hidden');}
 }
 // old Word (.doc): the text and tables become a new .docx, which then opens like any Word file
@@ -3633,6 +3653,8 @@ async function openLegacyDoc(file){
     await loadEditLibs('docx');
     if(!window.XLSX||!XLSX.CFB)await loadScript('xlsx.mini.min.js');
     const conv=await OFFICE_EDIT.docToDocx(new Uint8Array(await file.arrayBuffer()));
+    busy(false);const mode=await askDocMode(file.name);if(!mode)return;
+    if(mode==='edit'){await openWordEditor(conv.bytes,file.name.replace(/\.doc$/i,'')+'.docx');toast('קובץ DOC ישן: נפתחו הטקסט והטבלאות, בלי העיצוב והתמונות של המקור');return;}
     busy(true,'מכין את הקובץ לסימון…');
     const r=await OFFICE_EDIT.toPdf('docx',conv.bytes,m=>busy(true,m));
     const base=file.name.replace(/\.doc$/i,'');
@@ -3643,12 +3665,17 @@ async function openLegacyDoc(file){
   }catch(e){console.error(e);S.pendingOffice=null;toast('לא הצלחתי לפתוח את קובץ ה-DOC: '+(e.message||e));}
   finally{busy(false);}
 }
-async function openOffice(file,handle){
+async function openOffice(file,handle,opt){
   busy(true,'בודק את הקובץ…');
   try{
     await loadOfficeLibs();
     const bytes=new Uint8Array(await file.arrayBuffer());
     const res=await OFFICE.repair(bytes,file.name);
+    if(res.kind==='docx'&&!res.fatal&&!(opt&&opt.desk)){
+      busy(false);const mode=await askDocMode(file.name);if(!mode)return;
+      if(mode==='edit'){const src=res.changed?await OFFICE.build(res):bytes;await openWordEditor(src,file.name);if(res.changed)toast('הקובץ היה פגום ותוקן');return;}
+      busy(true,'מכין את הקובץ לסימון…');
+    }
     if((res.kind==='docx'||res.kind==='xlsx')&&!res.fatal){
       try{
         const src=res.changed?await OFFICE.build(res):bytes;
@@ -3731,6 +3758,33 @@ const loadEditLibs=k=>editLibs[k]||(editLibs[k]=(async()=>{
   if(!window.OFFICE_EDIT)await loadScript('office-edit.js');
 })().catch(e=>{editLibs[k]=null;throw e;}));
 const OF_LABEL={docx:'Word',xlsx:'Excel'};
+/* WORD EDITOR — a Word file opens for real editing, like in Word */
+function askDocMode(name){return new Promise(res=>{
+  const d=$('docModeDlg');$('docModeName').textContent=dispName(name);let done=false;
+  const fin=v=>{if(done)return;done=true;if(d.open)d.close();res(v);};
+  d.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>fin(b.dataset.mode));
+  $('docModeCancel').onclick=()=>fin(null);d.onclose=()=>fin(null);
+  d.showModal();d.querySelector('[data-mode=edit]').focus();
+});}
+async function openWordEditor(bytes,name,isNew){
+  busy(true,isNew?'פותח מסמך חדש…':'פותח את המסמך לעריכה…');
+  try{
+    await loadEditLibs('docx');if(!window.WORD_EDITOR)await loadScript('word-editor.js');
+    busy(false);
+    await WORD_EDITOR.open({bytes,name,isNew,
+      save:(n,b,k)=>saveBytes(n,b,k),toast,busy:(on,m)=>busy(on,m),
+      toPdf:async b=>{const r=await OFFICE_EDIT.toPdf('docx',b,m=>busy(true,m));return r.pdf instanceof Uint8Array?r.pdf:new Uint8Array(r.pdf);},
+      toDesk:async f=>{await openOffice(f,null,{desk:true});},
+      onClose:()=>{}});
+  }catch(e){console.error(e);toast('לא הצלחתי לפתוח את המסמך לעריכה: '+(e.message||e));}
+  finally{busy(false);}
+}
+const newWordDoc=()=>{if(needReg()){showReg();return;}openWordEditor(null,'מסמך חדש.docx',true);};
+$('wordEditBtn').onclick=async()=>{
+  if(!S.office||S.office.kind!=='docx')return;let bytes=S.office.bytes;
+  if(S.anns.length){busy(true,'מכניס את הסימונים למסמך…');try{const{file}=await buildOfficeFile();bytes=new Uint8Array(await file.arrayBuffer());}catch(e){console.error(e);}finally{busy(false);}}
+  openWordEditor(bytes,S.office.name);
+};
 const officeOutName=()=>`${S.office.base}${S.office.plain?'':' - ערוך'}.${S.office.kind}`;
 async function dataBytes(url){return new Uint8Array(await (await fetch(url)).arrayBuffer());}
 // marks on the desk → positions on the original page (CSS px of the rendered page)
@@ -4449,6 +4503,8 @@ async function trQuick(t){
 function openPages(){if($('pgpanel').classList.contains('hidden'))$('pgBtn').click();}
 function openTrPanel(){if($('tpanel').classList.contains('hidden'))$('trBtn').click();}
 const CMDS=[
+  {l:'מסמך Word חדש',k:'חדש מסמך וורד word כתיבה לכתוב ריק דף new document',run:()=>newWordDoc()},
+  {l:'עריכת המסמך כמו ב-Word',k:'ערוך עריכה וורד word גופן הדגשה מודגש קו תחתי פסקה רשימה',doc:1,run:()=>{if(S.office&&S.office.kind==='docx')$('wordEditBtn').click();else toast('עריכה כמו ב-Word זמינה לקובצי Word. פתחו קובץ Word או צרו מסמך חדש');}},
   {l:'פתיחת קובץ',k:'פתח פתיחה פתיחת קובץ חדש טען open',key:'Ctrl O',run:()=>$('openBtn').click()},
   {l:'חתימה',k:'חתום חתימה לחתום חותם sign signature',doc:1,run:()=>document.querySelector('.tool[data-action="sign"]').click()},
   {l:'מרקר',k:'סמן סימון הדגש הדגשה מרקר צהוב highlight',key:'H',doc:1,run:()=>setTool('highlight')},
@@ -4525,7 +4581,7 @@ $('cmdDlg').addEventListener('click',e=>{if(e.target===$('cmdDlg'))$('cmdDlg').c
 // quick actions on the first screen: choose the file, then the tool opens by itself
 const QA={sign:()=>document.querySelector('.tool[data-action="sign"]').click(),tr:openTrPanel,pages:openPages,conv:()=>$('convBtn').click()};
 document.querySelectorAll('.qa[data-qa]').forEach(b=>b.onclick=()=>{
-  const k=b.dataset.qa;if(k==='cmd'){openCmd();return;}
+  const k=b.dataset.qa;if(k==='cmd'){openCmd();return;}if(k==='newdoc'){newWordDoc();return;}
   if(needReg()){showReg();return;}
   afterOpen=QA[k];$('openBtn2').click();});
 // the opening: the name is marked once, then the app
