@@ -1267,7 +1267,7 @@ async function printDoc(){
   const notes=q('weNotes').innerHTML;
   const html=`<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><base href="${esc(location.href)}"><title>${esc(fileName())}</title><style>${fonts}
 ${styles}
-@page{size:${cm(pg.w)} ${cm(pg.h)};margin:${cm(pg.top)} ${cm(pg.right)} ${cm(pg.bottom)} ${cm(pg.left)}}
+@page{margin:${cm(pg.top)} ${cm(pg.right)} ${cm(pg.bottom)} ${cm(pg.left)};${pg.w>pg.h?'size:landscape;':''}}
 html,body{margin:0;padding:0;background:#fff}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .doc{color:#000;overflow-wrap:break-word;line-height:normal;text-align:start}
 .doc img{max-width:100%}.doc table{border-collapse:collapse}

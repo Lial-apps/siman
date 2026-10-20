@@ -1150,17 +1150,27 @@ async function printFrame(html,title){
 }
 async function printSheet(){
   if(X.editing)commitEdit();
-  const sh=cur(),g=geo(sh),A=printArea(sh),b=pageBreaks(sh),p=sh.page;
-  const vis=[];for(let c=A.c1;c<=A.c2;c++)if(colPx(sh,c)>4)vis.push(c);
+  const sh=cur(),g=geo(sh),A=printArea(sh),p=sh.page;
+  const cols=[];for(let c=A.c1;c<=A.c2;c++)if(colPx(sh,c)>4)cols.push(c);
   const o={lead:0,headH:0,left:new Map(),fc:0,fr:0,brk:null,print:true};
-  const table=`<table style="direction:${sh.rtl?'rtl':'ltr'};zoom:${b.scale};${p.hc?'margin:0 auto':''}"><colgroup>${vis.map(c=>`<col style="width:${colPx(sh,c)}px">`).join('')}</colgroup><tbody>${rowsHtml(sh,g,A.r1,A.r2,vis,o)}</tbody></table>`;
+  const totW=cols.reduce((a,c)=>a+colPx(sh,c),0),totH=g.top[Math.min(A.r2+1,g.rows)]-g.top[Math.min(A.r1,g.rows)];
+  // the page turns sideways in the print window too, so both layouts are prepared and the window shows the one chosen
+  const variant=or=>{
+    let [,w,h]=PAPER[p.paper]||PAPER[9];if(or==='landscape')[w,h]=[h,w];
+    const pw=(w-p.l-p.r)*96,ph=(h-p.t-p.b)*96;
+    const scale=p.fit?Math.min(1,p.fw?pw/Math.max(1,totW):1,p.fh?ph/Math.max(1,totH):1):(p.scale||100)/100;
+    const groups=[];let cur2=[],acc=0;const ew=pw/scale;
+    for(const c of cols){const x=colPx(sh,c);if(acc+x>ew&&cur2.length){groups.push(cur2);cur2=[];acc=0;}cur2.push(c);acc+=x;}if(cur2.length)groups.push(cur2);
+    return`<div class="pv ${or}">${groups.map((vis,i)=>`<table style="direction:${sh.rtl?'rtl':'ltr'};zoom:${scale};${p.hc?'margin:0 auto;':''}${i?'break-before:page;':''}"><colgroup>${vis.map(c=>`<col style="width:${colPx(sh,c)}px">`).join('')}</colgroup><tbody>${rowsHtml(sh,g,A.r1,A.r2,vis,o)}</tbody></table>`).join('')}</div>`;
+  };
   const html=`<!doctype html><html lang="he" dir="${sh.rtl?'rtl':'ltr'}"><head><meta charset="utf-8"><base href="${esc(location.href)}"><title>${esc(fileName())}</title><style>
-@page{size:${b.w}in ${b.h}in;margin:${p.t}in ${p.r}in ${p.b}in ${p.l}in}
+@page{margin:${p.t}in ${p.r}in ${p.b}in ${p.l}in;${p.orient==='landscape'?'size:landscape;':''}}
 html,body{margin:0;padding:0;background:#fff}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 table{border-collapse:collapse;table-layout:fixed;font:11pt Arial,sans-serif;color:#000}
 td{padding:0 3px;white-space:nowrap;overflow:hidden;vertical-align:bottom;line-height:1.2;${p.grid?'border:1px solid #BFBFBF;':''}}
 td.w{white-space:pre-wrap}td>div{overflow:hidden}tr{break-inside:avoid}
-</style></head><body>${table}</body></html>`;
+@media (orientation:portrait){.pv.landscape{display:none}}@media (orientation:landscape){.pv.portrait{display:none}}
+</style></head><body>${variant('portrait')}${variant('landscape')}</body></html>`;
   await printFrame(html,fileName());
 }
 function setZoom(z){X.zoom=Math.max(.5,Math.min(2,Math.round(z*10)/10));q('xeZoomV').textContent=Math.round(X.zoom*100)+'%';q('xeZoom').value=Math.round(X.zoom*100);render();}
