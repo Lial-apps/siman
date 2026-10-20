@@ -1173,6 +1173,11 @@ dialog.reg h2{font-family:"SF-frank","Times New Roman",serif;font-size:30px;line
 dialog.reg .reg-sub{margin:-6px 0 4px;color:var(--muted);font-size:15px}
 dialog.reg .field input{font-size:16px;padding:10px 12px;border-radius:10px}
 dialog.reg .btn.big{width:100%;font-size:16px;padding:12px}
+dialog.reg .reg-later{margin-top:-6px;background:transparent;border-color:transparent;color:var(--muted)}
+dialog.reg .reg-later:hover{color:var(--ink)}
+.set-del{margin-top:6px;padding-top:12px;border-top:1px solid var(--line);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.set-del .btn{color:#B42318;border-color:color-mix(in srgb,#B42318 40%,var(--line))}
+.set-del small{color:var(--muted);font-size:12.5px;flex:1;min-width:180px}
 dialog.reg::backdrop{background:color-mix(in srgb,var(--navy) 70%,transparent);backdrop-filter:blur(6px)}
 @media (prefers-reduced-motion:reduce){.wl-text .swipe path{animation:none;stroke-dashoffset:0}.btn.paste.pop,dialog.sig[open],dialog.sheet[open]{animation:none}}
 
@@ -1264,7 +1269,7 @@ dialog.cmd-dlg[open]{animation:cmdIn .16s ease-out}
 </dialog>
 
 <header class="bar">
-  <div class="brand"><b title="גרסה 4.0">סימן</b><span class="ver">4.0</span><span class="fname" id="fname"></span></div>
+  <div class="brand"><b title="גרסה 4.1">סימן</b><span class="ver">4.1</span><span class="fname" id="fname"></span></div>
 
   <nav class="tools" id="tools" aria-label="כלים">
     <button class="tool" data-tool="select" aria-pressed="true" title="בחירה וגלילה (V)">
@@ -1578,6 +1583,7 @@ dialog.cmd-dlg[open]{animation:cmdIn .16s ease-out}
     <label class="chk"><input type="checkbox" id="regNews" checked> אפשר לשלוח לי עדכונים על סימן</label>
     <p class="sh-status" id="regStatus" role="status"></p>
     <button type="submit" class="btn primary big" id="regGo">כניסה לסימן</button>
+    <button type="button" class="btn big reg-later hidden" id="regLater">אולי אחר כך</button>
     <p class="fmt-note">המייל משמש לשליחת קבצים אליך ולחשבון שלך בסימן. הקבצים עצמם לא עולים לשום שרת. <a href="privacy.html" target="_blank" rel="noopener">מדיניות הפרטיות</a></p>
   </form>
 </dialog>
@@ -1600,8 +1606,9 @@ dialog.cmd-dlg[open]{animation:cmdIn .16s ease-out}
     <label class="field">המייל שלך
       <input id="setMail" type="email" dir="ltr" autocomplete="email" placeholder="name@example.com" required></label>
     <label class="chk"><input type="checkbox" id="setCc"> לשים אותי בהעתק בכל שליחה במייל</label>
-    <p class="fmt-note">המייל משמש לשליחה אליך, להעתק במיילים ולהתחברות מהירה ל-Google Drive. הוא נשמר רק במכשיר הזה.</p>
+    <p class="fmt-note">המייל משמש לשליחה אליך, להעתק במיילים ולהתחברות מהירה ל-Google Drive. הוא נשמר במכשיר וברשימת הנרשמים של סימן.</p>
     <p class="sh-status" id="setStatus" role="status"></p>
+    <div class="set-del"><button type="button" class="btn" id="setDelete">מחיקת החשבון</button><small>מוחק את המייל מרשימת הנרשמים, ואת השם, המייל והחתימות השמורות מהמכשיר.</small></div>
     <div class="sig-row"><span class="grow"></span><button type="button" class="btn" id="setCancel">ביטול</button><button type="submit" class="btn primary" id="setSave">שמירה</button></div>
   </form>
 </dialog>
@@ -4369,12 +4376,12 @@ $('setBtn').onclick=()=>openSettings();
 $('setCancel').onclick=()=>{setAfter=null;$('setDlg').close();};
 $('setForm').addEventListener('submit',e=>{
   const mail=$('setMail').value.trim(),name=$('setName').value.trim();
-  if(!validMail(mail)){e.preventDefault();$('setStatus').textContent=mail?'כתובת המייל לא תקינה. בדקו שיש בה @ ונקודה.':'צריך מייל כדי להשתמש בסימן.';$('setMail').focus();return;}
+  if(!validMail(mail)&&!(typeof IN_APPLE_STORE!=='undefined'&&IN_APPLE_STORE&&!mail)){e.preventDefault();$('setStatus').textContent=mail?'כתובת המייל לא תקינה. בדקו שיש בה @ ונקודה.':'צריך מייל כדי להשתמש בסימן.';$('setMail').focus();return;}
   const changed=mail!==USER.mail;
   USER={...USER,name,mail,cc:$('setCc').checked};
   try{localStorage.setItem(USER_KEY,JSON.stringify(USER));}catch(_){}
   if(gTok&&mail!==gTokMail){gTok=null;}
-  applyUser();toast('ההגדרות נשמרו');if(changed)registerUser('update');
+  applyUser();toast('ההגדרות נשמרו');if(changed&&mail)registerUser('update');
   const f=setAfter;setAfter=null;if(f)setTimeout(f,0);
 });
 applyUser();
@@ -4388,13 +4395,20 @@ function registerUser(kind){
   fetch(REGISTER_URL,{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({kind,mail:USER.mail,name:USER.name,news:!!USER.news,lang:navigator.language,platform:IS_ANDROID?'android':IS_APPLE_TOUCH?'ios':IS_MAC?'mac':/Windows/i.test(UA)?'windows':'other',at:new Date().toISOString()})}).then(r=>{if(r.ok)sent();}).catch(()=>{});
 }
-function needReg(){return !validMail(USER.mail||'');}
+// inside the App Store app (iPhone, iPad, Mac) sign-up is optional: Apple does not allow requiring it
+const IN_APPLE_STORE=/(^|;\s*)app-platform=iOS(%20| )App(%20| )Store/i.test(document.cookie)||new URLSearchParams(location.search).get('store')==='apple';
+if(IN_APPLE_STORE){$('regLater').classList.remove('hidden');$('regNews').checked=false;
+  $('regTitle').nextElementSibling.textContent='אפשר להירשם עם מייל כדי לקבל קבצים ועדכונים. זה לא חובה.';}
+function needReg(){return !IN_APPLE_STORE&&!validMail(USER.mail||'');}
 function showReg(){
   const d=$('regDlg');if(d.open)return;
   $('regMail').value=USER.mail||'';$('regName').value=USER.name||'';$('regStatus').textContent='';
   d.showModal();setTimeout(()=>$('regMail').focus(),50);
 }
-$('regDlg').addEventListener('cancel',e=>e.preventDefault()); // Esc does not skip sign-up
+$('regDlg').addEventListener('cancel',e=>{if(IN_APPLE_STORE){regSkip();}else e.preventDefault();}); // Esc skips only where sign-up is optional
+function regSkip(){USER={...USER,skipped:true};try{localStorage.setItem(USER_KEY,JSON.stringify(USER));}catch(_){}
+  $('regDlg').close();if(pendingOpen){const p=pendingOpen;pendingOpen=null;setTimeout(()=>openFile(p.f,p.h),0);}}
+$('regLater').onclick=regSkip;
 $('regForm').addEventListener('submit',e=>{
   const mail=$('regMail').value.trim();
   if(!validMail(mail)){e.preventDefault();$('regStatus').textContent=mail?'כתובת המייל לא תקינה. בדקו שיש בה @ ונקודה.':'כתבו את המייל שלכם כדי להמשיך.';$('regMail').focus();return;}
@@ -4404,10 +4418,21 @@ $('regForm').addEventListener('submit',e=>{
   toast(USER.name?`נעים להכיר, ${USER.name}`:'נרשמת לסימן');
   if(pendingOpen){const p=pendingOpen;pendingOpen=null;setTimeout(()=>openFile(p.f,p.h),0);}
 });
+$('setDelete').onclick=async()=>{
+  if(!confirm('למחוק את החשבון שלך בסימן?\n\nהמייל יימחק מרשימת הנרשמים, והשם, המייל והחתימות השמורות יימחקו מהמכשיר. הקבצים שלך לא נפגעים.'))return;
+  const mail=USER.mail;let ok=!mail||!REGISTER_URL;
+  if(!ok){try{const r=await fetch(REGISTER_URL.replace(/\/register$/,'/delete'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mail})});ok=r.ok;}catch(_){ok=false;}}
+  if(!ok){$('setStatus').textContent='אין חיבור לאינטרנט, אז החשבון עוד לא נמחק. נסו שוב כשיש חיבור.';return;}
+  try{['siman.user','siman.signatures'].forEach(k=>localStorage.removeItem(k));}catch(_){}
+  USER={name:'',mail:'',cc:false,skipped:true};
+  if(typeof gTok!=='undefined')gTok=null;
+  $('setDlg').close();applyUser();toast('החשבון נמחק');
+  if(needReg())setTimeout(showReg,300);
+};
 let pendingOpen=null;
-if(needReg())setTimeout(showReg,document.getElementById('intro')?1150:0);
+if(needReg()||(IN_APPLE_STORE&&!validMail(USER.mail||'')&&!USER.skipped))setTimeout(showReg,document.getElementById('intro')?1150:0);
 // people who signed up before the sign-up list existed are added once
-else if(!USER.sent){registerUser('existing');}
+else if(!USER.sent&&validMail(USER.mail||'')){registerUser('existing');}
 
 /* =====================================================================
    COMMAND BAR (Ctrl+K) — write what you want to do, in your own words
