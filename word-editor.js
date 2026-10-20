@@ -581,7 +581,7 @@ const CSS=`
 .we-pop .pal button:hover{transform:scale(1.15)}
 .we-pop .mi{display:flex;align-items:center;gap:8px;width:100%;border:0;background:none;padding:7px 10px;border-radius:7px;cursor:pointer;text-align:start;white-space:nowrap}
 .we-pop .mi:hover,.we-pop .mi.on{background:#EEF2F8}
-.we-pop .mi small{color:var(--wmu);margin-inline-start:auto;font-size:12px}
+.we-pop .mi small{color:var(--wmu);margin-inline-start:auto;font-size:12px;padding-inline-start:18px}
 .we-pop .sep{height:1px;background:var(--wl);margin:5px 0}
 .we-pop .tgrid{display:grid;grid-template-columns:repeat(10,18px);gap:3px;direction:rtl}
 .we-pop .tgrid i{width:18px;height:18px;border:1px solid #C6CFDD;border-radius:2px;cursor:pointer;display:block}
@@ -1182,7 +1182,7 @@ function updateNow(){
   const press=(cmd,on)=>rb.querySelectorAll(`[data-cmd="${cmd}"]`).forEach(b=>b.setAttribute('aria-pressed',on?'true':'false'));
   rb.querySelector('[data-cmd=undo]').disabled=E.hi<=0&&!E.snapT;rb.querySelector('[data-cmd=redo]').disabled=E.hi>=E.hist.length-1;
   const tabT=E.root.querySelector('.we-tabs [data-tab=table]');
-  if(!r){tabT.hidden=true;return;}
+  if(!r)return;
   let el=r.startContainer.nodeType===3?r.startContainer.parentElement:r.startContainer;if(!el||el===E.body){el=E.body.querySelector('p,h1,h2,h3,li')||E.body;}
   const blk=blockOf(el);const cs=getComputedStyle(el);
   const ff=firstFamily(cs.fontFamily)||E.st.def.font;const fsel=rb.querySelector('[data-in=font]');
@@ -1325,7 +1325,10 @@ function wire(){
   // top bar
   q('weSave').onclick=()=>doSave();q('wePdf').onclick=()=>doPdf();q('weDesk').onclick=()=>doDesk();q('weClose').onclick=()=>doClose();
   const body=E.body;
+  body.addEventListener('contextmenu',ctxMenu);
+  q('weScroll').addEventListener('wheel',e=>{if(e.ctrlKey||e.metaKey){e.preventDefault();setZoom(E.zoom+(e.deltaY<0?.1:-.1));}},{passive:false});
   body.addEventListener('input',e=>{
+    if(e.inputType==='insertText'&&(e.data===' '||e.data==='\u00a0')&&autoList()){snap();after();return;}
     if(e.inputType==='insertParagraph'){const b=curBlock();const pv=b&&b.previousElementSibling;
       if(b&&pv&&isHeading(pv)&&!b.textContent.replace(ZW,'').trim()){for(const c of [...b.classList])if(c.startsWith(P+'_'))b.classList.remove(c);if(/^H\d$/.test(b.tagName)){const p=document.createElement('p');p.innerHTML='<br>';b.replaceWith(p);caretTo(p,0);}else{b.innerHTML='<br>';caretTo(b,0);}}}
     if(!body.firstElementChild||[...body.childNodes].some(n=>n.nodeType===3&&n.data.trim()))ensureBlocks();
@@ -1712,6 +1715,42 @@ async function buildDocx(){
   return{bytes,lost:ctx.lost};
 }
 
+
+/* ---------- extras: right-click menu, automatic lists, drafts ---------- */
+function ctxMenu(e){
+  if(e.shiftKey)return; // Shift + right click keeps the browser's menu (spelling suggestions)
+  const r0=curRange();
+  if(!r0||r0.collapsed){const cr=document.caretRangeFromPoint&&document.caretRangeFromPoint(e.clientX,e.clientY);if(cr&&E.body.contains(cr.startContainer)){const s=getSelection();s.removeAllRanges();s.addRange(cr);E.lastRange=cr.cloneRange();}}
+  e.preventDefault();
+  const inCell=!!cellOf(),r=curRange(),hasSel=r&&!r.collapsed;
+  const n=r&&(r.startContainer.nodeType===3?r.startContainer.parentElement:r.startContainer);const link=n&&n.closest&&n.closest('a[href]');
+  const items=[['cut','גזירה','Ctrl+X',!hasSel],['copy','העתקה','Ctrl+C',!hasSel],['paste','הדבקה','Ctrl+V'],'-',
+    ['bold','מודגש','Ctrl+B'],['italic','נטוי','Ctrl+I'],['underline','קו תחתי','Ctrl+U'],['clear','ניקוי העיצוב','Ctrl+Space'],'-',
+    ['link',link?'עריכת הקישור…':'הוספת קישור…','Ctrl+K'],['bullets','תבליטים'],['numbers','מספור'],'-',['right','יישור לימין'],['center','מרכוז'],['left','יישור לשמאל']];
+  if(inCell)items.push('-',['rowAbove','הוספת שורה מעל'],['rowBelow','הוספת שורה מתחת'],['colRight','הוספת עמודה מימין'],['colLeft','הוספת עמודה משמאל'],['delRow','מחיקת השורה'],['delCol','מחיקת העמודה'],['delTable','מחיקת הטבלה']);
+  const html=items.map(it=>it==='-'?'<div class="sep"></div>':`<button type="button" class="mi" data-v="${it[0]}"${it[3]?' disabled style="opacity:.4"':''}>${it[1]}${it[2]?`<small dir="ltr">${it[2]}</small>`:''}</button>`).join('')+'<div class="sep"></div><div style="font-size:11px;color:#7A879E;padding:2px 10px 4px">Shift + לחיצה ימנית: תיקוני איות</div>';
+  const anchor={getBoundingClientRect:()=>({left:e.clientX,right:e.clientX,top:e.clientY,bottom:e.clientY}),contains:()=>false};
+  const pp=pop(anchor,html,v=>{const f=CMD[v];if(f){liveRange();f();}});
+  pp.style.left=Math.max(6,Math.min(e.clientX,innerWidth-pp.offsetWidth-6))+'px';pp.style.top=Math.max(6,Math.min(e.clientY,innerHeight-pp.offsetHeight-6))+'px';
+}
+// typing "1. " or "- " at the start of a paragraph starts a list, like in Word
+function autoList(){
+  const r=curRange();if(!r||!r.collapsed)return false;const b=blockOf(r.startContainer);if(!b||numOf(b)||b.closest('td,th'))return false;
+  const pre=document.createRange();pre.setStart(b,0);pre.setEnd(r.startContainer,r.startOffset);const t=pre.toString().replace(ZW,'');
+  const m=/^\s*(?:(\d{1,3})[.)]|([-*•]))[\s\u00a0]$/.exec(t);if(!m)return false;
+  if(E.snapT)snap();
+  pre.deleteContents();toggleList(m[2]?'b':'n');
+  return true;
+}
+const DRAFT={db:null,
+  open(){return this.db||(this.db=new Promise((res,rej)=>{const r=indexedDB.open('siman-drafts',1);r.onupgradeneeded=()=>r.result.createObjectStore('d');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);}));},
+  async put(k,v){try{const db=await this.open();await new Promise(r=>{const t=db.transaction('d','readwrite');t.objectStore('d').put(v,k);t.oncomplete=t.onerror=r;});}catch(_){}},
+  async get(k){try{const db=await this.open();return await new Promise(r=>{const q2=db.transaction('d').objectStore('d').get(k);q2.onsuccess=()=>r(q2.result||null);q2.onerror=()=>r(null);});}catch(_){return null;}},
+  async del(k){try{const db=await this.open();await new Promise(r=>{const t=db.transaction('d','readwrite');t.objectStore('d').delete(k);t.oncomplete=t.onerror=r;});}catch(_){}}
+};
+const draftKey=()=>'w:'+(E.opts.name||'new');
+function startDrafts(){E.draftT=setInterval(async()=>{if(!E||!E.dirty||E.saving)return;try{const{bytes}=await buildDocx();if(E)await DRAFT.put(draftKey(),{bytes,time:Date.now(),name:fileName()});}catch(_){}},40000);}
+
 /* ------------------------------------------------------------ opening */
 function mapContainer(domC,xmlC,prefix){
   const d=[...domC.children].filter(e=>e.tagName==='P'||e.tagName==='TABLE');
@@ -1786,6 +1825,13 @@ async function open(opts){
   await nextFrame();guides();words();
   E.body.focus({preventScroll:true});caretIn(E.body.querySelector('p,h1,h2,h3,li,td')||E.body);updateUI();
   if(opts.isNew)q('weName').select();
+  if(opts.restored){E.dirty=true;E.cleanHtml='';markDirty();}
+  else if(window.indexedDB){const d=await DRAFT.get(draftKey());if(d&&d.bytes&&E){
+    const when=new Date(d.time).toLocaleString('he-IL',{dateStyle:'short',timeStyle:'short'});
+    const a=await ask('נמצאה עבודה שלא נשמרה',`המסמך ${esc(d.name||'')} נערך כאן ב-${when} ולא נשמר. לפתוח את הגרסה הזו?`,[{v:'x',l:'לא, לפתוח את הקובץ'},{v:'ok',l:'שחזור',cls:'pri'}]);
+    if(a==='ok'){const o={...opts,bytes:d.bytes,restored:true,isNew:false};await forceClose();return open(o);}
+    await DRAFT.del(draftKey());}}
+  startDrafts();
   return true;
 }
 const fileName=()=>((q('weName').value||'').trim().replace(/[\\/:*?"<>|]+/g,'').replace(/\.docx$/i,'')||'מסמך')+'.docx';
@@ -1793,7 +1839,7 @@ async function build(msg){E.opts.busy(true,msg||'שומר את המסמך…');t
 async function doSave(){
   if(!E||E.saving)return;E.saving=true;
   try{const{bytes,lost}=await build();const ok=await E.opts.save(fileName(),bytes,'docx');
-    if(ok){E.cleanHtml=E.body.innerHTML;E.pageDirty=false;E.savedOnce=true;markDirty();E.opts.toast('נשמר: '+fileName()+(lost?`. ${lost} תמונות לא נשמרו`:''));}}
+    if(ok){E.cleanHtml=E.body.innerHTML;E.pageDirty=false;E.savedOnce=true;markDirty();DRAFT.del(draftKey());E.opts.toast('נשמר: '+fileName()+(lost?`. ${lost} תמונות לא נשמרו`:''));}}
   catch(e){if(!(e&&e.name==='AbortError')){console.error(e);E.opts.toast('השמירה נכשלה: '+(e.message||e));}}
   finally{if(E)E.saving=false;}
 }
@@ -1806,17 +1852,18 @@ async function doPdf(){
 }
 async function doDesk(){
   if(!E||E.saving)return;E.saving=true;
-  try{const{bytes}=await build('מכין את המסמך לחתימה…');const f=new File([bytes],fileName(),{type:DOCX_MIME});const o=E.opts;await forceClose();await o.toDesk(f);}
+  try{const{bytes}=await build('מכין את המסמך לחתימה…');const f=new File([bytes],fileName(),{type:DOCX_MIME});const o=E.opts;DRAFT.del(draftKey());await forceClose();await o.toDesk(f);}
   catch(e){console.error(e);if(E){E.saving=false;E.opts.toast('לא הצלחתי לפתוח לחתימה: '+(e.message||e));}}
 }
 async function doClose(){
   if(!E)return;if(E.snapT){snap();markDirty();}
   if(E.dirty){const a=await ask('לשמור את השינויים?',`יש שינויים ב-${esc(fileName())} שעוד לא נשמרו.`,[{v:'x',l:'ביטול'},{v:'drop',l:'סגירה בלי לשמור',cls:'warn'},{v:'save',l:'שמירה',cls:'pri'}]);
     if(!a)return;if(a==='save'){await doSave();if(E&&E.dirty)return;}}
+  DRAFT.del(draftKey());
   const o=E.opts;await forceClose();o.onClose&&o.onClose();
 }
 async function forceClose(){
-  if(!E)return;const e=E;
+  if(!E)return;const e=E;clearInterval(e.draftT);
   document.removeEventListener('selectionchange',e.onSel);window.removeEventListener('keydown',e.onKey,true);window.removeEventListener('paste',e.onPaste,true);
   window.removeEventListener('copy',e.onCopy,true);window.removeEventListener('cut',e.onCopy,true);window.removeEventListener('dragover',e.onDrag,true);window.removeEventListener('drop',e.onDrop,true);
   window.removeEventListener('beforeunload',e.onUnload);document.removeEventListener('pointerdown',e.onDown,true);window.removeEventListener('resize',e.onResize);

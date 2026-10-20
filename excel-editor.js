@@ -546,7 +546,7 @@ function shellHtml(){return `
 <div class="xe-bottom"><div class="xe-sheets" id="xeSheets"></div><span class="grow"></span><span class="xe-stat" id="xeStat"></span>
   <button type="button" class="xb" data-cmd="zout" aria-label="הקטנה">−</button><input type="range" id="xeZoom" min="50" max="200" step="10" value="100" aria-label="זום"><button type="button" class="xb" data-cmd="zin" aria-label="הגדלה">+</button></div>
 <div class="xe-find" id="xeFind" hidden><input id="xeFindIn" placeholder="חיפוש בגיליון" dir="auto" aria-label="חיפוש"><button type="button" class="xb" id="xeFindNext" aria-label="הבא">▼</button><button type="button" class="xb" id="xeFindX" aria-label="סגירה">×</button></div>
-<div class="xe-pop" id="xePop" hidden></div>
+<div class="xe-pop" id="xePop" hidden></div><div class="xe-ac" id="xeAc" hidden></div>
 <div id="xePrint"></div>
 <div class="xe-dlg" id="xeDlg" hidden><div class="xe-dlg-in" role="dialog" aria-modal="true"></div></div>`;}
 const CSS=`
@@ -639,6 +639,10 @@ const CSS=`
 @media print{html>body>*:not(#xed){display:none!important}html>body>#xed{position:static!important;display:block!important;background:#fff!important;inset:auto!important}#xed>*:not(#xePrint){display:none!important}#xed #xePrint{display:block!important}
   #xePrint table{border-collapse:collapse;table-layout:fixed;font:11pt Arial,sans-serif;color:#000}#xePrint td{padding:0 3px;white-space:nowrap;overflow:hidden;vertical-align:bottom;line-height:1.2}
   #xePrint td.w{white-space:pre-wrap}#xePrint.pg td{border:1px solid #BFBFBF}#xePrint td>div{overflow:hidden}}
+#xed .xfh{position:absolute;width:8px;height:8px;background:var(--xg);border:1.5px solid #fff;bottom:-5px;inset-inline-end:-5px;z-index:6;cursor:crosshair;box-sizing:border-box}
+#xed .xe-ac{position:fixed;z-index:35;background:#fff;border:1px solid var(--xl);border-radius:8px;box-shadow:0 10px 26px -10px rgba(22,33,58,.4);padding:4px;min-width:220px}
+#xed .xe-ac[hidden]{display:none}#xed .xe-ac button{display:flex;gap:10px;align-items:center;width:100%;border:0;background:none;padding:5px 8px;border-radius:6px;cursor:pointer;text-align:start}
+#xed .xe-ac button.on,#xed .xe-ac button:hover{background:#E6F2EA}#xed .xe-ac b{font:600 12px Consolas,monospace;color:var(--xg)}#xed .xe-ac small{color:var(--xmu);font-size:12px}
 #xed .xe-load{position:absolute;inset:0;display:grid;place-items:center;color:var(--xmu);font-size:15px;background:#fff;z-index:6}
 @media (max-width:760px){#xed .xe-sub,#xed .xe-state,#xed .xg-l{display:none}#xed .xe-tb{padding:6px 9px;font-size:13px}#xed #xeDesk{display:none}}
 #xed .xb{color:#0F1A30}#xed .xg-l{color:#3E4A63!important;font-weight:500}#xed .xb:disabled{opacity:.45}@media (forced-colors:active){#xed .xb svg{forced-color-adjust:auto}}`;
@@ -757,7 +761,7 @@ function paintSel(){
   }
   for(const th of grid.querySelectorAll('th[data-col]')){const c=+th.dataset.col;th.classList.toggle('on',c>=s.c1&&c<=s.c2);}
   for(const th of grid.querySelectorAll('th[data-row]')){const r=+th.dataset.row;th.classList.toggle('on',r>=s.r1&&r<=s.r2);}
-  updateUI();
+  placeHandle();updateUI();
 }
 function tdOf(r,c){return q('xeGrid').querySelector(`td[data-r="${r}"][data-c="${c}"]`)||q('xeGrid').querySelector(`td[data-mr="${r}"][data-mc="${c}"]`);}
 function mergeAt(sh,r,c){return sh.merges.find(m=>r>=m.r1&&r<=m.r2&&c>=m.c1&&c<=m.c2)||null;}
@@ -1192,7 +1196,7 @@ function wire(){
   // grid
   let drag=false;
   wrap.addEventListener('mousedown',e=>{
-    if(e.button!==0)return;const rz=e.target.closest('[data-rz]');if(rz){startResize(e,+rz.dataset.rz);return;}
+    if(e.button!==0)return;if(e.target.closest('.xfh')){startFill(e);return;}const rz=e.target.closest('[data-rz]');if(rz){startResize(e,+rz.dataset.rz);return;}
     const th=e.target.closest('th');
     if(th){e.preventDefault();commitEdit();const sh=cur(),g=geo(sh);
       if(th.dataset.all){X.act={r:0,c:0};X.anchor={r:0,c:0};X.sel={r1:0,c1:0,r2:Math.max(sh.maxR,0),c2:Math.max(sh.maxC,0)};}
@@ -1205,13 +1209,16 @@ function wire(){
   });
   wrap.addEventListener('mouseover',e=>{if(!drag||!(e.buttons&1)){drag=false;return;}const p=cellFromEvent(e);if(p)select(p.r,p.c,true);});
   X.onUp=()=>{drag=false;};window.addEventListener('mouseup',X.onUp);
-  wrap.addEventListener('dblclick',e=>{const p=cellFromEvent(e);if(p){select(p.r,p.c);startEdit();}});
+  wrap.addEventListener('dblclick',e=>{if(e.target.closest('.xfh')){fillDownAuto();return;}const rz=e.target.closest('[data-rz]');if(rz){autoFit(+rz.dataset.rz);return;}const p=cellFromEvent(e);if(p){select(p.r,p.c);startEdit();}});
+  wrap.addEventListener('contextmenu',ctxMenu);
+  wrap.addEventListener('wheel',e=>{if(e.ctrlKey||e.metaKey){e.preventDefault();setZoom(X.zoom+(e.deltaY<0?.1:-.1));}},{passive:false});
+  const ac=q('xeAc');ac.addEventListener('mousedown',e=>e.preventDefault());ac.addEventListener('click',e=>{const b=e.target.closest('[data-fn]');if(b)fnPick(b.dataset.fn);});
   wrap.addEventListener('scroll',()=>{if(X.editing)commitEdit();closePop();renderSoon();},{passive:true});
-  const ed=q('xeEdit');ed.addEventListener('input',()=>{q('xeFx').value=ed.value;growEdit();});
+  const ed=q('xeEdit');ed.addEventListener('input',()=>{q('xeFx').value=ed.value;growEdit();fnSuggest(ed);});ed.addEventListener('blur',()=>{q('xeAc').hidden=true;});
   const fx=q('xeFx');
   fx.addEventListener('focus',()=>{if(!X.editing)X.editing={r:X.act.r,c:X.act.c,typed:false,orig:rawText(cellAt(cur(),X.act.r,X.act.c)),fx:true};});
-  fx.addEventListener('input',()=>{const e2=q('xeEdit');if(!e2.hidden)e2.value=fx.value;});
-  fx.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();const e2=q('xeEdit');e2.hidden=true;commitEdit([1,0]);}else if(e.key==='Escape'){e.preventDefault();fx.value=X.editing?X.editing.orig:'';cancelEdit();}});
+  fx.addEventListener('input',()=>{const e2=q('xeEdit');if(!e2.hidden)e2.value=fx.value;fnSuggest(fx);});
+  fx.addEventListener('keydown',e=>{if(fnKey(e))return;if(e.key==='Enter'){e.preventDefault();const e2=q('xeEdit');e2.hidden=true;commitEdit([1,0]);}else if(e.key==='Escape'){e.preventDefault();fx.value=X.editing?X.editing.orig:'';cancelEdit();}});
   fx.addEventListener('blur',()=>{if(X&&X.editing&&X.editing.fx&&q('xeEdit').hidden){const v=fx.value;const ed2=X.editing;X.editing=null;if(v!==ed2.orig)setInput(ed2.r,ed2.c,v);}});
   const ref=q('xeRef');ref.addEventListener('keydown',e=>{if(e.key!=='Enter')return;e.preventDefault();const g=parseRange(ref.value.replace(/\s/g,''));
     if(!g){hint('כתובת לא תקינה, למשל B7 או A1:C5');return;}select(g.r1,g.c1);if(g.r2>g.r1||g.c2>g.c1){X.sel=g;paintSel();}wrap.focus();});
@@ -1250,6 +1257,7 @@ function onKey(e){
   const rtl=cur().rtl;
   const editor=t===q('xeEdit');
   if(editor){
+    if(fnKey(e))return;
     if(k==='Enter'&&e.altKey){e.preventDefault();const el=q('xeEdit');const p=el.selectionStart;el.value=el.value.slice(0,p)+'\n'+el.value.slice(el.selectionEnd);el.selectionStart=el.selectionEnd=p+1;growEdit();q('xeFx').value=el.value;return;}
     if(k==='Enter')return run(commitEdit,[e.shiftKey?-1:1,0]);
     if(k==='Tab')return run(commitEdit,[0,e.shiftKey?-1:1]);
@@ -1278,6 +1286,128 @@ function onKey(e){
   if(k==='F2')return run(startEdit);
   if(k.length===1&&!e.ctrlKey&&!e.metaKey){startEdit('',true);return;}
 }
+
+
+/* ------------------------------------------------------------ extras: fill handle, menus, function hints, drafts */
+// fill handle: drag the small square at the corner of the selection to continue a series or copy
+function placeHandle(){
+  const old=q('xeGrid').querySelector('.xfh');if(old)old.remove();
+  if(X.editing)return;const s=X.sel;const td=tdOf(s.r2,s.c2)||(()=>{const m=mergeAt(cur(),s.r2,s.c2);return m?tdOf(m.r1,m.c1):null;})();if(!td)return;
+  const h=document.createElement('i');h.className='xfh';h.title='גררו כדי למלא את התאים הבאים';td.append(h);
+}
+function startFill(e){
+  e.preventDefault();e.stopPropagation();const s0={...X.sel};X.fill0=s0;let tgt=null;
+  const mv=ev=>{const el=document.elementFromPoint(ev.clientX,ev.clientY);const td=el&&el.closest&&el.closest('td[data-r]');if(!td)return;
+    const r=+(td.dataset.mr??td.dataset.r),c=+(td.dataset.mc??td.dataset.c);
+    const dr=r>s0.r2?r-s0.r2:r<s0.r1?r-s0.r1:0,dc=c>s0.c2?c-s0.c2:c<s0.c1?c-s0.c1:0;
+    if(!dr&&!dc){tgt=null;X.sel={...s0};}else if(Math.abs(dr)>=Math.abs(dc)){tgt={...s0,r1:Math.min(s0.r1,r),r2:Math.max(s0.r2,r)};X.sel=tgt;}else{tgt={...s0,c1:Math.min(s0.c1,c),c2:Math.max(s0.c2,c)};X.sel=tgt;}
+    paintSel();};
+  const up=()=>{removeEventListener('mousemove',mv);removeEventListener('mouseup',up);X.fill0=null;if(tgt)doFill(s0,tgt);else{X.sel=s0;paintSel();}};
+  addEventListener('mousemove',mv);addEventListener('mouseup',up);
+}
+function seriesOf(cells){
+  // cells: list of source cells (or null) in order; returns fn(i) giving the cell data for position i past the end
+  const n=cells.length;const nums=cells.map(c=>c&&!c.f&&typeof c.v==='number'?c.v:null);
+  const allNum=n>1&&nums.every(v=>v!==null);
+  const step=allNum?(nums[n-1]-nums[0])/(n-1):0;
+  const tm=cells.map(c=>c&&!c.f&&typeof c.v==='string'?/^(.*?)(\d+)$/.exec(c.v):null);
+  const isDate=n===1&&nums[0]!==null&&isDateFmt(descOf(X.st.st,cells[0].s).fmt);
+  return(i,k)=>{ // i: index past the end (0-based), k: source cell to imitate
+    const src=cells[k];if(!src)return null;
+    if(allNum)return{v:+(nums[n-1]+step*(i+1)).toFixed(10),t:'n'};
+    if(isDate)return{v:nums[0]+i+1,t:'n'};
+    if(tm[k]&&n===1)return{v:tm[k][1]+(+tm[k][2]+i+1),t:'s'};
+    return null;
+  };
+}
+function doFill(s0,t){
+  const sh=cur();
+  change(()=>{
+    const down=t.r1!==s0.r1||t.r2!==s0.r2;
+    const lines=down?[...Array(s0.c2-s0.c1+1)].map((_,i)=>s0.c1+i):[...Array(s0.r2-s0.r1+1)].map((_,i)=>s0.r1+i);
+    for(const L of lines){
+      const src=[];if(down)for(let r=s0.r1;r<=s0.r2;r++)src.push(cellAt(sh,r,L)||null);else for(let c=s0.c1;c<=s0.c2;c++)src.push(cellAt(sh,L,c)||null);
+      const n=src.length,ser=seriesOf(src);
+      const fwd=down?t.r2>s0.r2:t.c2>s0.c2;
+      const span=down?(fwd?t.r2-s0.r2:s0.r1-t.r1):(fwd?t.c2-s0.c2:s0.c1-t.c1);
+      for(let i=0;i<span;i++){
+        const k=fwd?i%n:(n-1-(i%n));
+        const r=down?(fwd?s0.r2+1+i:s0.r1-1-i):L,c=down?L:(fwd?s0.c2+1+i:s0.c1-1-i);
+        const from=src[k];const key2=key(r,c);
+        if(!from){const ex=sh.cells.get(key2);if(ex){ex.v=null;ex.f=null;ex.mod=true;}continue;}
+        const cell={r,c,s:from.s,t:from.t,v:from.v,f:null,mod:true};
+        const sv=fwd?ser(i,k):null;
+        if(from.f)cell.f=moveFormula(from.f,r-from.r,c-from.c);
+        else if(sv){cell.v=sv.v;cell.t=sv.t;}
+        sh.cells.set(key2,cell);sh.maxR=Math.max(sh.maxR,r);sh.maxC=Math.max(sh.maxC,c);
+      }
+    }
+    if(lines.some(()=>true))X.formulaTouched=X.formulaTouched||[...sh.cells.values()].some(c=>c.mod&&c.f);
+  });
+  X.sel=t;paintSel();
+}
+// double-click on the handle: fill down as far as the column next to it has data
+function fillDownAuto(){
+  const sh=cur(),s=X.sel;const has=(r,c)=>{const x=cellAt(sh,r,c);return !!x&&(x.v!==null&&x.v!==''||!!x.f);};
+  let end=s.r2;const side=[s.c1-1,s.c2+1].find(c=>c>=0&&has(s.r2+1,c));if(side===undefined)return;
+  while(has(end+1,side))end++;if(end>s.r2)doFill({...s},{...s,r2:end});
+}
+// right-click menu
+function ctxMenu(e){
+  const p=cellFromEvent(e);if(!p)return;e.preventDefault();commitEdit();
+  const s=X.sel;if(!(p.r>=s.r1&&p.r<=s.r2&&p.c>=s.c1&&p.c<=s.c2))select(p.r,p.c);
+  const items=[['cut','גזירה','Ctrl+X'],['copy','העתקה','Ctrl+C'],['paste','הדבקה','Ctrl+V'],'-',['rowIns','הוספת שורה מעל'],['colIns','הוספת עמודה לפני'],['rowDel','מחיקת שורות'],['colDel','מחיקת עמודות'],'-',
+    ['clearVal','ניקוי התוכן','Delete'],['clear','ניקוי העיצוב'],'-',['sortAZ','מיון מהקטן לגדול'],['sortZA','מיון מהגדול לקטן'],'-',['merge',mergeAt(cur(),X.act.r,X.act.c)?'ביטול המיזוג':'מיזוג ומרכוז'],['freezeHere','הקפאה עד כאן']];
+  const html=items.map(it=>it==='-'?'<div class="sep"></div>':`<button type="button" class="mi" data-v="${it[0]}">${it[1]}${it[2]?`<small style="margin-inline-start:auto;color:#5D6982" dir="ltr">${it[2]}</small>`:''}</button>`).join('');
+  const anchor={getBoundingClientRect:()=>({left:e.clientX,right:e.clientX,top:e.clientY,bottom:e.clientY}),contains:()=>false};
+  const pp=pop(anchor,html,v=>{if(v==='clearVal')return clearCells();if(v==='freezeHere'){const sh=cur();sh.freeze=X.act.r||X.act.c?{r:X.act.r,c:X.act.c}:null;sh.viewDirty=true;touch();render();return;}const f=CMD[v];if(f)f();});
+  pp.style.left=Math.min(e.clientX,innerWidth-pp.offsetWidth-6)+'px';pp.style.top=Math.min(e.clientY,innerHeight-pp.offsetHeight-6)+'px';
+}
+// function names while typing a formula
+const FN_HELP={SUM:'סכום',AVERAGE:'ממוצע',MIN:'הקטן ביותר',MAX:'הגדול ביותר',COUNT:'ספירת מספרים',COUNTA:'ספירת תאים מלאים',COUNTBLANK:'ספירת תאים ריקים',IF:'אם… אז… אחרת',IFERROR:'ערך חלופי בשגיאה',IFNA:'ערך חלופי כשאין',
+  AND:'וגם',OR:'או',NOT:'לא',ROUND:'עיגול',ROUNDUP:'עיגול כלפי מעלה',ROUNDDOWN:'עיגול כלפי מטה',INT:'חלק שלם',ABS:'ערך מוחלט',MOD:'שארית',POWER:'חזקה',SQRT:'שורש',PRODUCT:'מכפלה',MEDIAN:'חציון',
+  CONCAT:'חיבור טקסטים',CONCATENATE:'חיבור טקסטים',TEXTJOIN:'חיבור עם מפריד',LEN:'אורך טקסט',LEFT:'תווים משמאל',RIGHT:'תווים מימין',MID:'תווים מהאמצע',UPPER:'אותיות גדולות',LOWER:'אותיות קטנות',TRIM:'הסרת רווחים',
+  VALUE:'טקסט למספר',TEXT:'מספר לטקסט בעיצוב',TODAY:'התאריך היום',NOW:'התאריך והשעה עכשיו',YEAR:'שנה',MONTH:'חודש',DAY:'יום',DATE:'תאריך מיום, חודש ושנה',
+  ISBLANK:'האם ריק',ISNUMBER:'האם מספר',ISTEXT:'האם טקסט',ISERROR:'האם שגיאה',SUMIF:'סכום לפי תנאי',COUNTIF:'ספירה לפי תנאי',AVERAGEIF:'ממוצע לפי תנאי',SUMIFS:'סכום לפי כמה תנאים',COUNTIFS:'ספירה לפי כמה תנאים',
+  VLOOKUP:'חיפוש אנכי',HLOOKUP:'חיפוש אופקי',INDEX:'ערך לפי מיקום',MATCH:'מיקום של ערך'};
+function fnSuggest(input){
+  const box=q('xeAc');const v=input.value,pos=input.selectionStart;
+  const m=v[0]==='='&&/[A-Za-z][A-Za-z.]*$/.exec(v.slice(0,pos));
+  if(!m||(pos<v.length&&/[A-Za-z(]/.test(v[pos]))){box.hidden=true;X.ac=null;return;}
+  const w=m[0].toUpperCase();const list=Object.keys(FN_HELP).filter(n=>n.startsWith(w)).slice(0,8);
+  if(!list.length){box.hidden=true;X.ac=null;return;}
+  X.ac={input,list,at:0,start:pos-m[0].length,pos};
+  box.innerHTML=list.map((n,i)=>`<button type="button" data-fn="${n}" class="${i?'':'on'}"><b dir="ltr">${n}</b><small>${FN_HELP[n]}</small></button>`).join('');
+  const rc=input.getBoundingClientRect();box.hidden=false;
+  box.style.left=Math.max(4,Math.min(rc.right-box.offsetWidth,innerWidth-box.offsetWidth-4))+'px';box.style.top=Math.min(rc.bottom+2,innerHeight-box.offsetHeight-4)+'px';
+}
+function fnPick(n){const a=X.ac;if(!a)return;const i=a.input,v=i.value;n=n||a.list[a.at];
+  i.value=v.slice(0,a.start)+n+'('+v.slice(a.pos);const c=a.start+n.length+1;i.setSelectionRange(c,c);q('xeAc').hidden=true;X.ac=null;
+  if(i===q('xeEdit')){q('xeFx').value=i.value;growEdit();}else{const e2=q('xeEdit');if(!e2.hidden)e2.value=i.value;}i.focus();}
+function fnKey(e){
+  const a=X.ac;if(!a||q('xeAc').hidden)return false;
+  if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();a.at=(a.at+(e.key==='ArrowDown'?1:-1)+a.list.length)%a.list.length;
+    q('xeAc').querySelectorAll('button').forEach((b,i)=>b.classList.toggle('on',i===a.at));return true;}
+  if(e.key==='Tab'||(e.key==='Enter'&&!e.shiftKey)){e.preventDefault();fnPick();return true;}
+  if(e.key==='Escape'){e.preventDefault();q('xeAc').hidden=true;X.ac=null;return true;}
+  return false;
+}
+// a column fits its widest value on double-click of its edge
+function autoFit(c){
+  const sh=cur();const cv=document.createElement('canvas').getContext('2d');let w=40;
+  for(const cell of sh.cells.values()){if(cell.c!==c)continue;const d=descOf(X.st.st,cell.s);const t=display(X.si,cell,cell.r,cell.c).t;if(!t)continue;
+    cv.font=`${d.font.i?'italic ':''}${d.font.b?'700 ':''}${d.font.sz*4/3}px "${d.font.name}",Arial`;w=Math.max(w,Math.min(900,cv.measureText(t).width+14));}
+  const ci=sh.cols.get(c)||{};sh.cols.set(c,{...ci,w:Math.max(1,(w-5)/7),custom:'1',hidden:false});sh.dirty=true;X.dirty=true;markDirty();render();
+}
+// drafts: unsaved work is kept on this device and offered back if the window closes by mistake
+const DRAFT={db:null,
+  open(){return this.db||(this.db=new Promise((res,rej)=>{const r=indexedDB.open('siman-drafts',1);r.onupgradeneeded=()=>r.result.createObjectStore('d');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);}));},
+  async put(k,v){try{const db=await this.open();await new Promise(r=>{const t=db.transaction('d','readwrite');t.objectStore('d').put(v,k);t.oncomplete=t.onerror=r;});}catch(_){}},
+  async get(k){try{const db=await this.open();return await new Promise(r=>{const q2=db.transaction('d').objectStore('d').get(k);q2.onsuccess=()=>r(q2.result||null);q2.onerror=()=>r(null);});}catch(_){return null;}},
+  async del(k){try{const db=await this.open();await new Promise(r=>{const t=db.transaction('d','readwrite');t.objectStore('d').delete(k);t.oncomplete=t.onerror=r;});}catch(_){}}
+};
+const draftKey=()=>'x:'+(X.opts.name||'new');
+function startDrafts(){X.draftT=setInterval(async()=>{if(!X||!X.dirty||X.saving||X.editing)return;try{const b=await buildXlsx();if(X)await DRAFT.put(draftKey(),{bytes:b,time:Date.now(),name:fileName()});}catch(_){}},40000);}
 
 /* ------------------------------------------------------------ saving */
 const SHEET_ORDER=['sheetPr','dimension','sheetViews','sheetFormatPr','cols','sheetData','sheetCalcPr','sheetProtection','protectedRanges','scenarios','autoFilter','sortState','dataConsolidate','customSheetViews','mergeCells','phoneticPr','conditionalFormatting','dataValidations','hyperlinks','printOptions','pageMargins','pageSetup','headerFooter','rowBreaks','colBreaks','customProperties','cellWatches','ignoredErrors','smartTags','drawing','legacyDrawing','legacyDrawingHF','drawingHF','picture','oleObjects','controls','webPublishItems','tableParts','extLst'];
@@ -1409,13 +1539,20 @@ async function open(opts){
   load.remove();X.calc=makeCalc(X);
   X.si=Math.max(0,X.st.sheets.findIndex(s=>!s.hidden));
   wire();buildTabs();render();q('xeWrap').focus({preventScroll:true});select(0,0);
+  if(opts.restored){X.dirty=true;markDirty();}
+  else if(window.indexedDB){const d=await DRAFT.get(draftKey());if(d&&d.bytes&&X){
+    const when=new Date(d.time).toLocaleString('he-IL',{dateStyle:'short',timeStyle:'short'});
+    const a=await ask('נמצאה עבודה שלא נשמרה',`הגיליון ${esc(d.name||'')} נערך כאן ב-${when} ולא נשמר. לפתוח את הגרסה הזו?`,[{v:'drop',l:'לא, לפתוח את הקובץ'},{v:'ok',l:'שחזור',cls:'pri'}]);
+    if(a==='ok'){const o={...opts,bytes:d.bytes,restored:true};await forceClose();return open(o);}
+    await DRAFT.del(draftKey());}}
+  startDrafts();
   return true;
 }
 const fileName=()=>((q('xeName').value||'').trim().replace(/[\\/:*?"<>|]+/g,'').replace(/\.xlsx$/i,'')||'גיליון')+'.xlsx';
 async function build(msg){X.opts.busy(true,msg||'שומר את הגיליון…');try{await nextFrame();return await buildXlsx();}finally{X.opts.busy(false);}}
 async function doSave(){
   if(!X||X.saving)return;X.saving=true;
-  try{const b=await build();if(await X.opts.save(fileName(),b,'xlsx')){X.dirty=false;X.savedOnce=true;markDirty();X.opts.toast('נשמר: '+fileName());}}
+  try{const b=await build();if(await X.opts.save(fileName(),b,'xlsx')){X.dirty=false;X.savedOnce=true;markDirty();DRAFT.del(draftKey());X.opts.toast('נשמר: '+fileName());}}
   catch(e){if(!(e&&e.name==='AbortError')){console.error(e);X.opts.toast('השמירה נכשלה: '+(e.message||e));}}finally{if(X)X.saving=false;}
 }
 async function doPdf(){
@@ -1425,17 +1562,18 @@ async function doPdf(){
 }
 async function doDesk(){
   if(!X||X.saving)return;X.saving=true;
-  try{const b=await build('מכין את הגיליון לחתימה…');const f=new File([b],fileName(),{type:XLSX_MIME});const o=X.opts;await forceClose();await o.toDesk(f);}
+  try{const b=await build('מכין את הגיליון לחתימה…');const f=new File([b],fileName(),{type:XLSX_MIME});const o=X.opts;DRAFT.del(draftKey());await forceClose();await o.toDesk(f);}
   catch(e){console.error(e);if(X){X.saving=false;X.opts.toast('לא הצלחתי לפתוח לחתימה: '+(e.message||e));}}
 }
 async function doClose(){
   if(!X)return;commitEdit();
   if(X.dirty){const a=await ask('לשמור את השינויים?',`יש שינויים ב-${esc(fileName())} שעוד לא נשמרו.`,[{v:'x',l:'ביטול'},{v:'drop',l:'סגירה בלי לשמור',cls:'warn'},{v:'save',l:'שמירה',cls:'pri'}]);
     if(!a)return;if(a==='save'){await doSave();if(X&&X.dirty)return;}}
+  DRAFT.del(draftKey());
   const o=X.opts;await forceClose();o.onClose&&o.onClose();
 }
 async function forceClose(){
-  if(!X)return;const x=X;
+  if(!X)return;const x=X;clearInterval(x.draftT);
   window.removeEventListener('keydown',x.onKey,true);window.removeEventListener('copy',x.onCopy,true);window.removeEventListener('cut',x.onCopy,true);window.removeEventListener('paste',x.onPaste,true);
   window.removeEventListener('dragover',x.onDrag,true);window.removeEventListener('drop',x.onDrag,true);window.removeEventListener('beforeunload',x.onUnload);
   document.removeEventListener('pointerdown',x.onDown,true);window.removeEventListener('resize',x.onResize);window.removeEventListener('mouseup',x.onUp);
