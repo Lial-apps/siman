@@ -1274,7 +1274,7 @@ body:has(#wed) .busy,body:has(#xed) .busy{z-index:1000}body:has(#wed) .toast,bod
 </dialog>
 
 <header class="bar">
-  <div class="brand"><b title="גרסה 4.3.1">סימן</b><span class="ver">4.3.1</span><span class="fname" id="fname"></span></div>
+  <div class="brand"><b title="גרסה 4.4">סימן</b><span class="ver">4.4</span><span class="fname" id="fname"></span></div>
 
   <nav class="tools" id="tools" aria-label="כלים">
     <button class="tool" data-tool="select" aria-pressed="true" title="בחירה וגלילה (V)">
@@ -3787,7 +3787,7 @@ async function openWordEditor(bytes,name,isNew){
   try{
     await loadEditLibs('docx');if(!window.WORD_EDITOR)await loadScript('word-editor.js');
     busy(false);
-    await WORD_EDITOR.open({bytes,name,isNew,
+    await WORD_EDITOR.open({bytes,name,isNew,author:()=>USER.name||(USER.mail||'').split('@')[0]||'',
       save:(n,b,k)=>saveBytes(n,b,k),toast,busy:(on,m)=>busy(on,m),
       toPdf:async b=>{const r=await OFFICE_EDIT.toPdf('docx',b,m=>busy(true,m));return r.pdf instanceof Uint8Array?r.pdf:new Uint8Array(r.pdf);},
       toDesk:async f=>{await openOffice(f,null,{desk:true});},
