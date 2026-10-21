@@ -123,6 +123,9 @@ const CSS=`
 #snd .chip.ok{background:#E3F4EA;color:#1F6B3B}#snd .chip.no{background:#FBE7E5;color:#A02B22}#snd .chip.wait{background:#FFF4D6;color:#7A5300}
 #snd .bar{height:6px;border-radius:4px;background:#EEF1F5;overflow:hidden;margin:8px 0}#snd .bar i{display:block;height:100%;background:#1F8A4C}
 #snd .empty{text-align:center;color:var(--mu);padding:40px 10px}
+#snd .s-toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(22px + env(safe-area-inset-bottom));z-index:960;background:#16213A;color:#fff;border-inline-start:4px solid #FFD43B;padding:11px 18px;border-radius:10px;box-shadow:0 12px 30px -10px rgba(0,0,0,.5);max-width:92vw;font-size:14px;transition:opacity .2s;opacity:0;pointer-events:none}
+#snd .s-toast.on{opacity:1}#snd .s-toast.err{border-color:#E5484D}
+#snd .tool.combo{grid-column:1/-1;border-style:solid;background:#FFF8DB;border-color:#E9C46A}
 #snd .s-load{position:absolute;inset:0;display:grid;place-items:center;background:rgba(228,232,239,.85);font-size:15px;z-index:5}
 @media (max-width:760px){#snd .s-main{flex-direction:column-reverse}#snd .s-side{width:auto;max-height:46vh;border:0;border-top:1px solid var(--l)}#snd .s-pages{padding:14px 8px 40px}}
 `;
@@ -140,22 +143,26 @@ function shell(title,actions){
   return U;
 }
 function close(){if(!U)return;window.removeEventListener('keydown',U.onKey,true);if(U.cleanup)U.cleanup();U.root.remove();U=null;}
+function say(msg,err){
+  if(!U){alert(msg);return;}let t=U.root.querySelector('.s-toast');if(!t){t=document.createElement('div');t.className='s-toast';t.setAttribute('role','status');U.root.append(t);}
+  t.textContent=msg;t.classList.toggle('err',!!err);t.classList.add('on');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('on'),err?6000:3500);
+}
 const busy=(on,msg)=>{if(!U)return;let l=U.body.querySelector('.s-load');if(on){if(!l){l=document.createElement('div');l.className='s-load';U.body.append(l);}l.textContent=msg||'רגע…';}else if(l)l.remove();};
 
 /* ---------- step 1: who signs and where */
 async function open(opts){
   const{bytes,name}=opts;const title=String(name||'מסמך').replace(/\.pdf$/i,'');
   const u=shell('שליחה לחתימה',`<button class="s-btn pri" data-go>יצירת קישורים לחתימה</button>`);
-  u.opts=opts;u.dirty=true;u.signers=[{name:''}];u.cur=0;u.fields=[];u.tool='sig';u.sel=null;
+  u.opts=opts;u.dirty=true;u.signers=[{name:''}];u.cur=0;u.fields=[];u.tools=new Set(['sig']);u.sel=null;
   if(opts.selfName)u.signers=[{name:''}];
   u.body.innerHTML=`<div class="s-main"><div class="s-pages" tabindex="0" aria-label="עמודי המסמך"></div><aside class="s-side">
     <label><h3>שם המסמך</h3><input class="s-in" data-title value="${esc(title)}" maxlength="120" dir="auto"></label>
     <div><h3 style="margin-bottom:8px">מי חותם?</h3><div data-signers style="display:flex;flex-direction:column;gap:6px"></div>
       <button class="s-btn sm" data-add style="margin-top:8px">+ הוספת חותם</button>
       <label class="ck" style="margin-top:10px"><input type="checkbox" data-seq> לחתום לפי הסדר (כל אחד אחרי הקודם)</label></div>
-    <div><h3 style="margin-bottom:8px">מה להוסיף בשביל <span data-who></span>?</h3><div class="tools">${Object.entries(TYPES).map(([k,v])=>`<button class="tool${k==='sig'?' on':''}" data-tool="${k}">${v.l}</button>`).join('')}</div>
-      <p class="hint" style="margin-top:8px">בוחרים שדה ולוחצים במקום שבו צריך לחתום. אפשר לגרור, להגדיל ולמחוק.</p>
-      <button class="s-btn sm" data-auto style="margin-top:8px">הצבה מהירה: חתימה בסוף המסמך לכל אחד</button></div>
+    <div><h3 style="margin-bottom:8px">מה להוסיף בשביל <span data-who></span>?</h3><div class="tools"><button class="tool combo" data-combo>חתימה + שם מלא + תאריך</button>${Object.entries(TYPES).map(([k,v])=>`<button class="tool${k==='sig'?' on':''}" data-tool="${k}" aria-pressed="${k==='sig'}">${v.l}</button>`).join('')}</div>
+      <p class="hint" style="margin-top:8px">אפשר לבחור כמה שדות יחד. לוחצים על המסמך, והשדות שנבחרו נכנסים אחד מתחת לשני. אפשר לגרור, להגדיל ולמחוק.</p>
+      <button class="s-btn sm" data-auto style="margin-top:8px">הצבה מהירה: חתימה, שם ותאריך בסוף המסמך לכל אחד</button></div>
     <label><h3>הודעה לחותמים (לא חובה)</h3><textarea data-note rows="2" maxlength="500" dir="auto" placeholder="למשל: נא לחתום עד יום חמישי. תודה!"></textarea></label>
     <p class="hint">המסמך נשמר בשרת של סימן 30 יום ונמחק לבד. אפשר למחוק אותו קודם, מ"המסמכים ששלחתי".</p>
   </aside></div>`;
@@ -187,9 +194,15 @@ async function open(opts){
   const select=f=>{u.sel=f;for(const x of u.fields)x.el&&x.el.classList.toggle('on',x===f);};
   const add=(page,x,y,type,signer)=>{const T=TYPES[type];const pgx=u.pages[page];const ar=pgx.vp.width/pgx.vp.height;
     const w=T.w,h=T.h*ar;const f={page,type,signer,x:Math.max(0,Math.min(1-w,x-w/2)),y:Math.max(0,Math.min(1-h,y-h/2)),w,h};u.fields.push(f);fieldEl(f);select(f);drawSigners();return f;};
+  // several fields at once: the first where the click was, the rest one under the other
+  const ORDER=['sig','initials','name','date','text'];
+  const placeGroup=(page,x,y,types,signer)=>{types=ORDER.filter(t=>types.includes(t));let top=null;
+    for(const t of types){const f=add(page,x,top===null?y:0,t,signer);if(top!==null){f.y=Math.min(1-f.h,top);f.el.style.top=f.y*100+'%';}top=f.y+f.h+.006;}};
   side.addEventListener('click',e=>{
     const hit=q=>{const x=e.target.closest(q);return x&&side.contains(x)?x:null;};
-    const t=hit('[data-tool]');if(t){u.tool=t.dataset.tool;side.querySelectorAll('.tool').forEach(b=>b.classList.toggle('on',b===t));u.root.classList.add('arm');return;}
+    const paint=()=>side.querySelectorAll('[data-tool]').forEach(b=>{const on=u.tools.has(b.dataset.tool);b.classList.toggle('on',on);b.setAttribute('aria-pressed',on);});
+    if(hit('[data-combo]')){u.tools=new Set(['sig','name','date']);paint();say('נבחרו חתימה, שם מלא ותאריך. לוחצים על המסמך במקום החתימה');return;}
+    const t=hit('[data-tool]');if(t){const k=t.dataset.tool;if(u.tools.has(k)){if(u.tools.size>1)u.tools.delete(k);}else u.tools.add(k);paint();return;}
     const d=hit('[data-del]');if(d){const i=+d.dataset.del;u.fields=u.fields.filter(f=>f.signer!==i);u.fields.forEach(f=>{if(f.signer>i)f.signer--;});u.signers.splice(i,1);u.cur=Math.min(u.cur,u.signers.length-1);redraw();return;}
     const r=hit('.sg');if(r){const i=+r.dataset.i;if(i!==u.cur){u.cur=i;side.querySelectorAll('.sg').forEach(x=>x.classList.toggle('on',+x.dataset.i===i));
       const w=side.querySelector('[data-who]');w.textContent=u.signers[i].name||`חותם ${i+1}`;w.style.color=COLORS[i%COLORS.length];}
@@ -197,7 +210,7 @@ async function open(opts){
     if(hit('[data-add]')){if(u.signers.length>=10)return;u.signers.push({name:''});u.cur=u.signers.length-1;drawSigners();side.querySelector(`[data-name="${u.cur}"]`).focus();return;}
     if(hit('[data-auto]')){const last=u.pages.length-1;const n=u.signers.length;
       u.signers.forEach((s,i)=>{if(u.fields.some(f=>f.signer===i&&f.type==='sig'))return;const col=n<=2?(i===0?.75:.25):(1-(i%3+.5)/3);const row=Math.floor(i/(n<=2?2:3));
-        add(last,col,.86-row*.1,'sig',i);add(last,col,.86-row*.1+.055,'date',i);});return;}
+        placeGroup(last,col,.78-row*.13,['sig','name','date'],i);});say('השדות נוספו בעמוד האחרון. אפשר לגרור אותם למקום המדויק');return;}
   });
   side.addEventListener('focusin',e=>{const n=e.target.dataset&&e.target.dataset.name;if(n===undefined||+n===u.cur)return;u.cur=+n;
     side.querySelectorAll('.sg').forEach(x=>x.classList.toggle('on',+x.dataset.i===u.cur));const w=side.querySelector('[data-who]');w.textContent=u.signers[u.cur].name||`חותם ${u.cur+1}`;w.style.color=COLORS[u.cur%COLORS.length];});
@@ -214,15 +227,15 @@ async function open(opts){
         else{f.x=Math.max(0,Math.min(1-f.w,o.x+dx));f.y=Math.max(0,Math.min(1-f.h,o.y+dy));}
         Object.assign(fe.style,{left:f.x*100+'%',top:f.y*100+'%',width:f.w*100+'%',height:f.h*100+'%'});};
       const up=()=>{fe.removeEventListener('pointermove',mv);fe.removeEventListener('pointerup',up);};fe.addEventListener('pointermove',mv);fe.addEventListener('pointerup',up);return;}
-    add(+box.dataset.p,(e.clientX-R.left)/R.width,(e.clientY-R.top)/R.height,u.tool,u.cur);
+    placeGroup(+box.dataset.p,(e.clientX-R.left)/R.width,(e.clientY-R.top)/R.height,[...u.tools],u.cur);
   });
   u.onDel=e=>{if((e.key==='Delete'||e.key==='Backspace')&&u.sel&&!/INPUT|TEXTAREA/.test(document.activeElement.tagName)){e.preventDefault();u.sel.el.remove();u.fields=u.fields.filter(x=>x!==u.sel);u.sel=null;drawSigners();}};
   u.cleanup=()=>{if(u.pdf)u.pdf.destroy();};
   drawSigners();
   u.root.querySelector('[data-go]').onclick=async()=>{
     const names=u.signers.map((s,i)=>s.name.trim()||null);
-    const miss=names.findIndex(n=>!n);if(miss>=0){u.cur=miss;drawSigners();const inp=side.querySelector(`[data-name="${miss}"]`);inp.focus();opts.toast&&opts.toast('צריך לכתוב את השם של כל חותם');return;}
-    const noF=u.signers.findIndex((s,i)=>!u.fields.some(f=>f.signer===i));if(noF>=0){u.cur=noF;drawSigners();opts.toast&&opts.toast(`עוד לא סימנת איפה ${names[noF]} חותם/ת`);return;}
+    const miss=names.findIndex(n=>!n);if(miss>=0){u.cur=miss;drawSigners();const inp=side.querySelector(`[data-name="${miss}"]`);inp.focus();say('צריך לכתוב את השם של כל חותם',1);return;}
+    const noF=u.signers.findIndex((s,i)=>!u.fields.some(f=>f.signer===i));if(noF>=0){u.cur=noF;drawSigners();say(`עוד לא סימנת איפה ${names[noF]} חותם/ת`,1);return;}
     const fields=u.fields.map(f=>{const vp=u.pages[f.page].vp;const W=vp.width,H=vp.height;const a=vp.convertToPdfPoint(f.x*W,f.y*H),b=vp.convertToPdfPoint((f.x+f.w)*W,(f.y+f.h)*H);
       return{signer:f.signer,page:f.page,type:f.type,x:f.x,y:f.y,w:f.w,h:f.h,r:[a[0],a[1],b[0],b[1]].map(v=>+v.toFixed(2)),req:true};});
     await upload(u,{mode:'sign',title:side.querySelector('[data-title]').value.trim()||title,note:side.querySelector('[data-note]').value.trim(),order:side.querySelector('[data-seq]').checked?'seq':'any',
@@ -237,7 +250,7 @@ async function upload(u,meta){
     const r=await api('',{method:'POST',body:fd});
     const rec={id:r.id,k:r.owner,v:r.view,title:meta.title,mode:meta.mode,created:new Date().toISOString(),expires:r.expires,signers:(r.signers||[]).map(s=>({n:s.n,name:s.name,t:s.token})),note:meta.note||''};
     listSet([rec,...listGet()]);u.dirty=false;busy(false);links(rec,o);
-  }catch(e){busy(false);o.toast&&o.toast('השליחה נכשלה: '+(e.message||e));}
+  }catch(e){busy(false);say('השליחה נכשלה: '+(e.message||e),1);}
 }
 
 /* ---------- step 2: the links */
@@ -278,11 +291,11 @@ async function list(o){
     const el=e.target.closest('[data-dl],[data-links],[data-rm],[data-forget]');if(!el||!u.body.contains(el))return;const id=el.dataset;const r=l.find(x=>x.id===(id.dl||id.links||id.rm||id.forget));if(!r)return;
     if(id.links)return links(r,o);
     if(id.forget){listSet(listGet().filter(x=>x.id!==r.id));return list(o);}
-    if(id.rm){if(!confirm(`למחוק את "${r.title}" מהשרת? הקישורים יפסיקו לעבוד.`))return;try{await api(`/${r.id}?k=${encodeURIComponent(r.k)}`,{method:'DELETE'});}catch(err){if(!/לא נמצא/.test(err.message)){o.toast&&o.toast(err.message);return;}}
+    if(id.rm){if(!confirm(`למחוק את "${r.title}" מהשרת? הקישורים יפסיקו לעבוד.`))return;try{await api(`/${r.id}?k=${encodeURIComponent(r.k)}`,{method:'DELETE'});}catch(err){if(!/לא נמצא/.test(err.message)){say(err.message,1);return;}}
       listSet(listGet().filter(x=>x.id!==r.id));return list(o);}
     if(id.dl){busy(true,'בונה את המסמך החתום…');try{const pdf=await getPdf(r.id,{k:r.k});const out=await buildSigned(r.meta,pdf);busy(false);
       const name=`${r.title} - חתום.pdf`;if(o.save)await o.save(name,out,'pdf');else{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([out],{type:'application/pdf'}));a.download=name;a.click();}}
-      catch(err){busy(false);o.toast&&o.toast('לא הצלחתי לבנות את המסמך: '+(err.message||err));}}
+      catch(err){busy(false);say('לא הצלחתי לבנות את המסמך: '+(err.message||err),1);}}
   });
 }
 
