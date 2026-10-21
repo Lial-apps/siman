@@ -33,6 +33,9 @@ html,body{margin:0;background:var(--bg);color:var(--n);font:15px/1.45 "Heebo",sy
 .page{position:relative;background:#fff;box-shadow:0 10px 28px -14px rgba(22,33,58,.45);width:100%}
 .page canvas{display:block;width:100%;height:auto;direction:ltr}
 .f.flash{outline:3px solid #1F8A4C;outline-offset:3px}
+.aud{margin-top:12px;border-top:1px solid var(--l);padding-top:10px}.aud h3{margin:0 0 6px;font-size:15px}.aud h3.signed{color:var(--ok)}.aud h3.declined{color:#C2362B}.aud h3.waiting{color:#8F5B00}
+.aud table{border-collapse:collapse;font-size:13px;width:100%}.aud th{text-align:start;color:var(--mu);font-weight:400;padding:3px 0;width:150px;vertical-align:top}.aud td{padding:3px 0;word-break:break-all}.aud td[dir=ltr]{text-align:right}
+.aud summary{cursor:pointer;color:var(--mu);font-size:13px;margin-bottom:6px}
 .mysig{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:12px 0 4px}.mysig img{height:64px;max-width:240px;object-fit:contain;background:#F7F8FB;border:1px solid var(--l);border-radius:10px;padding:6px}
 .f{position:absolute;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:12px;overflow:hidden}
 .f.mine{border:2px dashed var(--b);background:rgba(255,212,59,.35);color:var(--n);cursor:pointer;font-weight:700;animation:pulse 2.2s infinite}
@@ -116,7 +119,11 @@ async function start(){
   const from=M.from&&M.from.name?esc(M.from.name):'מישהו';
   let head;
   if(M.owner){const n=M.signers.filter(s=>s.status==='signed').length;
-    head=`<h1>${esc(M.title)}</h1><p>${M.mode==='view'?'קישור לצפייה ששלחת.':`חתמו ${n} מתוך ${M.signers.length}: ${M.signers.map(s=>`${s.status==='signed'?'✓':s.status==='declined'?'✗':'⏳'} ${esc(s.name)}`).join(' · ')}`}</p>`;}
+    const row=(l,v,ltr)=>v?`<tr><th>${l}</th><td${ltr?' dir="ltr"':''}>${esc(v)}</td></tr>`:'';
+    head=`<h1>${esc(M.title)}</h1><p>${M.mode==='view'?'קישור לצפייה ששלחת.':`חתמו ${n} מתוך ${M.signers.length}`}</p>
+      ${M.mode==='sign'?M.signers.map(s=>`<div class="aud"><h3 class="${s.status}">${s.status==='signed'?'✓ חתם/ה':s.status==='declined'?'✗ סירב/ה':'⏳ ממתין/ה'} · ${esc(s.name)}</h3>
+        <table>${row('מועד',s.at?fmt(s.at)+(s.tz?` (${s.tz})`:''):'',1)}${row('כתובת רשת',s.ip?s.ip+(s.country?` (${s.country})`:''):'',1)}${row('מכשיר',s.ua?SS.devName(s.ua):'')}${row('סיבה',s.reason)}</table></div>`).join(''):''}
+      <details class="aud"><summary>פרטי המסמך</summary><table>${row('מזהה',M.id,1)}${row('נוצר',fmt(M.created),1)}${row('יימחק מהשרת',fmt(M.expires).split(',')[0],1)}${row('טביעת אצבע (SHA-256)',M.hash,1)}</table></details>`;}
   else if(M.mode==='view')head=`<h1>${esc(M.title)}</h1><p>${from} שיתף/ה איתך את המסמך.</p>`;
   else if(!me)head=`<h1>${esc(M.title)}</h1>`;
   else if(me.status==='signed')head=`<h1>✓ חתמת על המסמך</h1><p>${fmt(me.at)}. אפשר להוריד עותק.</p><div class="row" style="margin-top:8px"><button class="btn" onclick="showMine()">לראות את החתימה במסמך</button></div>`;
