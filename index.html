@@ -1274,7 +1274,7 @@ body:has(#wed) .busy,body:has(#xed) .busy{z-index:1000}body:has(#wed) .toast,bod
 </dialog>
 
 <header class="bar">
-  <div class="brand"><b title="גרסה 4.5.4">סימן</b><span class="ver">4.5.4</span><span class="fname" id="fname"></span></div>
+  <div class="brand"><b title="גרסה 4.6.0">סימן</b><span class="ver">4.6.0</span><span class="fname" id="fname"></span></div>
 
   <nav class="tools" id="tools" aria-label="כלים">
     <button class="tool" data-tool="select" aria-pressed="true" title="בחירה וגלילה (V)">
@@ -1458,6 +1458,12 @@ body:has(#wed) .busy,body:has(#xed) .busy{z-index:1000}body:has(#wed) .toast,bod
       <button class="segb" data-target="en" aria-pressed="false">לאנגלית</button>
       <button class="segb" data-target="none" aria-pressed="false" title="הטקסט של הקובץ כמו שהוא, לעריכה ולעיצוב">בלי תרגום</button>
     </div>
+    <div class="seg seg-more" role="group" aria-label="שפות נוספות">
+      <button class="segb" data-target="ru" aria-pressed="false" lang="ru" title="תרגום לרוסית">Русский</button>
+      <button class="segb" data-target="ar" aria-pressed="false" lang="ar" title="תרגום לערבית">العربية</button>
+      <button class="segb" data-target="fr" aria-pressed="false" lang="fr" title="תרגום לצרפתית">Français</button>
+      <button class="segb" data-target="es" aria-pressed="false" lang="es" title="תרגום לספרדית">Español</button>
+    </div>
     <label class="field">אופן התרגום
       <select id="tpMode"><option value="inplace">בתוך המסמך: שומר על העיצוב המקורי</option><option value="text">כטקסט נפרד (לעריכה ולעיצוב)</option></select></label>
     <label class="field">היקף
@@ -1557,6 +1563,7 @@ body:has(#wed) .busy,body:has(#xed) .busy{z-index:1000}body:has(#wed) .toast,bod
     <div class="sig-row"><span class="grow"></span><button class="btn" id="readyCancel">ביטול</button><button class="btn primary" id="readySave">שמירה</button></div>
   </div>
 </dialog>
+<style>.seg-more{margin-top:6px}.seg-more .segb{font-size:13.5px}</style>
 <style>.sh-ic.sg{background:#FFF3C4;color:#8A6100}.sh-ic.lk{background:#E6EEFF;color:#2E58CC}</style>
 <dialog class="sig sheet" id="shareDlg" aria-labelledby="shareTitle">
   <div class="sig-in">
@@ -1656,7 +1663,7 @@ const ALEF_B64 = "AAEAAAASAQAABAAgRkZUTWatrcwAAVxAAAAAHEdERUYHrgj9AAFcXAAAAEJHUE
    fontkit reverses Hebrew-script strings itself, so RTL runs are passed
    in logical order; neutral-only RTL runs are reversed here.
    ===================================================================== */
-const RE_R=/[\u0590-\u05FF\uFB1D-\uFB4F]/;
+const RE_R=/[\u0590-\u05FF\uFB1D-\uFB4F\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF]/;
 const RE_L=/[A-Za-z0-9\u00C0-\u024F\u0370-\u03FF\u0400-\u04FF]/;
 const RE_LL=/[A-Za-z\u00C0-\u024F\u0370-\u03FF\u0400-\u04FF]/; // letters only
 // paragraph direction by majority: a Hebrew line that starts with an English word is still RTL
@@ -2600,6 +2607,9 @@ async function saveBytes(name,bytes,kind){
    translate page by page through Claude, export as a new RTL/LTR PDF.
    ===================================================================== */
 const LANG_HE={he:'עברית',en:'אנגלית',ar:'ערבית',ru:'רוסית',fr:'צרפתית',es:'ספרדית',de:'גרמנית',it:'איטלקית',pt:'פורטוגזית',am:'אמהרית',yi:'יידיש',uk:'אוקראינית',tr:'טורקית',zh:'סינית',ja:'יפנית',ko:'קוריאנית',pl:'פולנית',nl:'הולנדית',ro:'רומנית',hu:'הונגרית',fa:'פרסית',el:'יוונית',la:'לטינית'};
+// translation targets: Hebrew/English through siman-translate, the others through siman-ai
+const TR_LANG={he:{n:'Hebrew',rtl:1,suf:'עברית'},en:{n:'English',suf:'English'},ru:{n:'Russian',suf:'Русский',font:'rubik'},fr:{n:'French',suf:'Français'},es:{n:'Spanish',suf:'Español'},ar:{n:'Arabic',rtl:1,suf:'العربية',font:'rubik'}};
+const trRtl=t=>!!(TR_LANG[t]&&TR_LANG[t].rtl);
 const TR={
   pages:[],target:'he',running:false,stop:false,src:null,
   reset(){this.pages=[];this.src=null;this.langFromApi=null;this.stop=true;$('tpResults').innerHTML='';$('tpFoot').classList.add('hidden');$('tpFmt').classList.add('hidden');status('');$('tpLang').textContent='בודק…';}
@@ -2746,7 +2756,7 @@ function setTarget(t){TR.target=t;document.querySelectorAll('.segb[data-target]'
 function currentPageIndex(){const m=/(\d+)/.exec($('pageInfo').textContent);return m?+m[1]-1:0;}
 
 function trSystem(target){
-  const t=target==='en'?'English':'Hebrew';
+  const t=(TR_LANG[target]||TR_LANG.he).n;
   return `You are a professional document translator. Translate the page the user sends into ${t}.\nOutput format, exactly:\nLANG: <ISO 639-1 code of the source text's main language>\n---\n<the translation>\nKeep paragraph breaks, headings, list numbering, numbers, names and line structure. Output only the translation, with no notes or explanations. If the text is already in ${t}, return it unchanged.`;
 }
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
@@ -2765,7 +2775,9 @@ async function callTranslate(text,target){
     const body=JSON.stringify({systemInstruction:{parts:[{text:trSystem(target)}]},contents:[{role:'user',parts:[{text:`<page>\n${text}\n</page>`}]}],generationConfig:{temperature:0.2,maxOutputTokens:16384}});
     for(let attempt=0;attempt<5;attempt++){
       const r=st.provider==='builtin'
-        ?await fetch(TRANSLATE_URL,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({text,target})})
+        ?(target==='he'||target==='en'
+          ?await fetch(TRANSLATE_URL,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({text,target})})
+          :await fetch(AI_URL,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({mode:'translate',text,target})}))
         :await fetch(url,{method:'POST',headers:{'content-type':'application/json','x-goog-api-key':key},body});
       const d=await r.json().catch(()=>({}));
       if(r.status===429||r.status===503){
@@ -2860,7 +2872,7 @@ async function translateInPlace(){
           const t=out[k+1];if(!t)return;
           const{bg,fg}=sampleColors(P,u);const fn=fontNameOf(P,u.font);
           const a={id:S.nextId++,type:'edit',page:i,rects:u.lines.map(l=>[l.x0,l.y0,l.x1,l.y1]),x0:u.x0,x1:u.x1,base:u.base,size:Math.round(u.size*10)/10,lh:u.lh,
-            dir:paraDir(t,target==='en'?'L':'R'),align:u.align,font:P.ocr?'heebo':guessFont(fn.name),bold:fn.bold||/bold|black|heavy|semibold/i.test(fn.name)||u.lines.some(l=>l.bold),color:fg,bg,text:t,orig:u.text,dx:0,dy:0,tr:true};
+            dir:paraDir(t,trRtl(target)?'R':'L'),align:u.align,font:(TR_LANG[target]&&TR_LANG[target].font)||(P.ocr?'heebo':guessFont(fn.name)),bold:fn.bold||/bold|black|heavy|semibold/i.test(fn.name)||u.lines.some(l=>l.bold),color:fg,bg,text:t,orig:u.text,dx:0,dy:0,tr:true};
           fitEdit(a);S.anns.push(a);pieces++;
         });
       }
@@ -2980,7 +2992,7 @@ function setTableDir(dom,rtl){
   }
 }
 async function translateOfficeDocx(){
-  const target=TR.target,rtl=target==='he';
+  const target=TR.target,rtl=trRtl(target);
   if(S.anns.length&&!confirm('התרגום יוצר קובץ Word חדש, והסימונים והחתימות שהוספת לא יעברו אליו. להמשיך?'))return;
   TR.running=true;TR.stop=false;$('tpGo').disabled=true;$('tpStop').classList.remove('hidden');
   $('tpResults').innerHTML='';$('tpFoot').classList.add('hidden');$('tpFmt').classList.add('hidden');
@@ -3024,7 +3036,7 @@ async function translateOfficeDocx(){
     const head='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n';
     for(const{path,dom}of parts){setTableDir(dom,rtl);zip.file(path,head+new XMLSerializer().serializeToString(dom.documentElement));}
     const bytes=await zip.generateAsync({type:'uint8array',compression:'DEFLATE'});
-    const name=`${S.office.base} - ${rtl?'עברית':'English'}.docx`;
+    const name=`${S.office.base} - ${(TR_LANG[target]||TR_LANG.he).suf}.docx`;
     msg=`התרגום הושלם (${n} פסקאות${n<units.length?`, ${units.length-n} לא תורגמו`:''}). זה קובץ Word חדש: אפשר לסמן ולחתום, ובשמירה לבחור Word או PDF.`;
     setDirty(false);
     await openFile(new File([bytes],name,{type:OFFICE_MIME.docx}));
@@ -3034,7 +3046,7 @@ async function translateOfficeDocx(){
   if(msg)status(msg);
 }
 function translatedPages(){return TR.pages.map((p,i)=>p&&p.text?{i,text:p.text}:null).filter(Boolean);}
-function baseName(){return S.name.replace(/\.pdf$/i,'')+(TR.target==='en'?' - English':TR.target==='none'?' - ערוך':' - עברית');}
+function baseName(){return S.name.replace(/\.pdf$/i,'')+(TR.target==='none'?' - ערוך':' - '+(TR_LANG[TR.target]||TR_LANG.he).suf);}
 
 /* ---------- formatting of the translation (panel preview + PDF) ---------- */
 const FMT_DEF={dir:'auto',align:'start',size:12,lh:1.55,head:true,hdr:true};
@@ -3073,8 +3085,10 @@ async function exportTranslationPdf(){
   busy(true,'יוצר PDF…');
   try{
     const{PDFDocument}=PDFLib;const doc=await PDFDocument.create();doc.registerFontkit(fontkit);
-    const font=await doc.embedFont(b64Bytes(ALEF_B64),{subset:true});
-    const bold=FMT.head?await doc.embedFont(b64Bytes(ALEF_BOLD_B64),{subset:true}):font;
+    // Russian and Arabic need a font that has their letters (Rubik); the others keep Alef
+    const fk=(TR_LANG[TR.target]&&TR_LANG[TR.target].font)||'alef';
+    const font=await doc.embedFont(await fontBytes(fk,false),{subset:true});
+    const bold=FMT.head?await doc.embedFont(await fontBytes(fk,true),{subset:true}):font;
     const W=595.28,H=841.89,M=56,maxW=W-2*M;
     const forcedAll=FMT.dir==='rtl'?'R':FMT.dir==='ltr'?'L':null;let forced=forcedAll;
     const grey=PDFLib.rgb(.45,.47,.52),ink=PDFLib.rgb(.11,.14,.2);
@@ -3178,6 +3192,7 @@ $('tpDocx').onclick=exportDocx;
 /* settings */
 // כתובת שרת התרגום (Cloudflare Worker). ריק = התרגום המובנה כבוי ומשתמשים במפתח אישי
 const TRANSLATE_URL='https://siman-translate.siman-app.workers.dev/';
+const AI_URL='https://siman-ai.siman-app.workers.dev/'; // smart features + translation to more languages (siman-ai.js)
 const PROVIDERS={
   builtin:{help:'תרגום מוכן לשימוש, בלי מפתח ובלי הרשמה. מתאים למסמכים רגילים; למסמכים רגישים עדיף לא להשתמש בתרגום מקוון.',ph:'',re:/.*/,reMsg:'',models:[['default','ברירת מחדל']]},
   gemini:{help:'תרגום חינמי באמצעות Google Gemini. יוצרים מפתח בחינם, בלי כרטיס אשראי, ב-<a href="https://aistudio.google.com/apikey" data-ext>aistudio.google.com/apikey</a>. במסלול החינמי Google רשאית להשתמש בטקסט לשיפור המודלים, לכן לא מומלץ למסמכים רגישים.',
@@ -3380,7 +3395,7 @@ async function ocrPage(P){
 // share of words that look like real words; low = a garbled text layer from a scanner
 function textQuality(lines){
   const toks=lines.flatMap(l=>l.text.split(/\s+/)).filter(t=>t.length>=2);if(!toks.length)return 0;
-  const good=toks.filter(t=>/^[\u05D0-\u05EA"'׳״-]+[.,:;!?)]*$/.test(t)&&/[\u05D0-\u05EA]{2}/.test(t)||/^[A-Za-z]{2,}[.,:;]?$/.test(t)&&/[aeiou]/i.test(t)||/^[\d.,:\/%-]+$/.test(t)).length;
+  const good=toks.filter(t=>/^[\u05D0-\u05EA"'׳״-]+[.,:;!?)]*$/.test(t)&&/[\u05D0-\u05EA]{2}/.test(t)||/^[A-Za-z\u00C0-\u00FF]{2,}[.,:;!?]?$/.test(t)&&/[aeiouyàâäéèêëîïôöûùüÿáíóú]/i.test(t)||/^[\u0400-\u04FF]{2,}[.,:;!?)]*$/.test(t)||/^[\u0600-\u06FF]{2,}[.,:;!?)\u060C\u061F]*$/.test(t)||/^[\d.,:\/%-]+$/.test(t)).length;
   return good/toks.length;
 }
 async function runOCR(idx){
@@ -4916,8 +4931,9 @@ const isIOS=/iphone|ipad|ipod/i.test(navigator.userAgent)||(navigator.platform==
 const standalone=matchMedia('(display-mode: standalone)').matches||navigator.standalone;
 if(isIOS&&!standalone)$('iosHint').classList.remove('hidden');
 if('launchQueue' in window){
-  launchQueue.setConsumer(async p=>{if(p.files&&p.files.length){const h=p.files[0];openFile(await h.getFile(),h);}});
+  launchQueue.setConsumer(async p=>{if(p.files&&p.files.length){for(const h of p.files){try{await openFile(await h.getFile(),h);}catch(e){console.error(e);}}}});
 }
 </script>
+<script src="siman-plus.js"></script>
 </body>
 </html>
