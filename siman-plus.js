@@ -413,16 +413,25 @@ window.SIMAN_TABS = { TB, switchTo, closeTab, mergeAll, zipAll, openMany };
 /* =====================================================================
    2. AI — the smart server (siman-ai)
    ===================================================================== */
-async function ai(payload, { onWait, signal } = {}) {
+async function ai(payload, { onWait, signal, timeout = 300000 } = {}) {
   for (let attempt = 0; attempt < 4; attempt++) {
-    let r, d;
+    let r, d, status;
+    const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), timeout);
+    if (signal) signal.addEventListener('abort', () => ctl.abort(), { once: true });
     try {
-      r = await fetch(AI, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload), signal });
-      d = await r.json().catch(() => ({}));
+      r = await fetch(AI, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload), signal: ctl.signal });
+      // the server keeps the line open with spaces while Gemini works; the JSON comes at the end
+      const raw = await r.text();
+      try { d = JSON.parse(raw.trim() || '{}'); } catch (_) { d = {}; }
     } catch (e) {
-      if (e && e.name === 'AbortError') throw e;
+      clearTimeout(timer);
+      if (signal && signal.aborted) throw e;
+      if (e && e.name === 'AbortError') throw new Error('הבקשה לקחה יותר מדי זמן. נסו שוב, או צלמו את הדף קרוב יותר ובאור טוב');
       throw new Error(navigator.onLine === false ? 'אין חיבור לאינטרנט' : 'השירות החכם לא זמין כרגע. נסו שוב בעוד רגע');
     }
+    clearTimeout(timer);
+    status = r.status;
+    if (r.ok && d.error) { status = +d.error.status || 502; r = { ok: false, status }; }
     if (r.ok) {
       const c = (d.candidates || [])[0];
       const out = c && c.content && (c.content.parts || []).filter(x => x.text && !x.thought).map(x => x.text).join('');
@@ -434,7 +443,8 @@ async function ai(payload, { onWait, signal } = {}) {
     if (r.status === 429 && /per ?day|PerDay/i.test(all)) throw new Error('נגמרה המכסה היומית החינמית. היא מתאפסת מחר בבוקר');
     if (r.status === 403) throw new Error('השרת החכם חוסם את הכתובת הזו של האפליקציה');
     if (r.status === 404) throw new Error('השרת החכם (siman-ai) עוד לא הוקם');
-    if ([429, 500, 502, 503, 504].includes(r.status)) {
+    if (r.status === 504 || r.status === 524) throw new Error('הקריאה לקחה יותר מדי זמן. נסו שוב בעוד רגע');
+    if ([429, 500, 502, 503].includes(r.status)) {
       const wait = 8 * (attempt + 1);
       for (let k = wait; k > 0; k--) { onWait && onWait(k); await sleep(1000); if (signal && signal.aborted) throw new DOMException('stop', 'AbortError'); }
       continue;
@@ -793,9 +803,11 @@ const SC = {
       if (this.stop) break;
       const p = this.pages[i], li = lis[i];
       li.className = 'now'; li.querySelector('span').textContent = 'קורא…';
-      st.textContent = `${i ? '' : pre}קורא את עמוד ${i + 1} מתוך ${this.pages.length}…`;
+      const t0 = Date.now(), line = `${i ? '' : pre}קורא את עמוד ${i + 1} מתוך ${this.pages.length}`;
+      st.textContent = line + '…';
+      const clock = setInterval(() => { const sec = Math.round((Date.now() - t0) / 1000); li.querySelector('span').textContent = `קורא… ${sec} שנ׳`; st.textContent = `${line} · ${sec} שניות${sec > 45 ? ' (כתב יד צפוף לוקח לפעמים עד שתי דקות)' : ''}`; }, 1000);
       try {
-        const raw = await ai({ mode: 'scan', image: p.b64, mime: 'image/jpeg', hint: this.hint }, { onWait: s => { st.textContent = `השירות עמוס, ממשיך בעוד ${s} שניות…`; } });
+        const raw = await ai({ mode: 'scan', image: p.b64, mime: 'image/jpeg', hint: this.hint }, { onWait: s => { st.textContent = `השירות עמוס, ממשיך בעוד ${s} שניות…`; } }).finally(() => clearInterval(clock));
         p.blocks = parseBlocks(raw); p.lang = p.blocks.lang;
         li.className = 'ok'; li.querySelector('span').textContent = p.blocks.length ? `${p.blocks.length} קטעים` : 'עמוד ריק';
       } catch (e) {
@@ -884,7 +896,7 @@ window.SIMAN_SCAN = SC;
 
 // pictures for the service: long side ~2000px, JPEG
 function canvasJpeg(draw, w, hgt) {
-  const s = Math.min(1, 2000 / Math.max(w, hgt));
+  const s = Math.min(1, 1700 / Math.max(w, hgt));
   const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(w * s)); c.height = Math.max(1, Math.round(hgt * s));
   const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height);
   return Promise.resolve(draw(x, c.width, c.height)).then(() => {
@@ -900,7 +912,7 @@ async function imgToJpeg(file) {
   return canvasJpeg((x, cw, ch) => x.drawImage(bmp, 0, 0, cw, ch), w, hh);
 }
 async function pageToJpeg(page) {
-  const v1 = page.getViewport({ scale: 1 }), sc = Math.min(3, 2000 / Math.max(v1.width, v1.height));
+  const v1 = page.getViewport({ scale: 1 }), sc = Math.min(3, 1700 / Math.max(v1.width, v1.height));
   const vp = page.getViewport({ scale: sc });
   return canvasJpeg(async x => { await page.render({ canvasContext: x, viewport: vp }).promise; }, vp.width, vp.height);
 }
