@@ -922,7 +922,8 @@ function parseBlocks(raw) {
   let j = null;
   const s = String(raw || '').replace(/^\s*```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '');
   try { j = JSON.parse(s); } catch (_) { const m = /\{[\s\S]*\}/.exec(s); if (m) { try { j = JSON.parse(m[0]); } catch (_) {} } }
-  if (!j) throw new Error('התשובה מהשירות לא הייתה תקינה');
+  if (!j) j = salvage(s);
+  if (!j) { console.warn('scan: unreadable answer', raw); throw new Error('התשובה מהשירות לא הייתה תקינה. נסו שוב'); }
   const arr = Array.isArray(j) ? j : Array.isArray(j.blocks) ? j.blocks : [];
   const out = [];
   for (const b of arr) {
@@ -938,6 +939,16 @@ function parseBlocks(raw) {
   }
   out.lang = typeof j.lang === 'string' ? j.lang.slice(0, 2).toLowerCase() : null;
   return out;
+}
+// a cut or broken answer: keep every block that is whole; plain text becomes paragraphs
+function salvage(s) {
+  const found = [];
+  for (const m of s.matchAll(/\{[^{}\[\]]*\}|\{[^{}]*"rows"\s*:\s*\[[\s\S]*?\]\s*\]\s*\}/g)) {
+    try { const o = JSON.parse(m[0]); if (o && (o.text || o.rows)) found.push({ at: m.index, o }); } catch (_) {}
+  }
+  if (found.length) { console.warn('scan: answer was broken, kept', found.length, 'blocks'); return { blocks: found.sort((a, b) => a.at - b.at).map(x => x.o) }; }
+  if (!/^\s*[\[{]/.test(s) && s.trim()) return { blocks: s.split(/\n+/).map(t => t.trim()).filter(Boolean).map(text => ({ t: 'p', text })) };
+  return null;
 }
 const unsureHtml = t => esc(t).replace(/\[\[(.*?)\]\]/g, (m, w) => w.trim() === '?' ? '<mark title="לא הצלחתי לקרוא">[?]</mark>' : `<mark title="לא בטוח, כדאי לבדוק">${w}</mark>`);
 function blocksHtml(blocks) {
