@@ -43,6 +43,10 @@ document.head.append(h(`<style id="simanPlusCss">
 /* above the full Word / Excel editors */
 body.ed-live .tabs{position:fixed;top:0;left:0;right:0;z-index:950;height:40px;box-shadow:0 1px 0 var(--line)}
 body.ed-live #wed,body.ed-live #xed{top:40px!important}
+body.ed-live #aiPanel{position:fixed;z-index:960;top:40px;bottom:0;inset-inline-end:0;width:min(400px,100vw);box-shadow:0 0 40px -12px rgba(0,0,0,.45);background:var(--bar)}
+@media (max-width:720px){body.ed-live #aiPanel{top:auto;height:72vh;width:100vw;border-radius:16px 16px 0 0}}
+.ed-ai{display:inline-flex;align-items:center;gap:6px}
+.ed-ai svg{width:16px;height:16px;color:var(--marker,#FFD43B)}
 .tab.ed .kd{color:#fff;border-color:transparent;opacity:1}
 .tab.ed.docx .kd{background:#2B579A}
 .tab.ed.xlsx .kd{background:#217346}
@@ -81,7 +85,7 @@ body.ed-live #wed,body.ed-live #xed{top:40px!important}
 .ai-ask textarea:focus{outline:2px solid var(--marker);border-color:var(--ink)}
 .ai-note{margin:0;padding:0 14px 10px;font-size:11.5px;color:var(--muted)}
 /* read aloud */
-.ra{position:fixed;z-index:70;inset-inline:0;bottom:calc(16px + env(safe-area-inset-bottom,0px));margin:auto;width:min(640px,calc(100vw - 20px));display:flex;align-items:center;gap:6px;padding:8px 10px;background:var(--navy);color:var(--chrome-text,#F2F2EC);border-radius:16px;box-shadow:0 20px 44px -18px rgba(0,0,0,.6)}
+.ra{position:fixed;z-index:980;inset-inline:0;bottom:calc(16px + env(safe-area-inset-bottom,0px));margin:auto;width:min(640px,calc(100vw - 20px));display:flex;align-items:center;gap:6px;padding:8px 10px;background:var(--navy);color:var(--chrome-text,#F2F2EC);border-radius:16px;box-shadow:0 20px 44px -18px rgba(0,0,0,.6)}
 .ra.hidden{display:none}
 .ra button,.ra select{flex:none;height:34px;min-width:34px;border:0;border-radius:9px;background:rgba(255,255,255,.08);color:inherit;font:inherit;font-size:14px;cursor:pointer}
 .ra button:hover{background:rgba(255,255,255,.16)}
@@ -198,7 +202,7 @@ async function leave() {
   if (c.ed) { if (edLive(c)) await park(c); } else stash();
   TB.cur = null;
 }
-async function enter(t) { if (t.ed) await unpark(t); else restore(t); renderTabs(); }
+async function enter(t) { if (t.ed) await unpark(t); else restore(t); renderTabs(); AS.onTab(); }
 
 function observe() {
   if (io) io.disconnect();
@@ -343,12 +347,25 @@ async function closeAll() {
 }
 
 /* ---- the full Word / Excel editors as tabs ---- */
+function edButton(el) {
+  if (el.querySelector('.ed-ai')) return;
+  const close = el.querySelector('#weClose,#xeClose'); if (!close) return;
+  const peer = [...close.parentElement.querySelectorAll('button')].find(b => b !== close && !b.classList.contains('primary'));
+  const b = document.createElement('button');
+  b.type = 'button'; b.className = (peer ? peer.className + ' ' : '') + 'ed-ai';
+  b.title = 'העוזר: שאלות על הקובץ, סיכום והקראה';
+  b.innerHTML = ICON.spark + '<span>עוזר</span>';
+  b.onclick = () => toggleAI();
+  close.after(b);
+}
 function edAdded(kind, el) {
+  setTimeout(() => edButton(el), 0);
   if (TB.opening && TB.opening.ed === kind) { const t = TB.opening; TB.opening = null; t.liveEl = el; t.data = null; TB.cur = t; renderTabs(); return; }
   const same = TB.list.find(x => x.ed === kind && x.liveEl && !document.body.contains(x.liveEl) && x === TB.cur);
   if (same) { same.liveEl = el; renderTabs(); return; }   // the editor reopened itself (restoring a draft)
   if (TB.cur && !TB.cur.ed) { TB.prev = TB.cur; stash(); }
   const t = { id: ++TB.seq, ed: kind, liveEl: el, data: null };
+  setTimeout(() => AS.onTab(), 0);
   const at = TB.prev && TB.list.includes(TB.prev) ? TB.list.indexOf(TB.prev) + 1 : TB.cur ? TB.list.indexOf(TB.cur) + 1 : TB.list.length;
   TB.list.splice(at || TB.list.length, 0, t);
   TB.cur = t; TB.prev = null;
@@ -578,7 +595,35 @@ async function ai(payload, { onWait, signal, timeout = 300000 } = {}) {
    3. THE ASSISTANT — questions, summaries, key points
    ===================================================================== */
 const textCache = new WeakMap();
+const onEditor = () => !!(TB.cur && TB.cur.ed && edLive(TB.cur));
+const hasDoc = () => !!S.doc || onEditor();
+const docTitle = () => onEditor() ? tabInfo(TB.cur).name : (S.office ? S.office.name : S.name);
+// the text of a file open in the Word / Excel editor
+function editorText() {
+  const k = TB.cur.ed, st = edState(k); if (!st) return '';
+  if (k === 'docx') {
+    const t = (st.main || st.body || TB.cur.liveEl.querySelector('#weBody')).innerText || '';
+    return `===== עמוד 1 =====\n${t.replace(/\n{3,}/g, '\n\n').slice(0, 380000)}`;
+  }
+  const out = []; let total = 0;
+  for (const sh of (st.st && st.st.sheets) || []) {
+    if (sh.hidden) continue;
+    const rows = new Map();
+    for (const [kk, cell] of sh.cells) {
+      const r = Math.floor(kk / 16384), c = kk % 16384;
+      let v = cell && cell.v != null && cell.v !== '' ? cell.v : cell && cell.f ? '=' + cell.f : '';
+      if (v === '' || v == null) continue;
+      if (!rows.has(r)) rows.set(r, []);
+      rows.get(r)[c] = String(v);
+    }
+    const lines = [...rows.keys()].sort((a, b) => a - b).map(r => `שורה ${r + 1}: ` + Array.from(rows.get(r), x => x ?? '').join('\t'));
+    const part = `===== גיליון: ${sh.name || ''} =====\n${lines.join('\n')}`;
+    out.push(part); total += part.length; if (total > 380000) break;
+  }
+  return out.join('\n\n');
+}
 async function docText() {
+  if (onEditor()) return editorText();
   if (!S.doc) return '';
   const sig = S.pages.map(P => P.ocr ? 1 : 0).join('') + '|' + S.pages.length;
   const c = textCache.get(S.doc);
@@ -634,6 +679,12 @@ function showAI() {
 }
 const toggleAI = () => panel.classList.contains('hidden') ? showAI() : hideAI();
 $('aiClose').onclick = hideAI;
+// the editors listen to the keyboard and to paste on the whole window: inside the assistant, the keys are the assistant's
+for (const ev of ['keydown', 'keyup', 'keypress', 'paste', 'copy', 'cut']) addEventListener(ev, e => { if (e.target && e.target.closest && e.target.closest('#aiPanel')) { e.stopImmediatePropagation();
+    // stopping here also stops the textarea's own key handler, so Enter (send) and Esc are handled here
+    if (ev === 'keydown' && e.key === 'Escape') hideAI();
+    if (ev === 'keydown' && e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.target.id === 'aiQ') { e.preventDefault(); $('aiSend').click(); }
+  } }, true);
 $('trBtn').addEventListener('click', () => { if (!$('tpanel').classList.contains('hidden')) panel.classList.add('hidden'); });
 
 function citeHtml(text) {
@@ -643,9 +694,11 @@ function citeHtml(text) {
     return Number.isFinite(first) ? `<button class="cite" type="button" data-p="${first}" title="מעבר לעמוד ${first}">${esc(m.slice(1, -1))}</button>` : m;
   });
 }
-function answerEl(a, q) {
+function answerEl(a, q, plain) {
   const el = h('<div class="ai-a"></div>');
-  el.innerHTML = a.split(/\n+/).filter(l => l.trim()).map(l => `<p dir="auto">${citeHtml(l)}</p>`).join('');
+  // in the Word / Excel editor there are no page numbers to jump to: the page marks are left out
+  const strip = l => l.replace(/\s*\[(?:עמ['׳]?|עמוד|עמודים|p\.|pp\.|page)\s*[\d\s,–-]+\]/gi, '');
+  el.innerHTML = a.split(/\n+/).filter(l => l.trim()).map(l => `<p dir="auto">${plain ? esc(strip(l)) : citeHtml(l)}</p>`).join('');
   const acts = h('<div class="ai-acts"><button type="button" data-a="copy">העתקה</button><button type="button" data-a="read">הקראה</button></div>');
   acts.querySelector('[data-a=copy]').onclick = async () => { try { await navigator.clipboard.writeText(a.replace(/\s*\[(?:עמ['׳]?|p\.)\s*[\d,\s–-]+\]/g, '')); toast('התשובה הועתקה'); } catch (_) { toast('ההעתקה לא הצליחה'); } };
   acts.querySelector('[data-a=read]').onclick = () => RA.speakText(a.replace(/\[[^\]]*\]/g, ''));
@@ -660,7 +713,7 @@ function goPage(n) {
 }
 function renderLog() {
   const log = $('aiLog'); log.innerHTML = '';
-  if (!S.doc) {
+  if (!hasDoc()) {
     log.append(h(`<div class="ai-hello"><b>פתחו קובץ ואשאל, אסכם ואקריא אותו.</b><br>בלי קובץ פתוח אפשר כבר עכשיו להפוך דף בכתב יד או סריקה למסמך מודפס.</div>`));
     $('aiQ').disabled = $('aiSend').disabled = true; $('aiRead').disabled = true;
     return;
@@ -669,14 +722,14 @@ function renderLog() {
   const items = AS.list();
   if (!items.length) {
     log.append(h(`<div class="ai-hello">שאלו כל שאלה על <b></b>, או בחרו:</div>`));
-    log.lastChild.querySelector('b').textContent = dispName(S.office ? S.office.name : S.name);
+    log.lastChild.querySelector('b').textContent = dispName(docTitle());
     const chips = h('<div class="ai-chips"></div>');
     for (const [l, q] of CHIPS) { const b = h(`<button class="ai-chip" type="button">${esc(l)}</button>`); b.onclick = () => askQ(q, l); chips.append(b); }
     log.append(chips);
   }
   for (const it of items) {
     const q = h('<div class="ai-q" dir="auto"></div>'); q.textContent = it.label || it.q; log.append(q);
-    if (it.a) log.append(answerEl(it.a, it.q));
+    if (it.a) log.append(answerEl(it.a, it.q, it.plain));
     else if (it.err) { const e = h('<div class="ai-err"></div>'); e.textContent = it.err; if (it.scanned) e.append(scannedHelp()); log.append(e); }
     else log.append(h(`<div class="ai-wait" id="aiWait">${it.wait || 'קורא את המסמך וכותב תשובה…'}</div>`));
   }
@@ -695,21 +748,22 @@ function scannedHelp() {
 }
 async function askQ(q, label) {
   q = String(q || '').trim();
-  if (!q || AS.busy || !S.doc) return;
+  if (!q || AS.busy || !hasDoc()) return;
   if (panel.classList.contains('hidden')) showAI();
   const list = AS.list(), tabKey = AS.key();
   const it = { q, label }; list.push(it);
   AS.busy = true; renderLog();
   try {
     const text = await docText();
-    if (!hasRealText(text)) { it.err = 'לא מצאתי טקסט במסמך. כנראה שהוא סרוק או מצולם — אפשר לזהות בו את הטקסט קודם:'; it.scanned = true; return; }
+    it.plain = onEditor();
+    const empty = it.plain ? !text.replace(/=====.*?=====/g, '').replace(/שורה \d+:/g, '').trim() : !hasRealText(text);
+    if (empty) { if (it.plain) { it.err = 'הקובץ ריק, אין עדיין על מה לשאול'; return; } it.err = 'לא מצאתי טקסט במסמך. כנראה שהוא סרוק או מצולם — אפשר לזהות בו את הטקסט קודם:'; it.scanned = true; return; }
     const history = list.filter(x => x.a && x !== it).slice(-4).map(x => ({ q: x.q, a: x.a }));
     it.a = await ai({ mode: 'ask', text, question: q, history }, { onWait: s => { it.wait = `השירות עמוס, מנסה שוב בעוד ${s} שניות…`; const w = document.getElementById('aiWait'); if (w && AS.key() === tabKey) w.textContent = it.wait; } });
   } catch (e) { it.err = e.message || String(e); }
   finally { AS.busy = false; if (AS.key() === tabKey) renderLog(); }
 }
 $('aiSend').onclick = () => { const q = $('aiQ').value; $('aiQ').value = ''; $('aiQ').style.height = ''; askQ(q); };
-$('aiQ').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); $('aiSend').click(); } });
 $('aiQ').addEventListener('input', e => { const t = e.target; t.style.height = 'auto'; t.style.height = Math.min(140, t.scrollHeight) + 'px'; });
 $('aiRead').onclick = () => RA.start(currentPageIndex());
 $('aiScan').onclick = () => SC.open();
@@ -753,6 +807,7 @@ const RA = {
   },
   async start(from) {
     if (!this.supported()) { toast('הדפדפן הזה לא תומך בהקראה'); return; }
+    if (onEditor()) { const t = editorText().replace(/=====.*?=====/g, '').replace(/^שורה \d+: /gm, '').replace(/\t/g, ', '); if (t.trim()) this.speakText(t); else toast('אין טקסט להקראה'); return; }
     if (!S.doc) { toast('פתחו קובץ כדי להקריא אותו'); return; }
     this.stop();
     busy(true, 'מכין את ההקראה…');
