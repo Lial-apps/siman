@@ -31,7 +31,9 @@ html,body{margin:0;background:var(--bg);color:var(--n);font:15px/1.45 "Heebo",sy
 .note{background:#FFF8DB;border-radius:10px;padding:10px 12px;color:#5A4500;margin-top:10px;white-space:pre-wrap}
 .pages{display:flex;flex-direction:column;align-items:center;gap:14px}
 .page{position:relative;background:#fff;box-shadow:0 10px 28px -14px rgba(22,33,58,.45);width:100%}
-.page canvas{display:block;width:100%;height:auto}
+.page canvas{display:block;width:100%;height:auto;direction:ltr}
+.f.flash{outline:3px solid #1F8A4C;outline-offset:3px}
+.mysig{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:12px 0 4px}.mysig img{height:64px;max-width:240px;object-fit:contain;background:#F7F8FB;border:1px solid var(--l);border-radius:10px;padding:6px}
 .f{position:absolute;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:12px;overflow:hidden}
 .f.mine{border:2px dashed var(--b);background:rgba(255,212,59,.35);color:var(--n);cursor:pointer;font-weight:700;animation:pulse 2.2s infinite}
 .f.mine.done{border:1px solid rgba(46,88,204,.35);background:rgba(46,88,204,.05);animation:none}
@@ -89,8 +91,12 @@ html,body{margin:0;background:var(--bg);color:var(--n);font:15px/1.45 "Heebo",sy
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
 const SS=window.SIMAN_SEND;
-const H=new URLSearchParams(location.hash.slice(1));const ID=H.get('d'),AUTH=H.get('t')?{t:H.get('t')}:{v:H.get('v')};
-const APP='./?ref=sign';
+// links: /s/<id>/<token> (signer), /v/<id>/<token> (viewer), /o/<id>#k=<key> (sender); older links: sign.html#d=<id>&t=<token>
+const H=new URLSearchParams(location.hash.slice(1));const PT=location.pathname.split('/').filter(Boolean);
+let ID=H.get('d'),AUTH=H.get('t')?{t:H.get('t')}:H.get('k')?{k:H.get('k')}:{v:H.get('v')};
+if(['s','v','o'].includes(PT[0])&&PT[1]){ID=PT[1];AUTH=PT[0]==='s'?{t:PT[2]}:PT[0]==='v'?{v:PT[2]}:{k:H.get('k')};}
+const APP=SS&&SS.HOST&&location.origin===new URL(SS.HOST).origin?'/go':'./?ref=sign';
+document.querySelector('.brand').href=APP;
 let M=null,PDF=null,VALS={},SIG=null,pages=[];
 const today=()=>new Date().toLocaleDateString('he-IL',{day:'2-digit',month:'2-digit',year:'numeric'});
 const fmt=d=>new Date(d).toLocaleString('he-IL',{day:'numeric',month:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'});
@@ -101,7 +107,7 @@ function cta(done){return`<div class="cta"><h2>${done?'רוצה לשלוח מס�
   <a class="btn pri" href="${APP}" target="_blank" rel="noopener">לפתוח את סימן בחינם</a></div>`;}
 
 async function start(){
-  if(!ID||!(AUTH.t||AUTH.v))return fail('הקישור חסר או לא שלם.');
+  if(!ID||!(AUTH.t||AUTH.v||AUTH.k))return fail('הקישור חסר או לא שלם.');
   try{[M,PDF]=await Promise.all([SS.getMeta(ID,AUTH),SS.getPdf(ID,AUTH)]);}catch(e){return fail(e.message);}
   document.title=`${M.title} · סימן`;$('ttl').textContent=M.title;
   const me=M.me!==null?M.signers[M.me]:null;
@@ -109,9 +115,11 @@ async function start(){
   const waitFor=M.order==='seq'&&me?M.signers.filter(s=>s.n<me.n&&s.status!=='signed'):[];
   const from=M.from&&M.from.name?esc(M.from.name):'מישהו';
   let head;
-  if(M.mode==='view')head=`<h1>${esc(M.title)}</h1><p>${from} שיתף/ה איתך את המסמך.</p>`;
+  if(M.owner){const n=M.signers.filter(s=>s.status==='signed').length;
+    head=`<h1>${esc(M.title)}</h1><p>${M.mode==='view'?'קישור לצפייה ששלחת.':`חתמו ${n} מתוך ${M.signers.length}: ${M.signers.map(s=>`${s.status==='signed'?'✓':s.status==='declined'?'✗':'⏳'} ${esc(s.name)}`).join(' · ')}`}</p>`;}
+  else if(M.mode==='view')head=`<h1>${esc(M.title)}</h1><p>${from} שיתף/ה איתך את המסמך.</p>`;
   else if(!me)head=`<h1>${esc(M.title)}</h1>`;
-  else if(me.status==='signed')head=`<h1>✓ חתמת על המסמך</h1><p>${fmt(me.at)}. אפשר להוריד עותק.</p>`;
+  else if(me.status==='signed')head=`<h1>✓ חתמת על המסמך</h1><p>${fmt(me.at)}. אפשר להוריד עותק.</p><div class="row" style="margin-top:8px"><button class="btn" onclick="showMine()">לראות את החתימה במסמך</button></div>`;
   else if(me.status==='declined')head=`<h1>סירבת לחתום על המסמך</h1><p>${fmt(me.at)}</p>`;
   else if(waitFor.length)head=`<h1>עוד לא תורך לחתום</h1><p>קודם צריכים לחתום: ${waitFor.map(s=>esc(s.name)).join(', ')}. כשיגיע תורך, אפשר לפתוח שוב את אותו קישור.</p>`;
   else head=`<h1>שלום ${esc(me.name)}</h1><p>${from} שלח/ה לך את <b>${esc(M.title)}</b> לחתימה. צריך למלא ${mine.length} ${mine.length===1?'שדה':'שדות'} שמסומנים בצהוב.</p>`;
@@ -126,13 +134,13 @@ async function renderPages(){
   const lib=window.pdfjsLib||window['pdfjs-dist/build/pdf'];lib.GlobalWorkerOptions.workerSrc='pdf.worker.min.js';
   const doc=await lib.getDocument({data:PDF.slice(0)}).promise;const box=$('pages');const W=Math.min(900,box.clientWidth||innerWidth-20);
   for(let i=1;i<=doc.numPages;i++){const pg=await doc.getPage(i);const v1=pg.getViewport({scale:1});const dpr=Math.min(2.5,devicePixelRatio||1);const vp=pg.getViewport({scale:W/v1.width*dpr});
-    const el=document.createElement('div');el.className='page';el.style.aspectRatio=`${v1.width}/${v1.height}`;const cv=document.createElement('canvas');cv.width=vp.width;cv.height=vp.height;el.append(cv);box.append(el);pages.push(el);
+    const el=document.createElement('div');el.className='page';el.style.aspectRatio=`${v1.width}/${v1.height}`;const cv=document.createElement('canvas');cv.dir='ltr';cv.style.direction='ltr';cv.width=vp.width;cv.height=vp.height;el.append(cv);box.append(el);pages.push(el);
     await pg.render({canvasContext:cv.getContext('2d'),viewport:vp}).promise;}
 }
 function drawFields(){
   for(const el of document.querySelectorAll('.f'))el.remove();
   const me=M.me!==null?M.signers[M.me]:null;const active=M.mode==='sign'&&me&&me.status==='waiting';
-  for(const f of M.fields){const pg=pages[f.page];if(!pg)continue;const s=M.signers[f.signer];const el=document.createElement('div');el.className='f';
+  for(const f of M.fields){const pg=pages[f.page];if(!pg)continue;const s=M.signers[f.signer];const el=document.createElement('div');el.className='f';el.dataset.fid=f.id;
     Object.assign(el.style,{left:f.x*100+'%',top:f.y*100+'%',width:f.w*100+'%',height:f.h*100+'%'});
     const val=s.status==='signed'&&s.values?s.values[f.id]:(me&&s.n===me.n?VALS[f.id]:null);
     if(me&&s.n===me.n&&active){el.classList.add('mine');el.tabIndex=0;el.setAttribute('role','button');el.dataset.id=f.id;if(val)el.classList.add('done');}
@@ -158,6 +166,10 @@ function dockSign(mine){
     $('decline').onclick=decline;
   };
   dockSign.render=render;render();
+}
+function showMine(){
+  const ids=M.fields.filter(f=>f.signer===M.me).map(f=>f.id);const els=[...document.querySelectorAll('.f')].filter(el=>ids.includes(el.dataset.fid));if(!els.length)return;
+  els[0].scrollIntoView({behavior:'smooth',block:'center'});els.forEach(el=>{el.classList.add('flash');setTimeout(()=>el.classList.remove('flash'),2200);});
 }
 function dockDone(me){
   $('dock').hidden=false;const signed=M.signers.filter(s=>s.status==='signed').length;
@@ -222,8 +234,12 @@ window.addEventListener('resize',()=>{if(!$('sigDlg').hidden&&$('tDraw').getAttr
 async function submit(){
   const b=$('finish');b.disabled=true;b.textContent='שולח…';
   try{M=await SS.api(`/${ID}/sign?t=${encodeURIComponent(AUTH.t)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({agree:true,values:VALS,tz:Intl.DateTimeFormat().resolvedOptions().timeZone})});
-    const me=M.signers[M.me];$('main').querySelector('.card').innerHTML=`<div class="center"><div class="big">✅</div><h1 style="margin-top:8px">תודה ${esc(me.name)}, המסמך נחתם</h1><p>${M.from&&M.from.name?esc(M.from.name)+' יראה/תראה שחתמת.':'השולח יראה שחתמת.'} אפשר להוריד עותק חתום.</p></div>`;
-    drawFields();dockDone(me);scrollTo({top:0,behavior:'smooth'});}
+    const me=M.signers[M.me];const pics=[...new Set(Object.values(me.values||{}).filter(v=>v.png).map(v=>v.png))];
+    $('main').querySelector('.card').innerHTML=`<div class="center"><div class="big">✅</div><h1 style="margin-top:8px">תודה ${esc(me.name)}, המסמך נחתם</h1>
+      ${pics.length?`<div class="mysig">${pics.map(p=>`<img alt="החתימה שלך" src="${p}">`).join('')}</div>`:''}
+      <p>${M.from&&M.from.name?esc(M.from.name)+' יראה/תראה שחתמת.':'השולח יראה שחתמת.'} החתימה מופיעה במסמך, ואפשר להוריד עותק חתום.</p>
+      <div class="row" style="justify-content:center;margin-top:10px"><button class="btn" id="seeSig">לראות את החתימה במסמך</button></div></div>`;
+    drawFields();dockDone(me);scrollTo({top:0,behavior:'smooth'});$('seeSig').onclick=showMine;}
   catch(e){alert(e.message||e);b.disabled=false;b.textContent='סיום וחתימה';}
 }
 async function decline(){
