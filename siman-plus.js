@@ -1073,16 +1073,34 @@ async function blocksPdf(pages) {
   const docDir = paraDir(all, 'R');
   let pg, y;
   const newPage = () => { pg = doc.addPage([W, H]); y = H - M; };
+  // arrows and check marks are in none of the app's fonts: they are drawn as lines
+  const SYM = /([→←↑↓⇒⇐➔➜►◄✓✔])/;
+  const norm = t => String(t).replace(/[✗✘❌]/g, '×').replace(/[●○■□▲▼★◆◇▪]/g, '•').replace(/[⇒➔➜►]/g, '→').replace(/[⇐◄]/g, '←');
+  const drawSym = (c, x, yy, sz, w) => {
+    const th = Math.max(.7, sz * .07), mid = yy + sz * .32, a = sz * .22, L = (x1, y1, x2, y2) => pg.drawLine({ start: { x: x1, y: y1 }, end: { x: x2, y: y2 }, thickness: th, color: ink });
+    if (c === '→' || c === '←') {
+      const l = x + w * .12, r = x + w * .88; L(l, mid, r, mid);
+      if (c === '→') { L(r, mid, r - a, mid + a * .8); L(r, mid, r - a, mid - a * .8); } else { L(l, mid, l + a, mid + a * .8); L(l, mid, l + a, mid - a * .8); }
+    } else if (c === '↓' || c === '↑') {
+      const cx = x + w / 2, top = yy + sz * .78, bot = yy - sz * .08; L(cx, top, cx, bot);
+      if (c === '↓') { L(cx, bot, cx - a * .8, bot + a); L(cx, bot, cx + a * .8, bot + a); } else { L(cx, top, cx - a * .8, top - a); L(cx, top, cx + a * .8, top - a); }
+    } else { L(x + w * .18, mid, x + w * .4, yy + sz * .05); L(x + w * .4, yy + sz * .05, x + w * .85, yy + sz * .72); } // ✓
+  };
   const lineAt = (line, x0, w, yy, f, sz, dir) => {
-    const { base, runs } = bidiRuns(line, dir);
-    const parts = runs.map(r => { const s = runForPdf(r); return { s, w: f.widthOfTextAtSize(s, sz) }; });
+    const { base, runs } = bidiRuns(norm(line), dir);
+    const parts = [];
+    for (const r of runs) {
+      if (!SYM.test(r.text)) { const s = runForPdf(r); parts.push({ s, w: f.widthOfTextAtSize(s, sz) }); continue; }
+      const segs = r.text.split(SYM).filter(Boolean).map(t => SYM.test(t) && t.length === 1 ? { sym: t, w: sz * .95 } : (() => { const s = runForPdf({ dir: r.dir, text: t }); return { s, w: f.widthOfTextAtSize(s, sz) }; })());
+      parts.push(...(r.dir === 'R' ? segs.reverse() : segs));   // a right-to-left run is laid out from its right end
+    }
     const tot = parts.reduce((t, p) => t + p.w, 0);
     let x = base === 'R' ? x0 + w - tot : x0;
-    for (const p of parts) { if (p.s) pg.drawText(p.s, { x, y: yy, size: sz, font: f, color: ink }); x += p.w; }
+    for (const p of parts) { if (p.sym) drawSym(p.sym, x, yy, sz, p.w); else if (p.s) pg.drawText(p.s, { x, y: yy, size: sz, font: f, color: ink }); x += p.w; }
   };
   const para = (text, { f = reg, sz = 12, lh = 1.5, before = 0, after = 7, mark = null } = {}) => {
     const dir = paraDir(text, docDir), ind = mark ? 20 : 0;
-    const lines = wrapLines(text, f, sz, maxW - ind);
+    const lines = wrapLines(norm(text), f, sz, maxW - ind);
     y -= before;
     lines.forEach((ln, j) => {
       const L = sz * lh;
