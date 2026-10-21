@@ -1,7 +1,7 @@
 // סימן — service worker: works offline, picks up new versions automatically
-const CACHE = 'siman-v27';
+const CACHE = 'siman-v28';
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './pdf.min.js', './pdf.worker.min.js',
-  './pdf-lib.min.js', './fontkit.umd.min.js', './icon-192.png', './icon-512.png', './icon-maskable-512.png', './jszip.min.js', './pptxgen.min.js', './office.js', './office-edit.js', './word-editor.js', './excel-editor.js', './docx-preview.min.js', './html2canvas.min.js', './xlsx.mini.min.js', './font-secular-he.woff2', './font-secular-lat.woff2'];
+  './pdf-lib.min.js', './fontkit.umd.min.js', './icon-192.png', './icon-512.png', './icon-maskable-512.png', './jszip.min.js', './pptxgen.min.js', './office.js', './office-edit.js', './word-editor.js', './excel-editor.js', './docx-preview.min.js', './html2canvas.min.js', './xlsx.mini.min.js', './font-secular-he.woff2', './font-secular-lat.woff2', './send.js'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
@@ -16,16 +16,18 @@ self.addEventListener('fetch', e => {
   const path = new URL(req.url).pathname;
   const isPage = req.mode === 'navigate' || /\/(index\.html)?$/.test(path);
   // the app's own code: always the newest version when online, so an upload shows up on the next refresh
-  const isAppCode = /\/(office|office-edit|word-editor|excel-editor|siman-register)\.js$/.test(path);
+  const isAppCode = /\/(office|office-edit|word-editor|excel-editor|siman-register|send)\.js$/.test(path);
   if (isAppCode) {
     e.respondWith(fetch(req, { cache: 'no-cache' }).then(r => { if (r.ok) { const copy = r.clone(); caches.open(CACHE).then(c => c.put(req, copy)); } return r; })
       .catch(() => caches.match(req)));
     return;
   }
   if (isPage) {
-    // newest page when online, cached page when offline
-    e.respondWith(fetch(req).then(r => { const copy = r.clone(); caches.open(CACHE).then(c => c.put('./index.html', copy)); return r; })
-      .catch(() => caches.match('./index.html')));
+    // newest page when online, cached page when offline. Only the app itself is kept as the app page:
+    // other pages (like sign.html, opened from a link) are kept under their own address
+    const isApp = /\/(index\.html)?$/.test(path);
+    e.respondWith(fetch(req).then(r => { if (r.ok) { const copy = r.clone(); caches.open(CACHE).then(c => c.put(isApp ? './index.html' : req, copy)); } return r; })
+      .catch(() => isApp ? caches.match('./index.html') : caches.match(req)));
     return;
   }
   e.respondWith(caches.match(req).then(hit => hit || fetch(req).then(r => {

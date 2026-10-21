@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>מסמך לחתימה · סימן</title>
+<meta name="description" content="פותחים, חותמים מהטלפון ושולחים. בלי להירשם ובלי להתקין.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="סימן">
+<meta property="og:title" content="יש לך מסמך לחתימה">
+<meta property="og:description" content="פותחים את הקישור וחותמים, גם מהטלפון. בלי להירשם ובלי להתקין.">
+<meta property="og:image" content="https://lial-apps.github.io/siman/og-sign.png">
+<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#16213A">
+<link rel="icon" href="icon-192.png">
+<style>
+@font-face{font-family:"Heebo";src:url(font-heebo-400.ttf) format("truetype");font-weight:400;font-display:swap}
+@font-face{font-family:"Heebo";src:url(font-heebo-700.ttf) format("truetype");font-weight:700;font-display:swap}
+@font-face{font-family:"SimanSig";src:url(font-secular-he.woff2) format("woff2");font-display:swap}
+:root{--n:#16213A;--m:#FFD43B;--b:#2E58CC;--l:#D4DBE5;--mu:#5D6982;--ok:#1F8A4C;--bg:#E4E8EF}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--n);font:15px/1.45 "Heebo",system-ui,sans-serif;-webkit-text-size-adjust:100%}
+.top{position:sticky;top:0;z-index:20;background:var(--n);color:#E4EAF4;padding:calc(10px + env(safe-area-inset-top)) 14px 10px;display:flex;align-items:center;gap:10px}
+.brand{display:flex;align-items:center;gap:8px;text-decoration:none;color:inherit}
+.mark{width:30px;height:30px;border-radius:8px;background:var(--m);color:var(--n);display:grid;place-items:center;font-weight:700;font-size:17px}
+.brand b{font-size:17px}.top .ttl{flex:1;min-width:0;font-size:13px;color:#AFBBD1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left}
+.wrap{max-width:900px;margin:0 auto;padding:14px 10px 170px}
+.card{background:#fff;border-radius:14px;padding:16px 18px;margin:0 auto 14px;box-shadow:0 8px 24px -14px rgba(22,33,58,.35)}
+.card h1{font-size:20px;margin:0 0 4px}.card p{margin:4px 0;color:var(--mu)}
+.note{background:#FFF8DB;border-radius:10px;padding:10px 12px;color:#5A4500;margin-top:10px;white-space:pre-wrap}
+.pages{display:flex;flex-direction:column;align-items:center;gap:14px}
+.page{position:relative;background:#fff;box-shadow:0 10px 28px -14px rgba(22,33,58,.45);width:100%}
+.page canvas{display:block;width:100%;height:auto}
+.f{position:absolute;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:12px;overflow:hidden}
+.f.mine{border:2px dashed var(--b);background:rgba(255,212,59,.35);color:var(--n);cursor:pointer;font-weight:700;animation:pulse 2.2s infinite}
+.f.mine.done{border:1px solid rgba(46,88,204,.35);background:rgba(46,88,204,.05);animation:none}
+.f.other{border:1px dashed #9AA6B8;background:rgba(154,166,184,.12);color:#7A879E}
+.f img{max-width:100%;max-height:100%;object-fit:contain}.f .tx{font-weight:400;color:#111;white-space:nowrap;padding:0 3px}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(46,88,204,.0)}50%{box-shadow:0 0 0 6px rgba(46,88,204,.18)}}
+.dock{position:fixed;inset-inline:0;bottom:0;z-index:20;background:#fff;border-top:1px solid var(--l);padding:12px 14px calc(12px + env(safe-area-inset-bottom));box-shadow:0 -10px 30px -18px rgba(22,33,58,.5)}
+.dock .in{max-width:900px;margin:0 auto;display:flex;flex-direction:column;gap:10px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.btn{border:1px solid var(--l);background:#fff;color:var(--n);border-radius:11px;padding:11px 16px;font:inherit;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;text-decoration:none}
+.btn.pri{background:var(--m);border-color:var(--m)}.btn.dark{background:var(--n);border-color:var(--n);color:#fff}.btn.grow{flex:1}.btn:disabled{opacity:.45;cursor:default}
+.btn.link{border:0;background:none;color:var(--mu);font-weight:400;text-decoration:underline;padding:6px}
+.ck{display:flex;gap:9px;align-items:flex-start;font-size:13px;color:var(--mu)}.ck input{margin-top:3px;width:18px;height:18px;flex:none}
+.prog{font-size:13px;color:var(--mu)}.prog b{color:var(--n)}
+.dlg{position:fixed;inset:0;z-index:40;background:rgba(22,33,58,.5);display:flex;align-items:flex-end;justify-content:center}
+.dlg[hidden]{display:none}.dlg .box{background:#fff;width:min(560px,100%);border-radius:18px 18px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom))}
+@media (min-width:640px){.dlg{align-items:center}.dlg .box{border-radius:18px}}
+.tabs{display:flex;gap:4px;background:#EEF1F5;border-radius:10px;padding:3px;margin:8px 0}.tabs button{flex:1;border:0;background:none;padding:8px;border-radius:8px;font:inherit;cursor:pointer}
+.tabs button[aria-pressed=true]{background:#fff;font-weight:700;box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.pad{width:100%;height:190px;border:1.5px dashed #9AA6B8;border-radius:12px;background:#FAFBFD;touch-action:none;display:block}
+.typed{width:100%;border:1px solid var(--l);border-radius:10px;padding:12px;font:inherit;font-size:16px}
+.tprev{height:110px;display:grid;place-items:center;font:44px "SimanSig","Heebo",cursive;border:1.5px dashed #9AA6B8;border-radius:12px;margin-top:8px;color:#0B1F5C;overflow:hidden;white-space:nowrap}
+.inks{display:flex;gap:8px;margin-top:8px}.inks button{width:28px;height:28px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px var(--l);cursor:pointer}.inks button[aria-pressed=true]{box-shadow:0 0 0 2px var(--n)}
+.cta{background:linear-gradient(135deg,#16213A,#23345E);color:#E4EAF4;border-radius:16px;padding:18px 18px 16px;margin-top:14px}
+.cta h2{margin:0 0 6px;font-size:19px;color:#fff}.cta p{margin:0 0 12px;color:#B9C5DB}.cta ul{margin:0 0 14px;padding-inline-start:18px;color:#D6DEEC}.cta li{margin:3px 0}
+.big{font-size:44px;line-height:1}.center{text-align:center}
+.err{max-width:520px;margin:60px auto;text-align:center}
+.foot{text-align:center;color:#7A879E;font-size:12px;margin:24px 0}
+.foot a{color:inherit}
+.load{padding:60px 10px;text-align:center;color:var(--mu)}
+</style>
+</head>
+<body>
+<header class="top"><a class="brand" href="./?ref=sign" target="_blank" rel="noopener"><span class="mark">ס</span><b>סימן</b></a><span class="ttl" id="ttl"></span></header>
+<main class="wrap" id="main"><div class="load">טוען את המסמך…</div></main>
+<div class="dock" id="dock" hidden><div class="in" id="dockIn"></div></div>
+<div class="dlg" id="sigDlg" hidden><div class="box" role="dialog" aria-modal="true" aria-labelledby="sigT">
+  <div class="row" style="justify-content:space-between"><b id="sigT" style="font-size:17px">החתימה שלך</b><button class="btn link" id="sigX">ביטול</button></div>
+  <div class="tabs"><button id="tDraw" aria-pressed="true">ציור</button><button id="tType" aria-pressed="false">הקלדה</button></div>
+  <div id="pDraw"><canvas class="pad" id="pad" aria-label="מקום לציור החתימה"></canvas>
+    <div class="row" style="justify-content:space-between;margin-top:6px"><div class="inks" id="inks"></div><button class="btn link" id="padClr">ניקוי</button></div></div>
+  <div id="pType" hidden><input class="typed" id="typed" dir="auto" maxlength="40" placeholder="השם שלך"><div class="tprev" id="tprev"></div></div>
+  <label class="ck" style="margin-top:12px"><input type="checkbox" id="sigAll" checked> להשתמש בחתימה הזו בכל המקומות שלי במסמך</label>
+  <div class="row" style="margin-top:12px"><button class="btn pri grow" id="sigOk">אישור</button></div>
+</div></div>
+<div class="dlg" id="txtDlg" hidden><div class="box" role="dialog" aria-modal="true" aria-labelledby="txtT">
+  <b id="txtT" style="font-size:17px"></b><input class="typed" id="txtIn" dir="auto" maxlength="120" style="margin-top:10px">
+  <div class="row" style="margin-top:12px"><button class="btn link" id="txtX">ביטול</button><button class="btn pri grow" id="txtOk">אישור</button></div>
+</div></div>
+<script src="pdf.min.js"></script>
+<script src="pdf-lib.min.js"></script>
+<script src="send.js"></script>
+<script>
+'use strict';
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
+const SS=window.SIMAN_SEND;
+const H=new URLSearchParams(location.hash.slice(1));const ID=H.get('d'),AUTH=H.get('t')?{t:H.get('t')}:{v:H.get('v')};
+const APP='./?ref=sign';
+let M=null,PDF=null,VALS={},SIG=null,pages=[];
+const today=()=>new Date().toLocaleDateString('he-IL',{day:'2-digit',month:'2-digit',year:'numeric'});
+const fmt=d=>new Date(d).toLocaleString('he-IL',{day:'numeric',month:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'});
+
+function fail(msg){$('main').innerHTML=`<div class="card err"><div class="big">📄</div><h1 style="margin-top:10px">לא הצלחנו לפתוח את המסמך</h1><p>${esc(msg)}</p><p style="margin-top:14px">אפשר לבקש מהשולח קישור חדש.</p></div>${cta(false)}`;$('dock').hidden=true;}
+function cta(done){return`<div class="cta"><h2>${done?'רוצה לשלוח מסמכים לחתימה ככה?':'סימן: עורך PDF בעברית'}</h2><p>${done?'בדיוק כמו שחתמת עכשיו. בחינם, בעברית, מהטלפון או מהמחשב.':'חתימה, סימון, עריכה ושליחה של מסמכים, בעברית ובחינם.'}</p>
+  <ul><li>שליחה לחתימה בקישור, עם מעקב מי חתם</li><li>עריכת PDF, Word ו-Excel בעברית</li><li>הקבצים נשארים במכשיר שלך</li></ul>
+  <a class="btn pri" href="${APP}" target="_blank" rel="noopener">לפתוח את סימן בחינם</a></div>`;}
+
+async function start(){
+  if(!ID||!(AUTH.t||AUTH.v))return fail('הקישור חסר או לא שלם.');
+  try{[M,PDF]=await Promise.all([SS.getMeta(ID,AUTH),SS.getPdf(ID,AUTH)]);}catch(e){return fail(e.message);}
+  document.title=`${M.title} · סימן`;$('ttl').textContent=M.title;
+  const me=M.me!==null?M.signers[M.me]:null;
+  const mine=me?M.fields.filter(f=>f.signer===me.n):[];
+  const waitFor=M.order==='seq'&&me?M.signers.filter(s=>s.n<me.n&&s.status!=='signed'):[];
+  const from=M.from&&M.from.name?esc(M.from.name):'מישהו';
+  let head;
+  if(M.mode==='view')head=`<h1>${esc(M.title)}</h1><p>${from} שיתף/ה איתך את המסמך.</p>`;
+  else if(!me)head=`<h1>${esc(M.title)}</h1>`;
+  else if(me.status==='signed')head=`<h1>✓ חתמת על המסמך</h1><p>${fmt(me.at)}. אפשר להוריד עותק.</p>`;
+  else if(me.status==='declined')head=`<h1>סירבת לחתום על המסמך</h1><p>${fmt(me.at)}</p>`;
+  else if(waitFor.length)head=`<h1>עוד לא תורך לחתום</h1><p>קודם צריכים לחתום: ${waitFor.map(s=>esc(s.name)).join(', ')}. כשיגיע תורך, אפשר לפתוח שוב את אותו קישור.</p>`;
+  else head=`<h1>שלום ${esc(me.name)}</h1><p>${from} שלח/ה לך את <b>${esc(M.title)}</b> לחתימה. צריך למלא ${mine.length} ${mine.length===1?'שדה':'שדות'} שמסומנים בצהוב.</p>`;
+  $('main').innerHTML=`<div class="card">${head}${M.note&&me&&me.status==='waiting'?`<div class="note">${esc(M.note)}</div>`:''}</div><div class="pages" id="pages"></div><div id="after"></div>`;
+  await renderPages();
+  if(M.mode==='sign'&&me&&me.status==='waiting'&&!waitFor.length){
+    for(const f of mine){if(f.type==='name')VALS[f.id]={text:me.name};if(f.type==='date')VALS[f.id]={text:today()};}
+    drawFields();dockSign(mine);
+  }else{drawFields();dockDone(me);}
+}
+async function renderPages(){
+  const lib=window.pdfjsLib||window['pdfjs-dist/build/pdf'];lib.GlobalWorkerOptions.workerSrc='pdf.worker.min.js';
+  const doc=await lib.getDocument({data:PDF.slice(0)}).promise;const box=$('pages');const W=Math.min(900,box.clientWidth||innerWidth-20);
+  for(let i=1;i<=doc.numPages;i++){const pg=await doc.getPage(i);const v1=pg.getViewport({scale:1});const dpr=Math.min(2.5,devicePixelRatio||1);const vp=pg.getViewport({scale:W/v1.width*dpr});
+    const el=document.createElement('div');el.className='page';el.style.aspectRatio=`${v1.width}/${v1.height}`;const cv=document.createElement('canvas');cv.width=vp.width;cv.height=vp.height;el.append(cv);box.append(el);pages.push(el);
+    await pg.render({canvasContext:cv.getContext('2d'),viewport:vp}).promise;}
+}
+function drawFields(){
+  for(const el of document.querySelectorAll('.f'))el.remove();
+  const me=M.me!==null?M.signers[M.me]:null;const active=M.mode==='sign'&&me&&me.status==='waiting';
+  for(const f of M.fields){const pg=pages[f.page];if(!pg)continue;const s=M.signers[f.signer];const el=document.createElement('div');el.className='f';
+    Object.assign(el.style,{left:f.x*100+'%',top:f.y*100+'%',width:f.w*100+'%',height:f.h*100+'%'});
+    const val=s.status==='signed'&&s.values?s.values[f.id]:(me&&s.n===me.n?VALS[f.id]:null);
+    if(me&&s.n===me.n&&active){el.classList.add('mine');el.tabIndex=0;el.setAttribute('role','button');el.dataset.id=f.id;if(val)el.classList.add('done');}
+    else if(!val){el.classList.add('other');el.textContent=s.status==='declined'?'סירב/ה':`${SS.TYPES[f.type].l}: ${s.name}`;}
+    if(val){if(val.png)el.innerHTML=`<img alt="" src="${val.png}">`;else el.innerHTML=`<span class="tx" dir="auto">${esc(val.text)}</span>`;}
+    else if(el.classList.contains('mine'))el.textContent=f.type==='sig'?'✍️ כאן חותמים':f.type==='initials'?'ראשי תיבות':SS.TYPES[f.type].l;
+    pg.append(el);
+  }
+  for(const el of document.querySelectorAll('.f.mine'))el.onclick=el.onkeydown=e=>{if(e.type==='keydown'&&e.key!=='Enter'&&e.key!==' ')return;e.preventDefault();openField(M.fields.find(f=>f.id===el.dataset.id));};
+}
+function dockSign(mine){
+  $('dock').hidden=false;
+  const left=()=>mine.filter(f=>f.req&&!VALS[f.id]);
+  const render=()=>{const l=left();
+    $('dockIn').innerHTML=`<div class="prog">${l.length?`נשארו <b>${l.length}</b> מתוך ${mine.length} שדות`:'<b>✓ הכל מלא.</b> נשאר רק לאשר ולסיים.'}</div>
+      ${l.length?`<div class="row"><button class="btn pri grow" id="next">${VALS[mine[0].id]?'לשדה הבא':'להתחיל לחתום'}</button></div>`:
+      `<label class="ck"><input type="checkbox" id="agree"> אני מסכים/ה לחתום על המסמך באופן אלקטרוני, ומאשר/ת שזו החתימה שלי.</label>
+       <div class="row"><button class="btn pri grow" id="finish" disabled>סיום וחתימה</button></div>`}
+      <div class="row" style="justify-content:center"><button class="btn link" id="decline">לא מעוניין/ת לחתום</button></div>`;
+    const nx=$('next');if(nx)nx.onclick=()=>{const f=left()[0];const el=document.querySelector(`.f[data-id="${f.id}"]`);el.scrollIntoView({behavior:'smooth',block:'center'});setTimeout(()=>openField(f),350);};
+    const ag=$('agree');if(ag)ag.onchange=()=>{$('finish').disabled=!ag.checked;};
+    const fin=$('finish');if(fin)fin.onclick=submit;
+    $('decline').onclick=decline;
+  };
+  dockSign.render=render;render();
+}
+function dockDone(me){
+  $('dock').hidden=false;const signed=M.signers.filter(s=>s.status==='signed').length;
+  $('dockIn').innerHTML=`<div class="row"><button class="btn dark grow" id="dl">${M.mode==='view'?'הורדת המסמך':signed===M.signers.length?'הורדת המסמך החתום':'הורדת עותק'}</button>${navigator.canShare?'<button class="btn" id="shr">שיתוף</button>':''}</div>`;
+  $('dl').onclick=()=>download(false);if($('shr'))$('shr').onclick=()=>download(true);
+  $('after').innerHTML=cta(me&&me.status==='signed')+`<p class="foot">המסמך יימחק מהשרת ב-${fmt(M.expires).split(',')[0]}. <a href="${APP}" target="_blank" rel="noopener">סימן</a> · <a href="privacy.html" target="_blank" rel="noopener">פרטיות</a></p>`;
+}
+async function download(share){
+  const b=$('dl');const t=b.textContent;b.disabled=true;b.textContent='מכין…';
+  try{const bytes=M.mode==='view'?PDF:await SS.buildSigned(M,PDF);
+    const name=`${M.title}${M.mode==='sign'?' - חתום':''}.pdf`;const file=new File([bytes],name,{type:'application/pdf'});
+    if(share&&navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({files:[file],title:M.title});}catch(_){}}
+    else{const a=document.createElement('a');a.href=URL.createObjectURL(file);a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000);}}
+  catch(e){alert('ההורדה נכשלה: '+(e.message||e));}
+  finally{b.disabled=false;b.textContent=t;}
+}
+
+/* ---------- filling a field */
+let CUR=null;
+function openField(f){
+  CUR=f;if(f.type==='sig'||f.type==='initials')return openSig(f);
+  if(f.type==='date'){VALS[f.id]={text:today()};drawFields();dockSign.render();return;}
+  $('txtT').textContent=f.type==='name'?'השם המלא שלך':'מה לכתוב כאן?';$('txtIn').value=(VALS[f.id]&&VALS[f.id].text)||'';$('txtDlg').hidden=false;setTimeout(()=>$('txtIn').focus(),50);
+}
+$('txtX').onclick=()=>{$('txtDlg').hidden=true;};
+$('txtOk').onclick=()=>{const v=$('txtIn').value.trim();$('txtDlg').hidden=true;if(v)VALS[CUR.id]={text:v};else delete VALS[CUR.id];drawFields();dockSign.render();};
+$('txtIn').onkeydown=e=>{if(e.key==='Enter')$('txtOk').click();};
+// signature pad
+const pad=$('pad');let ink='#0B1F5C',strokes=[],drawing=null;
+const INKS=['#0B1F5C','#111111','#1F4FD1'];$('inks').innerHTML=INKS.map(c=>`<button style="background:${c}" data-c="${c}" aria-label="צבע" aria-pressed="${c===ink}"></button>`).join('');
+$('inks').onclick=e=>{const b=e.target.closest('[data-c]');if(!b)return;ink=b.dataset.c;$('inks').querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',x===b));redrawPad();};
+function sizePad(){const r=pad.getBoundingClientRect();const d=devicePixelRatio||1;pad.width=r.width*d;pad.height=r.height*d;redrawPad();}
+function redrawPad(){const g=pad.getContext('2d');const d=devicePixelRatio||1;g.setTransform(d,0,0,d,0,0);g.clearRect(0,0,pad.width,pad.height);g.lineCap='round';g.lineJoin='round';g.strokeStyle=ink;
+  for(const s of strokes){if(s.length<2){g.beginPath();g.arc(s[0][0],s[0][1],1.4,0,7);g.fillStyle=ink;g.fill();continue;}g.beginPath();g.moveTo(s[0][0],s[0][1]);
+    for(let i=1;i<s.length-1;i++){const mx=(s[i][0]+s[i+1][0])/2,my=(s[i][1]+s[i+1][1])/2;g.lineWidth=Math.max(1.4,Math.min(3.4,s[i][2]));g.quadraticCurveTo(s[i][0],s[i][1],mx,my);}g.lineTo(s[s.length-1][0],s[s.length-1][1]);g.stroke();}}
+pad.onpointerdown=e=>{pad.setPointerCapture(e.pointerId);const r=pad.getBoundingClientRect();drawing=[[e.clientX-r.left,e.clientY-r.top,2.4]];strokes.push(drawing);redrawPad();};
+pad.onpointermove=e=>{if(!drawing)return;const r=pad.getBoundingClientRect();const p=[e.clientX-r.left,e.clientY-r.top];const l=drawing[drawing.length-1];const sp=Math.hypot(p[0]-l[0],p[1]-l[1]);drawing.push([p[0],p[1],3.2-Math.min(1.8,sp/14)]);redrawPad();};
+pad.onpointerup=pad.onpointercancel=()=>{drawing=null;};
+$('padClr').onclick=()=>{strokes=[];redrawPad();};
+const mode=m=>{$('tDraw').setAttribute('aria-pressed',m==='draw');$('tType').setAttribute('aria-pressed',m==='type');$('pDraw').hidden=m!=='draw';$('pType').hidden=m!=='type';if(m==='draw')sizePad();else{$('typed').focus();tprev();}};
+$('tDraw').onclick=()=>mode('draw');$('tType').onclick=()=>mode('type');
+const tprev=()=>{$('tprev').textContent=$('typed').value||' ';};$('typed').oninput=tprev;
+function openSig(f){$('sigT').textContent=f.type==='initials'?'ראשי התיבות שלך':'החתימה שלך';const me=M.signers[M.me];
+  if(!$('typed').value)$('typed').value=f.type==='initials'?me.name.split(/\s+/).map(w=>w[0]).join('.'):me.name;
+  $('sigDlg').hidden=false;strokes=[];mode(SIG&&SIG.mode==='type'?'type':'draw');}
+$('sigX').onclick=()=>{$('sigDlg').hidden=true;};
+function sigPng(){
+  if($('tType').getAttribute('aria-pressed')==='true'){const t=$('typed').value.trim();if(!t)return null;const c=document.createElement('canvas');const g=c.getContext('2d');g.font='120px "SimanSig","Heebo",cursive';
+    const w=Math.ceil(g.measureText(t).width)+40;c.width=w;c.height=170;g.font='120px "SimanSig","Heebo",cursive';g.fillStyle=ink;g.textBaseline='middle';g.direction='rtl';g.textAlign='center';g.fillText(t,w/2,90);return c.toDataURL('image/png');}
+  if(!strokes.length)return null;let x1=1e9,y1=1e9,x2=-1e9,y2=-1e9;for(const s of strokes)for(const p of s){x1=Math.min(x1,p[0]);y1=Math.min(y1,p[1]);x2=Math.max(x2,p[0]);y2=Math.max(y2,p[1]);}
+  const d=devicePixelRatio||1,m=8;const c=document.createElement('canvas');c.width=Math.max(10,(x2-x1+2*m)*d);c.height=Math.max(10,(y2-y1+2*m)*d);const g=c.getContext('2d');g.drawImage(pad,(x1-m)*d,(y1-m)*d,c.width,c.height,0,0,c.width,c.height);
+  // keep the picture small enough to send
+  const k=Math.min(1,700/c.width);if(k<1){const s=document.createElement('canvas');s.width=c.width*k;s.height=c.height*k;s.getContext('2d').drawImage(c,0,0,s.width,s.height);return s.toDataURL('image/png');}
+  return c.toDataURL('image/png');
+}
+$('sigOk').onclick=()=>{const png=sigPng();if(!png){alert('צריך לצייר או להקליד חתימה');return;}$('sigDlg').hidden=true;
+  SIG={mode:$('tType').getAttribute('aria-pressed')==='true'?'type':'draw'};
+  const targets=$('sigAll').checked?M.fields.filter(f=>f.signer===M.me&&f.type===CUR.type):[CUR];for(const f of targets)VALS[f.id]={png};
+  drawFields();dockSign.render();};
+window.addEventListener('resize',()=>{if(!$('sigDlg').hidden&&$('tDraw').getAttribute('aria-pressed')==='true')sizePad();});
+
+async function submit(){
+  const b=$('finish');b.disabled=true;b.textContent='שולח…';
+  try{M=await SS.api(`/${ID}/sign?t=${encodeURIComponent(AUTH.t)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({agree:true,values:VALS,tz:Intl.DateTimeFormat().resolvedOptions().timeZone})});
+    const me=M.signers[M.me];$('main').querySelector('.card').innerHTML=`<div class="center"><div class="big">✅</div><h1 style="margin-top:8px">תודה ${esc(me.name)}, המסמך נחתם</h1><p>${M.from&&M.from.name?esc(M.from.name)+' יראה/תראה שחתמת.':'השולח יראה שחתמת.'} אפשר להוריד עותק חתום.</p></div>`;
+    drawFields();dockDone(me);scrollTo({top:0,behavior:'smooth'});}
+  catch(e){alert(e.message||e);b.disabled=false;b.textContent='סיום וחתימה';}
+}
+async function decline(){
+  const r=prompt('למה לא לחתום? (לא חובה, השולח יראה את מה שתכתוב/י)');if(r===null)return;
+  try{M=await SS.api(`/${ID}/decline?t=${encodeURIComponent(AUTH.t)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({reason:r,tz:Intl.DateTimeFormat().resolvedOptions().timeZone})});
+    $('main').querySelector('.card').innerHTML='<h1>הסירוב נשלח לשולח</h1><p>אם זו טעות, אפשר לבקש ממנו קישור חדש.</p>';drawFields();dockDone(M.signers[M.me]);}catch(e){alert(e.message||e);}
+}
+start();
+</script>
+</body>
+</html>

@@ -1274,7 +1274,7 @@ body:has(#wed) .busy,body:has(#xed) .busy{z-index:1000}body:has(#wed) .toast,bod
 </dialog>
 
 <header class="bar">
-  <div class="brand"><b title="גרסה 4.4">סימן</b><span class="ver">4.4</span><span class="fname" id="fname"></span></div>
+  <div class="brand"><b title="גרסה 4.5">סימן</b><span class="ver">4.5</span><span class="fname" id="fname"></span></div>
 
   <nav class="tools" id="tools" aria-label="כלים">
     <button class="tool" data-tool="select" aria-pressed="true" title="בחירה וגלילה (V)">
@@ -1372,6 +1372,7 @@ body:has(#wed) .busy,body:has(#xed) .busy{z-index:1000}body:has(#wed) .toast,bod
         </div>
         <div class="wl-quick" role="group" aria-label="פעולות מהירות">
           <button class="qa" data-qa="sign"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17c3-6 5-6 6-2s3 4 5-1 4-5 7 0"/><path d="M3 21h18"/></svg>לחתום על מסמך</button>
+          <button class="qa" data-qa="send"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12l16-8-6 16-2.5-6.5z"/><path d="M11.5 13.5L20 4"/></svg>לשלוח לחתימה</button>
           <button class="qa" data-qa="tr"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h9M8.5 3v2M6 5c0 4 3 7 6 8M11 5c0 4-3 7-6 8"/><path d="M13 21l4-9 4 9M14.5 18h5"/></svg>לתרגם קובץ</button>
           <button class="qa" data-qa="pages"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3" width="7" height="8" rx="1"/><rect x="13" y="3" width="7" height="8" rx="1"/><rect x="4" y="13" width="7" height="8" rx="1"/><path d="M16.5 14v6M13.5 17h6"/></svg>לאחד או לפצל</button>
           <button class="qa" data-qa="conv"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M10 13h5M10 17h5"/></svg>להמיר ל-Word</button>
@@ -1556,6 +1557,7 @@ body:has(#wed) .busy,body:has(#xed) .busy{z-index:1000}body:has(#wed) .toast,bod
     <div class="sig-row"><span class="grow"></span><button class="btn" id="readyCancel">ביטול</button><button class="btn primary" id="readySave">שמירה</button></div>
   </div>
 </dialog>
+<style>.sh-ic.sg{background:#FFF3C4;color:#8A6100}.sh-ic.lk{background:#E6EEFF;color:#2E58CC}</style>
 <dialog class="sig sheet" id="shareDlg" aria-labelledby="shareTitle">
   <div class="sig-in">
     <div class="sh-head"><h2 id="shareTitle">שיתוף ושמירה</h2><button class="icon-btn" id="shareClose" aria-label="סגירה">×</button></div>
@@ -1563,6 +1565,11 @@ body:has(#wed) .busy,body:has(#xed) .busy{z-index:1000}body:has(#wed) .toast,bod
       <span class="sh-name-box"><input id="shareName" type="text" dir="auto" maxlength="120" spellcheck="false" autocomplete="off" aria-describedby="shNameHint"><span class="sh-ext" id="shareExt" dir="ltr">.pdf</span></span></label>
     <small class="sh-name-hint" id="shNameHint"></small>
     <div class="seg sh-fmt hidden" id="shFmt" role="group" aria-label="לשלוח בתור"><button class="segb" data-fmt="pdf" aria-pressed="true">PDF חתום</button><button class="segb" data-fmt="office" aria-pressed="false" id="shFmtOf">Word לעריכה</button></div>
+    <h3 class="sh-grp">קישור</h3>
+    <div class="sh-grid two">
+      <button class="sh" data-link="sign"><span class="sh-ic sg"><svg viewBox="0 0 24 24"><path d="M3 17c3-6 5-6 6-2s3 4 5-1 4-5 7 0"/><path d="M3 21h18"/></svg></span><b>שליחה לחתימה בקישור</b><small>מסמנים איפה חותמים, והם חותמים מהטלפון</small></button>
+      <button class="sh" data-link="view"><span class="sh-ic lk"><svg viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg></span><b>קישור לצפייה</b><small>מי שמקבל רואה ומוריד, בלי להירשם</small></button>
+    </div>
     <h3 class="sh-grp">שליחה</h3>
     <div class="sh-grid">
       <button class="sh" data-share="mail"><span class="sh-ic mail"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M4 7l8 6 8-6"/></svg></span><b>מייל</b><small id="shMailHint">שליחת הקובץ כקובץ מצורף</small></button>
@@ -1593,7 +1600,7 @@ body:has(#wed) .busy,body:has(#xed) .busy{z-index:1000}body:has(#wed) .toast,bod
     <p class="sh-status" id="regStatus" role="status"></p>
     <button type="submit" class="btn primary big" id="regGo">כניסה לסימן</button>
     <button type="button" class="btn big reg-later hidden" id="regLater">אולי אחר כך</button>
-    <p class="fmt-note">המייל משמש לשליחת קבצים אליך ולחשבון שלך בסימן. הקבצים עצמם לא עולים לשום שרת. <a href="privacy.html" target="_blank" rel="noopener">מדיניות הפרטיות</a></p>
+    <p class="fmt-note">המייל משמש לשליחת קבצים אליך ולחשבון שלך בסימן. הקבצים עצמם נשארים במכשיר, חוץ ממסמך שבוחרים לשלוח בקישור (לחתימה או לצפייה), שנשמר אצלנו 30 יום ונמחק. <a href="privacy.html" target="_blank" rel="noopener">מדיניות הפרטיות</a></p>
   </form>
 </dialog>
 <dialog class="sig conv" id="fmtDlg" aria-labelledby="fmtTitle">
@@ -4534,6 +4541,9 @@ async function trQuick(t){
 function openPages(){if($('pgpanel').classList.contains('hidden'))$('pgBtn').click();}
 function openTrPanel(){if($('tpanel').classList.contains('hidden'))$('trBtn').click();}
 const CMDS=[
+  {l:'שליחה לחתימה בקישור',k:'שלח שליחה לחתימה חותם קישור לינק וואטסאפ להחתים חתימה דיגיטלית אלקטרונית send sign link',doc:1,run:()=>sendLink('sign')},
+  {l:'קישור לצפייה במסמך',k:'קישור לינק שתף שיתוף צפייה לשלוח link share view',doc:1,run:()=>sendLink('view')},
+  {l:'המסמכים ששלחתי לחתימה',k:'שלחתי מסמכים נשלחו חתמו מי חתם סטטוס מעקב sent status',run:()=>openSent()},
   {l:'גיליון Excel חדש',k:'חדש גיליון אקסל excel טבלה חישוב נוסחאות new spreadsheet',run:()=>newExcel()},
   {l:'מסמך Word חדש',k:'חדש מסמך וורד word כתיבה לכתוב ריק דף new document',run:()=>newWordDoc()},
   {l:'עריכת המסמך כמו ב-Word או ב-Excel',k:'ערוך עריכה וורד word אקסל excel גיליון תאים נוסחה גופן הדגשה מודגש קו תחתי פסקה רשימה',doc:1,run:()=>{if(S.office&&(S.office.kind==='docx'||S.office.kind==='xlsx'))$('wordEditBtn').click();else toast('עריכה כמו ב-Word וב-Excel זמינה לקובצי Word ו-Excel. פתחו קובץ או צרו חדש');}},
@@ -4611,9 +4621,10 @@ $('cmdIn').addEventListener('keydown',e=>{
 });
 $('cmdDlg').addEventListener('click',e=>{if(e.target===$('cmdDlg'))$('cmdDlg').close();});
 // quick actions on the first screen: choose the file, then the tool opens by itself
-const QA={sign:()=>document.querySelector('.tool[data-action="sign"]').click(),tr:openTrPanel,pages:openPages,conv:()=>$('convBtn').click()};
+const QA={send:()=>sendLink('sign'),sign:()=>document.querySelector('.tool[data-action="sign"]').click(),tr:openTrPanel,pages:openPages,conv:()=>$('convBtn').click()};
 document.querySelectorAll('.qa[data-qa]').forEach(b=>b.onclick=()=>{
   const k=b.dataset.qa;if(k==='cmd'){openCmd();return;}if(k==='newdoc'){newWordDoc();return;}if(k==='newxl'){newExcel();return;}
+  if(k==='sent'){openSent();return;}if(k==='send'){if(needReg()){showReg();return;}afterOpen=()=>sendLink('sign');$('openBtn2').click();return;}
   if(needReg()){showReg();return;}
   afterOpen=QA[k];$('openBtn2').click();});
 // the opening: the name is marked once, then the app
@@ -4679,6 +4690,20 @@ function prepShare(focusKey){
   }).catch(e=>{console.error(e);shStatus('הכנת הקובץ נכשלה: '+(e.message||e));});
 }
 $('shareBtn').onclick=()=>openShare();
+/* SEND FOR SIGNING / SHARE BY LINK — see send.js */
+const loadSend=()=>window.SIMAN_SEND?Promise.resolve():loadScript('send.js');
+async function sendLink(kind){
+  if(!S.bytes){toast('קודם פותחים מסמך');return;}
+  if($('shareDlg').open)$('shareDlg').close();
+  busy(true,kind==='sign'?'מכין את המסמך לחתימה…':'מכין קישור…');
+  try{await loadSend();const bytes=await buildPdf();busy(false);
+    const o={bytes,name:fileName(),sender:{name:USER.name||'',mail:USER.mail||''},toast,save:(n,b,k)=>saveBytes(n,b,k)};
+    if(kind==='sign')await SIMAN_SEND.open(o);else await SIMAN_SEND.openView(o);}
+  catch(e){console.error(e);toast(e.message||String(e));}
+  finally{busy(false);}
+}
+async function openSent(){try{await loadSend();SIMAN_SEND.list({toast,save:(n,b,k)=>saveBytes(n,b,k)});}catch(e){toast(e.message||String(e));}}
+document.querySelectorAll('.sh[data-link]').forEach(b=>b.addEventListener('click',()=>sendLink(b.dataset.link)));
 $('shareName').addEventListener('input',()=>{SH.base=$('shareName').value;renameShareFile();});
 $('shareName').addEventListener('change',()=>{if(!cleanBase(SH.base))SH.base=null;fillShareName();renameShareFile();});
 $('shareName').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('shareName').blur();}});
