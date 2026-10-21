@@ -5,8 +5,8 @@
    Needs: pdf.js (pdfjsLib), pdf-lib (PDFLib). */
 (function(){
 'use strict';
-const API='https://siman-share.lioralmo1.workers.dev/docs';
-const SIGN_URL=new URL('sign.html',location.href.replace(/[#?].*$/,'')).href;
+const API='https://siman-share.siman-app.workers.dev/docs';
+const HOST=API.replace(/\/docs$/,'');
 const LIST_KEY='siman.sent';
 const COLORS=['#2E58CC','#D9480F','#1F8A4C','#7A3EB1','#C2255C','#0B7285','#8F5B00','#495057','#5F3DC4','#2B8A3E'];
 const TYPES={sig:{l:'חתימה',w:.26,h:.06},initials:{l:'ראשי תיבות',w:.12,h:.05},name:{l:'שם מלא',w:.24,h:.035},date:{l:'תאריך',w:.16,h:.035},text:{l:'טקסט',w:.26,h:.035}};
@@ -24,8 +24,9 @@ async function api(path,opt={}){
 const qs=a=>a.k?`?k=${encodeURIComponent(a.k)}`:a.t?`?t=${encodeURIComponent(a.t)}`:`?v=${encodeURIComponent(a.v)}`;
 const getMeta=(id,a)=>api(`/${id}${qs(a)}`);
 const getPdf=(id,a)=>api(`/${id}/pdf${qs(a)}`);
-const signLink=(id,t)=>`${SIGN_URL}#d=${id}&t=${t}`;
-const viewLink=(id,v)=>`${SIGN_URL}#d=${id}&v=${v}`;
+const signLink=(id,t)=>`${HOST}/s/${id}/${t}`;
+const viewLink=(id,v)=>`${HOST}/v/${id}/${v}`;
+const ownerLink=(id,k)=>`${HOST}/o/${id}#k=${k}`;
 
 /* ------------------------------------------------------------ the signed document */
 // draws a field's content into a picture with exactly the field's proportions
@@ -173,7 +174,7 @@ async function open(opts){
     const avail=Math.min(900,P.clientWidth-32);
     for(let i=1;i<=pdf.numPages;i++){const pg=await pdf.getPage(i);const v1=pg.getViewport({scale:1});const sc=avail/v1.width;const vp=pg.getViewport({scale:sc});
       const box=document.createElement('div');box.className='s-page';box.style.width=vp.width+'px';box.style.height=vp.height+'px';box.dataset.p=i-1;
-      const cv=document.createElement('canvas');const dpr=Math.min(2,devicePixelRatio||1);cv.width=vp.width*dpr;cv.height=vp.height*dpr;box.append(cv);
+      const cv=document.createElement('canvas');cv.dir='ltr';cv.style.direction='ltr';const dpr=Math.min(2,devicePixelRatio||1);cv.width=vp.width*dpr;cv.height=vp.height*dpr;box.append(cv);
       const lay=document.createElement('div');lay.className='s-lay';box.append(lay);const pn=document.createElement('span');pn.className='s-pn';pn.textContent=`עמוד ${i} מתוך ${pdf.numPages}`;box.append(pn);P.append(box);
       u.pages.push({vp,box,lay,page:pg});
       pg.render({canvasContext:cv.getContext('2d'),viewport:pg.getViewport({scale:sc*dpr})});
@@ -285,7 +286,7 @@ async function list(o){
     st.innerHTML=(m.mode==='sign'?`<div class="bar"><i style="width:${all?done/all*100:0}%"></i></div>${m.signers.map(s=>`<span class="chip ${s.status==='signed'?'ok':s.status==='declined'?'no':'wait'}">${s.status==='signed'?'✓':s.status==='declined'?'✗':'⏳'} ${esc(s.name)}${s.at?` · ${fmtDate(s.at)}`:''}</span>`).join('')}
         ${m.signers.filter(s=>s.reason).map(s=>`<p class="hint">${esc(s.name)} כתב/ה: ${esc(s.reason)}</p>`).join('')}`:'<span class="chip">קישור לצפייה</span>')+
       `<div class="lnk">${m.mode==='sign'?`<button class="s-btn sm ${done===all?'pri':''}" data-dl="${r.id}" ${done?'':'disabled'}>${done===all?'הורדת המסמך החתום':'הורדה עם החתימות עד עכשיו'}</button>`:''}
-       <button class="s-btn sm" data-links="${r.id}">הקישורים</button><button class="s-btn sm" data-rm="${r.id}">מחיקה מהשרת</button></div>`;};
+       <a class="s-btn sm" href="${ownerLink(r.id,r.k)}" target="_blank" rel="noopener">צפייה במסמך</a><button class="s-btn sm" data-links="${r.id}">הקישורים</button><button class="s-btn sm" data-rm="${r.id}">מחיקה מהשרת</button></div>`;};
   l.forEach(draw);
   u.body.addEventListener('click',async e=>{
     const el=e.target.closest('[data-dl],[data-links],[data-rm],[data-forget]');if(!el||!u.body.contains(el))return;const id=el.dataset;const r=l.find(x=>x.id===(id.dl||id.links||id.rm||id.forget));if(!r)return;
@@ -306,5 +307,5 @@ async function openView(opts){
   await upload(u,{mode:'view',title:String(opts.name||'מסמך').replace(/\.pdf$/i,''),signers:[],fields:[],pages:1});
 }
 
-window.SIMAN_SEND={open,openView,list,links,close,buildSigned,getMeta,getPdf,api,signLink,viewLink,devName,COLORS,TYPES,isOpen:()=>!!U};
+window.SIMAN_SEND={open,openView,list,links,close,buildSigned,getMeta,getPdf,api,signLink,viewLink,ownerLink,HOST,devName,COLORS,TYPES,isOpen:()=>!!U};
 })();

@@ -3177,7 +3177,7 @@ $('tpDocx').onclick=exportDocx;
 
 /* settings */
 // כתובת שרת התרגום (Cloudflare Worker). ריק = התרגום המובנה כבוי ומשתמשים במפתח אישי
-const TRANSLATE_URL='https://siman-translate.lioralmo1.workers.dev/';
+const TRANSLATE_URL='https://siman-translate.siman-app.workers.dev/';
 const PROVIDERS={
   builtin:{help:'תרגום מוכן לשימוש, בלי מפתח ובלי הרשמה. מתאים למסמכים רגילים; למסמכים רגישים עדיף לא להשתמש בתרגום מקוון.',ph:'',re:/.*/,reMsg:'',models:[['default','ברירת מחדל']]},
   gemini:{help:'תרגום חינמי באמצעות Google Gemini. יוצרים מפתח בחינם, בלי כרטיס אשראי, ב-<a href="https://aistudio.google.com/apikey" data-ext>aistudio.google.com/apikey</a>. במסלול החינמי Google רשאית להשתמש בטקסט לשיפור המודלים, לכן לא מומלץ למסמכים רגישים.',
@@ -4480,7 +4480,7 @@ applyUser();
 
 /* --- mandatory sign-up on first use --- */
 // optional: an address that records new users (e.g. the Cloudflare worker + '/register'). Empty = kept on this device only.
-const REGISTER_URL='https://siman-register.lioralmo1.workers.dev/register';
+const REGISTER_URL='https://siman-register.siman-app.workers.dev/register';
 function registerUser(kind){
   if(!REGISTER_URL)return;
   const sent=()=>{USER.sent=true;try{localStorage.setItem(USER_KEY,JSON.stringify(USER));}catch(_){}};
