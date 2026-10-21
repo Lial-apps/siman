@@ -41,26 +41,30 @@ async function fieldPng(f,val,wPt,hPt){
 function auditCanvas(meta){
   const W=1190,H=1684,c=document.createElement('canvas');c.width=W;c.height=H;const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,W,H);
   g.direction='rtl';g.textAlign='right';const R=W-90;let y=110;
-  const line=(t,sz,col,bold,dy)=>{g.font=`${bold?'700 ':''}${sz}px "Heebo","Arial",sans-serif`;g.fillStyle=col||'#16213A';g.fillText(t,R,y);y+=dy||sz*1.6;};
+  const line=(t,sz,col,bold,dy)=>{g.font=`${bold?'700 ':''}${sz}px "Heebo","Arial",sans-serif`;g.fillStyle=col||'#16213A';g.direction='rtl';g.textAlign='right';g.fillText(t,R,y);y+=dy||sz*1.6;};
+  // a Hebrew label and a value in left-to-right order (dates, addresses, codes), so numbers are not reversed
+  const pair=(lbl,val,sz,col,dy)=>{g.font=`${sz}px "Heebo","Arial",sans-serif`;g.fillStyle=col||'#5D6982';g.direction='rtl';g.textAlign='right';g.fillText(lbl,R,y);
+    const w=g.measureText(lbl).width;g.direction='ltr';g.textAlign='right';g.fillText(String(val),R-w-10,y);g.direction='rtl';y+=dy||sz*1.6;};
   g.fillStyle='#16213A';g.fillRect(0,0,W,24);g.fillStyle='#FFD43B';g.fillRect(R-120,52,120,8);
   line('תעודת חתימה',46,'#16213A',true,80);
   line(meta.title,30,'#16213A',true,52);
-  line(`מזהה המסמך: ${meta.id}`,22,'#5D6982');
-  line(`נשלח על ידי: ${meta.from&&meta.from.name||'—'}${meta.from&&meta.from.mail?` (${meta.from.mail})`:''}`,22,'#5D6982');
-  line(`נוצר: ${fmtDate(meta.created)}`,22,'#5D6982');
+  pair('מזהה המסמך:',meta.id,22);
+  line(`נשלח על ידי: ${meta.from&&meta.from.name||'—'}`,22,'#5D6982');
+  if(meta.from&&meta.from.mail)pair('מייל:',meta.from.mail,22);
+  pair('נוצר:',fmtDate(meta.created),22);
   g.font='18px monospace';g.fillStyle='#5D6982';g.direction='ltr';g.textAlign='right';g.fillText('SHA-256: '+meta.hash,R,y);y+=36;g.direction='rtl';g.textAlign='right';
   g.fillStyle='#D4DBE5';g.fillRect(90,y,W-180,2);y+=50;
   for(const s of meta.signers){
     const st=s.status==='signed'?'✓ חתם/ה':s.status==='declined'?'✗ סירב/ה לחתום':'ממתין/ה לחתימה';
     line(`${s.name} — ${st}`,28,s.status==='signed'?'#1F8A4C':s.status==='declined'?'#C2362B':'#8F5B00',true,44);
-    if(s.at)line(`מועד: ${fmtDate(s.at)}${s.tz?` (${s.tz})`:''}`,20,'#5D6982',false,32);
-    if(s.ip)line(`כתובת IP: ${s.ip}${s.country?` · ${s.country}`:''}`,20,'#5D6982',false,32);
-    if(s.ua)line(`מכשיר: ${devName(s.ua)}`,20,'#5D6982',false,32);
+    if(s.at)pair('מועד:',`${fmtDate(s.at)}${s.tz?` (${s.tz})`:''}`,20,null,32);
+    if(s.ip)pair('כתובת רשת:',`${s.ip}${s.country?` (${s.country})`:''}`,20,null,32);
+    if(s.ua)pair('מכשיר:',devName(s.ua).replace(' ב-',' / '),20,null,32);
     if(s.reason)line(`סיבה: ${s.reason}`,20,'#5D6982',false,32);
     y+=18;if(y>H-260)break;
   }
   y=H-200;g.fillStyle='#D4DBE5';g.fillRect(90,y,W-180,2);y+=50;
-  line('המסמך נחתם באמצעות סימן, עורך PDF בעברית · lial-apps.github.io/siman',20,'#5D6982',false,32);
+  line('המסמך נחתם באמצעות סימן, עורך PDF בעברית',20,'#5D6982',false,32);
   line('כל חותם אישר שהוא מסכים לחתום על המסמך באופן אלקטרוני. הפרטים בעמוד זה נרשמו בזמן החתימה.',18,'#7A879E',false,30);
   return c;
 }
@@ -76,7 +80,7 @@ async function buildSigned(meta,pdfBytes){
       pg.drawImage(img,o);}}
   const c=auditCanvas(meta);const png=await doc.embedPng(new Uint8Array(await (await new Promise(r=>c.toBlob(r,'image/png'))).arrayBuffer()));
   const p=doc.addPage([595.28,841.89]);p.drawImage(png,{x:0,y:0,width:595.28,height:841.89});
-  doc.setProducer('Siman · lial-apps.github.io/siman');doc.setKeywords(['siman',meta.id]);doc.setModificationDate(new Date());
+  doc.setProducer('Siman');doc.setKeywords(['siman',meta.id]);doc.setModificationDate(new Date());
   return doc.save();
 }
 
