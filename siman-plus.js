@@ -114,6 +114,8 @@ dialog.scan::backdrop{background:color-mix(in srgb,var(--navy) 60%,transparent);
 .sc-pg>figure{margin:0;position:sticky;top:0}
 .sc-pg img{display:block;width:100%;max-height:72vh;object-fit:contain;background:#fff;border:1px solid var(--line);border-radius:10px;cursor:zoom-in}
 .sc-pg figcaption{font-size:12px;color:var(--muted);margin-top:6px}
+.sc-again{border:0;background:none;color:var(--blue);font:inherit;font-size:12px;cursor:pointer;text-decoration:underline;padding:0}
+.sc-again:disabled{color:var(--muted);text-decoration:none;cursor:default}
 .sc-ed{min-height:200px;background:#fff;color:#1B1C1F;border:1px solid var(--line);border-radius:10px;padding:26px 30px;font-family:"SF-rubik",Arial,sans-serif;font-size:15px;line-height:1.6;box-shadow:var(--paper-shadow)}
 .sc-ed:focus{outline:2px solid var(--marker)}
 .sc-ed h1{font-size:23px;margin:0 0 10px}
@@ -715,7 +717,7 @@ const imgIn = h('<input type="file" accept="image/*" multiple hidden>');
 const pdfIn = h('<input type="file" accept="application/pdf,.pdf" hidden>');
 dlg.append(camIn, imgIn, pdfIn);
 const SC = {
-  pages: [], stop: false, running: false, hint: '', name: '',
+  pages: [], stop: false, running: false, hint: '', name: '', quality: 'accurate',
   body: () => dlg.querySelector('.sc-body'), foot: () => dlg.querySelector('.sc-foot'),
   // a modal dialog covers the app's toasts and busy screen, so messages are shown inside it
   note(msg) {
@@ -750,11 +752,13 @@ const SC = {
         <button class="sc-src" type="button" data-s="pdf"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4"/></svg><b>PDF סרוק</b><span>קובץ שנסרק או צולם, עד 30 עמודים</span></button>
         ${docN ? `<button class="sc-src" type="button" data-s="doc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="1.5"/><path d="M9 8h6M9 12h6M9 16h3"/></svg><b>הקובץ הפתוח</b><span></span></button>` : ''}
       </div>
-      <div class="sc-opts"><label>שפת הכתב <select data-o="hint">${SC_LANGS.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select></label></div>
+      <div class="sc-opts"><label>שפת הכתב <select data-o="hint">${SC_LANGS.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select></label>
+        <label>אופן הקריאה <select data-o="quality"><option value="accurate">מדויק: הכי טוב לכתב יד (חצי דקה עד שתי דקות לעמוד)</option><option value="fast">מהיר: כמה שניות לעמוד, מנחש יותר</option></select></label></div>
       <p class="sc-fine">התמונות נשלחות לזיהוי אצל Google Gemini ולא נשמרות אצלנו. בשירות החינמי Google עשויה להשתמש בהן לשיפור השירות שלה, לכן לא כדאי לסרוק כך מסמכים רגישים במיוחד (תעודות זהות, מסמכים רפואיים). כל עמוד לוקח כמה שניות.</p>
     </div>`;
     if (docN) b.querySelector('[data-s=doc] span').textContent = `${dispName(S.office ? S.office.name : S.name)} · ${docN} ${docN === 1 ? 'עמוד' : 'עמודים'}`;
     const sel = b.querySelector('[data-o=hint]'); sel.value = this.hint; sel.onchange = () => { this.hint = sel.value; };
+    const q = b.querySelector('[data-o=quality]'); q.value = this.quality; q.onchange = () => { this.quality = q.value; };
     b.querySelector('[data-s=cam]').onclick = () => camIn.click();
     b.querySelector('[data-s=img]').onclick = () => imgIn.click();
     b.querySelector('[data-s=pdf]').onclick = () => pdfIn.click();
@@ -807,7 +811,7 @@ const SC = {
       st.textContent = line + '…';
       const clock = setInterval(() => { const sec = Math.round((Date.now() - t0) / 1000); li.querySelector('span').textContent = `קורא… ${sec} שנ׳`; st.textContent = `${line} · ${sec} שניות${sec > 45 ? ' (כתב יד צפוף לוקח לפעמים עד שתי דקות)' : ''}`; }, 1000);
       try {
-        const raw = await ai({ mode: 'scan', image: p.b64, mime: 'image/jpeg', hint: this.hint }, { onWait: s => { st.textContent = `השירות עמוס, ממשיך בעוד ${s} שניות…`; } }).finally(() => clearInterval(clock));
+        const raw = await ai({ mode: 'scan', image: p.b64, mime: 'image/jpeg', hint: this.hint, quality: this.quality }, { onWait: s => { st.textContent = `השירות עמוס, ממשיך בעוד ${s} שניות…`; } }).finally(() => clearInterval(clock));
         p.blocks = parseBlocks(raw); p.lang = p.blocks.lang;
         li.className = 'ok'; li.querySelector('span').textContent = p.blocks.length ? `${p.blocks.length} קטעים` : 'עמוד ריק';
       } catch (e) {
@@ -832,7 +836,7 @@ const SC = {
     const rev = b.firstChild;
     this.pages.forEach((p, i) => {
       if (!p.blocks && !p.err) return;
-      const row = h(`<section class="sc-pg" aria-label="עמוד ${i + 1}"><figure><img alt="המקור, עמוד ${i + 1}" src="${p.url}"><figcaption>המקור · עמוד ${i + 1}${p.err ? ' · לא נקרא: ' + esc(p.err) : ''}</figcaption></figure><div class="sc-ed" contenteditable="true" spellcheck="true"></div></section>`);
+      const row = h(`<section class="sc-pg" aria-label="עמוד ${i + 1}"><figure><img alt="המקור, עמוד ${i + 1}" src="${p.url}"><figcaption>המקור · עמוד ${i + 1}${p.err ? ' · לא נקרא: ' + esc(p.err) : ''} · <button type="button" class="sc-again">לקרוא את העמוד שוב במצב מדויק</button></figcaption></figure><div class="sc-ed" contenteditable="true" spellcheck="true"></div></section>`);
       const ed = row.querySelector('.sc-ed');
       ed.innerHTML = p.blocks && p.blocks.length ? blocksHtml(p.blocks) : '<p class="empty">לא זוהה טקסט בעמוד הזה. אפשר להקליד כאן.</p>';
       ed.dir = p.blocks && p.blocks.length ? (blocksRtl(p.blocks) ? 'rtl' : 'ltr') : 'rtl';
@@ -841,6 +845,7 @@ const SC = {
       ed.addEventListener('click', e => { const m = e.target.closest('mark'); if (m && !m.dataset.seen) { m.dataset.seen = 1; } });
       row.querySelector('img').onclick = () => { const z = h(`<div class="sc-zoom"><img alt="" src="${p.url}"></div>`); z.onclick = () => z.remove(); dlg.append(z); };
       p.ed = ed;
+      row.querySelector('.sc-again').onclick = () => this.again(i, row);
       rev.append(row);
     });
     const f = this.foot(); f.classList.remove('hidden');
@@ -857,6 +862,19 @@ const SC = {
     f.querySelector('[data-a=edit]').onclick = () => this.save('edit');
     f.querySelector('[data-a=copy]').onclick = async () => { try { await navigator.clipboard.writeText(this.collect().map(pg => pg.map(blockText).join('\n')).join('\n\n')); toast('הטקסט הועתק'); } catch (_) { toast('ההעתקה לא הצליחה'); } };
     this.count();
+  },
+  async again(i, row) {
+    const p = this.pages[i], btn = row.querySelector('.sc-again'), ed = row.querySelector('.sc-ed');
+    if (this.running) return;
+    this.running = true; btn.disabled = true;
+    const t0 = Date.now(), clock = setInterval(() => { btn.textContent = `קורא שוב… ${Math.round((Date.now() - t0) / 1000)} שנ׳`; }, 1000);
+    try {
+      const raw = await ai({ mode: 'scan', image: p.b64, mime: 'image/jpeg', hint: this.hint, quality: 'accurate' });
+      const bl = parseBlocks(raw);
+      if (bl.length) { p.blocks = bl; ed.innerHTML = blocksHtml(bl); ed.dir = blocksRtl(bl) ? 'rtl' : 'ltr'; this.count(); btn.textContent = 'נקרא שוב ✓'; }
+      else btn.textContent = 'לא זוהה טקסט';
+    } catch (e) { btn.textContent = 'נכשל: ' + (e.message || e); btn.disabled = false; }
+    finally { clearInterval(clock); this.running = false; }
   },
   count() {
     const n = this.pages.reduce((t, p) => t + (p.ed ? p.ed.querySelectorAll('mark').length : 0), 0);
@@ -896,7 +914,7 @@ window.SIMAN_SCAN = SC;
 
 // pictures for the service: long side ~2000px, JPEG
 function canvasJpeg(draw, w, hgt) {
-  const s = Math.min(1, 1700 / Math.max(w, hgt));
+  const s = Math.min(1, (SC.quality === 'fast' ? 1700 : 2400) / Math.max(w, hgt));
   const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(w * s)); c.height = Math.max(1, Math.round(hgt * s));
   const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height);
   return Promise.resolve(draw(x, c.width, c.height)).then(() => {
@@ -912,7 +930,7 @@ async function imgToJpeg(file) {
   return canvasJpeg((x, cw, ch) => x.drawImage(bmp, 0, 0, cw, ch), w, hh);
 }
 async function pageToJpeg(page) {
-  const v1 = page.getViewport({ scale: 1 }), sc = Math.min(3, 1700 / Math.max(v1.width, v1.height));
+  const v1 = page.getViewport({ scale: 1 }), sc = Math.min(4, (SC.quality === 'fast' ? 1700 : 2400) / Math.max(v1.width, v1.height));
   const vp = page.getViewport({ scale: sc });
   return canvasJpeg(async x => { await page.render({ canvasContext: x, viewport: vp }).promise; }, vp.width, vp.height);
 }
@@ -951,14 +969,15 @@ function salvage(s) {
   return null;
 }
 const unsureHtml = t => esc(t).replace(/\[\[(.*?)\]\]/g, (m, w) => w.trim() === '?' ? '<mark title="לא הצלחתי לקרוא">[?]</mark>' : `<mark title="לא בטוח, כדאי לבדוק">${w}</mark>`);
+const dirOf = t => paraDir(String(t || ''), 'R') === 'R' ? 'rtl' : 'ltr';
 function blocksHtml(blocks) {
   let html = '', list = null;
   const endList = () => { if (list) { html += `</${list}>`; list = null; } };
   for (const b of blocks) {
-    if (b.t === 'li' || b.t === 'oli') { const tag = b.t === 'li' ? 'ul' : 'ol'; if (list !== tag) { endList(); html += `<${tag}>`; list = tag; } html += `<li dir="auto">${unsureHtml(b.text)}</li>`; continue; }
+    if (b.t === 'li' || b.t === 'oli') { const tag = b.t === 'li' ? 'ul' : 'ol'; if (list !== tag) { endList(); html += `<${tag}>`; list = tag; } html += `<li dir="${dirOf(b.text)}">${unsureHtml(b.text)}</li>`; continue; }
     endList();
-    if (b.t === 'table') html += `<table>${b.rows.map(r => `<tr>${r.map(c => `<td dir="auto">${unsureHtml(c)}</td>`).join('')}</tr>`).join('')}</table>`;
-    else { const tag = b.t === 'h1' ? 'h1' : b.t === 'h2' ? 'h2' : 'p'; html += `<${tag} dir="auto">${unsureHtml(b.text)}</${tag}>`; }
+    if (b.t === 'table') html += `<table>${b.rows.map(r => `<tr>${r.map(c => `<td dir="${dirOf(c)}">${unsureHtml(c)}</td>`).join('')}</tr>`).join('')}</table>`;
+    else { const tag = b.t === 'h1' ? 'h1' : b.t === 'h2' ? 'h2' : 'p'; html += `<${tag} dir="${dirOf(b.text)}">${unsureHtml(b.text)}</${tag}>`; }
   }
   endList();
   return html;
