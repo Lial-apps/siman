@@ -40,6 +40,12 @@ document.head.append(h(`<style id="simanPlusCss">
 .tab-add svg{width:15px;height:15px}
 .tab-add:hover,.tab-all:hover{color:var(--ink);border-color:var(--ink)}
 .tab-all{border-style:solid;margin-inline-start:auto}
+/* above the full Word / Excel editors */
+body.ed-live .tabs{position:fixed;top:0;left:0;right:0;z-index:950;height:40px;box-shadow:0 1px 0 var(--line)}
+body.ed-live #wed,body.ed-live #xed{top:40px!important}
+.tab.ed .kd{color:#fff;border-color:transparent;opacity:1}
+.tab.ed.docx .kd{background:#2B579A}
+.tab.ed.xlsx .kd{background:#217346}
 .tab-menu{position:fixed;z-index:60;min-width:230px;background:var(--bar);border:1px solid var(--line);border-radius:12px;box-shadow:0 18px 40px -16px rgba(0,0,0,.45);padding:6px}
 .tab-menu button{display:block;width:100%;text-align:start;border:0;background:none;font:inherit;font-size:14px;color:var(--ink);padding:9px 12px;border-radius:8px;cursor:pointer}
 .tab-menu button:hover,.tab-menu button:focus-visible{background:color-mix(in srgb,var(--marker) 45%,var(--bar));outline:none}
@@ -145,9 +151,54 @@ dialog.scan::backdrop{background:color-mix(in srgb,var(--navy) 60%,transparent);
 const KEEP = ['bytes', 'name', 'doc', 'pages', 'zoom', 'anns', 'hist', 'redo', 'dirty', 'nextId', 'handle', 'office', 'hasForm', 'sel'];
 const MAX_TABS = 12;
 const TB = { list: [], cur: null, prev: null, seq: 0, depth: 0, drag: null };
-const tabData = t => t === TB.cur ? S : (t.data || {});
-const tabName = t => { const d = tabData(t); return (d.office ? d.office.name : d.name) || 'מסמך'; };
-const tabKind = t => { const d = tabData(t); return d.office ? d.office.kind.toUpperCase() : 'PDF'; };
+const tabData = t => t === TB.cur && !t.ed ? S : (t.data || {});
+// Word / Excel files open in the full editors are tabs too ("editor tabs", t.ed = 'docx' | 'xlsx').
+// The editors are one-at-a-time modules, so a tab that is not in front keeps its file as bytes ("parked")
+// and is opened again when it comes back.
+const edApi = k => k === 'docx' ? window.WORD_EDITOR : window.XLSX_EDITOR;
+const edState = k => { const A = edApi(k); return A && A._test ? A._test[k === 'docx' ? 'E' : 'X'] : null; };
+const edLive = t => !!(t && t.ed && t.liveEl && document.body.contains(t.liveEl));
+function tabInfo(t) {
+  if (t.ed) {
+    const live = edLive(t), st = live && edState(t.ed);
+    const inp = live && t.liveEl.querySelector(t.ed === 'docx' ? '#weName' : '#xeName');
+    const base = ((inp && inp.value) || (t.data && t.data.name) || 'מסמך').replace(/\.(docx|xlsx)$/i, '');
+    return { name: base + '.' + t.ed, dirty: live ? !!(st && (st.dirty || st.snapT)) : !!(t.data && t.data.dirty), kind: t.ed === 'docx' ? 'WORD' : 'EXCEL', edit: true };
+  }
+  const d = tabData(t);
+  return { name: (d.office ? d.office.name : d.name) || 'מסמך', dirty: !!d.dirty, kind: d.office ? d.office.kind.toUpperCase() : 'PDF' };
+}
+const tabName = t => tabInfo(t).name;
+const deskTabs = () => TB.list.filter(t => !t.ed);
+async function park(t) {
+  if (!edLive(t)) return;
+  const A = edApi(t.ed), st = edState(t.ed); if (!A || !st) return;
+  busy(true, 'שומר את הקובץ בצד…');
+  try {
+    const r = t.ed === 'docx' ? await A._test.buildDocx() : await A._test.buildXlsx();
+    const info = tabInfo(t);
+    t.data = { bytes: r && r.bytes ? r.bytes : r, name: info.name, dirty: info.dirty, opts: st.opts };
+    t.parking = true;
+    await A.close();
+  } finally { t.parking = false; t.liveEl = null; busy(false); }
+}
+async function unpark(t) {
+  const d = t.data; if (!d) return;
+  TB.opening = t; TB.cur = t;
+  try {
+    if (t.ed === 'docx') { await loadEditLibs('docx'); if (!window.WORD_EDITOR) await loadScript('word-editor.js'); }
+    else { await loadEditLibs('xlsx'); if (!window.XLSX_EDITOR) await loadScript('excel-editor.js'); }
+    await edApi(t.ed).open({ ...d.opts, bytes: d.bytes, name: d.name, isNew: false, restored: d.dirty });
+  } catch (e) { console.error(e); toast('לא הצלחתי לפתוח שוב את הקובץ: ' + (e.message || e)); }
+  finally { if (TB.opening === t) TB.opening = null; }
+}
+// leave the tab in front / bring a tab to the front (desk tabs and editor tabs alike)
+async function leave() {
+  const c = TB.cur; if (!c) return;
+  if (c.ed) { if (edLive(c)) await park(c); } else stash();
+  TB.cur = null;
+}
+async function enter(t) { if (t.ed) await unpark(t); else restore(t); renderTabs(); }
 
 function observe() {
   if (io) io.disconnect();
@@ -156,7 +207,7 @@ function observe() {
   far = new IntersectionObserver(es => es.forEach(e => { if (!e.isIntersecting && S.pages.length > 6) releasePage(S.pages[+e.target.dataset.i]); }), { root: $('desk'), rootMargin: '3000px 0px' });
 }
 function stash() {
-  const t = TB.cur; if (!t || !S.doc) return;
+  const t = TB.cur; if (!t || t.ed || !S.doc) return;
   RA.stop();
   const d = {};
   for (const k of KEEP) d[k] = S[k];
@@ -223,7 +274,11 @@ function toEmpty() {
 const openOne = openFile;
 openFile = async function (file, handle) {
   if (!file) return;
-  if (TB.depth === 0 && S.doc && TB.cur && !(typeof needReg === 'function' && needReg())) {
+  if (TB.depth === 0 && TB.cur && TB.cur.ed && !(typeof needReg === 'function' && needReg())) {
+    if (TB.list.length >= MAX_TABS) { toast(`אפשר לפתוח עד ${MAX_TABS} קבצים יחד. סגרו אחד מהם כדי לפתוח עוד`); return; }
+    if (edLive(TB.cur)) { await park(TB.cur); TB.prev = TB.cur; } else TB.prev = null;
+    TB.cur = null;
+  } else if (TB.depth === 0 && S.doc && TB.cur && !(typeof needReg === 'function' && needReg())) {
     if (TB.list.length >= MAX_TABS) { toast(`אפשר לפתוח עד ${MAX_TABS} קבצים יחד. סגרו אחד מהם כדי לפתוח עוד`); return; }
     if (isBusy()) return;
     TB.prev = TB.cur; stash(); TB.cur = null;
@@ -239,43 +294,101 @@ function settle() {
     const at = TB.prev ? TB.list.indexOf(TB.prev) + 1 : TB.list.length;
     TB.list.splice(at || TB.list.length, 0, t);
     TB.cur = t; TB.prev = null; AS.onTab();
-  } else if (!S.doc && !TB.cur && TB.prev) {      // nothing came up (cancelled, failed, or opened only in the Word editor)
-    const p = TB.prev; TB.prev = null; restore(p);
+  } else if (!S.doc && !TB.cur && TB.prev && TB.list.includes(TB.prev)) {      // nothing came up (cancelled or failed)
+    const p = TB.prev; TB.prev = null; enter(p);
+  } else TB.prev = null;
+  renderTabs();
+}
+let switching = false;
+async function switchTo(t) {
+  if (t === TB.cur || switching) return;
+  if (isBusy() || TR.running) { toast('רגע, פעולה עדיין רצה'); return; }
+  switching = true;
+  try { await leave(); await enter(t); } finally { switching = false; renderTabs(); }
+}
+async function closeTab(t) {
+  if (isBusy() || switching) return;
+  const info = tabInfo(t);
+  if (info.dirty && !confirm(`ב"${info.name}" יש שינויים שלא נשמרו. לסגור בכל זאת?`)) return;
+  const i = TB.list.indexOf(t); TB.list.splice(i, 1);
+  AS.forget(t);
+  if (t.ed) { if (edLive(t)) { t.closing = true; try { await edApi(t.ed).close(); } catch (_) {} } }
+  else if (t !== TB.cur) { try { t.data.doc && t.data.doc.destroy(); } catch (_) {} }
+  if (t === TB.cur) {
+    if (!t.ed) {
+      RA.stop();
+      try { S.doc && S.doc.destroy(); } catch (_) {}
+      if (io) io.disconnect(); if (far) far.disconnect();
+      $('pages').innerHTML = '';
+      Object.assign(S, { doc: null, dirty: false });
+    }
+    TB.cur = null;
+    const next = TB.list[Math.min(i, TB.list.length - 1)];
+    if (next) await enter(next); else toEmpty();
   }
   renderTabs();
 }
-function switchTo(t) {
-  if (t === TB.cur) return;
-  if (isBusy() || TR.running) { toast('רגע, פעולה עדיין רצה'); return; }
-  stash(); restore(t); renderTabs();
-}
-function closeTab(t) {
-  if (isBusy()) return;
-  const d = tabData(t);
-  if (d.dirty && !confirm(`ב"${tabName(t)}" יש שינויים שלא נשמרו. לסגור בכל זאת?`)) return;
-  const i = TB.list.indexOf(t); TB.list.splice(i, 1);
-  AS.forget(t);
-  if (t === TB.cur) {
-    RA.stop();
-    try { S.doc && S.doc.destroy(); } catch (_) {}
-    TB.cur = null;
-    if (io) io.disconnect(); if (far) far.disconnect();
-    $('pages').innerHTML = '';
-    Object.assign(S, { doc: null, dirty: false });
-    const next = TB.list[Math.min(i, TB.list.length - 1)];
-    if (next) restore(next); else toEmpty();
-  } else { try { d.doc && d.doc.destroy(); } catch (_) {} }
-  renderTabs();
-}
-function closeAll() {
-  const dirty = TB.list.filter(t => tabData(t).dirty).length;
+async function closeAll() {
+  const dirty = TB.list.filter(t => tabInfo(t).dirty).length;
   if (dirty && !confirm(dirty === 1 ? 'בקובץ אחד יש שינויים שלא נשמרו. לסגור הכל בכל זאת?' : `ב-${dirty} קבצים יש שינויים שלא נשמרו. לסגור הכל בכל זאת?`)) return;
-  for (const t of TB.list) { if (t !== TB.cur) { try { t.data.doc && t.data.doc.destroy(); } catch (_) {} } }
+  const list = TB.list; TB.list = [];
+  for (const t of list) {
+    if (t.ed) { if (edLive(t)) { t.closing = true; try { await edApi(t.ed).close(); } catch (_) {} } }
+    else if (t !== TB.cur) { try { t.data.doc && t.data.doc.destroy(); } catch (_) {} }
+  }
   RA.stop();
-  try { S.doc && S.doc.destroy(); } catch (_) {}
-  TB.list = []; TB.cur = null; AS.forgetAll();
+  if (TB.cur && !TB.cur.ed) { try { S.doc && S.doc.destroy(); } catch (_) {} }
+  TB.cur = null; AS.forgetAll();
   toEmpty(); renderTabs();
 }
+
+/* ---- the full Word / Excel editors as tabs ---- */
+function edAdded(kind, el) {
+  if (TB.opening && TB.opening.ed === kind) { const t = TB.opening; TB.opening = null; t.liveEl = el; t.data = null; TB.cur = t; renderTabs(); return; }
+  const same = TB.list.find(x => x.ed === kind && x.liveEl && !document.body.contains(x.liveEl) && x === TB.cur);
+  if (same) { same.liveEl = el; renderTabs(); return; }   // the editor reopened itself (restoring a draft)
+  if (TB.cur && !TB.cur.ed) { TB.prev = TB.cur; stash(); }
+  const t = { id: ++TB.seq, ed: kind, liveEl: el, data: null };
+  const at = TB.prev && TB.list.includes(TB.prev) ? TB.list.indexOf(TB.prev) + 1 : TB.cur ? TB.list.indexOf(TB.cur) + 1 : TB.list.length;
+  TB.list.splice(at || TB.list.length, 0, t);
+  TB.cur = t; TB.prev = null;
+  if (TB.list.length > MAX_TABS) toast(`יש ${TB.list.length} קבצים פתוחים. כדאי לסגור כמה`);
+  renderTabs();
+}
+function edRemoved(kind, el) {
+  const t = TB.list.find(x => x.liveEl === el);
+  if (!t || t.parking || t.closing) { renderTabs(); return; }
+  setTimeout(async () => {
+    const id = kind === 'docx' ? 'wed' : 'xed', now = document.getElementById(id);
+    if (now && TB.cur === t && !TB.list.some(x => x !== t && x.liveEl === now)) { t.liveEl = now; renderTabs(); return; }
+    if (edLive(t) || t.data || !TB.list.includes(t)) { renderTabs(); return; }
+    // closed in the editor itself (×), or sent to the desk for signing
+    const i = TB.list.indexOf(t); TB.list.splice(i, 1); AS.forget(t);
+    if (TB.cur === t) {
+      TB.cur = null;
+      if (!S.doc && TB.depth === 0) { const n = TB.list[Math.min(i, TB.list.length - 1)]; if (n) await enter(n); else toEmpty(); }
+    }
+    renderTabs();
+  }, 450);
+}
+new MutationObserver(ms => {
+  for (const m of ms) {
+    for (const n of m.addedNodes) if (n.nodeType === 1 && (n.id === 'wed' || n.id === 'xed')) edAdded(n.id === 'wed' ? 'docx' : 'xlsx', n);
+    for (const n of m.removedNodes) if (n.nodeType === 1 && (n.id === 'wed' || n.id === 'xed')) edRemoved(n.id === 'wed' ? 'docx' : 'xlsx', n);
+  }
+}).observe(document.body, { childList: true });
+// a new editor while another one is in front: the one in front is put aside first, not closed
+for (const fn of ['openWordEditor', 'openExcelEditor']) {
+  const one = window[fn];
+  if (typeof one !== 'function') continue;
+  window[fn] = async function (...args) {
+    if (TB.cur && TB.cur.ed && edLive(TB.cur)) { await park(TB.cur); TB.prev = TB.cur; TB.cur = null; }
+    return one.apply(this, args);
+  };
+}
+// the unsaved-changes dot of an editor tab follows the typing
+let edT = 0;
+document.addEventListener('input', e => { if (e.target.closest && e.target.closest('#wed,#xed')) { clearTimeout(edT); edT = setTimeout(renderTabs, 600); } }, true);
 
 const strip = h('<div class="tabs hidden" id="tabs" role="tablist" aria-label="הקבצים הפתוחים"></div>');
 document.querySelector('.work').before(strip);
@@ -284,12 +397,13 @@ function renderTabs() {
   cancelAnimationFrame(tabsRaf);
   tabsRaf = requestAnimationFrame(() => {
     strip.classList.toggle('hidden', !TB.list.length);
+    document.body.classList.toggle('ed-live', TB.list.some(edLive));
     strip.innerHTML = '';
     for (const t of TB.list) {
-      const on = t === TB.cur, d = tabData(t);
-      const b = h(`<div class="tab" role="tab" tabindex="${on ? 0 : -1}" aria-selected="${on}" draggable="true"><span class="kd">${tabKind(t)}</span><span class="nm"></span>${d.dirty ? '<span class="dot" title="יש שינויים שלא נשמרו"></span>' : ''}<span class="x" role="button" aria-label="סגירת הקובץ" title="סגירה">×</span></div>`);
-      b.querySelector('.nm').textContent = dispName(tabName(t));
-      b.title = tabName(t);
+      const on = t === TB.cur, d = tabInfo(t);
+      const b = h(`<div class="tab${d.edit ? ' ed ' + t.ed : ''}" role="tab" tabindex="${on ? 0 : -1}" aria-selected="${on}" draggable="true"><span class="kd">${d.kind}</span><span class="nm"></span>${d.dirty ? '<span class="dot" title="יש שינויים שלא נשמרו"></span>' : ''}<span class="x" role="button" aria-label="סגירת הקובץ" title="סגירה">×</span></div>`);
+      b.querySelector('.nm').textContent = dispName(d.name);
+      b.title = d.name + (d.edit ? ' (עריכה)' : '');
       b.onclick = e => { if (e.target.closest('.x')) { closeTab(t); return; } switchTo(t); };
       b.onauxclick = e => { if (e.button === 1) { e.preventDefault(); closeTab(t); } };
       b.onkeydown = e => {
@@ -324,8 +438,8 @@ setDirty = function (v) { setDirtyOne(v); if (TB.list.length) renderTabs(); };
 function allMenu(anchor) {
   document.querySelector('.tab-menu')?.remove();
   const m = h(`<div class="tab-menu" role="menu">
-    <button role="menuitem" data-a="merge">איחוד לקובץ PDF אחד<small>לפי סדר הלשוניות, עם כל הסימונים והחתימות</small></button>
-    <button role="menuitem" data-a="zip">שמירת כל הקבצים<small>כל קובץ כ-PDF, יחד בקובץ ZIP אחד</small></button>
+    <button role="menuitem" data-a="merge">איחוד לקובץ PDF אחד<small>לפי סדר הלשוניות, עם כל הסימונים והחתימות${TB.list.some(t => t.ed) ? '. בלי הקבצים שבעורך' : ''}</small></button>
+    <button role="menuitem" data-a="zip">שמירת כל הקבצים<small>כל קובץ כ-PDF, יחד בקובץ ZIP אחד${TB.list.some(t => t.ed) ? '. בלי הקבצים שבעורך' : ''}</small></button>
     <button role="menuitem" data-a="close">סגירת כל הקבצים</button></div>`);
   document.body.append(m);
   const r = anchor.getBoundingClientRect();
@@ -341,19 +455,20 @@ function allMenu(anchor) {
 // a PDF of every tab, with its marks: each tab is brought up in turn and built
 async function eachTabPdf(label) {
   const back = TB.cur, out = [];
-  for (const t of TB.list.slice()) {
+  if (back && back.ed) await leave();
+  for (const t of deskTabs()) {
     if (t !== TB.cur) { stash(); restore(t); }
     busy(true, `${label}: ${tabName(t)}…`);
     const bytes = await buildPdf();
     const base = (S.office ? S.office.base || S.office.name : S.name).replace(/\.(pdf|docx|xlsx|pptx|doc)$/i, '');
     out.push({ name: base + '.pdf', bytes: bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes) });
   }
-  if (TB.cur !== back) { stash(); restore(back); }
+  if (TB.cur !== back && back) { if (back.ed) { stash(); TB.cur = null; } else stash(); await enter(back); }
   renderTabs();
   return out;
 }
 async function mergeAll() {
-  if (TB.list.length < 2) return;
+  if (deskTabs().length < 2) { toast('האיחוד עובד על קבצים שפתוחים לסימון (לא על קבצים בעורך Word / Excel)'); return; }
   try {
     const parts = await eachTabPdf('מאחד');
     busy(true, 'מחבר את הקבצים…');
@@ -370,7 +485,7 @@ async function mergeAll() {
   finally { busy(false); }
 }
 async function zipAll() {
-  if (!TB.list.length) return;
+  if (!deskTabs().length) return;
   try {
     const parts = await eachTabPdf('מכין');
     const used = new Set(), enc = [];
@@ -401,8 +516,11 @@ $('file').onchange = e => { const fs = [...e.target.files]; e.target.value = '';
 addEventListener('drop', async e => {
   if (TB.drag) return;
   const fs = e.dataTransfer && e.dataTransfer.files;
-  if (!fs || fs.length < 2) return;                 // one file: the usual way
-  e.preventDefault(); e.stopPropagation();
+  const onEditor = !!(document.getElementById('wed') || document.getElementById('xed'));
+  const docs = fs && fs.length && [...fs].every(f => /\.(pdf|docx?|xlsx|pptx)$/i.test(f.name));
+  if (!fs || !fs.length || (fs.length < 2 && !(onEditor && docs))) return;   // one file on the desk: the usual way
+  if (onEditor && !docs) return;                                            // pictures dropped into the editor stay there
+  e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
   dragN = 0; document.body.classList.remove('dragging');
   const files = [...fs], items = [...(e.dataTransfer.items || [])];
   // the handles must be asked for now: the dropped items are gone once the event is over
@@ -410,7 +528,7 @@ addEventListener('drop', async e => {
   const got = await Promise.all(hs.map(p => p || Promise.resolve(null)));
   openMany(files.map((f, k) => ({ f, h: got[k] && got[k].kind === 'file' ? got[k] : null })));
 }, true);
-window.SIMAN_TABS = { TB, switchTo, closeTab, mergeAll, zipAll, openMany };
+window.SIMAN_TABS = { TB, switchTo, closeTab, mergeAll, zipAll, openMany, tabInfo };
 
 /* =====================================================================
    2. AI — the smart server (siman-ai)
