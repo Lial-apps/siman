@@ -908,6 +908,10 @@ dialog.conv{width:min(560px,94vw)}
 .fmt-grid input[type=range]{accent-color:var(--blue)}
 .chk{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--ink)}
 .fmt-note{margin:8px 0 2px;font-size:12px;color:var(--muted)}
+.trial-line{margin:10px 0 2px;padding:9px 12px;border-radius:10px;background:color-mix(in srgb,var(--marker) 22%,transparent);border:1px solid color-mix(in srgb,var(--marker) 55%,transparent);font-size:13px;line-height:1.5;color:var(--ink)}
+.trial-line b{font-weight:700}
+.wl-trial{display:inline-block;margin:0 0 10px;padding:4px 12px;border-radius:999px;font-size:13px;font-weight:600;color:var(--ink);background:color-mix(in srgb,var(--marker) 30%,transparent);border:1px solid color-mix(in srgb,var(--marker) 60%,transparent)}
+.wl-trial.hidden,.trial-line.hidden{display:none}
 .tp-page .tt.fmt{font-family:"AlefEmbed",Arial,sans-serif;unicode-bidi:normal;outline:none;border-radius:4px;padding:2px 4px;margin:0 -4px}
 .tp-page .tt.fmt:focus{background:color-mix(in srgb,var(--blue) 6%,transparent);outline:1px solid color-mix(in srgb,var(--blue) 40%,transparent)}
 .tt.fmt>div{min-height:1em;unicode-bidi:isolate}
@@ -1274,7 +1278,7 @@ body:has(#wed) .busy,body:has(#xed) .busy{z-index:1000}body:has(#wed) .toast,bod
 </dialog>
 
 <header class="bar">
-  <div class="brand"><b title="גרסה 4.6.0">סימן</b><span class="ver">4.6.0</span><span class="fname" id="fname"></span></div>
+  <div class="brand"><b title="גרסה 4.7.0">סימן</b><span class="ver">4.7.0</span><span class="fname" id="fname"></span></div>
 
   <nav class="tools" id="tools" aria-label="כלים">
     <button class="tool" data-tool="select" aria-pressed="true" title="בחירה וגלילה (V)">
@@ -1363,6 +1367,7 @@ body:has(#wed) .busy,body:has(#xed) .busy{z-index:1000}body:has(#wed) .toast,bod
     <div class="welcome">
       <div class="wl-text">
         <p class="wl-hi hidden" id="wlHi"></p>
+        <p class="wl-trial hidden" id="wlTrial"></p>
         <h1>מה נסמן היום?</h1>
         <svg class="swipe" viewBox="0 0 300 26" preserveAspectRatio="none" aria-hidden="true"><path d="M6 15c46-9 98-11 150-9s92 7 138 2" stroke="#FFD43B" stroke-width="16" stroke-linecap="round" fill="none"/></svg>
         <p class="wl-sub">סימן פותח PDF, Word (גם DOC ישן) ו-Excel לסימון, חתימה ושליחה ישר בדפדפן, עורך מסמכי Word וגיליונות Excel כמו בתוכנות עצמן, ומתקן קבצי PowerPoint שלא נפתחים. הקובץ נשאר אצלכם במכשיר.</p>
@@ -1607,7 +1612,7 @@ body:has(#wed) .busy,body:has(#xed) .busy{z-index:1000}body:has(#wed) .toast,bod
     <p class="sh-status" id="regStatus" role="status"></p>
     <button type="submit" class="btn primary big" id="regGo">כניסה לסימן</button>
     <button type="button" class="btn big reg-later hidden" id="regLater">אולי אחר כך</button>
-    <p class="fmt-note">המייל משמש לשליחת קבצים אליך ולחשבון שלך בסימן. הקבצים עצמם נשארים במכשיר, חוץ ממסמך שבוחרים לשלוח בקישור (לחתימה או לצפייה), שנשמר אצלנו 30 יום ונמחק. <a href="privacy.html" target="_blank" rel="noopener">מדיניות הפרטיות</a></p>
+    <p class="fmt-note">המייל משמש לשליחת קבצים אליך ולחשבון שלך בסימן. הקבצים עצמם נשארים במכשיר, חוץ ממסמך שבוחרים לשלוח בקישור (לחתימה או לצפייה), שנשמר אצלנו 30 יום ונמחק. נעדכן אותך במייל על שינויים חשובים בשירות, כמו מסלולים ומחירים. <a href="privacy.html" target="_blank" rel="noopener">מדיניות הפרטיות</a></p>
   </form>
 </dialog>
 <dialog class="sig conv" id="fmtDlg" aria-labelledby="fmtTitle">
@@ -1641,6 +1646,7 @@ body:has(#wed) .busy,body:has(#xed) .busy{z-index:1000}body:has(#wed) .toast,bod
       <input id="setMail" type="email" dir="ltr" autocomplete="email" placeholder="name@example.com" required></label>
     <label class="chk"><input type="checkbox" id="setCc"> לשים אותי בהעתק בכל שליחה במייל</label>
     <p class="fmt-note">המייל משמש לשליחה אליך, להעתק במיילים ולהתחברות מהירה ל-Google Drive. הוא נשמר במכשיר וברשימת הנרשמים של סימן.</p>
+    <p class="trial-line hidden" id="setTrial"></p>
     <p class="sh-status" id="setStatus" role="status"></p>
     <div class="set-del"><button type="button" class="btn" id="setDelete">מחיקת החשבון</button><small>מוחק את המייל מרשימת הנרשמים, ואת השם, המייל והחתימות השמורות מהמכשיר.</small></div>
     <div class="sig-row"><span class="grow"></span><button type="button" class="btn" id="setCancel">ביטול</button><button type="submit" class="btn primary" id="setSave">שמירה</button></div>
@@ -4935,5 +4941,76 @@ if('launchQueue' in window){
 }
 </script>
 <script src="siman-plus.js"></script>
+<script>
+/* =====================================================================
+   4.7 — launch period (4 months per user) + feature-use counting
+   Counts only WHICH features are used (e.g. "translate: 3"), never file
+   names or content. Sent at most once a day, together with the status check.
+   ===================================================================== */
+(function(){
+  const STATUS_URL=(typeof REGISTER_URL!=='undefined'&&REGISTER_URL)?REGISTER_URL.replace(/\/register$/,'/status'):'';
+  const U_KEY='siman.usage', T_KEY='siman.trial', APP_VER='4.7.0';
+  const today=()=>new Date().toISOString().slice(0,10);
+  const rd=k=>{try{return JSON.parse(localStorage.getItem(k)||'null');}catch(_){return null;}};
+  const wr=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch(_){}};
+  let usage=rd(U_KEY)||{c:{},sent:''};if(!usage.c)usage.c={};
+  function count(f){if(!f)return;usage.c[f]=(usage.c[f]||0)+1;wr(U_KEY,usage);}
+  window.simanCount=count;
+
+  // which click counts as which feature
+  const BY_ID={trBtn:'translate_open',tpGo:'translate',ocrBtn:'ocr',ocrAllBtn:'ocr_all',convBtn:'convert_open',wordEditBtn:'word_edit',
+    printBtn:'print',saveBtn:'save',saveAsBtn:'save_as',driveMenuBtn:'save_drive',icloudMenuBtn:'save_icloud',shareBtn:'share_open',
+    pgBtn:'pages',mergeBtn:'merge',splitGo:'split',saveSelBtn:'save_pages',pasteBtn:'paste',cmdBtn:'command_bar',
+    sigUse:'signature',aiBtn:'ai_open',aiSend:'ai_ask',aiRead:'read_aloud',aiScan:'handwriting',installBtn:'install',autoNames:'auto_names'};
+  document.addEventListener('click',e=>{
+    const el=e.target&&e.target.closest&&e.target.closest('button,[data-tool],[data-to],[data-share],[data-qa],[data-target]');if(!el)return;
+    if(el.id&&BY_ID[el.id])return count(BY_ID[el.id]);
+    const d=el.dataset||{};
+    if(d.tool&&d.tool!=='select')return count('tool_'+d.tool);
+    if(d.to)return count('convert_'+d.to);
+    if(d.share)return count('share_'+d.share);
+    if(d.target&&d.target!=='none')return count('lang_'+d.target);
+    if(d.qa)return count('quick_'+d.qa);
+  },true);
+  // files opened, by type; send-for-signature and view links
+  if(typeof openFile==='function'){const _o=openFile;openFile=function(file){try{const ext=(String(file&&file.name||'').split('.').pop()||'').toLowerCase();count('open_'+(/^(pdf|docx?|xlsx?|pptx?|jpe?g|png)$/.test(ext)?ext.replace('jpeg','jpg'):'other'));}catch(_){}return _o.apply(this,arguments);};}
+  if(typeof sendLink==='function'){const _s=sendLink;sendLink=function(kind){count(kind==='sign'?'link_sign':'link_view');return _s.apply(this,arguments);};}
+
+  // launch period display
+  const fmt=iso=>{const d=new Date(iso);return d.getDate()+'.'+(d.getMonth()+1)+'.'+d.getFullYear();};
+  function showTrial(){
+    const t=rd(T_KEY);const line=document.getElementById('setTrial'),chip=document.getElementById('wlTrial');
+    if(!t||!t.trialEnd){line&&line.classList.add('hidden');chip&&chip.classList.add('hidden');return;}
+    const left=Math.ceil((new Date(t.trialEnd)-new Date())/864e5);
+    if(line){line.classList.remove('hidden');
+      line.innerHTML=left>0?`<b>תקופת ההשקה החינמית שלך:</b> נותרו ${left} ימים, עד ${fmt(t.trialEnd)}. בינתיים כל היכולות פתוחות.`
+        :`<b>תקופת ההשקה החינמית שלך הסתיימה</b> ב־${fmt(t.trialEnd)}. בינתיים כל היכולות עדיין פתוחות, ונעדכן במייל לפני כל שינוי.`;}
+    if(chip){ // on the welcome screen only in the last 30 days
+      if(left>0&&left<=30){chip.textContent=`תקופת ההשקה החינמית: עוד ${left} ימים`;chip.classList.remove('hidden');}else chip.classList.add('hidden');}
+  }
+  window.simanTrial=()=>rd(T_KEY); // for the future premium step
+  showTrial();
+  const sb=document.getElementById('setBtn');if(sb)sb.addEventListener('click',()=>setTimeout(showTrial,0));
+
+  // at most once a day: status check + the counts collected so far (one small request)
+  function sync(beacon){
+    if(!STATUS_URL||typeof USER==='undefined'||!validMail(USER.mail||''))return;
+    if(usage.sent===today())return;
+    const counts={...usage.c};const body=JSON.stringify({mail:USER.mail,counts,ver:APP_VER,day:today()});
+    if(beacon){if(navigator.sendBeacon&&navigator.sendBeacon(STATUS_URL,new Blob([body],{type:'text/plain'}))){usage={c:{},sent:today()};wr(U_KEY,usage);}return;}
+    fetch(STATUS_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body}).then(r=>r.ok?r.json():null).then(j=>{
+      if(!j)return;
+      const extra={};for(const k in usage.c){const v=usage.c[k]-(counts[k]||0);if(v>0)extra[k]=v;} // counts made while waiting
+      usage={c:extra,sent:today()};wr(U_KEY,usage);
+      if(j.trialEnd){wr(T_KEY,{trialStart:j.trialStart,trialEnd:j.trialEnd,plan:j.plan||'launch'});showTrial();}
+    }).catch(()=>{});
+  }
+  setTimeout(()=>sync(false),4000);
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')sync(true);});
+  // a new sign-up: get the launch period right away
+  const rf=document.getElementById('regForm');if(rf)rf.addEventListener('submit',()=>setTimeout(()=>{usage.sent='';sync(false);},1500));
+})();
+</script>
+
 </body>
 </html>
