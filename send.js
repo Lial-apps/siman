@@ -31,6 +31,19 @@ const ownerLink=(id,k)=>`${HOST}/o/${id}#k=${k}`;
 
 /* ------------------------------------------------------------ the signed document */
 // draws a field's content into a picture with exactly the field's proportions
+// written text (a name, a date, an answer) at a size that can be read: at least 12pt, even on a thin line.
+// A long text gets a wider picture instead of tiny letters: it grows toward where the text continues.
+async function textPng(t,wPt,hPt){
+  const S=4,FONT=px=>`${px}px "Heebo","Arial",sans-serif`;const rtl=/[\u0590-\u05FF]/.test(t);
+  const m=document.createElement('canvas').getContext('2d');
+  let fs=Math.min(16,Math.max(12,hPt*.72));m.font=FONT(fs*S);
+  while(fs>11&&m.measureText(t).width/S>wPt*.98){fs-=.5;m.font=FONT(fs*S);}
+  const tw=m.measureText(t).width/S,w=Math.max(wPt,tw+4),h=Math.max(hPt,fs*1.35);
+  const c=document.createElement('canvas');c.width=Math.round(w*S);c.height=Math.round(h*S);const g=c.getContext('2d');
+  g.font=FONT(fs*S);g.fillStyle='#111';g.textBaseline='alphabetic';g.direction=rtl?'rtl':'ltr';g.textAlign=rtl?'right':'left';
+  g.fillText(t,rtl?c.width-2*S:2*S,c.height-fs*.32*S);           // sits on the line, like handwriting
+  return{bytes:new Uint8Array(await (await new Promise(r=>c.toBlob(r,'image/png'))).arrayBuffer()),w,h,rtl};
+}
 async function fieldPng(f,val,wPt,hPt){
   const S=4,c=document.createElement('canvas');c.width=Math.max(8,Math.round(wPt*S));c.height=Math.max(8,Math.round(hPt*S));const g=c.getContext('2d');
   if(val.png){const img=new Image();img.src=val.png;await img.decode();const k=Math.min(c.width/img.width,c.height/img.height);const w=img.width*k,h=img.height*k;
@@ -76,6 +89,8 @@ async function buildSigned(meta,pdfBytes){
   for(const s of meta.signers){if(s.status!=='signed'||!s.values)continue;
     for(const f of meta.fields.filter(x=>x.signer===s.n)){const val=s.values[f.id];const pg=pages[f.page];if(!val||!pg||!f.r)continue;
       const rot=((pg.getRotation().angle%360)+360)%360;const[x1,y1,x2,y2]=f.r;const minX=Math.min(x1,x2),maxX=Math.max(x1,x2),minY=Math.min(y1,y2),maxY=Math.max(y1,y2);const Wr=maxX-minX,Hr=maxY-minY;
+      if(!val.png&&rot===0&&String(val.text||'').trim()){const tp=await textPng(String(val.text).trim(),Wr,Hr);const im=await doc.embedPng(tp.bytes);
+        pg.drawImage(im,{x:tp.rtl?maxX-tp.w:minX,y:minY,width:tp.w,height:tp.h});continue;}
       const side=rot===90||rot===270;const img=await doc.embedPng(await fieldPng(f,val,side?Hr:Wr,side?Wr:Hr));
       const o=rot===90?{x:maxX,y:minY,width:Hr,height:Wr,rotate:degrees(90)}:rot===180?{x:maxX,y:maxY,width:Wr,height:Hr,rotate:degrees(180)}:rot===270?{x:minX,y:maxY,width:Hr,height:Wr,rotate:degrees(270)}:{x:minX,y:minY,width:Wr,height:Hr};
       pg.drawImage(img,o);}}
