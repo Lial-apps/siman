@@ -42,7 +42,7 @@ document.head.append(h(`<style id="simanPlusCss">
 .tab-all{border-style:solid;margin-inline-start:auto}
 /* above the full Word / Excel editors */
 body.ed-live .tabs{position:fixed;top:0;left:0;right:0;z-index:950;height:40px;box-shadow:0 1px 0 var(--line)}
-body.ed-live #wed,body.ed-live #xed{top:40px!important}
+body.ed-live #wed,body.ed-live #xed,body.ed-live #ped{top:40px!important}
 body.ed-live #aiPanel{position:fixed;z-index:960;top:40px;bottom:0;inset-inline-end:0;width:min(400px,100vw);box-shadow:0 0 40px -12px rgba(0,0,0,.45);background:var(--bar)}
 @media (max-width:720px){body.ed-live #aiPanel{top:auto;height:72vh;width:100vw;border-radius:16px 16px 0 0}}
 .ed-ai{display:inline-flex;align-items:center;gap:6px}
@@ -50,6 +50,7 @@ body.ed-live #aiPanel{position:fixed;z-index:960;top:40px;bottom:0;inset-inline-
 .tab.ed .kd{color:#fff;border-color:transparent;opacity:1}
 .tab.ed.docx .kd{background:#2B579A}
 .tab.ed.xlsx .kd{background:#217346}
+.tab.ed.pptx .kd{background:#C43E1C}
 .tab-menu{position:fixed;z-index:60;min-width:230px;background:var(--bar);border:1px solid var(--line);border-radius:12px;box-shadow:0 18px 40px -16px rgba(0,0,0,.45);padding:6px}
 .tab-menu button{display:block;width:100%;text-align:start;border:0;background:none;font:inherit;font-size:14px;color:var(--ink);padding:9px 12px;border-radius:8px;cursor:pointer}
 .tab-menu button:hover,.tab-menu button:focus-visible{background:color-mix(in srgb,var(--marker) 45%,var(--bar));outline:none}
@@ -159,15 +160,23 @@ const tabData = t => t === TB.cur && !t.ed ? S : (t.data || {});
 // Word / Excel files open in the full editors are tabs too ("editor tabs", t.ed = 'docx' | 'xlsx').
 // The editors are one-at-a-time modules, so a tab that is not in front keeps its file as bytes ("parked")
 // and is opened again when it comes back.
-const edApi = k => k === 'docx' ? window.WORD_EDITOR : window.XLSX_EDITOR;
-const edState = k => { const A = edApi(k); return A && A._test ? A._test[k === 'docx' ? 'E' : 'X'] : null; };
+// the three editors: Word, Excel and PowerPoint
+const ED = {
+  docx: { api: 'WORD_EDITOR', st: 'E', id: 'wed', name: '#weName', kind: 'WORD', build: 'buildDocx', lib: 'docx', file: 'word-editor.js' },
+  xlsx: { api: 'XLSX_EDITOR', st: 'X', id: 'xed', name: '#xeName', kind: 'EXCEL', build: 'buildXlsx', lib: 'xlsx', file: 'excel-editor.js' },
+  pptx: { api: 'PPTX_EDITOR', st: 'X', id: 'ped', name: '#peName', kind: 'POWERPOINT', build: 'buildPptx', lib: 'pptx', file: 'ppt-editor.js' },
+};
+const ED_IDS = Object.values(ED).map(e => e.id), ED_SEL = ED_IDS.map(i => '#' + i).join(',');
+const edKindOfId = id => Object.keys(ED).find(k => ED[k].id === id);
+const edApi = k => window[ED[k].api];
+const edState = k => { const A = edApi(k); return A && A._test ? A._test[ED[k].st] : null; };
 const edLive = t => !!(t && t.ed && t.liveEl && document.body.contains(t.liveEl));
 function tabInfo(t) {
   if (t.ed) {
     const live = edLive(t), st = live && edState(t.ed);
-    const inp = live && t.liveEl.querySelector(t.ed === 'docx' ? '#weName' : '#xeName');
-    const base = ((inp && inp.value) || (t.data && t.data.name) || 'מסמך').replace(/\.(docx|xlsx)$/i, '');
-    return { name: base + '.' + t.ed, dirty: live ? !!(st && (st.dirty || st.snapT)) : !!(t.data && t.data.dirty), kind: t.ed === 'docx' ? 'WORD' : 'EXCEL', edit: true };
+    const inp = live && t.liveEl.querySelector(ED[t.ed].name);
+    const base = ((inp && inp.value) || (t.data && t.data.name) || 'מסמך').replace(/\.(docx|xlsx|pptx)$/i, '');
+    return { name: base + '.' + t.ed, dirty: live ? !!(st && (st.dirty || st.snapT)) : !!(t.data && t.data.dirty), kind: ED[t.ed].kind, edit: true };
   }
   const d = tabData(t);
   return { name: (d.office ? d.office.name : d.name) || 'מסמך', dirty: !!d.dirty, kind: d.office ? d.office.kind.toUpperCase() : 'PDF' };
@@ -179,7 +188,7 @@ async function park(t) {
   const A = edApi(t.ed), st = edState(t.ed); if (!A || !st) return;
   busy(true, 'שומר את הקובץ בצד…');
   try {
-    const r = t.ed === 'docx' ? await A._test.buildDocx() : await A._test.buildXlsx();
+    const r = await A._test[ED[t.ed].build]();
     const info = tabInfo(t);
     t.data = { bytes: r && r.bytes ? r.bytes : r, name: info.name, dirty: info.dirty, opts: st.opts };
     t.parking = true;
@@ -190,8 +199,7 @@ async function unpark(t) {
   const d = t.data; if (!d) return;
   TB.opening = t; TB.cur = t;
   try {
-    if (t.ed === 'docx') { await loadEditLibs('docx'); if (!window.WORD_EDITOR) await loadScript('word-editor.js'); }
-    else { await loadEditLibs('xlsx'); if (!window.XLSX_EDITOR) await loadScript('excel-editor.js'); }
+    await loadEditLibs(ED[t.ed].lib); if (!edApi(t.ed)) await loadScript(ED[t.ed].file);
     await edApi(t.ed).open({ ...d.opts, bytes: d.bytes, name: d.name, isNew: false, restored: d.dirty });
   } catch (e) { console.error(e); toast('לא הצלחתי לפתוח שוב את הקובץ: ' + (e.message || e)); }
   finally { if (TB.opening === t) TB.opening = null; }
@@ -349,7 +357,7 @@ async function closeAll() {
 /* ---- the full Word / Excel editors as tabs ---- */
 function edButton(el) {
   if (el.querySelector('.ed-ai')) return;
-  const close = el.querySelector('#weClose,#xeClose'); if (!close) return;
+  const close = el.querySelector('#weClose,#xeClose,#peClose'); if (!close) return;
   const peer = [...close.parentElement.querySelectorAll('button')].find(b => b !== close && !b.classList.contains('primary'));
   const b = document.createElement('button');
   b.type = 'button'; b.className = (peer ? peer.className + ' ' : '') + 'ed-ai';
@@ -376,7 +384,7 @@ function edRemoved(kind, el) {
   const t = TB.list.find(x => x.liveEl === el);
   if (!t || t.parking || t.closing) { renderTabs(); return; }
   setTimeout(async () => {
-    const id = kind === 'docx' ? 'wed' : 'xed', now = document.getElementById(id);
+    const id = ED[kind].id, now = document.getElementById(id);
     if (now && TB.cur === t && !TB.list.some(x => x !== t && x.liveEl === now)) { t.liveEl = now; renderTabs(); return; }
     if (edLive(t) || t.data || !TB.list.includes(t)) { renderTabs(); return; }
     // closed in the editor itself (×), or sent to the desk for signing
@@ -390,12 +398,12 @@ function edRemoved(kind, el) {
 }
 new MutationObserver(ms => {
   for (const m of ms) {
-    for (const n of m.addedNodes) if (n.nodeType === 1 && (n.id === 'wed' || n.id === 'xed')) edAdded(n.id === 'wed' ? 'docx' : 'xlsx', n);
-    for (const n of m.removedNodes) if (n.nodeType === 1 && (n.id === 'wed' || n.id === 'xed')) edRemoved(n.id === 'wed' ? 'docx' : 'xlsx', n);
+    for (const n of m.addedNodes) if (n.nodeType === 1 && ED_IDS.includes(n.id)) edAdded(edKindOfId(n.id), n);
+    for (const n of m.removedNodes) if (n.nodeType === 1 && ED_IDS.includes(n.id)) edRemoved(edKindOfId(n.id), n);
   }
 }).observe(document.body, { childList: true });
 // a new editor while another one is in front: the one in front is put aside first, not closed
-for (const fn of ['openWordEditor', 'openExcelEditor']) {
+for (const fn of ['openWordEditor', 'openExcelEditor', 'openPptEditor']) {
   const one = window[fn];
   if (typeof one !== 'function') continue;
   window[fn] = async function (...args) {
@@ -405,7 +413,7 @@ for (const fn of ['openWordEditor', 'openExcelEditor']) {
 }
 // the unsaved-changes dot of an editor tab follows the typing
 let edT = 0;
-document.addEventListener('input', e => { if (e.target.closest && e.target.closest('#wed,#xed')) { clearTimeout(edT); edT = setTimeout(renderTabs, 600); } }, true);
+document.addEventListener('input', e => { if (e.target.closest && e.target.closest(ED_SEL)) { clearTimeout(edT); edT = setTimeout(renderTabs, 600); } }, true);
 
 const strip = h('<div class="tabs hidden" id="tabs" role="tablist" aria-label="הקבצים הפתוחים"></div>');
 document.querySelector('.work').before(strip);
@@ -533,7 +541,7 @@ $('file').onchange = e => { const fs = [...e.target.files]; e.target.value = '';
 addEventListener('drop', async e => {
   if (TB.drag) return;
   const fs = e.dataTransfer && e.dataTransfer.files;
-  const onEditor = !!(document.getElementById('wed') || document.getElementById('xed'));
+  const onEditor = ED_IDS.some(i => document.getElementById(i));
   const docs = fs && fs.length && [...fs].every(f => /\.(pdf|docx?|xlsx|pptx)$/i.test(f.name));
   if (!fs || !fs.length || (fs.length < 2 && !(onEditor && docs))) return;   // one file on the desk: the usual way
   if (onEditor && !docs) return;                                            // pictures dropped into the editor stay there
@@ -623,6 +631,7 @@ function editorText() {
   return out.join('\n\n');
 }
 async function docText() {
+  if (onEditor() && TB.cur.ed === 'pptx') return (await PPTX_EDITOR.textOf()).slice(0, 380000);
   if (onEditor()) return editorText();
   if (!S.doc) return '';
   const sig = S.pages.map(P => P.ocr ? 1 : 0).join('') + '|' + S.pages.length;
@@ -807,7 +816,7 @@ const RA = {
   },
   async start(from) {
     if (!this.supported()) { toast('הדפדפן הזה לא תומך בהקראה'); return; }
-    if (onEditor()) { const t = editorText().replace(/=====.*?=====/g, '').replace(/^שורה \d+: /gm, '').replace(/\t/g, ', '); if (t.trim()) this.speakText(t); else toast('אין טקסט להקראה'); return; }
+    if (onEditor()) { const t = (TB.cur.ed === 'pptx' ? await PPTX_EDITOR.textOf() : editorText()).replace(/=====.*?=====/g, '').replace(/^שורה \d+: /gm, '').replace(/\t/g, ', '); if (t.trim()) this.speakText(t); else toast('אין טקסט להקראה'); return; }
     if (!S.doc) { toast('פתחו קובץ כדי להקריא אותו'); return; }
     this.stop();
     busy(true, 'מכין את ההקראה…');
