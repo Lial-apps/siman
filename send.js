@@ -113,6 +113,68 @@ async function findTargets(pages){
   return out.filter((t,i)=>!out.some((o,j)=>j<i&&o.page===t.page&&Math.abs(o.x-t.x)<.03&&Math.abs(o.y-t.y)<.02)).sort((a,b)=>a.page-b.page||a.y-b.y||b.x-a.x);
 }
 
+// a scanned form has no text: the blank lines are found in the picture, and the label next to each is read with OCR
+function findBlanks(g,W,H){
+  const d=g.getImageData(0,0,W,H).data,dark=new Uint8Array(W*H);
+  for(let i=0,j=0;i<dark.length;i++,j+=4)dark[i]=(d[j]*.3+d[j+1]*.59+d[j+2]*.11)<160?1:0;
+  const minL=W*.05,maxL=W*.75,gap=Math.max(3,Math.round(W*.004)),runs=[];
+  for(let y=0;y<H;y++){let x=0;const row=y*W;
+    while(x<W){if(!dark[row+x]){x++;continue;}let x1=x,miss=0,e=x;while(e<W&&miss<=gap){if(dark[row+e]){x1=e;miss=0;}else miss++;e++;}
+      if(x1-x>=minL&&x1-x<=maxL){let fill=0;for(let k=x;k<=x1;k++)fill+=dark[row+k];if(fill/(x1-x+1)>.7)runs.push({x0:x,x1,y});}x=e;}}
+  // runs on neighbouring rows are one line; a thick one is a picture or a filled box, not a blank
+  const lines=[];
+  for(const r of runs){const l=lines.find(l=>r.y-l.y1<=2&&r.x0<l.x1&&r.x1>l.x0);if(l){l.y1=r.y;l.x0=Math.min(l.x0,r.x0);l.x1=Math.max(l.x1,r.x1);}else lines.push({x0:r.x0,x1:r.x1,y0:r.y,y1:r.y});}
+  // a faint or dotted blank comes out in pieces: pieces on the same row with a small gap are one blank
+  const thin=lines.filter(l=>l.y1-l.y0<=Math.max(5,H*.004)).sort((a,b)=>a.y0-b.y0||a.x0-b.x0),out=[];
+  for(const l of thin){const o=out.find(o=>Math.abs(o.y1-l.y1)<=Math.max(3,H*.002)&&l.x0-o.x1<W*.012&&o.x0-l.x1<W*.012);
+    if(o){o.x0=Math.min(o.x0,l.x0);o.x1=Math.max(o.x1,l.x1);o.y0=Math.min(o.y0,l.y0);o.y1=Math.max(o.y1,l.y1);}else out.push({...l});}
+  return out.filter(l=>l.x1-l.x0<=maxL);
+}
+// the label next to a blank, read on its own (a single line of Hebrew reads far better than the whole page)
+let LW=null;
+const HOOK={
+  ready:()=>!!window.Tesseract||typeof TESS_URL!=='undefined',
+  async ocrLine(c){
+    if(!LW){if(!window.Tesseract)await loadScript(TESS_URL);LW=await Tesseract.createWorker('heb',1);await LW.setParameters({tessedit_pageseg_mode:'7'});}
+    const{data}=await LW.recognize(c);return data.text||'';},
+  async done(){if(LW){try{await LW.terminate();}catch(_){}LW=null;}}
+};
+function labelKind(t){
+  t=String(t||'').replace(/[|_=~<>"'״׳`.,;()\[\]{}]/g,' ').replace(/\s+/g,' ').trim();
+  if(/ח?ת?ימ[תה]|חתימ|signature|sign/i.test(t))return'sig';
+  if(/תארי|אריך|date/i.test(t))return'date';
+  if(/ש[םס]\s*:?\s*$|ש[םס]\s*(ה?הור|ההור|מלא|החות)|full name|^name/i.test(t))return'name';
+  if(/ש[םס]\s|משפח|זהות|ת\s?ז\b|כתוב|טלפו|כית[הת]|תלמיד|מספר|address|phone/i.test(t))return'text';
+  return null;
+}
+async function scanTargets(pages,skip){
+  if(!HOOK.ready())return[];
+  const out=[];
+  try{
+    for(let i=0;i<pages.length&&i<12;i++){if(skip&&skip(i))continue;const{page}=pages[i];
+      let txt='';try{txt=(await page.getTextContent()).items.map(x=>x.str).join('').trim();}catch(_){}
+      if(txt.length>40)continue;                       // a page with real text: found from its text already
+      const v1=page.getViewport({scale:1}),sc=Math.min(4,2200/Math.max(v1.width,v1.height)),vp=page.getViewport({scale:sc});
+      const c=document.createElement('canvas');c.width=Math.round(vp.width);c.height=Math.round(vp.height);const g=c.getContext('2d',{willReadFrequently:true});
+      g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);await page.render({canvasContext:g,viewport:vp}).promise;
+      const W=c.width,H=c.height,lines=findBlanks(g,W,H);
+      for(const ln of lines.slice(0,40)){
+        // the label: to the right of the blank (Hebrew), up to the next blank on the same row
+        const nextR=lines.filter(o=>o!==ln&&Math.abs(o.y1-ln.y1)<H*.01&&o.x0>ln.x1).reduce((m,o)=>Math.min(m,o.x0),W);
+        const x0=ln.x1+2,x1=Math.min(W,ln.x1+W*.3,nextR-2),y0=Math.max(0,ln.y1-H*.035),y1=Math.min(H,ln.y1+H*.004);
+        if(x1-x0<W*.03)continue;
+        const k=2,cc=document.createElement('canvas');cc.width=Math.round((x1-x0)*k);cc.height=Math.round((y1-y0)*k);const gg=cc.getContext('2d');
+        gg.fillStyle='#fff';gg.fillRect(0,0,cc.width,cc.height);gg.drawImage(c,x0,y0,x1-x0,y1-y0,0,0,cc.width,cc.height);
+        let text='';try{text=await HOOK.ocrLine(cc);}catch(e){console.warn('label ocr',e);break;}
+        const kind=labelKind(text);if(!kind)continue;
+        const lh=Math.min(H*.03,Math.max(H*.012,(ln.y1-y0)*.55));
+        out.push({page:i,x:ln.x0/W,y:Math.max(0,ln.y0-lh)/H,w:(ln.x1-ln.x0)/W,h:lh/H,kind,src:'text',scan:true,label:text.trim()});
+      }
+    }
+  }finally{await HOOK.done();}
+  return out;
+}
+
 /* ------------------------------------------------------------ the list of documents I sent */
 const listGet=()=>{try{return JSON.parse(localStorage.getItem(LIST_KEY)||'[]');}catch(_){return[];}};
 const listSet=l=>{try{localStorage.setItem(LIST_KEY,JSON.stringify(l.slice(0,200)));}catch(_){}};
@@ -240,9 +302,21 @@ async function open(opts){
   const side=u.body.querySelector('.s-side');
   try{u.targets=await findTargets(u.pages);}catch(_){u.targets=[];}
   const TL={sig:'מקום לחתימה',name:'מקום לשם',date:'מקום לתאריך',text:'מקום לטקסט'};
-  for(const t of u.targets){const pgx=u.pages[t.page];let tg=pgx.box.querySelector('.s-tg');if(!tg){tg=document.createElement('div');tg.className='s-tg';pgx.box.insertBefore(tg,pgx.lay);}
-    const el=document.createElement('div');el.className='s-t';el.style.cssText=`left:${t.x*100}%;top:${t.y*100}%;width:${t.w*100}%;height:${t.h*100}%`;el.innerHTML=`<i>${TL[t.kind]||'מקום לחתימה'}</i>`;tg.append(el);}
-  {const fr=side.querySelector('[data-qw][value="form"]'),n=u.targets.length;fr.disabled=!n;side.querySelector('[data-qpn]').textContent=n?`(נמצאו ${n})`:'(לא נמצאו במסמך)';if(n){fr.checked=true;setTimeout(()=>say(`נמצאו במסמך ${n} מקומות לחתימה (מסומנים בצהוב). שדה שגוררים לידם נצמד אליהם`),400);}}
+  const drawTargets=list=>{for(const t of list){const pgx=u.pages[t.page];let tg=pgx.box.querySelector('.s-tg');if(!tg){tg=document.createElement('div');tg.className='s-tg';pgx.box.insertBefore(tg,pgx.lay);}
+    const el=document.createElement('div');el.className='s-t';el.style.cssText=`left:${t.x*100}%;top:${t.y*100}%;width:${t.w*100}%;height:${t.h*100}%`;el.innerHTML=`<i>${TL[t.kind]||'מקום לחתימה'}</i>`;el.title=t.label||'';tg.append(el);}};
+  const qpCount=(busyMsg)=>{const fr=side.querySelector('[data-qw][value="form"]'),n=u.targets.length;fr.disabled=!n;side.querySelector('[data-qpn]').textContent=busyMsg||(n?`(נמצאו ${n})`:'(לא נמצאו במסמך)');if(n&&!fr.checked&&!u.qpTouched)fr.checked=true;};
+  drawTargets(u.targets);qpCount();
+  if(u.targets.length)setTimeout(()=>say(`נמצאו במסמך ${u.targets.length} מקומות לחתימה (מסומנים בצהוב). שדה שגוררים לידם נצמד אליהם`),400);
+  side.addEventListener('change',e=>{if(e.target.matches('[data-qw]'))u.qpTouched=true;});
+  // scanned pages: read in the background, the screen is already usable
+  (async()=>{const withText=new Set(u.targets.map(t=>t.page));
+    let scanned=false;for(const p of u.pages){try{const t=(await p.page.getTextContent()).items.map(x=>x.str).join('').trim();if(t.length<=40){scanned=true;break;}}catch(_){}}
+    if(!scanned||!HOOK.ready())return;
+    qpCount('(מחפש בטופס הסרוק…)');say('המסמך סרוק: מחפש בו את מקומות החתימה…');
+    let more=[];try{more=await scanTargets(u.pages,i=>withText.has(i));}catch(e){console.warn('scan targets',e);}
+    if(U!==u)return;
+    u.targets.push(...more);u.targets.sort((a,b)=>a.page-b.page||a.y-b.y||b.x-a.x);drawTargets(more);qpCount();
+    say(more.length?`נמצאו בטופס ${more.length} מקומות למילוי (מסומנים בצהוב). שדה שגוררים לידם נצמד אליהם`:'לא מצאתי בטופס הסרוק מקומות חתימה. אפשר לגרור את השדות ידנית');})();
   const drawSigners=()=>{
     const qw=side.querySelector('[data-qpwho]');if(qw){qw.hidden=u.how==='open'||u.signers.length<2;const c=side.querySelector('[data-qpcur]');if(c)c.textContent=u.signers[u.cur].name||`חותם ${u.cur+1}`;}
     if(u.how==='open'){const w=side.querySelector('[data-who]');w.textContent='כל חותם';w.style.color=COLORS[0];return;}
@@ -454,5 +528,5 @@ async function openView(opts){
   await upload(u,{mode:'view',title:String(opts.name||'מסמך').replace(/\.pdf$/i,''),signers:[],fields:[],pages:1});
 }
 
-window.SIMAN_SEND={open,openView,list,links,close,buildSigned,getMeta,getPdf,api,signLink,viewLink,groupLink,ownerLink,findTargets,HOST,devName,COLORS,TYPES,isOpen:()=>!!U};
+window.SIMAN_SEND={open,openView,list,links,close,buildSigned,getMeta,getPdf,api,signLink,viewLink,groupLink,ownerLink,findTargets,scanTargets,findBlanks,labelKind,hook:HOOK,HOST,devName,COLORS,TYPES,isOpen:()=>!!U};
 })();
