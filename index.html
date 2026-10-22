@@ -4980,6 +4980,7 @@ if('launchQueue' in window){
   const fmt=iso=>{const d=new Date(iso);return d.getDate()+'.'+(d.getMonth()+1)+'.'+d.getFullYear();};
   function showTrial(){
     const t=rd(T_KEY);const line=document.getElementById('setTrial'),chip=document.getElementById('wlTrial');
+    if(t&&t.plan==='admin'){chip&&chip.classList.add('hidden');if(line){line.classList.remove('hidden');line.innerHTML='<b>חשבון מנהל:</b> כל היכולות פתוחות תמיד, בלי תקופת השקה ובלי תשלום.';}return;}
     if(!t||!t.trialEnd){line&&line.classList.add('hidden');chip&&chip.classList.add('hidden');return;}
     const left=Math.ceil((new Date(t.trialEnd)-new Date())/864e5);
     if(line){line.classList.remove('hidden');
@@ -4989,6 +4990,7 @@ if('launchQueue' in window){
       if(left>0&&left<=30){chip.textContent=`תקופת ההשקה החינמית: עוד ${left} ימים`;chip.classList.remove('hidden');}else chip.classList.add('hidden');}
   }
   window.simanTrial=()=>rd(T_KEY); // for the future premium step
+  window.simanIsAdmin=()=>{const t=rd(T_KEY);return !!(t&&t.plan==='admin');}; // managers are never asked to pay
   showTrial();
   const sb=document.getElementById('setBtn');if(sb)sb.addEventListener('click',()=>setTimeout(showTrial,0));
 
@@ -5002,12 +5004,13 @@ if('launchQueue' in window){
       if(!j)return;
       const extra={};for(const k in usage.c){const v=usage.c[k]-(counts[k]||0);if(v>0)extra[k]=v;} // counts made while waiting
       usage={c:extra,sent:today()};wr(U_KEY,usage);
-      if(j.trialEnd){wr(T_KEY,{trialStart:j.trialStart,trialEnd:j.trialEnd,plan:j.plan||'launch'});showTrial();}
+      if(j.plan==='admin'||j.trialEnd){wr(T_KEY,{trialStart:j.trialStart||null,trialEnd:j.trialEnd||null,plan:j.plan||'launch'});showTrial();}
     }).catch(()=>{});
   }
   setTimeout(()=>sync(false),4000);
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')sync(true);});
   // a new sign-up: get the launch period right away
+  const sf=document.getElementById('setForm');if(sf)sf.addEventListener('submit',()=>setTimeout(()=>{usage.sent='';sync(false);},1500)); // saving settings refreshes the account status
   const rf=document.getElementById('regForm');if(rf)rf.addEventListener('submit',()=>setTimeout(()=>{usage.sent='';sync(false);},1500));
 })();
 </script>
