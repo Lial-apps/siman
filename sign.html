@@ -67,6 +67,10 @@ html,body{margin:0;background:var(--bg);color:var(--n);font:15px/1.45 "Heebo",sy
 .foot{text-align:center;color:#7A879E;font-size:12px;margin:24px 0}
 .foot a{color:inherit}
 .load{padding:60px 10px;text-align:center;color:var(--mu)}
+
+.who{display:grid;gap:10px;margin-top:12px}.who label{display:grid;gap:5px;font-size:13.5px;font-weight:600;color:#5D6982}
+.gin{font:inherit;font-size:16px;padding:11px 12px;border:1.5px solid #C7D0DE;border-radius:10px;background:#fff;color:#16213A;width:100%}
+.gin:focus{outline:3px solid #FFD43B;border-color:#16213A}.gin.bad{border-color:#C2362B;box-shadow:0 0 0 3px rgba(194,54,43,.15)}
 </style>
 </head>
 <body>
@@ -97,7 +101,7 @@ const SS=window.SIMAN_SEND;
 // links: /s/<id>/<token> (signer), /v/<id>/<token> (viewer), /o/<id>#k=<key> (sender); older links: sign.html#d=<id>&t=<token>
 const H=new URLSearchParams(location.hash.slice(1));const PT=location.pathname.split('/').filter(Boolean);
 let ID=H.get('d'),AUTH=H.get('t')?{t:H.get('t')}:H.get('k')?{k:H.get('k')}:{v:H.get('v')};
-if(['s','v','o'].includes(PT[0])&&PT[1]){ID=PT[1];AUTH=PT[0]==='s'?{t:PT[2]}:PT[0]==='v'?{v:PT[2]}:{k:H.get('k')};}
+if(['s','v','o','g'].includes(PT[0])&&PT[1]){ID=PT[1];AUTH=PT[0]==='s'?{t:PT[2]}:PT[0]==='v'?{v:PT[2]}:PT[0]==='g'?{g:PT[2]}:{k:H.get('k')};}
 const APP=SS&&SS.HOST&&location.origin===new URL(SS.HOST).origin?'/go':'./?ref=sign';
 document.querySelector('.brand').href=APP;
 let M=null,PDF=null,VALS={},SIG=null,pages=[];
@@ -110,9 +114,10 @@ function cta(done){return`<div class="cta"><h2>${done?'רוצה לשלוח מס�
   <a class="btn pri" href="${APP}" target="_blank" rel="noopener">לפתוח את סימן בחינם</a></div>`;}
 
 async function start(){
-  if(!ID||!(AUTH.t||AUTH.v||AUTH.k))return fail('הקישור חסר או לא שלם.');
+  if(!ID||!(AUTH.t||AUTH.v||AUTH.k||AUTH.g))return fail('הקישור חסר או לא שלם.');
   try{[M,PDF]=await Promise.all([SS.getMeta(ID,AUTH),SS.getPdf(ID,AUTH)]);}catch(e){return fail(e.message);}
   document.title=`${M.title} · סימן`;$('ttl').textContent=M.title;
+  if(M.mode==='open')return startGroup();
   const me=M.me!==null?M.signers[M.me]:null;
   const mine=me?M.fields.filter(f=>f.signer===me.n):[];
   const waitFor=M.order==='seq'&&me?M.signers.filter(s=>s.n<me.n&&s.status!=='signed'):[];
@@ -137,6 +142,32 @@ async function start(){
     drawFields();dockSign(mine);
   }else{drawFields();dockDone(me);}
 }
+/* ---------- one link for a whole group: everyone writes their own name and signs */
+const GKEY='siman.g.'+ID;
+const gPrev=()=>{try{return JSON.parse(localStorage.getItem(GKEY)||'[]');}catch(_){return[];}};
+async function startGroup(){
+  const me=M.signers[0],from=M.from&&M.from.name?esc(M.from.name):'מישהו';let head;
+  if(M.owner){const R=M.responses||[];
+    head=`<h1>${esc(M.title)}</h1><p>קישור לקבוצה · ${R.length?`חתמו ${R.length}`:'עוד אף אחד לא חתם'}${M.open.closed?' · הקישור סגור':''}</p>${R.length?`<div class="aud"><table>${R.map(x=>`<tr><th>${esc(x.name)}${x.extra?` · ${esc(x.extra)}`:''}</th><td dir="ltr">${fmt(x.at)}</td></tr>`).join('')}</table></div>`:''}<p class="foot" style="text-align:start">את העותקים החתומים מורידים באפליקציה, ב"המסמכים ששלחתי".</p>`;}
+  else if(M.open.closed)head=`<h1>הקישור נסגר</h1><p>${from} סגר/ה את הקישור, ואי אפשר לחתום עליו יותר. אם צריך, אפשר לפנות אליו/ה.</p>`;
+  else{const prev=gPrev();
+    head=`<h1>${esc(M.title)}</h1><p>${from} שלח/ה את המסמך לחתימה. כותבים את השם, ממלאים את השדות שמסומנים בצהוב וחותמים. לא צריך להירשם.</p>
+      ${prev.length?`<div class="note">כבר חתמת מהמכשיר הזה: ${prev.map(p=>`<b>${esc(p.name)}</b> (<a href="#" data-mine="${esc(p.r)}">עותק חתום</a>)`).join(', ')}. אפשר לחתום שוב, למשל בשם ההורה השני.</div>`:''}
+      <div class="who"><label>השם המלא שלך<input id="gName" class="gin" dir="auto" autocomplete="name" maxlength="80"></label>${M.open.ask?`<label>${esc(M.open.ask)}<input id="gExtra" class="gin" dir="auto" maxlength="120"></label>`:''}</div>`;}
+  $('main').innerHTML=`<div class="card">${head}${M.note&&!M.owner&&!M.open.closed?`<div class="note">${esc(M.note)}</div>`:''}</div><div class="pages" id="pages"></div><div id="after"></div>`;
+  $('main').querySelectorAll('[data-mine]').forEach(a=>a.onclick=async e=>{e.preventDefault();a.textContent='מכין…';
+    try{const m=await SS.getMeta(ID,{g:AUTH.g,r:a.dataset.mine});const bytes=await SS.buildSigned(m,PDF);const n=`${M.title} - ${m.signers[0].name} - חתום.pdf`;
+      const x=document.createElement('a');x.href=URL.createObjectURL(new Blob([bytes],{type:'application/pdf'}));x.download=n;document.body.append(x);x.click();x.remove();}
+    catch(err){alert(err.message||err);}a.textContent='עותק חתום';});
+  await renderPages();
+  if(M.me===0&&!M.open.closed){
+    const name=$('gName');
+    name.oninput=()=>{me.name=name.value.trim();name.classList.remove('bad');for(const f of M.fields)if(f.type==='name'){if(me.name)VALS[f.id]={text:me.name};else delete VALS[f.id];}drawFields();dockSign.render();};
+    if($('gExtra'))$('gExtra').oninput=()=>$('gExtra').classList.remove('bad');
+    for(const f of M.fields)if(f.type==='date')VALS[f.id]={text:today()};
+    drawFields();dockSign(M.fields);
+  }else{drawFields();dockDone(null);}
+}
 async function renderPages(){
   const lib=window.pdfjsLib||window['pdfjs-dist/build/pdf'];lib.GlobalWorkerOptions.workerSrc='pdf.worker.min.js';
   const doc=await lib.getDocument({data:PDF.slice(0)}).promise;const box=$('pages');const W=Math.min(900,box.clientWidth||innerWidth-20);
@@ -146,7 +177,7 @@ async function renderPages(){
 }
 function drawFields(){
   for(const el of document.querySelectorAll('.f'))el.remove();
-  const me=M.me!==null?M.signers[M.me]:null;const active=M.mode==='sign'&&me&&me.status==='waiting';
+  const me=M.me!==null?M.signers[M.me]:null;const active=(M.mode==='sign'||(M.mode==='open'&&!M.open.closed))&&me&&me.status==='waiting';
   for(const f of M.fields){const pg=pages[f.page];if(!pg)continue;const s=M.signers[f.signer];const el=document.createElement('div');el.className='f';el.dataset.fid=f.id;
     Object.assign(el.style,{left:f.x*100+'%',top:f.y*100+'%',width:f.w*100+'%',height:f.h*100+'%'});
     const val=s.status==='signed'&&s.values?s.values[f.id]:(me&&s.n===me.n?VALS[f.id]:null);
@@ -166,11 +197,11 @@ function dockSign(mine){
       ${l.length?`<div class="row"><button class="btn pri grow" id="next">${VALS[mine[0].id]?'לשדה הבא':'להתחיל לחתום'}</button></div>`:
       `<label class="ck"><input type="checkbox" id="agree"> אני מסכים/ה לחתום על המסמך באופן אלקטרוני, ומאשר/ת שזו החתימה שלי.</label>
        <div class="row"><button class="btn pri grow" id="finish" disabled>סיום וחתימה</button></div>`}
-      <div class="row" style="justify-content:center"><button class="btn link" id="decline">לא מעוניין/ת לחתום</button></div>`;
+      ${M.mode==='open'?'':'<div class="row" style="justify-content:center"><button class="btn link" id="decline">לא מעוניין/ת לחתום</button></div>'}`;
     const nx=$('next');if(nx)nx.onclick=()=>{const f=left()[0];const el=document.querySelector(`.f[data-id="${f.id}"]`);el.scrollIntoView({behavior:'smooth',block:'center'});setTimeout(()=>openField(f),350);};
     const ag=$('agree');if(ag)ag.onchange=()=>{$('finish').disabled=!ag.checked;};
     const fin=$('finish');if(fin)fin.onclick=submit;
-    $('decline').onclick=decline;
+    if($('decline'))$('decline').onclick=decline;
   };
   dockSign.render=render;render();
 }
@@ -202,7 +233,8 @@ function openField(f){
   $('txtT').textContent=f.type==='name'?'השם המלא שלך':'מה לכתוב כאן?';$('txtIn').value=(VALS[f.id]&&VALS[f.id].text)||'';$('txtDlg').hidden=false;setTimeout(()=>$('txtIn').focus(),50);
 }
 $('txtX').onclick=()=>{$('txtDlg').hidden=true;};
-$('txtOk').onclick=()=>{const v=$('txtIn').value.trim();$('txtDlg').hidden=true;if(v)VALS[CUR.id]={text:v};else delete VALS[CUR.id];drawFields();dockSign.render();};
+$('txtOk').onclick=()=>{const v=$('txtIn').value.trim();$('txtDlg').hidden=true;if(v)VALS[CUR.id]={text:v};else delete VALS[CUR.id];
+  if(M.mode==='open'&&CUR.type==='name'&&v&&$('gName')&&!$('gName').value.trim()){$('gName').value=v;M.signers[0].name=v;}drawFields();dockSign.render();};
 $('txtIn').onkeydown=e=>{if(e.key==='Enter')$('txtOk').click();};
 // signature pad
 const pad=$('pad');let ink='#0B1F5C',strokes=[],drawing=null;
@@ -238,7 +270,23 @@ $('sigOk').onclick=()=>{const png=sigPng();if(!png){alert('צריך לצייר �
   drawFields();dockSign.render();};
 window.addEventListener('resize',()=>{if(!$('sigDlg').hidden&&$('tDraw').getAttribute('aria-pressed')==='true')sizePad();});
 
+async function submitGroup(){
+  const b=$('finish'),name=$('gName'),ex=$('gExtra');
+  if(name.value.trim().length<2){name.classList.add('bad');name.scrollIntoView({behavior:'smooth',block:'center'});setTimeout(()=>name.focus(),300);alert('צריך לכתוב את השם המלא שלך');return;}
+  if(ex&&!ex.value.trim()){ex.classList.add('bad');ex.scrollIntoView({behavior:'smooth',block:'center'});setTimeout(()=>ex.focus(),300);alert(`צריך למלא: ${M.open.ask}`);return;}
+  b.disabled=true;b.textContent='שולח…';
+  try{M=await SS.api(`/${ID}/sign?g=${encodeURIComponent(AUTH.g)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({agree:true,name:name.value.trim(),extra:ex?ex.value.trim():'',values:VALS,tz:Intl.DateTimeFormat().resolvedOptions().timeZone})});
+    const me=M.signers[0];try{const l=gPrev();l.push({r:M.rid,name:name.value.trim()});localStorage.setItem(GKEY,JSON.stringify(l.slice(-20)));}catch(_){}
+    const pics=[...new Set(Object.values(me.values||{}).filter(v=>v.png).map(v=>v.png))];
+    $('main').querySelector('.card').innerHTML=`<div class="center"><div class="big">✅</div><h1 style="margin-top:8px">תודה ${esc(name.value.trim())}, המסמך נחתם</h1>
+      ${pics.length?`<div class="mysig">${pics.map(p=>`<img alt="החתימה שלך" src="${p}">`).join('')}</div>`:''}
+      <p>${M.from&&M.from.name?esc(M.from.name)+' יראה/תראה שחתמת.':'השולח יראה שחתמת.'} אפשר להוריד עותק חתום.</p>
+      <div class="row" style="justify-content:center;margin-top:10px"><button class="btn" id="again">חתימה נוספת בשם אחר</button></div></div>`;
+    drawFields();dockDone(me);scrollTo({top:0,behavior:'smooth'});$('again').onclick=()=>location.reload();}
+  catch(e){alert(e.message||e);b.disabled=false;b.textContent='סיום וחתימה';}
+}
 async function submit(){
+  if(M.mode==='open')return submitGroup();
   const b=$('finish');b.disabled=true;b.textContent='שולח…';
   try{M=await SS.api(`/${ID}/sign?t=${encodeURIComponent(AUTH.t)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({agree:true,values:VALS,tz:Intl.DateTimeFormat().resolvedOptions().timeZone})});
     const me=M.signers[M.me];const pics=[...new Set(Object.values(me.values||{}).filter(v=>v.png).map(v=>v.png))];

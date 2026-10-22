@@ -21,11 +21,12 @@ async function api(path,opt={}){
   if(!r.ok){let m='';try{m=(await r.json()).error;}catch(_){}throw new Error(m||('שגיאה '+r.status));}
   return /json/.test(r.headers.get('Content-Type')||'')?r.json():new Uint8Array(await r.arrayBuffer());
 }
-const qs=a=>a.k?`?k=${encodeURIComponent(a.k)}`:a.t?`?t=${encodeURIComponent(a.t)}`:`?v=${encodeURIComponent(a.v)}`;
+const qs=a=>a.k?`?k=${encodeURIComponent(a.k)}`:a.t?`?t=${encodeURIComponent(a.t)}`:a.g?`?g=${encodeURIComponent(a.g)}${a.r?`&r=${encodeURIComponent(a.r)}`:''}`:`?v=${encodeURIComponent(a.v)}`;
 const getMeta=(id,a)=>api(`/${id}${qs(a)}`);
 const getPdf=(id,a)=>api(`/${id}/pdf${qs(a)}`);
 const signLink=(id,t)=>`${HOST}/s/${id}/${t}`;
 const viewLink=(id,v)=>`${HOST}/v/${id}/${v}`;
+const groupLink=(id,t)=>`${HOST}/g/${id}/${t}`; // one link for a whole group: everyone writes their own name
 const ownerLink=(id,k)=>`${HOST}/o/${id}#k=${k}`;
 
 /* ------------------------------------------------------------ the signed document */
@@ -84,6 +85,34 @@ async function buildSigned(meta,pdfBytes){
   return doc.save();
 }
 
+/* ------------------------------------------------------------ where a form asks for a signature */
+// form fields of the PDF (signature fields, and text fields named name/date/signature), and printed labels
+// such as "חתימה: ______", "תאריך:", "שם מלא:" — the blank next to them is where the field goes
+async function findTargets(pages){
+  const out=[];const LBL=/^(חתימת\s*\S+|חתימה|ת\.?\s?ז\.?|תאריך|שם\s*מלא|שם\s*ה\S+|שם|signature|sign here|date|full name|name)\s*[:：]?\s*(_{2,}|\.{3,}|-{3,})?\s*$/i;
+  // the same with the blank first ("____ :תאריך"), as some PDFs store right-to-left lines
+  const LBL2=/^(_{2,}|\.{3,}|-{3,})\s*[:：]?\s*(חתימת\s*\S+|חתימה|תאריך|שם\s*מלא|שם\s*ה\S+|שם|signature|date|name)\s*[:：]?$/i;
+  for(let i=0;i<pages.length;i++){const{page,vp}=pages[i];const W=vp.width,H=vp.height;
+    try{for(const a of await page.getAnnotations()){if(a.subtype!=='Widget'||a.hidden)continue;const ft=a.fieldType;if(ft!=='Sig'&&ft!=='Tx')continue;
+      const nm=`${a.fieldName||''} ${a.alternativeText||''}`;const kind=ft==='Sig'||/sign|חתימ/i.test(nm)?'sig':/date|תאריך/i.test(nm)?'date':/name|שם/i.test(nm)?'name':null;if(!kind)continue;
+      const r=vp.convertToViewportRectangle(a.rect);const x=Math.min(r[0],r[2])/W,y=Math.min(r[1],r[3])/H,w=Math.abs(r[2]-r[0])/W,h=Math.abs(r[3]-r[1])/H;
+      if(w>.01&&h>.005)out.push({page:i,x,y,w,h,kind,src:'form'});}}catch(_){}
+    try{const tc=await page.getTextContent();
+      for(const it of tc.items){const s=String(it.str||'').trim();if(!s||s.length>40)continue;let m=LBL.exec(s);if(!m){const r=LBL2.exec(s);if(r)m=[r[0],r[2],r[1]];}if(!m)continue;
+        // "שם התלמיד" / "שם החברה" is a detail to write, not the signer's own name
+        const kind=/חתימ|sign/i.test(m[1])?'sig':/תאריך|date/i.test(m[1])?'date':/ת\.?\s?ז/.test(m[1])?null:/^שם\s*ה/.test(m[1])&&!/^שם\s*ה(הורה|חותם|חותמת|מבקש|מבקשת|מצהיר|מצהירה|עובד|עובדת|לקוח|לקוחה|משתתף|משתתפת)$/.test(m[1].replace(/[:：]/g,'').trim())?'text':'name';if(!kind)continue;
+        const tx=it.transform,fh=Math.hypot(tx[2],tx[3])||10;const p1=vp.convertToViewportPoint(tx[4],tx[5]),p2=vp.convertToViewportPoint(tx[4]+(it.width||fh*s.length*.5),tx[5]+fh);
+        const lx=Math.min(p1[0],p2[0]),rx=Math.max(p1[0],p2[0]),top=Math.min(p1[1],p2[1]),bot=Math.max(p1[1],p2[1]);
+        const rtl=/[\u0590-\u05FF]/.test(s);let x0,x1;
+        if(m[2]){const k=m[2].length/s.length;if(rtl){x0=lx;x1=lx+(rx-lx)*k;}else{x1=rx;x0=rx-(rx-lx)*k;}}  // the blank is part of the same text
+        else{const tw=(kind==='sig'?.26:.2)*W;if(rtl){x1=lx-6;x0=Math.max(0,x1-tw);}else{x0=rx+6;x1=Math.min(W,x0+tw);}}
+        if(x1-x0<W*.05)continue;
+        out.push({page:i,x:x0/W,y:top/H,w:(x1-x0)/W,h:Math.max(.012,(bot-top)/H),kind,src:'text'});}}catch(_){}
+  }
+  // the same place found twice (a form field over its printed line): keep the form field
+  return out.filter((t,i)=>!out.some((o,j)=>j<i&&o.page===t.page&&Math.abs(o.x-t.x)<.03&&Math.abs(o.y-t.y)<.02)).sort((a,b)=>a.page-b.page||a.y-b.y||b.x-a.x);
+}
+
 /* ------------------------------------------------------------ the list of documents I sent */
 const listGet=()=>{try{return JSON.parse(localStorage.getItem(LIST_KEY)||'[]');}catch(_){return[];}};
 const listSet=l=>{try{localStorage.setItem(LIST_KEY,JSON.stringify(l.slice(0,200)));}catch(_){}};
@@ -132,6 +161,20 @@ const CSS=`
 #snd .s-toast.on{opacity:1}#snd .s-toast.err{border-color:#E5484D}
 #snd .tool.combo{grid-column:1/-1;border-style:solid;background:#FFF8DB;border-color:#E9C46A}
 #snd .s-load{position:absolute;inset:0;display:grid;place-items:center;background:rgba(228,232,239,.85);font-size:15px;z-index:5}
+#snd .how{display:flex;flex-direction:column;gap:6px}
+#snd .hw{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:start;border:1px solid var(--l);background:#fff;border-radius:10px;padding:9px 11px;font:inherit;cursor:pointer;color:var(--t)}
+#snd .hw span{font-size:12px;color:var(--mu);line-height:1.35}#snd .hw.on{border-color:var(--b);background:#EAF0FD;box-shadow:0 0 0 2px rgba(46,88,204,.15)}#snd .hw.on b{color:var(--b)}
+#snd .tool{touch-action:none;cursor:grab}
+#snd .s-ghost{position:fixed;z-index:970;pointer-events:none;padding:6px 10px;border-radius:7px;background:#EAF0FD;border:2px solid var(--b);color:var(--b);font-weight:600;font-size:12.5px;transform:translate(-50%,-50%);box-shadow:0 8px 20px -8px rgba(0,0,0,.4);white-space:nowrap}
+#snd .s-tg{position:absolute;inset:0;pointer-events:none}
+#snd .s-t{position:absolute;border:1.5px dashed #D49A00;background:rgba(255,212,59,.14);border-radius:4px}
+#snd .s-t i{position:absolute;bottom:100%;inset-inline-start:0;font-style:normal;font-size:10px;font-weight:600;line-height:1;color:#7A5300;background:#FFF4D6;padding:2px 4px;border-radius:3px;white-space:nowrap;margin-bottom:1px}
+#snd .s-f.snap{box-shadow:0 0 0 4px rgba(255,212,59,.75)}
+#snd .qp>summary{list-style:none;cursor:pointer;width:100%;justify-content:center}#snd .qp>summary::-webkit-details-marker{display:none}
+#snd .qp-in{border:1px solid var(--l);border-radius:10px;padding:10px;margin-top:6px;display:flex;flex-direction:column;gap:9px;background:#FAFBFD}
+#snd .qp-row{display:flex;flex-wrap:wrap;gap:5px 12px;align-items:center}#snd .qp-row>b{width:100%;font-size:12px;color:var(--mu)}
+#snd .ck small{color:var(--mu)}#snd .ck input:disabled+span{opacity:.5}
+#snd .resp{display:flex;flex-wrap:wrap;gap:2px;margin:6px 0}#snd button.chip{border:0;cursor:pointer;font:inherit;font-size:12.5px}#snd button.chip:hover{filter:brightness(.94)}
 @media (max-width:760px){#snd .s-main{flex-direction:column-reverse}#snd .s-side{width:auto;max-height:46vh;border:0;border-top:1px solid var(--l)}#snd .s-pages{padding:14px 8px 40px}}
 `;
 let U=null; // the open screen
@@ -158,16 +201,25 @@ const busy=(on,msg)=>{if(!U)return;let l=U.body.querySelector('.s-load');if(on){
 async function open(opts){
   const{bytes,name}=opts;const title=String(name||'מסמך').replace(/\.pdf$/i,'');
   const u=shell('שליחה לחתימה',`<button class="s-btn pri" data-go>יצירת קישורים לחתימה</button>`);
-  u.opts=opts;u.dirty=true;u.signers=[{name:''}];u.cur=0;u.fields=[];u.tools=new Set(['sig']);u.sel=null;
+  u.opts=opts;u.dirty=true;u.signers=[{name:''}];u.cur=0;u.fields=[];u.tools=new Set(['sig']);u.sel=null;u.how='named';u.targets=[];
   if(opts.selfName)u.signers=[{name:''}];
   u.body.innerHTML=`<div class="s-main"><div class="s-pages" tabindex="0" aria-label="עמודי המסמך"></div><aside class="s-side">
     <label><h3>שם המסמך</h3><input class="s-in" data-title value="${esc(title)}" maxlength="120" dir="auto"></label>
-    <div><h3 style="margin-bottom:8px">מי חותם?</h3><div data-signers style="display:flex;flex-direction:column;gap:6px"></div>
+    <div><h3 style="margin-bottom:8px">איך שולחים?</h3><div class="how" role="radiogroup" aria-label="איך שולחים">
+      <button class="hw on" data-how="named" role="radio" aria-checked="true"><b>לאנשים לפי שם</b><span>קישור אישי לכל חותם, עם מעקב מי חתם</span></button>
+      <button class="hw" data-how="open" role="radio" aria-checked="false"><b>קישור אחד לקבוצה</b><span>למשל לקבוצת הורים: כל אחד כותב את השם שלו וחותם</span></button></div></div>
+    <div data-openbox hidden><h3 style="margin-bottom:6px">פרט נוסף מכל חותם (לא חובה)</h3><input class="s-in" data-ask maxlength="60" dir="auto" placeholder="למשל: שם התלמיד/ה">
+      <p class="hint" style="margin-top:6px">מי שפותח את הקישור כותב את השם שלו (ואת הפרט הנוסף, אם ביקשת), ממלא את השדות וחותם. כל חתימה נשמרת כעותק נפרד, והחותמים לא רואים זה את החתימות של זה.</p></div>
+    <div data-named><h3 style="margin-bottom:8px">מי חותם?</h3><div data-signers style="display:flex;flex-direction:column;gap:6px"></div>
       <button class="s-btn sm" data-add style="margin-top:8px">+ הוספת חותם</button>
       <label class="ck" style="margin-top:10px"><input type="checkbox" data-seq> לחתום לפי הסדר (כל אחד אחרי הקודם)</label></div>
     <div><h3 style="margin-bottom:8px">מה להוסיף בשביל <span data-who></span>?</h3><div class="tools"><button class="tool combo" data-combo>חתימה + שם מלא + תאריך</button>${Object.entries(TYPES).map(([k,v])=>`<button class="tool${k==='sig'?' on':''}" data-tool="${k}" aria-pressed="${k==='sig'}">${v.l}</button>`).join('')}</div>
-      <p class="hint" style="margin-top:8px">אפשר לבחור כמה שדות יחד. לוחצים על המסמך, והשדות שנבחרו נכנסים אחד מתחת לשני. אפשר לגרור, להגדיל ולמחוק.</p>
-      <button class="s-btn sm" data-auto style="margin-top:8px">הצבה מהירה: חתימה, שם ותאריך בסוף המסמך לכל אחד</button></div>
+      <p class="hint" style="margin-top:8px">גוררים שדה אל המסמך, או בוחרים שדות ולוחצים על המסמך. ליד מקום חתימה בטופס (מסומן בצהוב מקווקו) השדה נצמד אליו לבד. אפשר לגרור, להגדיל ולמחוק.</p>
+      <details class="qp" data-qp style="margin-top:8px"><summary class="s-btn sm">הצבה מהירה…</summary><div class="qp-in">
+        <div class="qp-row"><b>מה להוסיף</b><label class="ck"><input type="checkbox" data-qt="sig" checked><span>חתימה</span></label><label class="ck"><input type="checkbox" data-qt="name" checked><span>שם מלא</span></label><label class="ck"><input type="checkbox" data-qt="date" checked><span>תאריך</span></label><label class="ck"><input type="checkbox" data-qt="initials"><span>ראשי תיבות</span></label></div>
+        <div class="qp-row"><b>איפה</b><label class="ck"><input type="radio" name="qpw" value="form" data-qw><span>במקומות החתימה שבטופס <small data-qpn></small></span></label><label class="ck"><input type="radio" name="qpw" value="end" data-qw checked><span>בסוף המסמך</span></label><label class="ck"><input type="radio" name="qpw" value="each" data-qw><span>בתחתית כל עמוד</span></label></div>
+        <div class="qp-row" data-qpwho><b>בשביל מי</b><label class="ck"><input type="radio" name="qpp" value="all" checked><span>כל החותמים</span></label><label class="ck"><input type="radio" name="qpp" value="cur"><span>רק <span data-qpcur></span></span></label></div>
+        <button class="s-btn sm pri" data-qpgo>הוספה</button></div></details></div>
     <label><h3>הודעה לחותמים (לא חובה)</h3><textarea data-note rows="2" maxlength="500" dir="auto" placeholder="למשל: נא לחתום עד יום חמישי. תודה!"></textarea></label>
     <p class="hint">המסמך נשמר בשרת של סימן 30 יום ונמחק לבד. אפשר למחוק אותו קודם, מ"המסמכים ששלחתי".</p>
   </aside></div>`;
@@ -186,14 +238,21 @@ async function open(opts){
   }catch(e){busy(false);u.dirty=false;close();throw new Error('לא הצלחתי לקרוא את המסמך: '+(e.message||e));}
   busy(false);
   const side=u.body.querySelector('.s-side');
+  try{u.targets=await findTargets(u.pages);}catch(_){u.targets=[];}
+  const TL={sig:'מקום לחתימה',name:'מקום לשם',date:'מקום לתאריך',text:'מקום לטקסט'};
+  for(const t of u.targets){const pgx=u.pages[t.page];let tg=pgx.box.querySelector('.s-tg');if(!tg){tg=document.createElement('div');tg.className='s-tg';pgx.box.insertBefore(tg,pgx.lay);}
+    const el=document.createElement('div');el.className='s-t';el.style.cssText=`left:${t.x*100}%;top:${t.y*100}%;width:${t.w*100}%;height:${t.h*100}%`;el.innerHTML=`<i>${TL[t.kind]||'מקום לחתימה'}</i>`;tg.append(el);}
+  {const fr=side.querySelector('[data-qw][value="form"]'),n=u.targets.length;fr.disabled=!n;side.querySelector('[data-qpn]').textContent=n?`(נמצאו ${n})`:'(לא נמצאו במסמך)';if(n){fr.checked=true;setTimeout(()=>say(`נמצאו במסמך ${n} מקומות לחתימה (מסומנים בצהוב). שדה שגוררים לידם נצמד אליהם`),400);}}
   const drawSigners=()=>{
+    const qw=side.querySelector('[data-qpwho]');if(qw){qw.hidden=u.how==='open'||u.signers.length<2;const c=side.querySelector('[data-qpcur]');if(c)c.textContent=u.signers[u.cur].name||`חותם ${u.cur+1}`;}
+    if(u.how==='open'){const w=side.querySelector('[data-who]');w.textContent='כל חותם';w.style.color=COLORS[0];return;}
     const box=side.querySelector('[data-signers]');
     box.innerHTML=u.signers.map((s,i)=>`<div class="sg${i===u.cur?' on':''}" data-i="${i}"><i style="background:${COLORS[i%COLORS.length]}"></i><input value="${esc(s.name)}" placeholder="השם של חותם ${i+1}" maxlength="60" dir="auto" data-name="${i}"><small>${u.fields.filter(f=>f.signer===i).length} שדות</small>${u.signers.length>1?`<button data-del="${i}" title="הסרה" aria-label="הסרת החותם">×</button>`:''}</div>`).join('');
     side.querySelector('[data-who]').textContent=u.signers[u.cur].name||`חותם ${u.cur+1}`;side.querySelector('[data-who]').style.color=COLORS[u.cur%COLORS.length];
   };
   const fieldEl=f=>{const pgx=u.pages[f.page];const el=document.createElement('div');el.className='s-f';const col=COLORS[f.signer%COLORS.length];
     el.style.cssText=`left:${f.x*100}%;top:${f.y*100}%;width:${f.w*100}%;height:${f.h*100}%;border-color:${col};background:${col}1F;color:${col}`;
-    el.innerHTML=`<span>${esc(TYPES[f.type].l)} · ${esc(u.signers[f.signer].name||'חותם '+(f.signer+1))}</span><button class="del" style="background:${col}" aria-label="מחיקה">×</button><i class="rs" style="background:${col}"></i>`;
+    el.innerHTML=`<span>${esc(TYPES[f.type].l)}${u.how==='open'?'':` · ${esc(u.signers[f.signer].name||'חותם '+(f.signer+1))}`}</span><button class="del" style="background:${col}" aria-label="מחיקה">×</button><i class="rs" style="background:${col}"></i>`;
     f.el=el;pgx.lay.append(el);return el;};
   const redraw=()=>{for(const p of u.pages)p.lay.innerHTML='';for(const f of u.fields){fieldEl(f);if(f===u.sel)f.el.classList.add('on');}drawSigners();};
   const select=f=>{u.sel=f;for(const x of u.fields)x.el&&x.el.classList.toggle('on',x===f);};
@@ -201,10 +260,50 @@ async function open(opts){
     const w=T.w,h=T.h*ar;const f={page,type,signer,x:Math.max(0,Math.min(1-w,x-w/2)),y:Math.max(0,Math.min(1-h,y-h/2)),w,h};u.fields.push(f);fieldEl(f);select(f);drawSigners();return f;};
   // several fields at once: the first where the click was, the rest one under the other
   const ORDER=['sig','initials','name','date','text'];
-  const placeGroup=(page,x,y,types,signer)=>{types=ORDER.filter(t=>types.includes(t));let top=null;
-    for(const t of types){const f=add(page,x,top===null?y:0,t,signer);if(top!==null){f.y=Math.min(1-f.h,top);f.el.style.top=f.y*100+'%';}top=f.y+f.h+.006;}};
+  const placeGroup=(page,x,y,types,signer)=>{types=ORDER.filter(t=>types.includes(t));let top=null;const made=[];
+    for(const t of types){const f=add(page,x,top===null?y:0,t,signer);if(top!==null){f.y=Math.min(1-f.h,top);f.el.style.top=f.y*100+'%';}top=f.y+f.h+.006;made.push(f);}return made;};
+  // a field fits itself into a place to sign: a form field exactly, a printed line by sitting on it
+  const setPos=f=>Object.assign(f.el.style,{left:f.x*100+'%',top:f.y*100+'%',width:f.w*100+'%',height:f.h*100+'%'});
+  const fitTo=(f,t)=>{if(t.src==='form'){f.x=t.x;f.y=t.y;f.w=t.w;f.h=Math.max(t.h,.012);}
+    else{f.x=t.x;f.w=t.w;f.y=Math.max(0,Math.min(1-f.h,t.y+t.h*1.15-f.h));}
+    setPos(f);f.el.classList.add('snap');setTimeout(()=>f.el&&f.el.classList.remove('snap'),800);};
+  const taken=(t,f)=>u.fields.some(o=>o!==f&&o.page===t.page&&o.x<t.x+t.w&&o.x+o.w>t.x&&o.y<t.y+t.h*1.2&&o.y+o.h>t.y-t.h*.2&&Math.abs((o.x+o.w/2)-(t.x+t.w/2))<t.w/2);
+  const snapField=f=>{let best=null,bd=.04;const want=f.type==='initials'?'sig':f.type;const cx=f.x+f.w/2,cy=f.y+f.h/2;
+    for(const t of u.targets){if(t.page!==f.page||taken(t,f))continue;const dx=Math.max(t.x-cx,0,cx-(t.x+t.w)),dy=Math.max(t.y-cy,0,cy-(t.y+t.h));
+      const d=Math.hypot(dx,dy)+(t.kind&&f.type!=='text'&&t.kind!==want?.025:0);if(d<bd){bd=d;best=t;}}
+    if(best){fitTo(f,best);return true;}return false;};
+  const setHow=m=>{if(m===u.how)return;
+    if(m==='open'){if(u.fields.some(f=>f.signer>0)&&!confirm('בקישור לקבוצה יש סוג חותם אחד. השדות של שאר החותמים יימחקו. להמשיך?'))return;
+      u.saved=u.signers;u.fields.filter(f=>f.signer>0).forEach(f=>f.el&&f.el.remove());u.fields=u.fields.filter(f=>f.signer===0);u.signers=[{name:'חותם'}];u.cur=0;}
+    else{u.signers=u.saved&&u.saved.length?u.saved:[{name:''}];if(u.signers[0].name==='חותם')u.signers[0].name='';u.cur=0;}
+    u.how=m;side.querySelectorAll('[data-how]').forEach(b=>{const on=b.dataset.how===m;b.classList.toggle('on',on);b.setAttribute('aria-checked',on);});
+    side.querySelector('[data-named]').hidden=m==='open';side.querySelector('[data-openbox]').hidden=m!=='open';
+    u.root.querySelector('[data-go]').textContent=m==='open'?'יצירת קישור לקבוצה':'יצירת קישורים לחתימה';
+    redraw();if(m==='open')setTimeout(()=>side.querySelector('[data-ask]').focus(),30);};
+  // quick placement, by choice
+  const quick=()=>{
+    const types=[...side.querySelectorAll('[data-qt]:checked')].map(x=>x.dataset.qt);if(!types.length){say('בוחרים לפחות שדה אחד',1);return;}
+    const where=(side.querySelector('[data-qw]:checked')||{}).value||'end';
+    const who=u.how==='open'||u.signers.length<2||(side.querySelector('[name=qpp]:checked')||{}).value==='cur'?[u.cur]:u.signers.map((_,i)=>i);
+    let added=0;
+    if(where==='form'){
+      const byKind={};for(const t of u.targets)(byKind[t.kind||'sig']=byKind[t.kind||'sig']||[]).push(t);
+      const miss=[];
+      for(const type of ORDER.filter(t=>types.includes(t))){if(type==='initials'&&types.includes('sig'))continue;const list=byKind[type==='initials'?'sig':type]||[];if(!list.length){miss.push(TYPES[type].l);continue;}
+        list.forEach((t,j)=>{if(taken(t))return;const f=add(t.page,t.x+t.w/2,t.y+t.h/2,type,who[j%who.length]);fitTo(f,t);added++;});}
+      if(miss.length)setTimeout(()=>say(`בטופס לא נמצא מקום ל${miss.join(', ל')}. אפשר לגרור אותם ידנית`),1200);
+    }else{
+      const pgs=where==='each'?u.pages.map((_,i)=>i):[u.pages.length-1];const n=who.length;
+      for(const pi of pgs)who.forEach((s,i)=>{const col=n<=2?(i===0?.75:.25):(1-(i%3+.5)/3);const row=Math.floor(i/(n<=2?2:3));added+=placeGroup(pi,col,(where==='each'?.84:.78)-row*.13,types,s).length;});
+    }
+    side.querySelector('[data-qp]').open=false;drawSigners();
+    say(added?`נוספו ${added} שדות. אפשר לגרור אותם למקום המדויק`:'לא נוספו שדות: המקומות כבר תפוסים',!added);};
+  let dragged=false;
   side.addEventListener('click',e=>{
+    if(dragged){dragged=false;e.preventDefault();return;}
     const hit=q=>{const x=e.target.closest(q);return x&&side.contains(x)?x:null;};
+    const hw=hit('[data-how]');if(hw){setHow(hw.dataset.how);return;}
+    if(hit('[data-qpgo]')){quick();return;}
     const paint=()=>side.querySelectorAll('[data-tool]').forEach(b=>{const on=u.tools.has(b.dataset.tool);b.classList.toggle('on',on);b.setAttribute('aria-pressed',on);});
     if(hit('[data-combo]')){u.tools=new Set(['sig','name','date']);paint();say('נבחרו חתימה, שם מלא ותאריך. לוחצים על המסמך במקום החתימה');return;}
     const t=hit('[data-tool]');if(t){const k=t.dataset.tool;if(u.tools.has(k)){if(u.tools.size>1)u.tools.delete(k);}else u.tools.add(k);paint();return;}
@@ -213,10 +312,19 @@ async function open(opts){
       const w=side.querySelector('[data-who]');w.textContent=u.signers[i].name||`חותם ${i+1}`;w.style.color=COLORS[i%COLORS.length];}
       if(e.target.tagName!=='INPUT')side.querySelector(`[data-name="${i}"]`).focus();return;}
     if(hit('[data-add]')){if(u.signers.length>=10)return;u.signers.push({name:''});u.cur=u.signers.length-1;drawSigners();side.querySelector(`[data-name="${u.cur}"]`).focus();return;}
-    if(hit('[data-auto]')){const last=u.pages.length-1;const n=u.signers.length;
-      u.signers.forEach((s,i)=>{if(u.fields.some(f=>f.signer===i&&f.type==='sig'))return;const col=n<=2?(i===0?.75:.25):(1-(i%3+.5)/3);const row=Math.floor(i/(n<=2?2:3));
-        placeGroup(last,col,.78-row*.13,['sig','name','date'],i);});say('השדות נוספו בעמוד האחרון. אפשר לגרור אותם למקום המדויק');return;}
   });
+  // drag a field from the list onto the document (mouse and touch)
+  let drag=null;
+  side.addEventListener('pointerdown',e=>{const tb=e.target.closest('.tool');if(!tb||!side.contains(tb)||e.button>0)return;
+    drag={tb,types:tb.dataset.combo!==undefined?['sig','name','date']:[tb.dataset.tool],x0:e.clientX,y0:e.clientY,ghost:null};try{tb.setPointerCapture(e.pointerId);}catch(_){}});
+  side.addEventListener('pointermove',e=>{if(!drag)return;
+    if(!drag.ghost){if(Math.hypot(e.clientX-drag.x0,e.clientY-drag.y0)<7)return;drag.ghost=document.createElement('div');drag.ghost.className='s-ghost';drag.ghost.textContent=drag.types.map(t=>TYPES[t].l).join(' + ');u.root.append(drag.ghost);}
+    drag.ghost.style.left=e.clientX+'px';drag.ghost.style.top=e.clientY+'px';});
+  const dragEnd=e=>{if(!drag)return;const d=drag;drag=null;if(!d.ghost)return;d.ghost.remove();dragged=true;setTimeout(()=>{dragged=false;},60);
+    if(e.type==='pointercancel')return;const el=document.elementFromPoint(e.clientX,e.clientY);const box=el&&el.closest('.s-page');if(!box||!P.contains(box))return;
+    const R=box.getBoundingClientRect();const made=placeGroup(+box.dataset.p,(e.clientX-R.left)/R.width,(e.clientY-R.top)/R.height,d.types,u.cur);
+    let snapped=0;for(const f of made)if(snapField(f))snapped++;if(snapped)say('השדה נצמד למקום החתימה בטופס');};
+  side.addEventListener('pointerup',dragEnd);side.addEventListener('pointercancel',dragEnd);
   side.addEventListener('focusin',e=>{const n=e.target.dataset&&e.target.dataset.name;if(n===undefined||+n===u.cur)return;u.cur=+n;
     side.querySelectorAll('.sg').forEach(x=>x.classList.toggle('on',+x.dataset.i===u.cur));const w=side.querySelector('[data-who]');w.textContent=u.signers[u.cur].name||`חותם ${u.cur+1}`;w.style.color=COLORS[u.cur%COLORS.length];});
   side.addEventListener('input',e=>{const n=e.target.dataset.name;if(n!==undefined){u.signers[+n].name=e.target.value;side.querySelector('[data-who]').textContent=e.target.value||`חותם ${+n+1}`;
@@ -231,18 +339,23 @@ async function open(opts){
         if(rs){const nw=Math.max(.04,Math.min(1-o.x+ (o.w), o.w-dx));f.x=Math.max(0,o.x+o.w-nw);f.w=o.x+o.w-f.x;f.h=Math.max(.015,Math.min(1-o.y,o.h+dy));}
         else{f.x=Math.max(0,Math.min(1-f.w,o.x+dx));f.y=Math.max(0,Math.min(1-f.h,o.y+dy));}
         Object.assign(fe.style,{left:f.x*100+'%',top:f.y*100+'%',width:f.w*100+'%',height:f.h*100+'%'});};
-      const up=()=>{fe.removeEventListener('pointermove',mv);fe.removeEventListener('pointerup',up);};fe.addEventListener('pointermove',mv);fe.addEventListener('pointerup',up);return;}
-    placeGroup(+box.dataset.p,(e.clientX-R.left)/R.width,(e.clientY-R.top)/R.height,[...u.tools],u.cur);
+      const up=()=>{fe.removeEventListener('pointermove',mv);fe.removeEventListener('pointerup',up);if(!rs&&(Math.abs(f.x-o.x)>.004||Math.abs(f.y-o.y)>.004))snapField(f);};fe.addEventListener('pointermove',mv);fe.addEventListener('pointerup',up);return;}
+    const made=placeGroup(+box.dataset.p,(e.clientX-R.left)/R.width,(e.clientY-R.top)/R.height,[...u.tools],u.cur);
+    for(const f of made)snapField(f);
   });
   u.onDel=e=>{if((e.key==='Delete'||e.key==='Backspace')&&u.sel&&!/INPUT|TEXTAREA/.test(document.activeElement.tagName)){e.preventDefault();u.sel.el.remove();u.fields=u.fields.filter(x=>x!==u.sel);u.sel=null;drawSigners();}};
   u.cleanup=()=>{if(u.pdf)u.pdf.destroy();};
   drawSigners();
+  const mapFields=()=>u.fields.map(f=>{const vp=u.pages[f.page].vp;const W=vp.width,H=vp.height;const a=vp.convertToPdfPoint(f.x*W,f.y*H),b=vp.convertToPdfPoint((f.x+f.w)*W,(f.y+f.h)*H);
+      return{signer:f.signer,page:f.page,type:f.type,x:f.x,y:f.y,w:f.w,h:f.h,r:[a[0],a[1],b[0],b[1]].map(v=>+v.toFixed(2)),req:true};});
   u.root.querySelector('[data-go]').onclick=async()=>{
+    if(u.how==='open'){if(!u.fields.length){say('עוד לא סימנת איפה חותמים',1);return;}
+      await upload(u,{mode:'open',title:side.querySelector('[data-title]').value.trim()||title,note:side.querySelector('[data-note]').value.trim(),ask:side.querySelector('[data-ask]').value.trim(),
+        signers:[{name:'חותם'}],fields:mapFields(),pages:u.pages.length});return;}
     const names=u.signers.map((s,i)=>s.name.trim()||null);
     const miss=names.findIndex(n=>!n);if(miss>=0){u.cur=miss;drawSigners();const inp=side.querySelector(`[data-name="${miss}"]`);inp.focus();say('צריך לכתוב את השם של כל חותם',1);return;}
     const noF=u.signers.findIndex((s,i)=>!u.fields.some(f=>f.signer===i));if(noF>=0){u.cur=noF;drawSigners();say(`עוד לא סימנת איפה ${names[noF]} חותם/ת`,1);return;}
-    const fields=u.fields.map(f=>{const vp=u.pages[f.page].vp;const W=vp.width,H=vp.height;const a=vp.convertToPdfPoint(f.x*W,f.y*H),b=vp.convertToPdfPoint((f.x+f.w)*W,(f.y+f.h)*H);
-      return{signer:f.signer,page:f.page,type:f.type,x:f.x,y:f.y,w:f.w,h:f.h,r:[a[0],a[1],b[0],b[1]].map(v=>+v.toFixed(2)),req:true};});
+    const fields=mapFields();
     await upload(u,{mode:'sign',title:side.querySelector('[data-title]').value.trim()||title,note:side.querySelector('[data-note]').value.trim(),order:side.querySelector('[data-seq]').checked?'seq':'any',
       signers:names.map(n=>({name:n})),fields,pages:u.pages.length});
   };
@@ -253,24 +366,25 @@ async function upload(u,meta){
     const fd=new FormData();fd.append('meta',JSON.stringify({...meta,from:{name:o.sender&&o.sender.name||'',mail:o.sender&&o.sender.mail||''}}));
     fd.append('pdf',new Blob([o.bytes],{type:'application/pdf'}),'doc.pdf');
     const r=await api('',{method:'POST',body:fd});
-    const rec={id:r.id,k:r.owner,v:r.view,title:meta.title,mode:meta.mode,created:new Date().toISOString(),expires:r.expires,signers:(r.signers||[]).map(s=>({n:s.n,name:s.name,t:s.token})),note:meta.note||''};
+    const rec={id:r.id,k:r.owner,v:r.view,title:meta.title,mode:meta.mode,created:new Date().toISOString(),expires:r.expires,signers:(r.signers||[]).map(s=>({n:s.n,name:s.name,t:s.token})),note:meta.note||'',ask:meta.ask||''};
     listSet([rec,...listGet()]);u.dirty=false;busy(false);links(rec,o);
   }catch(e){busy(false);say('השליחה נכשלה: '+(e.message||e),1);}
 }
 
 /* ---------- step 2: the links */
 function msgFor(rec,s,o){const from=o&&o.sender&&o.sender.name?o.sender.name:'';
+  if(rec.mode==='open')return `שלום לכולם, ${from?from+' שלח/ה':'נשלח'} את "${rec.title}" לחתימה.\nכל אחד פותח את הקישור, כותב את השם שלו${rec.ask?` ואת ${rec.ask}`:''} וחותם. גם מהטלפון, בלי להירשם:\n${groupLink(rec.id,rec.signers[0].t)}${rec.note?`\n\n${rec.note}`:''}`;
   return rec.mode==='view'?`${from?from+' שיתף/ה איתך':'שותף איתך'} את "${rec.title}" בסימן:\n${viewLink(rec.id,rec.v)}`
     :`שלום ${s.name}, ${from?from+' שלח/ה לך':'נשלח אליך'} את "${rec.title}" לחתימה.\nפותחים את הקישור וחותמים, גם מהטלפון. לא צריך להירשם:\n${signLink(rec.id,s.t)}${rec.note?`\n\n${rec.note}`:''}`;}
 function links(rec,o){
-  o=o||{};const u=shell(rec.mode==='view'?'קישור לשיתוף':'הקישורים לחתימה',`<button class="s-btn" data-list>המסמכים ששלחתי</button>`);
+  o=o||{};const u=shell(rec.mode==='view'?'קישור לשיתוף':rec.mode==='open'?'הקישור לחתימה של הקבוצה':'הקישורים לחתימה',`<button class="s-btn" data-list>המסמכים ששלחתי</button>`);
   u.root.querySelector('[data-list]').onclick=()=>list(o);
-  const row=(s,link,msg)=>`<div class="s-card" style="padding:14px 18px"><h4>${s?`<i style="width:12px;height:12px;border-radius:50%;background:${COLORS[s.n%COLORS.length]}"></i>${esc(s.name)}`:'הקישור למסמך'}</h4>
+  const row=(s,link,msg)=>`<div class="s-card" style="padding:14px 18px"><h4>${s?`<i style="width:12px;height:12px;border-radius:50%;background:${COLORS[s.n%COLORS.length]}"></i>${esc(s.name)}`:rec.mode==='open'?'הקישור לקבוצה':'הקישור למסמך'}</h4>
     <div class="lnk"><input readonly value="${esc(link)}" aria-label="הקישור"><button class="s-btn sm wa" data-wa="${esc(msg)}">וואטסאפ</button><button class="s-btn sm" data-copy="${esc(link)}">העתקה</button>${navigator.share?`<button class="s-btn sm" data-share="${esc(msg)}">שיתוף</button>`:''}</div></div>`;
   u.body.innerHTML=`<div class="s-wide"><div class="s-card"><h2>✓ ${rec.mode==='view'?'הקישור מוכן':'המסמך מוכן לחתימה'}</h2>
-    <p class="hint">${rec.mode==='view'?'כל מי שמקבל את הקישור יכול לראות ולהוריד את המסמך, בלי להירשם.':rec.signers.length>1?'לכל חותם יש קישור משלו. שלחו לכל אחד את הקישור שלו.':'שלחו את הקישור לחותם. הוא יחתום מהטלפון או מהמחשב, בלי להירשם.'}
-    ${rec.mode==='sign'?'<br>מה שנחתם מופיע ב"המסמכים ששלחתי", ומשם מורידים את המסמך החתום עם עמוד התיעוד.':''}<br>המסמך יימחק מהשרת ב-${fmtDate(rec.expires).split(',')[0]}.</p></div>
-    ${rec.mode==='view'?row(null,viewLink(rec.id,rec.v),msgFor(rec,null,o)):rec.signers.map(s=>row(s,signLink(rec.id,s.t),msgFor(rec,s,o))).join('')}</div>`;
+    <p class="hint">${rec.mode==='view'?'כל מי שמקבל את הקישור יכול לראות ולהוריד את המסמך, בלי להירשם.':rec.mode==='open'?'קישור אחד לכולם: שולחים אותו לקבוצה, וכל מי שפותח אותו כותב את השם שלו וחותם. כל חתימה נשמרת בנפרד, ואף אחד לא רואה את החתימות של האחרים.':rec.signers.length>1?'לכל חותם יש קישור משלו. שלחו לכל אחד את הקישור שלו.':'שלחו את הקישור לחותם. הוא יחתום מהטלפון או מהמחשב, בלי להירשם.'}
+    ${rec.mode==='sign'?'<br>מה שנחתם מופיע ב"המסמכים ששלחתי", ומשם מורידים את המסמך החתום עם עמוד התיעוד.':rec.mode==='open'?'<br>ב"המסמכים ששלחתי" רואים מי חתם, מורידים את החתימות (כל אחד בנפרד או הכל ב-PDF אחד) וסוגרים את הקישור כשמסיימים.':''}<br>המסמך יימחק מהשרת ב-${fmtDate(rec.expires).split(',')[0]}.</p></div>
+    ${rec.mode==='view'?row(null,viewLink(rec.id,rec.v),msgFor(rec,null,o)):rec.mode==='open'?row(null,groupLink(rec.id,rec.signers[0].t),msgFor(rec,null,o)):rec.signers.map(s=>row(s,signLink(rec.id,s.t),msgFor(rec,s,o))).join('')}</div>`;
   u.body.addEventListener('click',async e=>{
     if(!u.body.contains(e.target))return;
     const w=e.target.closest('[data-wa]');if(w){window.open('https://wa.me/?text='+encodeURIComponent(w.dataset.wa),'_blank','noopener');return;}
@@ -286,14 +400,33 @@ async function list(o){
   u.body.innerHTML=`<div class="s-wide">${l.map(r=>`<div class="s-card" data-id="${r.id}"><h4 style="justify-content:space-between"><span dir="auto">${esc(r.title)}</span><small style="color:#5D6982;font-weight:400">${fmtDate(r.created)}</small></h4><div data-st><span class="chip">בודק…</span></div></div>`).join('')}</div>`;
   const draw=async r=>{const card=u.body.querySelector(`[data-id="${r.id}"]`);if(!card)return;const st=card.querySelector('[data-st]');
     let m;try{m=await getMeta(r.id,{k:r.k});}catch(e){st.innerHTML=`<p class="hint">${esc(e.message)}</p><div class="lnk"><button class="s-btn sm" data-forget="${r.id}">הסרה מהרשימה</button></div>`;return;}
-    r.meta=m;const done=m.signers.filter(s=>s.status==='signed').length,all=m.signers.length;
+    r.meta=m;
+    if(m.mode==='open'){const R=m.responses||[];const shown=R.slice(-80).reverse();
+      st.innerHTML=`<div class="resp"><span class="chip ok">✓ ${R.length} ${R.length===1?'חתם/ה':'חתמו'}</span>${m.open.closed?'<span class="chip no">הקישור סגור</span>':'<span class="chip wait">הקישור פתוח לחתימות</span>'}</div>
+        ${R.length?`<div class="resp">${shown.map(x=>`<button class="chip ok" data-one="${r.id}" data-rid="${x.rid}" title="הורדת העותק החתום · ${esc(fmtDate(x.at))}">${esc(x.name)}${x.extra?` · ${esc(x.extra)}`:''}</button>`).join('')}${R.length>80?`<span class="chip">ועוד ${R.length-80}</span>`:''}</div><p class="hint">לחיצה על שם מורידה את העותק החתום שלו.</p>`:'<p class="hint">עוד אף אחד לא חתם.</p>'}
+        <div class="lnk"><button class="s-btn sm pri" data-all="${r.id}" ${R.length?'':'disabled'}>כל החתימות ב-PDF אחד</button>${typeof window.zip==='function'?`<button class="s-btn sm" data-zip="${r.id}" ${R.length?'':'disabled'}>כל אחד בקובץ נפרד (ZIP)</button>`:''}
+        <button class="s-btn sm" data-links="${r.id}">הקישור</button><button class="s-btn sm" data-close="${r.id}">${m.open.closed?'פתיחת הקישור מחדש':'סגירת הקישור'}</button><button class="s-btn sm" data-rm="${r.id}">מחיקה מהשרת</button></div>`;
+      return;}
+    const done=m.signers.filter(s=>s.status==='signed').length,all=m.signers.length;
     st.innerHTML=(m.mode==='sign'?`<div class="bar"><i style="width:${all?done/all*100:0}%"></i></div>${m.signers.map(s=>`<span class="chip ${s.status==='signed'?'ok':s.status==='declined'?'no':'wait'}">${s.status==='signed'?'✓':s.status==='declined'?'✗':'⏳'} ${esc(s.name)}${s.at?` · ${fmtDate(s.at)}`:''}</span>`).join('')}
         ${m.signers.filter(s=>s.reason).map(s=>`<p class="hint">${esc(s.name)} כתב/ה: ${esc(s.reason)}</p>`).join('')}`:'<span class="chip">קישור לצפייה</span>')+
       `<div class="lnk">${m.mode==='sign'?`<button class="s-btn sm ${done===all?'pri':''}" data-dl="${r.id}" ${done?'':'disabled'}>${done===all?'הורדת המסמך החתום':'הורדה עם החתימות עד עכשיו'}</button>`:''}
        <a class="s-btn sm" href="${ownerLink(r.id,r.k)}" target="_blank" rel="noopener">צפייה במסמך</a><button class="s-btn sm" data-links="${r.id}">הקישורים</button><button class="s-btn sm" data-rm="${r.id}">מחיקה מהשרת</button></div>`;};
   l.forEach(draw);
   u.body.addEventListener('click',async e=>{
-    const el=e.target.closest('[data-dl],[data-links],[data-rm],[data-forget]');if(!el||!u.body.contains(el))return;const id=el.dataset;const r=l.find(x=>x.id===(id.dl||id.links||id.rm||id.forget));if(!r)return;
+    const el=e.target.closest('[data-dl],[data-links],[data-rm],[data-forget],[data-one],[data-all],[data-zip],[data-close]');if(!el||!u.body.contains(el))return;const id=el.dataset;const r=l.find(x=>x.id===(id.dl||id.links||id.rm||id.forget||id.one||id.all||id.zip||id.close));if(!r)return;
+    if(id.close){try{await api(`/${r.id}/close?k=${encodeURIComponent(r.k)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({closed:!(r.meta&&r.meta.open&&r.meta.open.closed)})});say(r.meta.open.closed?'הקישור פתוח שוב לחתימות':'הקישור נסגר. אי אפשר לחתום עליו יותר');draw(r);}catch(err){say(err.message,1);}return;}
+    if(id.one||id.all||id.zip){
+      try{const parts=await groupPdfs(r,id.one?id.rid:null);busy(false);if(!parts.length){say('לא נמצאו חתימות',1);return;}
+        const clean=t=>String(t).replace(/[\\/:*?"<>|]+/g,' ').trim().slice(0,80);
+        const save=async(name,bytes,kind)=>{if(o.save)await o.save(name,bytes,kind);else{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([bytes]));a.download=name;a.click();}};
+        if(id.one){const p=parts[0];await save(`${clean(r.title)} - ${clean(p.x.name)}.pdf`,p.bytes,'pdf');return;}
+        if(id.zip){const used=new Set();const files=parts.map(p=>{let n=`${clean(p.x.name)}${p.x.extra?' - '+clean(p.x.extra):''}.pdf`,k=2;while(used.has(n))n=n.replace(/( \(\d+\))?\.pdf$/,` (${k++}).pdf`);used.add(n);return{name:n,data:p.bytes};});
+          await save(`${clean(r.title)} - חתימות.zip`,window.zip(files),'zip');return;}
+        busy(true,'מאחד לקובץ אחד…');const{PDFDocument}=PDFLib;const out=await PDFDocument.create();
+        for(const p of parts){const d=await PDFDocument.load(p.bytes);for(const pg of await out.copyPages(d,d.getPageIndices()))out.addPage(pg);}
+        const bytes=await out.save();busy(false);await save(`${clean(r.title)} - כל החתימות.pdf`,bytes,'pdf');}
+      catch(err){busy(false);say('לא הצלחתי לבנות את הקבצים: '+(err.message||err),1);}return;}
     if(id.links)return links(r,o);
     if(id.forget){listSet(listGet().filter(x=>x.id!==r.id));return list(o);}
     if(id.rm){if(!confirm(`למחוק את "${r.title}" מהשרת? הקישורים יפסיקו לעבוד.`))return;try{await api(`/${r.id}?k=${encodeURIComponent(r.k)}`,{method:'DELETE'});}catch(err){if(!/לא נמצא/.test(err.message)){say(err.message,1);return;}}
@@ -304,6 +437,16 @@ async function list(o){
   });
 }
 
+// the signed copies of a group link: the document + one person's signature + their certificate page
+const groupMeta=(m,x)=>({...m,signers:[{n:0,name:x.label||x.name,status:'signed',at:x.at,values:x.values,ip:x.ip,ua:x.ua,country:x.country,tz:x.tz}]});
+async function groupPdfs(r,only){
+  busy(true,'מוריד את החתימות…');
+  const res=(await api(`/${r.id}/responses?k=${encodeURIComponent(r.k)}`)).responses||[];
+  const pdf=await getPdf(r.id,{k:r.k});const list=only?res.filter(x=>x.rid===only):res;const out=[];
+  for(let i=0;i<list.length;i++){busy(true,list.length>1?`בונה ${i+1} מתוך ${list.length}…`:'בונה את העותק החתום…');out.push({x:list[i],bytes:await buildSigned(groupMeta(r.meta,list[i]),pdf.slice(0))});}
+  return out;
+}
+
 /* ---------- a link for viewing only */
 async function openView(opts){
   const u=shell('קישור לשיתוף');u.opts=opts;
@@ -311,5 +454,5 @@ async function openView(opts){
   await upload(u,{mode:'view',title:String(opts.name||'מסמך').replace(/\.pdf$/i,''),signers:[],fields:[],pages:1});
 }
 
-window.SIMAN_SEND={open,openView,list,links,close,buildSigned,getMeta,getPdf,api,signLink,viewLink,ownerLink,HOST,devName,COLORS,TYPES,isOpen:()=>!!U};
+window.SIMAN_SEND={open,openView,list,links,close,buildSigned,getMeta,getPdf,api,signLink,viewLink,groupLink,ownerLink,findTargets,HOST,devName,COLORS,TYPES,isOpen:()=>!!U};
 })();
