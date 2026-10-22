@@ -1,5 +1,5 @@
 /* =====================================================================
-   סימן 4.9 — לוח ניהול בתוך האפליקציה
+   סימן 4.9.1 — לוח ניהול בתוך האפליקציה
    מופיע רק כשהמייל בהגדרות הוא מייל של מנהל.
    הנתונים עצמם מוגנים במפתח הניהול (ADMIN_KEY) בשרת: מזינים אותו פעם אחת
    במכשיר, והוא נשמר רק במכשיר הזה.
@@ -102,11 +102,18 @@
   setPanelBtn.textContent = 'לוח ניהול (מנהל)';
   if (delBox && delBox.parentNode) delBox.parentNode.insertBefore(setPanelBtn, delBox);
 
-  function syncButtons() {
+  let syncButtons = function () {
     const a = isAdmin();
     topBtn.classList.toggle('hidden', !a);
     setPanelBtn.classList.toggle('hidden', !a);
+  };
+  // חשבון המנהל מוצג כחשבון מנהל גם לפני בדיקת הסטטוס היומית מהשרת
+  function markAdminPlan() {
+    if (!isAdmin()) return;
+    try { const t = JSON.parse(localStorage.getItem('siman.trial') || 'null'); if (!t || t.plan !== 'admin') localStorage.setItem('siman.trial', JSON.stringify({ ...(t || {}), plan: 'admin' })); } catch (_) {}
   }
+  const _sync = syncButtons;
+  syncButtons = function () { _sync(); markAdminPlan(); };
   syncButtons();
   setInterval(syncButtons, 2000);
   document.addEventListener('click', () => setTimeout(syncButtons, 300), true);
@@ -118,6 +125,8 @@
 
   function open() {
     if (!isAdmin()) return;
+    // חלון ההגדרות הוא dialog שיושב מעל הכול, לכן סוגרים אותו לפני שהלוח נפתח
+    document.querySelectorAll('dialog[open]').forEach((d) => { try { d.close(); } catch (_) {} });
     if (!panel) {
       panel = document.createElement('div');
       panel.id = 'admPanel'; panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-label', 'לוח ניהול');
