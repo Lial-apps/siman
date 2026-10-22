@@ -163,7 +163,10 @@ async function startGroup(){
   if(M.me===0&&!M.open.closed){
     const name=$('gName');
     name.oninput=()=>{me.name=name.value.trim();name.classList.remove('bad');for(const f of M.fields)if(f.type==='name'){if(me.name)VALS[f.id]={text:me.name};else delete VALS[f.id];}drawFields();dockSign.render();};
-    if($('gExtra'))$('gExtra').oninput=()=>$('gExtra').classList.remove('bad');
+    // "שם התלמיד/ה" asked once fills every text field titled "שם התלמיד"
+    const words=t=>String(t||'').replace(/\/ה\b|\(ה\)/g,'').replace(/[^\u0590-\u05FFA-Za-z0-9 ]+/g,' ').split(/\s+/).filter(w=>w.length>=3&&w!=='שם'&&w!=='של');
+    const aw=words(M.open.ask),same=M.fields.filter(f=>f.type==='text'&&f.label&&aw.length&&words(f.label).some(w=>aw.includes(w)));
+    if($('gExtra'))$('gExtra').oninput=()=>{const v=$('gExtra').value.trim();$('gExtra').classList.remove('bad');for(const f of same){if(v)VALS[f.id]={text:v};else delete VALS[f.id];}if(same.length){drawFields();dockSign.render();}};
     for(const f of M.fields)if(f.type==='date')VALS[f.id]={text:today()};
     drawFields();dockSign(M.fields);
   }else{drawFields();dockDone(null);}
@@ -184,7 +187,7 @@ function drawFields(){
     if(me&&s.n===me.n&&active){el.classList.add('mine');el.tabIndex=0;el.setAttribute('role','button');el.dataset.id=f.id;if(val)el.classList.add('done');}
     else if(!val){el.classList.add('other');el.textContent=s.status==='declined'?'סירב/ה':`${SS.TYPES[f.type].l}: ${s.name}`;}
     if(val){if(val.png)el.innerHTML=`<img alt="" src="${val.png}">`;else el.innerHTML=`<span class="tx" dir="auto">${esc(val.text)}</span>`;}
-    else if(el.classList.contains('mine'))el.textContent=f.type==='sig'?'✍️ כאן חותמים':f.type==='initials'?'ראשי תיבות':SS.TYPES[f.type].l;
+    else if(el.classList.contains('mine'))el.textContent=f.type==='sig'?'✍️ כאן חותמים':f.type==='initials'?'ראשי תיבות':f.type==='name'?'השם שלך':f.type==='text'&&f.label?f.label:SS.TYPES[f.type].l;
     pg.append(el);
   }
   for(const el of document.querySelectorAll('.f.mine'))el.onclick=el.onkeydown=e=>{if(e.type==='keydown'&&e.key!=='Enter'&&e.key!==' ')return;e.preventDefault();openField(M.fields.find(f=>f.id===el.dataset.id));};
@@ -230,7 +233,7 @@ let CUR=null;
 function openField(f){
   CUR=f;if(f.type==='sig'||f.type==='initials')return openSig(f);
   if(f.type==='date'){VALS[f.id]={text:today()};drawFields();dockSign.render();return;}
-  $('txtT').textContent=f.type==='name'?'השם המלא שלך':'מה לכתוב כאן?';$('txtIn').value=(VALS[f.id]&&VALS[f.id].text)||'';$('txtDlg').hidden=false;setTimeout(()=>$('txtIn').focus(),50);
+  $('txtT').textContent=f.type==='name'?'השם שלך':f.label||'מה לכתוב כאן?';$('txtIn').value=(VALS[f.id]&&VALS[f.id].text)||'';$('txtDlg').hidden=false;setTimeout(()=>$('txtIn').focus(),50);
 }
 $('txtX').onclick=()=>{$('txtDlg').hidden=true;};
 $('txtOk').onclick=()=>{const v=$('txtIn').value.trim();$('txtDlg').hidden=true;if(v)VALS[CUR.id]={text:v};else delete VALS[CUR.id];
