@@ -173,7 +173,7 @@ html.a11y-focus *:focus{outline:4px solid #FFB000!important;outline-offset:2px!i
       panel.style.left = Math.max(10, Math.min(vw - w - 10, r.left + r.width / 2 - w / 2)) + 'px';
     } else {                                     // opened from the corner button: open above it
       panel.style.top = 'auto'; panel.style.bottom = (r ? vh - r.top + 10 : 78) + 'px';
-      panel.style.left = Math.max(10, r ? r.left : 16) + 'px';
+      panel.style.left = Math.max(10, Math.min(vw - w - 10, r ? r.left : 16)) + 'px';   // stays on the screen in either corner
     }
   }
   function open(from) {
