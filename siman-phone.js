@@ -1,4 +1,6 @@
-/* סימן — phone: "שמירה" in the Word / Excel / PowerPoint editors asks how to save (5.0.3)
+/* סימן — phone helpers (5.0.5)
+   1. "שמירה" in the Word / Excel / PowerPoint editors asks how to save
+   2. after a translation into the document: the panel closes, the translated document shows, and a notice says so
    Word (or Excel / PowerPoint) or PDF, plus opening the file for signing. It calls the editors' own
    buttons, so saving works exactly as before. On a computer nothing changes. */
 (function () {
@@ -44,4 +46,48 @@
   });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && !menu.hidden) close(); });
   addEventListener('resize', close);
+})();
+
+/* ---------- 2. translation into the document, on a phone ----------
+   The translation panel covers the screen, so the translated document stayed hidden behind it.
+   When the translation is done: close the panel, show the document from its first page,
+   and say it in a notice that screen readers announce (role="status") and that stays long enough to read. */
+(function () {
+  'use strict';
+  const st = document.getElementById('tpStatus');
+  if (!st) return;
+  const phone = () => matchMedia('(max-width:720px)').matches;
+  const calm = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const note = document.createElement('div');
+  note.className = 'sp-note'; note.setAttribute('role', 'status'); note.setAttribute('aria-live', 'polite'); note.hidden = true;
+  note.innerHTML = '<p class="sp-note-t"></p><button type="button" class="sp-note-x" aria-label="סגירת ההודעה">×</button>';
+  document.body.append(note);
+  let hideT = 0;
+  const hide = () => { note.hidden = true; clearTimeout(hideT); };
+  note.querySelector('.sp-note-x').addEventListener('click', hide);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !note.hidden) hide(); });
+  function show(msg) {
+    note.querySelector('.sp-note-t').textContent = msg;
+    note.hidden = false;
+    clearTimeout(hideT); hideT = setTimeout(hide, 12000);
+  }
+  let last = '';
+  new MutationObserver(() => {
+    const t = st.textContent || '';
+    if (!/^התרגום הוצב בתוך המסמך/.test(t)) { last = ''; return; }
+    if (t === last || !phone()) return;
+    last = t;
+    setTimeout(() => {
+      const panel = document.getElementById('tpanel');
+      if (panel && !panel.classList.contains('hidden')) { const x = document.getElementById('tpClose'); if (x) x.click(); }
+      const desk = document.getElementById('desk');
+      if (desk) {
+        desk.scrollTo({ top: 0, behavior: calm() ? 'auto' : 'smooth' });
+        if (!desk.hasAttribute('tabindex')) desk.setAttribute('tabindex', '-1');
+        desk.focus({ preventScroll: true }); // the panel that had the focus is gone
+      }
+      const m = t.match(/\((\d+) קטעים ב-(\d+) עמודים\)/);
+      show(`התרגום מוכן${m ? ` (${m[2] === '1' ? 'עמוד אחד' : m[2] + ' עמודים'})` : ''}. לתיקון משפט: "עריכה". כדי לשמור את הקובץ המתורגם: "שמירה".`);
+    }, 400);
+  }).observe(st, { childList: true, characterData: true, subtree: true });
 })();
