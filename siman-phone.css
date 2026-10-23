@@ -1,0 +1,32 @@
+/* סימן — Word / Excel / PowerPoint editors on a phone (5.0.3)
+   Only the top of the editors, only on narrow screens. Nothing else in the app is touched.
+   Row 1: name + close.  Row 2: the action buttons, sharing the width.  The tabs scroll sideways. */
+@media (max-width:720px){
+  #wed .we-top,#xed .xe-top,#ped .pe-top{flex-wrap:wrap!important;row-gap:6px!important;column-gap:6px!important;padding:6px 8px!important;min-height:0!important;height:auto!important}
+  #wed .we-top > *,#xed .xe-top > *,#ped .pe-top > *{order:6}
+  #wed .we-brand,#xed .xe-brand,#ped .pe-brand{order:1!important;flex:none;gap:6px!important}
+  #wed .we-sub,#xed .xe-sub,#ped .pe-sub{display:none!important}
+  #wed .we-namebox,#xed .xe-namebox,#ped .pe-namebox{order:2!important;flex:1 1 0!important;min-width:0!important;width:auto!important;max-width:none!important}
+  #wed .we-name,#xed .xe-name,#ped .pe-name{min-width:0!important;width:100%!important}
+  #wed .we-state,#xed .xe-state,#ped .pe-state{order:3!important;flex:none}
+  #wed .we-x,#xed .xe-x,#ped .pe-x{order:4!important;flex:none;min-width:40px;min-height:40px}
+  #wed .we-top > .grow,#xed .xe-top > .grow,#ped .pe-top > .grow{order:5!important;flex:0 0 100%!important;height:0!important;margin:0!important;padding:0!important}
+  #wed .we-top > button:not(.we-x),#xed .xe-top > button:not(.xe-x),#ped .pe-top > button:not(.pe-x){flex:1 1 auto;min-width:0;padding-inline:6px!important;font-size:13.5px!important;white-space:nowrap;justify-content:center;overflow:hidden;text-overflow:ellipsis}
+  /* "sign" and "PDF" leave the top row: saving asks Word / PDF (siman-phone.js) */
+  #wed #weDesk,#xed #xeDesk,#ped #peDesk,#wed #wePdf,#xed #xePdf,#ped #pePdf{display:none!important}
+  /* the tabs (בית, הוספה…) scroll sideways instead of being cut */
+  #wed .we-tabs,#xed .xe-tabs,#ped .pe-tabs{overflow-x:auto!important;flex-wrap:nowrap!important;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  #wed .we-tabs::-webkit-scrollbar,#xed .xe-tabs::-webkit-scrollbar,#ped .pe-tabs::-webkit-scrollbar{display:none}
+  #wed .we-tabs > *,#xed .xe-tabs > *,#ped .pe-tabs > *{flex:none!important}
+}
+
+/* the save choice that opens under "שמירה" on a phone */
+.sp-save{position:fixed;z-index:2147482000;min-width:230px;background:#fff;color:#1B2232;border-radius:18px;padding:6px;
+  box-shadow:0 14px 40px rgba(22,33,58,.28),0 0 0 1px rgba(22,33,58,.08);direction:rtl;font-family:Rubik,Heebo,Arial,sans-serif}
+.sp-save[hidden]{display:none}
+.sp-save button{display:flex;align-items:center;gap:12px;width:100%;min-height:50px;padding:0 12px;border:0;border-radius:12px;background:none;color:inherit;font:inherit;font-size:15.5px;text-align:start;cursor:pointer}
+.sp-save button:active,.sp-save button:hover{background:#F1F3F7}
+.sp-save .ic{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;font-size:11px;font-weight:700;color:#fff;flex:none;direction:ltr}
+.sp-save small{display:block;font-size:12px;color:#6A7488;margin-top:1px}
+.sp-save hr{border:0;border-top:1px solid #E6E9EF;margin:4px 8px}
+.sp-save .sec{min-height:44px;font-size:14px;color:#4A5468}
