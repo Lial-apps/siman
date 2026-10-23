@@ -567,6 +567,15 @@ const FMTS=[['General','כללי'],['#,##0.00','מספר'],['[$₪-40D] #,##0.00
 
 /* ------------------------------------------------------------ the editor screen */
 const ICO={
+  fx:'<path d="M8.5 16c1.6 0 2-1.4 2.3-3l1.2-6.5c.3-1.6.8-3 2.5-3"/><path d="M7.5 8h6"/><path d="M12.5 11l4 5M16.5 11l-4 5" stroke-width="1.5"/>',
+  fshow:'<rect x="2.5" y="4" width="15" height="12" rx="1.5"/><path d="M5.5 10.5h2.5M5.5 8h2.5"/><path d="M11 7.5c-.7 0-1 .5-1.1 1.2l-.5 3.6c-.1.7-.5 1.2-1.1 1.2M9 9.5h3"/>',
+  fnmath:'<path d="M4 6h5M6.5 3.5v5M11.5 6h5M4 13.5l4 4M8 13.5l-4 4M11.5 14h5M11.5 17h5"/>',
+  fnstat:'<path d="M3 17h14"/><rect x="4.5" y="10" width="2.5" height="7"/><rect x="9" y="6" width="2.5" height="11"/><rect x="13.5" y="12" width="2.5" height="5"/>',
+  fnlogic:'<path d="M10 3l7 7-7 7-7-7z"/><path d="M8.5 8.2c.3-1.3 3.3-1.3 3 .5-.2 1-1.5 1.2-1.5 2.4M10 13.2v.3"/>',
+  fntext:'<path d="M4 16l4-11h1l4 11M5.4 12.5h6.2"/><path d="M14 9v7M14 9h3"/>',
+  fndate:'<rect x="3" y="4" width="14" height="13" rx="1.5"/><path d="M3 8h14M7 2.5v3M13 2.5v3"/><circle cx="12.5" cy="13" r="2.3"/><path d="M12.5 12v1.1l.8.6"/>',
+  fnlookup:'<circle cx="8.5" cy="8.5" r="4.5"/><path d="M12 12l5 5"/><path d="M6.5 8.5h4"/>',
+  fnfin:'<circle cx="10" cy="10" r="7"/><path d="M12.3 7.3c-.4-.8-1.3-1.2-2.3-1.2-1.4 0-2.4.8-2.4 1.9 0 2.7 5 1.4 5 4 0 1.1-1 1.9-2.6 1.9-1.1 0-2-.5-2.4-1.3M10 4.5v1.6M10 14v1.6"/>',
   undo:'<path d="M7 5L3 9l4 4"/><path d="M3 9h9a5 5 0 0 1 0 10H8"/>',redo:'<path d="M13 5l4 4-4 4"/><path d="M17 9H8a5 5 0 0 0 0 10h4"/>',
   cut:'<circle cx="6" cy="15" r="2.5"/><circle cx="14" cy="15" r="2.5"/><path d="M7.5 13L14 3M12.5 13L6 3"/>',
   copy:'<rect x="7" y="7" width="10" height="11" rx="1.5"/><path d="M4 13V4a1 1 0 0 1 1-1h8"/>',
@@ -626,6 +635,10 @@ function ribbonHtml(){return `
  ${G('תאים',`<div class="row">${B('rowIns',ic('rowIns'),'הוספת שורה מעל')}${B('colIns',ic('colIns'),'הוספת עמודה לפני')}</div><div class="row">${B('rowDel',ic('rowDel'),'מחיקת שורות')}${B('colDel',ic('colDel'),'מחיקת עמודות')}</div>`)}
  ${G('עריכה',BL('sum','sum','סכום','סכום אוטומטי (Alt+=)')+`<div class="col">${B('sortAZ',ic('sortAZ'),'מיון מהקטן לגדול')}${B('sortZA',ic('sortZA'),'מיון מהגדול לקטן')}${B('clear',ic('clear'),'ניקוי העיצוב')}</div>`+BL('find','find','חיפוש','חיפוש (Ctrl+F)'))}
 </div>
+<div class="xpanel" data-panel="formulas" hidden>
+ ${G('ספריית פונקציות',BL('fnInsert','fx','הוספת פונקציה','חיפוש ובחירה של פונקציה','data-pop="fn-all"')+BL('sumMenu','sum','סכום אוטומטי','סכום, ממוצע, ספירה, מקסימום ומינימום','data-pop="fn-auto"')+FN_CATS.map(c=>BL('fnCat','fn'+c[0],c[1],c[1],`data-pop="fn-${c[0]}"`)).join(''))}
+ ${G('ביקורת נוסחאות',BL('formulas','fshow','הצגת נוסחאות','הצגת הנוסחאות בתאים במקום התוצאות','data-toggle'))}
+</div>
 <div class="xpanel" data-panel="data" hidden>
  ${G('מיון וסינון',`<div class="col">${B('sortAZ',ic('sortAZ'),'מיון מהקטן לגדול')}${B('sortZA',ic('sortZA'),'מיון מהגדול לקטן')}</div>`+BL('filter','filter','סינון','חצים בכותרות לסינון ומיון (Ctrl+Shift+L)','data-toggle')+`<div class="col">${B('fclear',ic('filterX'),'ניקוי כל המסננים')}${B('freapply',ic('reapply'),'החלה מחדש של הסינון')}</div>`)}
  ${G('כלי נתונים',BL('dv','valid','אימות נתונים','רשימה נפתחת בתא, וערכים שמותר להקליד')+BL('dups','dup','הסרת כפילויות','מחיקת שורות כפולות')+BL('cfMenu','cf','עיצוב מותנה','צבע לתאים לפי הערך שלהם','data-pop="cf"'))}
@@ -654,7 +667,7 @@ function shellHtml(){return `
   <button type="button" class="xe-tb pri" id="xeSave" title="שמירה כקובץ Excel (Ctrl+S)">שמירה</button>
   <button type="button" class="xe-x" id="xeClose" aria-label="סגירת העורך" title="סגירה">×</button>
 </div>
-<div class="xe-tabs" role="tablist"><button type="button" role="tab" data-tab="home" aria-selected="true">בית</button><button type="button" role="tab" data-tab="data" aria-selected="false">נתונים</button><button type="button" role="tab" data-tab="layout" aria-selected="false">פריסה</button><button type="button" role="tab" data-tab="view" aria-selected="false">תצוגה</button></div>
+<div class="xe-tabs" role="tablist"><button type="button" role="tab" data-tab="home" aria-selected="true">בית</button><button type="button" role="tab" data-tab="formulas" aria-selected="false">נוסחאות</button><button type="button" role="tab" data-tab="data" aria-selected="false">נתונים</button><button type="button" role="tab" data-tab="layout" aria-selected="false">פריסה</button><button type="button" role="tab" data-tab="view" aria-selected="false">תצוגה</button></div>
 <div class="xe-ribbon" id="xeRibbon">${ribbonHtml()}</div>
 <div class="xe-fbar"><input id="xeRef" class="xe-ref" aria-label="כתובת התא" dir="ltr" spellcheck="false"><span class="xe-fx">fx</span><input id="xeFx" class="xe-fxin" aria-label="תוכן התא" dir="auto" spellcheck="false" autocomplete="off"></div>
 <div class="xe-wrap" id="xeWrap" tabindex="0" aria-label="תאי הגיליון"><table class="xe-grid" id="xeGrid"></table><textarea class="xe-edit" id="xeEdit" hidden spellcheck="false" aria-label="עריכת תא"></textarea></div>
@@ -733,7 +746,7 @@ const CSS=`
 #xed .xe-find{position:absolute;top:150px;inset-inline-start:24px;z-index:20;background:#fff;border:1px solid var(--xl);border-radius:10px;box-shadow:0 12px 30px -10px rgba(22,33,58,.35);padding:6px;display:flex;gap:4px}
 #xed .xe-find[hidden]{display:none}#xed .xe-find input{width:220px;height:30px;border:1px solid #CBD3DF;border-radius:6px;padding:0 8px;font:inherit}
 #xed .xe-pop{position:fixed;z-index:30;max-height:calc(100vh - 16px);overflow:auto;box-sizing:border-box;background:#fff;border:1px solid var(--xl);border-radius:10px;box-shadow:0 14px 34px -12px rgba(22,33,58,.4);padding:8px;max-width:340px}
-#xed .xe-pop[hidden]{display:none}#xed .xe-pop h4{margin:2px 2px 6px;font-size:12px;color:var(--xmu);font-weight:600}
+#xed .xe-pop[hidden]{display:none}#xed .xe-pop .fnpop{display:flex;flex-direction:column;gap:1px;min-width:250px;max-height:min(420px,58vh);overflow:auto}#xed .xe-pop .mi.fn{display:flex;flex-direction:column;align-items:flex-start;gap:0;padding:5px 9px}#xed .xe-pop .mi.fn small{color:var(--xmu);font-size:11.5px}#xed .xe-pop .fnq{width:100%;box-sizing:border-box;height:32px;border:1px solid var(--xl);border-radius:7px;padding:0 9px;font:inherit;margin-bottom:6px}#xed .xe-pop .fnl{max-height:46vh;overflow:auto;display:flex;flex-direction:column;gap:1px}#xed .xe-pop .mi.fn[hidden]{display:none}#xed .xe-pop h4{margin:2px 2px 6px;font-size:12px;color:var(--xmu);font-weight:600}
 #xed .xe-pop .pal{display:grid;grid-template-columns:repeat(10,22px);gap:4px}
 #xed .xe-pop .pal button{width:22px;height:22px;border-radius:4px;border:1px solid rgba(0,0,0,.15);cursor:pointer;padding:0}
 #xed .xe-pop .mi{display:flex;align-items:center;gap:8px;width:100%;border:0;background:none;padding:7px 10px;border-radius:7px;cursor:pointer;text-align:start;white-space:nowrap}
@@ -1188,6 +1201,24 @@ function setColor(h){X.color=h;q('xeRibbon').querySelector('[data-bar=color]').s
 function setFill(h){X.fill=h;q('xeRibbon').querySelector('[data-bar=fill]').style.background=h?'#'+h:'transparent';style({bg:h});}
 function openPop(kind,btn){
   if(X.popFor===btn){closePop();return;}
+  if(kind.startsWith('fn-')){
+    const k=kind.slice(3),it=n=>`<button type="button" class="mi fn" data-v="${n}"><b dir="ltr">${n}</b><small>${FN_HELP[n]||''}</small></button>`;
+    let html;
+    if(k==='auto')html=['SUM','AVERAGE','COUNT','MAX','MIN'].map(it).join('');
+    else if(k==='all')html=`<input class="fnq" placeholder="חיפוש פונקציה…" aria-label="חיפוש פונקציה" dir="auto"><div class="fnl">${Object.keys(FN_HELP).sort().map(it).join('')}</div>`;
+    else{const c=FN_CATS.find(x=>x[0]===k);html=c?c[2].filter(n=>FN_HELP[n]).map(it).join(''):'';}
+    const auto=k==='auto';
+    pop(btn,`<div class="fnpop">${html}</div>`,v=>{if(auto){commitEdit();const s=X.sel;if(v==='SUM')return autoSum();
+        const sh=cur();let {r,c}=X.act;let a=r-1;const num=(rr,cc)=>{const x=cellAt(sh,rr,cc);return x&&(typeof x.v==='number'||x.f);};
+        if(s.r2>s.r1||s.c2>s.c1){change(()=>{for(let cc=s.c1;cc<=s.c2;cc++)putValue(sh,s.r2+1,cc,`=${v}(${refOf(s.r1,cc)}:${refOf(s.r2,cc)})`);});select(s.r2+1,s.c1);return;}
+        while(a>=0&&num(a,c))a--;if(a<r-1){setInput(r,c,`=${v}(${refOf(a+1,c)}:${refOf(r-1,c)})`);select(r+1,c);return;}
+        return insertFn(v);}
+      insertFn(v);});
+    const pp=q('xePop');const inp=pp.querySelector('.fnq');
+    if(inp){setTimeout(()=>inp.focus(),30);inp.oninput=()=>{const w=inp.value.trim().toUpperCase(),he=inp.value.trim();for(const b of pp.querySelectorAll('.fnl button'))b.hidden=!!w&&!(b.dataset.v.includes(w)||(FN_HELP[b.dataset.v]||'').includes(he));};
+      inp.onkeydown=e=>{e.stopPropagation();if(e.key==='Enter'){const f=[...pp.querySelectorAll('.fnl button')].find(b=>!b.hidden);if(f)f.click();}else if(e.key==='Escape')closePop();};}
+    return;
+  }
   if(kind==='cf'){const it=(v,l)=>`<button type="button" class="mi" data-v="${v}">${l}</button>`;
     pop(btn,`<h4>סימון תאים לפי כלל</h4>${it('gt','גדול מ…')}${it('lt','קטן מ…')}${it('between','בין…')}${it('eq','שווה ל…')}${it('text','טקסט שמכיל…')}${it('dup','ערכים כפולים…')}
       <div class="sep"></div><h4>עליונים ותחתונים</h4>${it('top','10 העליונים…')}${it('bottom','10 התחתונים…')}${it('above','מעל הממוצע')}${it('below','מתחת לממוצע')}
@@ -1544,6 +1575,19 @@ function ctxMenu(e){
   pp.style.left=Math.min(e.clientX,innerWidth-pp.offsetWidth-6)+'px';pp.style.top=Math.min(e.clientY,innerHeight-pp.offsetHeight-6)+'px';
 }
 // function names while typing a formula
+const FN_CATS=[['math','מתמטיקה',['SUM','SUMIF','SUMIFS','SUMPRODUCT','PRODUCT','ROUND','ROUNDUP','ROUNDDOWN','INT','ABS','MOD','POWER','SQRT','CEILING','FLOOR','RANDBETWEEN','LOG','SUBTOTAL']],
+  ['stat','סטטיסטיקה',['AVERAGE','AVERAGEIF','AVERAGEIFS','COUNT','COUNTA','COUNTBLANK','COUNTIF','COUNTIFS','MAX','MAXIFS','MIN','MINIFS','MEDIAN','LARGE','SMALL','RANK','STDEV','VAR']],
+  ['logic','לוגיות',['IF','IFS','IFERROR','IFNA','AND','OR','NOT','SWITCH','CHOOSE']],
+  ['text','טקסט',['CONCAT','TEXTJOIN','LEFT','RIGHT','MID','LEN','TRIM','UPPER','LOWER','PROPER','SUBSTITUTE','REPLACE','FIND','SEARCH','TEXT','VALUE','REPT','EXACT']],
+  ['date','תאריך ושעה',['TODAY','NOW','DATE','YEAR','MONTH','DAY','WEEKDAY','DATEDIF','EDATE','EOMONTH','NETWORKDAYS','WORKDAY','TIME','HOUR','MINUTE','SECOND']],
+  ['lookup','חיפוש והפניה',['XLOOKUP','VLOOKUP','HLOOKUP','INDEX','MATCH','ROWS','COLUMNS','INDIRECT','OFFSET']],
+  ['fin','פיננסיות',['PMT','FV','PV']]];
+function insertFn(n){
+  if(!n)return;const e=q('xeEdit');
+  if(X.editing&&!e.hidden){const a=e.selectionStart,b=e.selectionEnd,v=e.value;const pre=v.slice(0,a)+(a===0||v[0]!=='='?'=':'');e.value=pre+n+'()'+v.slice(b);const c=pre.length+n.length+1;e.focus();e.setSelectionRange(c,c);q('xeFx').value=e.value;growEdit();}
+  else{startEdit('='+n+'()',true);const c=n.length+2;e.setSelectionRange(c,c);}
+  hint(n+': '+(FN_HELP[n]||''));
+}
 const FN_HELP={SUM:'סכום',AVERAGE:'ממוצע',MIN:'הקטן ביותר',MAX:'הגדול ביותר',COUNT:'ספירת מספרים',COUNTA:'ספירת תאים מלאים',COUNTBLANK:'ספירת תאים ריקים',IF:'אם… אז… אחרת',IFERROR:'ערך חלופי בשגיאה',IFNA:'ערך חלופי כשאין',
   AND:'וגם',OR:'או',NOT:'לא',ROUND:'עיגול',ROUNDUP:'עיגול כלפי מעלה',ROUNDDOWN:'עיגול כלפי מטה',INT:'חלק שלם',ABS:'ערך מוחלט',MOD:'שארית',POWER:'חזקה',SQRT:'שורש',PRODUCT:'מכפלה',MEDIAN:'חציון',
   CONCAT:'חיבור טקסטים',CONCATENATE:'חיבור טקסטים',TEXTJOIN:'חיבור עם מפריד',LEN:'אורך טקסט',LEFT:'תווים משמאל',RIGHT:'תווים מימין',MID:'תווים מהאמצע',UPPER:'אותיות גדולות',LOWER:'אותיות קטנות',TRIM:'הסרת רווחים',
@@ -2058,6 +2102,7 @@ function sheetXml(si,ctx){
     if(sh.headings!==false)sv.removeAttribute('showRowColHeaders');else sv.setAttribute('showRowColHeaders','0');
     if(sh.formulas)sv.setAttribute('showFormulas','1');else sv.removeAttribute('showFormulas');
     if(sh.viewDirty){for(const e of kids(sv,'pane','selection'))sv.removeChild(e);
+      if(sh.rtl)sv.setAttribute('rightToLeft','1');else sv.removeAttribute('rightToLeft');
       if(sh.freeze){const f=sh.freeze;const pn=sNew(d,'pane',{xSplit:f.c||null,ySplit:f.r||null,topLeftCell:refOf(f.r,f.c),activePane:f.r&&f.c?'bottomRight':f.r?'bottomLeft':'topRight',state:'frozen'});sv.insertBefore(pn,sv.firstChild);}}
   }
   if(sh.pageDirty){
@@ -2213,6 +2258,148 @@ async function forceClose(){
   document.removeEventListener('pointerdown',x.onDown,true);window.removeEventListener('resize',x.onResize);window.removeEventListener('mouseup',x.onUp);
   x.root.remove();X=null;
 }
+/* ---------- the assistant: describes the workbook and makes the changes it is asked for ---------- */
+const aiHex=c=>{if(c===null||c===false||c==='none')return null;c=String(c||'').trim().replace(/^#/,'');if(/^[0-9a-f]{3}$/i.test(c))c=c.replace(/./g,x=>x+x);return /^[0-9a-f]{6}$/i.test(c)?c.toUpperCase():undefined;};
+const aiCol=s=>{s=String(s).toUpperCase().replace(/[^A-Z]/g,'');let n=0;for(const ch of s)n=n*26+ch.charCodeAt(0)-64;return n-1;};
+function aiRange(s){
+  if(s&&typeof s==='object'&&'r1' in s)return s;
+  s=String(s||'').trim().toUpperCase().replace(/\$/g,'');
+  if(!s||s==='SELECTION')return{...X.sel};
+  const sh=cur();
+  if(s==='ALL'||s==='USED')return{r1:0,c1:0,r2:Math.max(0,sh.maxR),c2:Math.max(0,sh.maxC)};
+  let m=/^([A-Z]{1,3}):([A-Z]{1,3})$/.exec(s);if(m){const a=aiCol(m[1]),b=aiCol(m[2]);return{r1:0,r2:Math.max(0,sh.maxR),c1:Math.min(a,b),c2:Math.max(a,b)};}
+  m=/^(\d+):(\d+)$/.exec(s);if(m){const a=+m[1]-1,b=+m[2]-1;return{r1:Math.min(a,b),r2:Math.max(a,b),c1:0,c2:Math.max(0,sh.maxC)};}
+  if(/^[A-Z]{1,3}$/.test(s)){const c=aiCol(s);return{r1:0,r2:Math.max(0,sh.maxR),c1:c,c2:c};}
+  if(/^\d+$/.test(s)){const r=+s-1;return{r1:r,r2:r,c1:0,c2:Math.max(0,sh.maxC)};}
+  const g=parseRange(s);if(!g)return null;
+  return{r1:Math.min(g.r1,g.r2),r2:Math.max(g.r1,g.r2),c1:Math.min(g.c1,g.c2),c2:Math.max(g.c1,g.c2)};
+}
+function aiContext(){
+  if(!X)return null;commitEdit();
+  const st=X.st,sh=cur();const lines=[];let total=0,cut=false;
+  const R=Math.min(sh.maxR,299),C=Math.min(sh.maxC,39);
+  for(let r=0;r<=R&&!cut;r++){const vals=[];let any=false;
+    for(let c=0;c<=C;c++){const cell=cellAt(sh,r,c);if(!cell){vals.push('');continue;}
+      let t=cell.f?'='+cell.f+' → '+display(X.si,{...cell,f:cell.f},r,c).t:display(X.si,cell,r,c).t;
+      const d=descOf(st.st,cell.s);const tags=[];if(d.font.b)tags.push('B');if(d.bg)tags.push('bg#'+d.bg);if(d.font.color&&d.font.color!=='000000')tags.push('c#'+d.font.color);
+      if(t!==''||tags.length){any=true;vals.push(refOf(r,c)+'='+String(t).slice(0,60)+(tags.length?'{'+tags.join(',')+'}':''));}else vals.push('');}
+    if(!any)continue;const l=`שורה ${r+1}: `+vals.filter(Boolean).join(' | ');if(total+l.length>50000){cut=true;break;}lines.push(l);total+=l.length;}
+  const merges=sh.merges.slice(0,30).map(rangeStr).join(', ');
+  const widths=[];for(let c=0;c<=Math.min(C,15);c++){const ci=sh.cols.get(c);if(ci&&ci.w!=null)widths.push(colName(c)+':'+(+ci.w).toFixed(1));}
+  return {kind:'xlsx',name:X.opts.name||'',text:
+`סוג הקובץ: חוברת Excel. גיליונות: ${st.sheets.filter(s=>!s.hidden).map(s=>'"'+s.name+'"').join(', ')}. הגיליון הפתוח: "${sh.name}" (${sh.rtl?'מימין לשמאל':'משמאל לימין'}).
+טווח בשימוש: A1:${refOf(Math.max(0,sh.maxR),Math.max(0,sh.maxC))}. התאים המסומנים: ${rangeStr(X.sel)}. הקפאה: ${sh.freeze?`${sh.freeze.r} שורות, ${sh.freeze.c} עמודות`:'אין'}.
+${merges?'תאים ממוזגים: '+merges+'\n':''}${widths.length?'רוחב עמודות (תווים): '+widths.join(', ')+'\n':''}תוכן הגיליון (תא=ערך, נוסחה מוצגת עם התוצאה, {B}=מודגש, bg=רקע):
+${lines.join('\n')||'(הגיליון ריק)'}${cut?'\n…הגיליון ארוך יותר, הוצגו רק השורות הראשונות':''}`};
+}
+const NUMF={currency:'[$₪-40D] #,##0.00',shekel:'[$₪-40D] #,##0.00',ils:'[$₪-40D] #,##0.00',dollar:'"$"#,##0.00',usd:'"$"#,##0.00',euro:'"€"#,##0.00',
+  number:'#,##0.00',thousands:'#,##0',integer:'0',percent:'0%',percent2:'0.00%',date:'dd/mm/yyyy',time:'h:mm',text:'@',general:'General'};
+function aiCh(st){
+  const ch={};const f={};
+  if(st.bold!==undefined)f.b=!!st.bold;if(st.italic!==undefined)f.i=!!st.italic;if(st.strike!==undefined)f.strike=!!st.strike;
+  if(st.underline!==undefined)f.u=st.underline?(st.underline==='double'?'double':'single'):null;
+  if(+st.size>0)f.sz=Math.max(1,Math.min(409,+st.size));if(st.font)f.name=String(st.font);
+  const c=aiHex(st.color);if(c)f.color=c;
+  if(Object.keys(f).length)ch.font=f;
+  const bg=aiHex(st.fill!==undefined?st.fill:st.background);if(bg!==undefined)ch.bg=bg;
+  const al={};const H={right:'right',left:'left',center:'center',justify:'justify',general:null,ימין:'right',שמאל:'left',מרכז:'center'};
+  if(st.align!==undefined&&st.align in H)al.h=H[st.align];
+  const V={top:'top',middle:'center',center:'center',bottom:null};if(st.valign!==undefined&&st.valign in V)al.v=V[st.valign];
+  if(st.wrap!==undefined)al.wrap=!!st.wrap;if(st.indent!==undefined)al.indent=Math.max(0,+st.indent|0)||null;
+  if(Object.keys(al).length)ch.al=al;
+  const nf=st.numFormat||st.format;if(nf)ch.fmt=NUMF[String(nf).toLowerCase()]||String(nf);
+  return ch;
+}
+function aiEach(s,fn){const sh=cur();const n=(s.r2-s.r1+1)*(s.c2-s.c1+1);if(n>200000)return;
+  for(let r=s.r1;r<=s.r2;r++)for(let c=s.c1;c<=s.c2;c++){let cell=cellAt(sh,r,c);if(!cell){cell={r,c,s:0,t:'n',v:null,f:null,mod:true};sh.cells.set(key(r,c),cell);}fn(cell);}}
+function aiBorders(s,kind){
+  const T={style:'thin',color:'000000'},K={style:'medium',color:'000000'};kind=String(kind||'all');
+  aiEach(s,cell=>{const top=cell.r===s.r1,bot=cell.r===s.r2,lft=cell.c===s.c1,rgt=cell.c===s.c2;let bd=null;
+    if(kind==='all')bd={top:T,bottom:T,left:T,right:T};else if(kind==='none')bd={top:null,bottom:null,left:null,right:null};
+    else if(kind==='outside'||kind==='thick'){const B2=kind==='thick'?K:T;bd={};if(top)bd.top=B2;if(bot)bd.bottom=B2;if(lft)bd.left=B2;if(rgt)bd.right=B2;if(!Object.keys(bd).length)return;}
+    else if(kind==='bottom'){if(!bot)return;bd={bottom:T};}else if(kind==='top'){if(!top)return;bd={top:T};}
+    else if(kind==='dbottom'||kind==='double'){if(!bot)return;bd={bottom:{style:'double',color:'000000'}};}else return;
+    cell.s=newXf(X.st.st,cell.s,{bd});cell.mod=true;});
+}
+function aiStyleRange(s,st){
+  const ch=aiCh(st||{});if(Object.keys(ch).length)aiEach(s,cell=>{cell.s=newXf(X.st.st,cell.s,ch);cell.mod=true;});
+  if(st&&st.border)aiBorders(s,st.border);
+  X.styleDirty=true;X.st.st.css=null;
+}
+function aiPut(r,c,v){const sh=cur();
+  if(v===null||v===undefined)v='';
+  if(typeof v==='number')v=String(v);else if(typeof v==='boolean')v=v?'TRUE':'FALSE';else v=String(v);
+  putValue(sh,r,c,v);}
+function aiAutoFit(c){const sh=cur();const cv=document.createElement('canvas').getContext('2d');let w=40;
+  for(const cell of sh.cells.values()){if(cell.c!==c)continue;const d=descOf(X.st.st,cell.s);const t=display(X.si,cell,cell.r,cell.c).t;if(!t)continue;
+    cv.font=`${d.font.i?'italic ':''}${d.font.b?'700 ':''}${d.font.sz*4/3}px "${d.font.name}",Arial`;w=Math.max(w,Math.min(900,cv.measureText(t).width+14));}
+  const ci=sh.cols.get(c)||{};sh.cols.set(c,{...ci,w:Math.max(1,(w-5)/7),custom:'1',hidden:false});}
+function aiSheet(name){if(!name)return true;const i=X.st.sheets.findIndex(s=>s.name===String(name));if(i<0)return false;if(i!==X.si){X.si=i;X.sel={r1:0,c1:0,r2:0,c2:0};X.act={r:0,c:0};buildTabs();}return true;}
+function aiApply(actions){
+  if(!X)throw new Error('העורך סגור');commitEdit();
+  const mark={hi:X.hi,si:X.si,sheets:X.st.sheets.length};const done=[],skipped=[];
+  const one=fn=>change(fn,true);
+  for(const a of (Array.isArray(actions)?actions:[]).slice(0,120)){
+    if(!a||typeof a!=='object')continue;const op=String(a.op||a.action||'').toLowerCase();
+    try{
+      if(a.sheet&&!/^(addsheet|newsheet|renamesheet)$/.test(op)&&!aiSheet(a.sheet)){skipped.push(op);continue;}
+      if(op==='set'||op==='write'||op==='values'){
+        let n=0;
+        one(()=>{
+          if(a.cells&&typeof a.cells==='object')for(const [ref,v] of Object.entries(a.cells)){const g=aiRange(ref);if(g){aiPut(g.r1,g.c1,v);n++;}}
+          const rows=Array.isArray(a.values)?a.values:Array.isArray(a.rows)?a.rows:null;
+          if(rows){const g=aiRange(a.range||a.at||a.start||'A1');if(g)rows.slice(0,2000).forEach((row,i)=>(Array.isArray(row)?row:[row]).slice(0,200).forEach((v,j)=>{aiPut(g.r1+i,g.c1+j,v);n++;}));}
+          if(a.value!==undefined&&a.range){const g=aiRange(a.range);if(g)for(let r=g.r1;r<=g.r2;r++)for(let c=g.c1;c<=g.c2;c++){aiPut(r,c,a.value);n++;}}
+        });
+        n?done.push(op):skipped.push(op);
+      }
+      else if(op==='format'||op==='style'){const g=aiRange(a.range);if(!g){skipped.push(op);continue;}one(()=>aiStyleRange(g,a.style||a.format||a));done.push(op);}
+      else if(op==='border'||op==='borders'){const g=aiRange(a.range);if(!g){skipped.push(op);continue;}one(()=>{aiBorders(g,a.kind||a.style||'all');X.styleDirty=true;X.st.st.css=null;});done.push(op);}
+      else if(op==='table'||op==='tablestyle'){const g=aiRange(a.range||'used');if(!g){skipped.push(op);continue;}
+        const hc=aiHex(a.headerColor)||'1F4E78',ht=aiHex(a.headerText)||'FFFFFF',bc=aiHex(a.bandColor)||'DDEBF7';
+        one(()=>{aiBorders(g,'all');aiStyleRange({...g,r2:g.r1},{bold:true,fill:hc,color:ht,align:'center',valign:'middle'});
+          if(a.banded!==false)for(let r=g.r1+1;r<=g.r2;r++)if((r-g.r1)%2===0)aiStyleRange({...g,r1:r,r2:r},{fill:bc});
+          if(a.autofit!==false)for(let c=g.c1;c<=g.c2;c++)aiAutoFit(c);});done.push(op);}
+      else if(op==='merge'||op==='unmerge'){const g=aiRange(a.range);if(!g){skipped.push(op);continue;}const sh=cur();
+        one(()=>{sh.merges=sh.merges.filter(x=>!(x.r2>=g.r1&&x.r1<=g.r2&&x.c2>=g.c1&&x.c1<=g.c2));
+          if(op==='merge'&&(g.r1!==g.r2||g.c1!==g.c2)){for(const c of sh.cells.values())if(c.r>=g.r1&&c.r<=g.r2&&c.c>=g.c1&&c.c<=g.c2&&!(c.r===g.r1&&c.c===g.c1)){c.v=null;c.f=null;c.mod=true;}
+            sh.merges.push({...g});let tl=cellAt(sh,g.r1,g.c1);if(!tl){tl={r:g.r1,c:g.c1,s:0,t:'n',v:null,f:null};sh.cells.set(key(g.r1,g.c1),tl);}
+            if(a.center!==false){tl.s=newXf(X.st.st,tl.s,{al:{h:'center',v:'center'}});X.styleDirty=true;X.st.st.css=null;}tl.mod=true;}});done.push(op);}
+      else if(op==='insertrows'||op==='deleterows'||op==='insertcols'||op==='deletecols'){
+        const col=/cols/.test(op),n=Math.max(1,Math.min(1000,+a.count||1));
+        const at=col?aiCol(a.at||a.col||'A'):Math.max(0,(+a.at||+a.row||1)-1);
+        structural(col?'c':'r',at,/^delete/.test(op)?-n:n);done.push(op);}
+      else if(op==='colwidth'||op==='width'||op==='autofit'){const g=aiRange(a.cols||a.range||a.col||'used');if(!g){skipped.push(op);continue;}const sh=cur();
+        one(()=>{for(let c=g.c1;c<=g.c2;c++){if(op==='autofit'||a.width==='auto'||!(+a.width>0))aiAutoFit(c);else{const ci=sh.cols.get(c)||{style:null};sh.cols.set(c,{...ci,w:+a.width,custom:'1',hidden:false});}}if(sh.g){sh.g.rows=0;sh.g.cols=0;}});done.push(op);}
+      else if(op==='rowheight'||op==='height'){const g=aiRange(a.rows||a.range||'1');const v=+a.height;if(!g||!(v>0)){skipped.push(op);continue;}const sh=cur();
+        one(()=>{for(let i=g.r1;i<=g.r2;i++){let info=sh.rows.get(i);if(!info){info={attrs:{},ht:null,hidden:false};sh.rows.set(i,info);}info.ht=v;info.attrs.ht=String(v);info.attrs.customHeight='1';}if(sh.g){sh.g.rows=0;sh.g.cols=0;}});done.push(op);}
+      else if(op==='freeze'){const sh=cur();const r=Math.max(0,+a.rows||0),c=Math.max(0,+a.cols||0);sh.freeze=r||c?{r,c}:null;sh.viewDirty=true;touch();done.push(op);}
+      else if(op==='sort'){const g=aiRange(a.range||'used');if(!g){skipped.push(op);continue;}
+        const by=a.by!==undefined?(/^\d+$/.test(String(a.by))?g.c1+(+a.by)-1:aiCol(a.by)):g.c1;
+        let s={...g};if(a.header!==false&&s.r2>s.r1){const h=cellAt(cur(),s.r1,by);if(h&&typeof h.v==='string')s.r1++;}
+        X.sel=s;X.act={r:s.r1,c:Math.max(s.c1,Math.min(s.c2,by))};sortSel(!!a.desc||a.order==='desc');done.push(op);}
+      else if(op==='clear'){const g=aiRange(a.range);if(!g){skipped.push(op);continue;}const sh=cur();
+        one(()=>{for(const cell of [...sh.cells.values()])if(cell.r>=g.r1&&cell.r<=g.r2&&cell.c>=g.c1&&cell.c<=g.c2){if(a.formats){cell.s=0;}if(a.values!==false){cell.v=null;cell.f=null;cell.t='n';delete cell.ast;}cell.mod=true;}X.st.st.css=null;});done.push(op);}
+      else if(op==='direction'||op==='rtl'){const sh=cur();sh.rtl=a.rtl!==undefined?!!a.rtl:a.dir!=='ltr';sh.viewDirty=true;touch();done.push(op);}
+      else if(op==='addsheet'||op==='newsheet'){const back=X.si;addSheet();const sh=cur();if(a.name&&!X.st.sheets.some(s=>s!==sh&&s.name===a.name)){sh.name=String(a.name).slice(0,31);sh.el.setAttribute('name',sh.name);X.wbDirty=true;}X.si=back;X.sel={r1:0,c1:0,r2:0,c2:0};X.act={r:0,c:0};buildTabs();done.push(op);}
+      else if(op==='renamesheet'){const sh=a.from?X.st.sheets.find(s=>s.name===a.from):cur();const nm=String(a.name||'').replace(/[\\\/?*\[\]:]/g,'').slice(0,31);
+        if(!sh||!nm||X.st.sheets.some(s=>s!==sh&&s.name===nm)){skipped.push(op);continue;}sh.name=nm;sh.el.setAttribute('name',nm);X.wbDirty=true;sh.dirty=true;X.dirty=true;buildTabs();done.push(op);}
+      else if(op==='select'||op==='goto'){const g=aiRange(a.range);if(g){X.sel=g;X.act={r:g.r1,c:g.c1};done.push(op);}}
+      else skipped.push(op||'?');
+    }catch(e){console.warn('assistant action',a,e);skipped.push(op);}
+  }
+  if(X.si!==mark.si&&X.st.sheets[mark.si]){X.si=mark.si;X.sel={r1:0,c1:0,r2:0,c2:0};X.act={r:0,c:0};}
+  X.calc.reset();buildTabs();markDirty();render();paintSel();
+  return {done:done.length,skipped:skipped.length,mark};
+}
+function aiRevert(mark){
+  if(!X||!mark)return false;commitEdit();
+  while(X.hi>mark.hi)undo();
+  // sheets the assistant added are taken out again
+  for(let i=mark.sheets;i<X.st.sheets.length;i++){const sh=X.st.sheets[i];if(!sh.hidden){sh.hidden=true;sh.el.setAttribute('state','hidden');X.wbDirty=true;X.dirty=true;}}
+  X.si=Math.min(mark.si,X.st.sheets.length-1);buildTabs();render();paintSel();return true;
+}
 window.XLSX_EDITOR={open,close:forceClose,isOpen:()=>!!X,
+  assist:{context:aiContext,apply:aiApply,revert:aiRevert,root:()=>X&&X.root},
   _test:{get X(){return X;},filterOf,toggleFilter,setColFilter,applyFilter,addRule,cfPick,cfCss,dvDialog,dvCheck,dvAt,dvItems,removeDups,hideSel,unhideSel,fillDir,cycleRef,region,evalF:(f)=>X.calc.evalF(f,X.si),buildXlsx:()=>buildXlsx(),setInput,select,style,borders,toggleMerge,insRows,insCols,delRows,delCols,sortSel,autoSum,undo,redo,doPaste,doCopy,display:(r,c)=>display(X.si,cellAt(cur(),r,c),r,c).t,parseFormula,moveFormula,shiftFormula}};
 })();

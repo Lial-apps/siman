@@ -911,7 +911,12 @@ dialog.conv{width:min(560px,94vw)}
 .trial-line{margin:10px 0 2px;padding:9px 12px;border-radius:10px;background:color-mix(in srgb,var(--marker) 22%,transparent);border:1px solid color-mix(in srgb,var(--marker) 55%,transparent);font-size:13px;line-height:1.5;color:var(--ink)}
 .trial-line b{font-weight:700}
 .trial-line a{color:inherit;font-weight:600}
-#a11yBtn svg{width:19px;height:19px}
+/* the accessibility button sits in the corner, away from the toolbar */
+.a11y-fab{left:14px!important;bottom:calc(14px + env(safe-area-inset-bottom,0px))!important;width:46px!important;height:46px!important;margin:0!important;opacity:.94}
+.a11y-fab:hover{opacity:1}
+.a11y-fab svg{width:26px!important;height:26px!important}
+body.ed-live .a11y-fab{bottom:calc(44px + env(safe-area-inset-bottom,0px))!important;width:40px!important;height:40px!important}
+body.ed-live .a11y-fab svg{width:22px!important;height:22px!important}
 .wl-trial{display:inline-block;margin:0 0 10px;padding:4px 12px;border-radius:999px;font-size:13px;font-weight:600;color:var(--ink);background:color-mix(in srgb,var(--marker) 30%,transparent);border:1px solid color-mix(in srgb,var(--marker) 60%,transparent)}
 .wl-trial.hidden,.trial-line.hidden{display:none}
 .tp-page .tt.fmt{font-family:"AlefEmbed",Arial,sans-serif;unicode-bidi:normal;outline:none;border-radius:4px;padding:2px 4px;margin:0 -4px}
@@ -1280,7 +1285,7 @@ body:has(#wed) .busy,body:has(#xed) .busy{z-index:1000}body:has(#wed) .toast,bod
 </dialog>
 
 <header class="bar">
-  <div class="brand"><b title="גרסה 4.9.1">סימן</b><span class="ver">4.9.1</span><span class="fname" id="fname"></span></div>
+  <div class="brand"><b title="גרסה 5.0.0">סימן</b><span class="ver">5.0.0</span><span class="fname" id="fname"></span></div>
 
   <nav class="tools" id="tools" aria-label="כלים">
     <button class="tool" data-tool="select" aria-pressed="true" title="בחירה וגלילה (V)">
@@ -1325,7 +1330,6 @@ body:has(#wed) .busy,body:has(#xed) .busy{z-index:1000}body:has(#wed) .toast,bod
     </div>
     <button class="btn cmd" id="cmdBtn" title="מה לעשות? (Ctrl+K)" aria-haspopup="dialog"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg><span class="lbl">מה לעשות?</span><kbd dir="ltr">Ctrl K</kbd></button>
     <button class="btn share" id="shareBtn" disabled title="שליחה במייל, בוואטסאפ, ב-AirDrop או בשיתוף מהיר"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.3 10.8l7.4-4.4M8.3 13.2l7.4 4.4"/></svg><span class="lbl">שיתוף</span></button>
-    <button class="icon-btn" id="a11yBtn" title="נגישות" aria-label="תפריט נגישות"></button>
     <button class="icon-btn" id="setBtn" title="הגדרות: השם והמייל שלך" aria-label="הגדרות"><svg viewBox="0 0 24 24" aria-hidden="true" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="8.5" r="3.6"/><path d="M4.5 20c1.2-3.6 4-5.4 7.5-5.4s6.3 1.8 7.5 5.4"/></svg></button>
     <button class="btn install hidden" id="installBtn" title="התקנת האפליקציה במכשיר">התקנה</button>
   </div>
@@ -4981,7 +4985,7 @@ if('launchQueue' in window){
    ===================================================================== */
 (function(){
   const STATUS_URL=(typeof REGISTER_URL!=='undefined'&&REGISTER_URL)?REGISTER_URL.replace(/\/register$/,'/status'):'';
-  const U_KEY='siman.usage', T_KEY='siman.trial', APP_VER='4.9.1';
+  const U_KEY='siman.usage', T_KEY='siman.trial', APP_VER='5.0.0';
   const today=()=>new Date().toISOString().slice(0,10);
   const rd=k=>{try{return JSON.parse(localStorage.getItem(k)||'null');}catch(_){return null;}};
   const wr=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch(_){}};

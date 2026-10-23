@@ -1845,7 +1845,159 @@ async function open(opts) {
 async function toPdf(bytes, progress) { const m = model(await readPkg(bytes)); try { return await slidesPdf(m, progress); } finally { for (const u of m.urls.values()) if (u) URL.revokeObjectURL(u); } }
 async function textOf(bytes) { const m = bytes ? model(await readPkg(bytes)) : X; return m.order.map((p, i) => `===== שקף ${i + 1} =====\n` + [...parseXml(m.files.get(p)).getElementsByTagNameNS(NS.a, 'p')].map(pp => [...pp.getElementsByTagNameNS(NS.a, 't')].map(t => t.textContent).join('')).filter(Boolean).join('\n')).join('\n\n'); }
 
+/* ---------- the assistant: describes the presentation and makes the changes it is asked for ---------- */
+const aiHex = c => { if (c === null || c === false || c === 'none') return null; c = String(c || '').trim().replace(/^#/, ''); if (/^[0-9a-f]{3}$/i.test(c)) c = c.replace(/./g, x => x + x); return /^[0-9a-f]{6}$/i.test(c) ? c.toUpperCase() : undefined; };
+const AI_LAYOUT = { title: 'title', cover: 'title', content: 'obj', obj: 'obj', bullets: 'obj', section: 'secHead', titleonly: 'titleOnly', blank: 'blank', two: 'twoObj', twocontent: 'twoObj', comparison: 'twoTxTwoObj', picture: 'picTx' };
+const aiShapes = doc => { const tree = doc.getElementsByTagNameNS(NS.p, 'spTree')[0]; return kids(tree).filter(n => /^(sp|pic|graphicFrame|grpSp|cxnSp)$/.test(n.localName)); };
+function aiKind(n) {
+  if (n.localName === 'pic') return 'תמונה'; if (n.localName === 'graphicFrame') return n.getElementsByTagNameNS(NS.a, 'tbl').length ? 'טבלה' : 'אובייקט';
+  if (n.localName === 'grpSp') return 'קבוצה'; if (n.localName === 'cxnSp') return 'קו';
+  const ph = phOf(n); if (ph) { const t = at(ph, 'type') || 'body'; return { title: 'כותרת', ctrTitle: 'כותרת', subTitle: 'כותרת משנה', body: 'תוכן', obj: 'תוכן', dt: 'תאריך', ftr: 'כותרת תחתונה', sldNum: 'מספר שקף', pic: 'מקום לתמונה' }[t] || 'תוכן'; }
+  const nv = kid(kid(n, 'nvSpPr'), 'cNvSpPr'); if (nv && at(nv, 'txBox') === '1') return 'תיבת טקסט';
+  const g = n.getElementsByTagNameNS(NS.a, 'prstGeom')[0]; return 'צורה' + (g ? ' ' + at(g, 'prst') : '');
+}
+const aiParas = n => [...n.getElementsByTagNameNS(NS.a, 'p')].map(p => [...p.getElementsByTagNameNS(NS.a, 't')].map(t => t.textContent).join(''));
+const aiDocOf = i => i === X.cur ? X.doc : parseXml(X.files.get(X.order[i]));
+function aiContext() {
+  if (!X) return null; if (X.editing) exitEdit();
+  const out = []; let total = 0;
+  X.order.forEach((p, i) => {
+    if (total > 50000) return;
+    const doc = aiDocOf(i), ctx = ctxOf(X, p);
+    const bg = doc.getElementsByTagNameNS(NS.p, 'bg')[0], bgc = bg && bg.getElementsByTagNameNS(NS.a, 'srgbClr')[0];
+    let s = `שקף ${i + 1}${i === X.cur ? ' (פתוח עכשיו)' : ''}${bgc ? `, רקע #${at(bgc, 'val')}` : ''}:`;
+    aiShapes(doc).forEach((n, k) => {
+      const b = topBox(X, ctx, n), pc = v => Math.round(v);
+      const r = n.getElementsByTagNameNS(NS.a, 'rPr')[0], sz = r && at(r, 'sz') ? ' ' + (+at(r, 'sz') / 100) + 'pt' : '';
+      const t = aiParas(n).filter(Boolean).join(' / ').slice(0, 300);
+      s += `\n  צורה ${k}: ${aiKind(n)}${sz} [x${pc(b.x / X.size.w * 100)}% y${pc(b.y / X.size.h * 100)}% w${pc(b.w / X.size.w * 100)}% h${pc(b.h / X.size.h * 100)}%]${t ? ' "' + t + '"' : ' (ריק)'}`;
+    });
+    out.push(s); total += s.length;
+  });
+  const lays = layoutsOf(X, X.order[X.cur]).map(l => l.name).filter((v, i, a) => a.indexOf(v) === i);
+  return { kind: 'pptx', name: X.opts.name || '', text: `סוג הקובץ: מצגת PowerPoint. ${X.order.length} שקפים, גודל השקף ${Math.round(X.size.w)}×${Math.round(X.size.h)} נקודות (מיקומים באחוזים מהשקף).\nפריסות זמינות: ${lays.join(', ')}.\n${out.join('\n')}` };
+}
+function aiSlides(v) {
+  const n = X.order.length;
+  if (v === undefined || v === null || v === 'current' || v === 'this') return [X.cur];
+  if (v === 'all') return X.order.map((_, i) => i);
+  if (v === 'last') return [n - 1];
+  const list = Array.isArray(v) ? v : [v]; const out = [];
+  for (const x of list) { const m = /^(\d+)\s*[-–]\s*(\d+)$/.exec(String(x)); if (m) { for (let i = +m[1]; i <= +m[2]; i++) if (i >= 1 && i <= n) out.push(i - 1); } else if (+x >= 1 && +x <= n) out.push(+x - 1); }
+  return [...new Set(out)];
+}
+function aiTargetsIn(doc, sel) {
+  const all = aiShapes(doc);
+  if (sel === undefined || sel === null || sel === 'all') return sel === 'all' ? all.filter(n => n.localName === 'sp') : all;
+  const list = Array.isArray(sel) ? sel : [sel]; const out = [];
+  for (const s of list) {
+    if (/^\d+$/.test(String(s))) { const n = all[+s]; if (n) out.push(n); continue; }
+    const want = String(s).toLowerCase();
+    for (const n of all) { const ph = n.localName === 'sp' && phOf(n); const t = ph ? at(ph, 'type') || 'body' : n.localName === 'sp' ? 'text' : n.localName;
+      if ((want === 'title' && /^(title|ctrTitle)$/.test(t)) || (want === 'subtitle' && t === 'subTitle') || (want === 'body' && /^(body|obj)$/.test(t) && ph && !/^(dt|ftr|sldNum)$/.test(t)) || (want === 'text' && n.localName === 'sp') || (want === 'picture' && n.localName === 'pic') || (want === 'table' && n.localName === 'graphicFrame')) out.push(n); }
+  }
+  return [...new Set(out)];
+}
+const HEBX = /[\u0590-\u05FF\u0600-\u06FF]/;
+function aiSetText(n, paras) {
+  if (n.localName !== 'sp') return false;
+  const doc = n.ownerDocument; const tb = ensureTxBody(n);
+  const ph = phOf(n), isTitle = !!ph && /^(title|ctrTitle|subTitle)$/.test(at(ph, 'type') || '');
+  const old = kids(tb, 'p'); const p0 = old[0];
+  const pPr0 = p0 && kid(p0, 'pPr'); const r0 = p0 && p0.getElementsByTagNameNS(NS.a, 'rPr')[0]; const e0 = p0 && kid(p0, 'endParaRPr');
+  for (const p of old) p.remove();
+  const list = (Array.isArray(paras) ? paras : String(paras ?? '').split('\n')).map(x => typeof x === 'object' && x ? x : { text: String(x ?? '') });
+  if (!list.length) list.push({ text: '' });
+  for (const it of list) {
+    const t = String(it.text ?? ''), rtl = HEBX.test(t) || (!/[A-Za-z]/.test(t) && true);
+    const p = aNew(doc, 'p'); const pPr = pPr0 ? pPr0.cloneNode(true) : aNew(doc, 'pPr');
+    pPr.setAttribute('rtl', rtl ? '1' : '0'); if (+it.level > 0) pPr.setAttribute('lvl', String(Math.min(8, +it.level)));
+    // Hebrew body text starts on the right, like in PowerPoint (titles keep the layout's alignment)
+    if (!pPr.hasAttribute('algn') && !isTitle) pPr.setAttribute('algn', rtl ? 'r' : 'l');
+    if (pPr.attributes.length || pPr.childNodes.length) p.append(pPr);
+    if (t) { const r = aNew(doc, 'r'); const rp = r0 ? r0.cloneNode(true) : aNew(doc, 'rPr'); rp.setAttribute('lang', rtl ? 'he-IL' : 'en-US'); rp.removeAttribute('dirty'); r.append(rp); const tt = aNew(doc, 't'); tt.textContent = t; r.append(tt); p.append(r); }
+    const e = e0 ? e0.cloneNode(true) : aNew(doc, 'endParaRPr', { lang: rtl ? 'he-IL' : 'en-US' }); p.append(e);
+    tb.append(p);
+  }
+  return true;
+}
+function aiFormat(n, st) {
+  if (!st || typeof st !== 'object') return false;
+  const doc = n.ownerDocument; let ok = false;
+  const f = {}; if (st.bold !== undefined) f.b = !!st.bold; if (st.italic !== undefined) f.i = !!st.italic; if (st.underline !== undefined) f.u = !!st.underline; if (st.strike !== undefined) f.s = !!st.strike;
+  if (+st.size > 0) f.sz = Math.round(Math.min(400, +st.size) * 100); const c = aiHex(st.color); if (c) f.color = c; if (st.font) f.font = String(st.font);
+  if (Object.keys(f).length) for (const r of [...n.getElementsByTagNameNS(NS.a, 'r'), ...n.getElementsByTagNameNS(NS.a, 'fld')]) {
+    const old = kid(r, 'rPr'); const t = (kid(r, 't') || {}).textContent || '';
+    const rp = buildRPr(doc, f, old, t); if (old) old.replaceWith(rp); else r.prepend(rp); ok = true;
+    if (old === null && rp.parentNode !== r) r.prepend(rp);
+  }
+  if (Object.keys(f).length) for (const e of n.getElementsByTagNameNS(NS.a, 'endParaRPr')) { const rp = buildRPr(doc, f, e, ''); const ne = aNew(doc, 'endParaRPr'); for (const a of [...rp.attributes]) ne.setAttribute(a.name, a.value); for (const k of kids(rp)) ne.append(k); e.replaceWith(ne); }
+  const AL = { right: 'r', left: 'l', center: 'ctr', justify: 'just', ימין: 'r', שמאל: 'l', מרכז: 'ctr' };
+  if (st.align && AL[st.align]) for (const p of n.getElementsByTagNameNS(NS.a, 'p')) { let pPr = kid(p, 'pPr'); if (!pPr) { pPr = aNew(doc, 'pPr'); p.prepend(pPr); } pPr.setAttribute('algn', AL[st.align]); ok = true; }
+  const fl = aiHex(st.fill); if (fl !== undefined && n.localName === 'sp') { setFill(n, fl); ok = true; }
+  const ln = aiHex(st.line); if (ln !== undefined && n.localName === 'sp') { setLine(n, ln); ok = true; }
+  return ok || Object.keys(f).length > 0;
+}
+const pctBox = (a, def) => { const v = (k, d) => (a[k] !== undefined && isFinite(+a[k]) ? +a[k] : d); return { x: v('x', def.x) / 100 * X.size.w, y: v('y', def.y) / 100 * X.size.h, w: v('w', def.w) / 100 * X.size.w, h: v('h', def.h) / 100 * X.size.h }; };
+function aiAddSlide(a, done) {
+  const lays = layoutsOf(X, X.order[X.cur]);
+  const want = AI_LAYOUT[String(a.layout || (a.bullets || a.body ? 'content' : a.subtitle ? 'title' : 'content')).toLowerCase().replace(/[\s_-]/g, '')] || 'obj';
+  const L = (lays.find(l => l.type === want) || lays.find(l => l.type === 'obj') || lays[0] || {}).path || [...ctxOf(X, X.order[X.cur]).sR.values()].find(r => r.type === RT.layout).target;
+  const after = a.after === 'start' ? -1 : a.after !== undefined && a.after !== 'end' && isFinite(+a.after) ? Math.max(-1, Math.min(X.order.length - 1, +a.after - 1)) : a.position === 'next' ? X.cur : X.order.length - 1;
+  const p = addSlide(X, after, L); const i = X.order.indexOf(p);
+  const doc = parseXml(X.files.get(p));
+  const T = aiTargetsIn(doc, 'title')[0], S = aiTargetsIn(doc, 'subtitle')[0], B = aiTargetsIn(doc, 'body')[0];
+  if (a.title !== undefined) { if (T) aiSetText(T, String(a.title)); else aiSetText(addTextBox(doc, { x: X.size.w * .06, y: X.size.h * .06, w: X.size.w * .88, h: 60 }, String(a.title)), String(a.title)); }
+  const body = a.bullets || a.body || a.subtitle;
+  if (body !== undefined) { const tgt = (a.subtitle !== undefined && S) || B || S; if (tgt) aiSetText(tgt, Array.isArray(body) ? body : String(body).split('\n')); else addTextBox(doc, { x: X.size.w * .08, y: X.size.h * .28, w: X.size.w * .84, h: X.size.h * .6 }, (Array.isArray(body) ? body : [body]).join('\n')); }
+  if (a.subtitle !== undefined && S && (a.bullets || a.body)) aiSetText(S, String(a.subtitle));
+  const bgc = aiHex(a.background); if (bgc) setBackground(doc, bgc);
+  if (a.style) for (const n of aiTargetsIn(doc, 'all')) aiFormat(n, a.style);
+  X.files.set(p, ser(doc)); done.push(i);
+  return i;
+}
+function aiApply(actions) {
+  if (!X) throw new Error('העורך סגור'); if (X.editing) exitEdit();
+  const mark = { hi: X.hi, cur: X.cur }; let done = 0, skipped = 0; let goTo = null;
+  X.files.set(X.order[X.cur], ser(X.doc));
+  const touched = new Map(); // slide path -> doc
+  const docFor = i => { const p = X.order[i]; if (!touched.has(p)) touched.set(p, parseXml(X.files.get(p))); return touched.get(p); };
+  const flush = () => { for (const [p, d] of touched) if (X.files.has(p)) X.files.set(p, ser(d)); touched.clear(); };
+  for (const a of (Array.isArray(actions) ? actions : []).slice(0, 80)) {
+    if (!a || typeof a !== 'object') continue; const op = String(a.op || a.action || '').toLowerCase();
+    try {
+      if (op === 'addslide' || op === 'newslide') { flush(); const made = []; goTo = aiAddSlide(a, made); done++; }
+      else if (op === 'deleteslide') { flush(); const sl = aiSlides(a.slide).sort((x, y) => y - x); for (const i of sl) if (X.order.length > 1) deleteSlide(X, i); sl.length ? done++ : skipped++; }
+      else if (op === 'duplicateslide') { flush(); const sl = aiSlides(a.slide); if (sl[0] !== undefined) { const p = duplicateSlide(X, sl[0]); goTo = X.order.indexOf(p); done++; } else skipped++; }
+      else if (op === 'moveslide') { flush(); const f = +a.from - 1, t = Math.max(0, Math.min(X.order.length - 1, +a.to - 1)); if (X.order[f]) { const [p] = X.order.splice(f, 1); X.order.splice(t, 0, p); writeOrder(X.files, X.order); done++; } else skipped++; }
+      else if (op === 'text' || op === 'settext') { let k = 0; for (const i of aiSlides(a.slide)) { const d = docFor(i); let ts = aiTargetsIn(d, a.shape ?? 'title'); if (!ts.length && (a.shape === 'title' || a.shape === undefined)) ts = [addTextBox(d, { x: X.size.w * .06, y: X.size.h * .06, w: X.size.w * .88, h: 60 }, '')]; for (const n of ts.slice(0, 1)) if (aiSetText(n, a.paragraphs || a.bullets || a.text)) k++; } k ? done++ : skipped++; }
+      else if (op === 'format' || op === 'style') { let k = 0; for (const i of aiSlides(a.slide)) { const d = docFor(i); for (const n of aiTargetsIn(d, a.shape ?? 'all')) if (aiFormat(n, a.style || a.format)) k++; } k ? done++ : skipped++; }
+      else if (op === 'background') { const c = aiHex(a.color); if (c === undefined) { skipped++; continue; } for (const i of aiSlides(a.slide)) setBackground(docFor(i), c); done++; }
+      else if (op === 'addtext' || op === 'textbox') { for (const i of aiSlides(a.slide)) { const d = docFor(i); const n = addTextBox(d, pctBox(a, { x: 10, y: 40, w: 80, h: 15 }), String(a.text || '')); aiSetText(n, String(a.text || '').split('\n')); if (a.style) aiFormat(n, a.style); } done++; }
+      else if (op === 'addshape' || op === 'shape') { const prst = /^[a-zA-Z0-9]+$/.test(a.shape || '') ? a.shape : 'rect';
+        for (const i of aiSlides(a.slide)) { const d = docFor(i); const n = addShapeXml(d, prst, pctBox(a, { x: 30, y: 35, w: 40, h: 30 })); const c = aiHex(a.color || a.fill); if (c !== undefined) setFill(n, c);
+          if (a.text) { aiSetText(n, String(a.text).split('\n')); aiFormat(n, { color: a.textColor || 'FFFFFF', align: 'center', ...(a.style || {}) }); } } done++; }
+      else if (op === 'move' || op === 'resize' || op === 'position') { let k = 0; for (const i of aiSlides(a.slide)) { const d = docFor(i); const ctx = ctxOf(X, X.order[i]);
+          for (const n of aiTargetsIn(d, a.shape)) { const b = topBox(X, ctx, n); const cur = { x: b.x / X.size.w * 100, y: b.y / X.size.h * 100, w: b.w / X.size.w * 100, h: b.h / X.size.h * 100 }; setBox(n, ctx, pctBox(a, cur)); k++; } } k ? done++ : skipped++; }
+      else if (op === 'delete' || op === 'deleteshape' || op === 'remove') { let k = 0; for (const i of aiSlides(a.slide)) for (const n of aiTargetsIn(docFor(i), a.shape)) { n.remove(); k++; } k ? done++ : skipped++; }
+      else if (op === 'goto') { const s = aiSlides(a.slide)[0]; if (s !== undefined) goTo = s; }
+      else skipped++;
+    } catch (e) { console.warn('assistant action', a, e); skipped++; }
+  }
+  flush();
+  X.parts.clear(); X.parts.delete('ppt/presentation.xml');
+  if (goTo !== null) X.cur = Math.max(0, Math.min(X.order.length - 1, goTo)); else X.cur = Math.min(X.cur, X.order.length - 1);
+  X.doc = parseXml(X.files.get(X.order[X.cur])); X.sel = null;
+  pushHist(); renderThumbs(); renderStage(); markDirty();
+  q('peSlides').querySelectorAll('.pe-th').forEach(t => t.classList.toggle('on', +t.dataset.i === X.cur));
+  return { done, skipped, mark };
+}
+function aiRevert(mark) {
+  if (!X || !mark || !X.hist[mark.hi]) return false; if (X.editing) exitEdit();
+  X.hi = mark.hi; restore(X.hist[mark.hi]); renderThumbs(); goSlide(Math.min(mark.cur, X.order.length - 1)); return true;
+}
 window.PPTX_EDITOR = { open, close: forceClose, isOpen: () => !!X, toPdf, textOf,
+  assist: { context: aiContext, apply: aiApply, revert: aiRevert, root: () => X && X.root },
   _test: { get X() { return X; }, buildPptx: () => buildPptx(), goSlide, select, enterEdit, exitEdit, commitText, newSlide, dupSlide, delSlide, moveSlide, setSize, setColor, setFont, toggle, align, setDir, bullets, deleteSel, duplicateSel, insertImage, present, undo, redo, keyOf: keyOfNode, findTop, slidesPdf: () => slidesPdf(X), setFill: c => { const t = findTop(X.sel); setFill(t, c); commit(); renderStage(); } }
 };
 })();

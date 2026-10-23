@@ -670,6 +670,13 @@ const CHIPS = [
   ['הסבר בשפה פשוטה', 'הסבר את המסמך בשפה פשוטה, כמו לאדם שאינו מכיר את התחום.'],
   ['מה צריך לעשות?', 'מה המסמך מבקש ממני לעשות, למלא או לחתום, ועד מתי?'],
 ];
+const ED_CHIPS = {
+  docx: [['כותרת לקובץ', 'הכן לי כותרת מתאימה לקובץ, בתחילת המסמך.'], ['עיצוב הכותרות', 'עצב את כל הכותרות במסמך בצורה אחידה ומקצועית: מודגש, צבע כחול כהה וגודל מתאים.'], ['סידור המסמך', 'סדר את עיצוב המסמך: יישור לשני הצדדים, רווח שורה 1.5 ורווח קטן אחרי כל פסקה.'], ['טבלה מעוצבת', 'עצב את הטבלאות במסמך: שורת כותרת צבועה עם טקסט לבן מודגש ופסים בשורות.'], ['מספרי עמודים', 'הוסף מספרי עמודים במרכז הכותרת התחתונה, בתבנית עמוד X מתוך Y.'], ['סיכום קצר', 'סכם את המסמך בקצרה, ב-3 עד 5 משפטים. אל תשנה את הקובץ.']],
+  xlsx: [['כותרת לטבלה', 'עצב את השורה הראשונה ככותרת: מודגש, רקע כחול כהה, טקסט לבן וממורכז, והקפא אותה.'], ['טבלה מעוצבת', 'הפוך את הנתונים לטבלה מעוצבת: שורת כותרת צבועה, גבולות ופסים, והתאם את רוחב העמודות.'], ['שורת סיכום', 'הוסף מתחת לנתונים שורת סה"כ עם סכום לכל עמודה מספרית, מודגשת.'], ['עיצוב מספרים', 'עצב את העמודות המספריות: מחירים וסכומים כשקלים, כמויות עם מפריד אלפים.'], ['מה בגיליון?', 'הסבר בקצרה מה יש בגיליון ומה הנתונים החשובים. אל תשנה את הקובץ.']],
+  pptx: [['שקף פתיחה', 'הכן שקף פתיחה בתחילת המצגת, עם כותרת וכותרת משנה מתאימות לתוכן.'], ['שקף סיכום', 'הוסף בסוף המצגת שקף סיכום עם 3 עד 5 נקודות עיקריות מהמצגת.'], ['עיצוב אחיד', 'עצב את המצגת בצורה אחידה: כל הכותרות מודגשות באותו גופן ובאותו צבע.'], ['רקע לשקפים', 'שנה את הרקע של כל השקפים לכחול כהה, ואת כל הטקסט ללבן.'], ['תוכן עניינים', 'הוסף אחרי השקף הראשון שקף תוכן עניינים עם הכותרות של השקפים.']],
+};
+const edKind = () => onEditor() ? TB.cur.ed : null;
+const chipsNow = () => { const k = edKind(); return k && ED_CHIPS[k] && window.OFFICE_AI ? ED_CHIPS[k] : CHIPS; };
 const AS = {
   hist: new Map(),           // tab id -> [{q,a}] or {err}
   key() { return TB.cur ? TB.cur.id : 0; },
@@ -703,7 +710,7 @@ function citeHtml(text) {
     return Number.isFinite(first) ? `<button class="cite" type="button" data-p="${first}" title="מעבר לעמוד ${first}">${esc(m.slice(1, -1))}</button>` : m;
   });
 }
-function answerEl(a, q, plain) {
+function answerEl(a, q, plain, it) {
   const el = h('<div class="ai-a"></div>');
   // in the Word / Excel editor there are no page numbers to jump to: the page marks are left out
   const strip = l => l.replace(/\s*\[(?:עמ['׳]?|עמוד|עמודים|p\.|pp\.|page)\s*[\d\s,–-]+\]/gi, '');
@@ -712,8 +719,31 @@ function answerEl(a, q, plain) {
   acts.querySelector('[data-a=copy]').onclick = async () => { try { await navigator.clipboard.writeText(a.replace(/\s*\[(?:עמ['׳]?|p\.)\s*[\d,\s–-]+\]/g, '')); toast('התשובה הועתקה'); } catch (_) { toast('ההעתקה לא הצליחה'); } };
   acts.querySelector('[data-a=read]').onclick = () => RA.speakText(a.replace(/\[[^\]]*\]/g, ''));
   el.append(acts);
+  if (it && it.res && (it.res.asked || it.res.done)) el.append(resultEl(it));
   el.addEventListener('click', e => { const b = e.target.closest('.cite'); if (b) goPage(+b.dataset.p); });
   return el;
+}
+// what the assistant changed in the file, and taking it back
+function resultEl(it) {
+  const r = it.res, w = h('<div class="ai-res"></div>');
+  const n = r.done || 0;
+  const tag = h(`<span class="done${n ? '' : ' none'}"></span>`);
+  tag.textContent = n ? (n === 1 ? '✓ שינוי אחד בוצע בקובץ' : `✓ ${n} שינויים בוצעו בקובץ`) : 'לא בוצע שינוי בקובץ';
+  w.append(tag);
+  if (n && r.mark) {
+    const b = h('<button type="button">ביטול השינוי</button>');
+    if (it.undone) { b.textContent = 'השינוי בוטל'; b.disabled = true; }
+    b.onclick = () => {
+      if (AS.key() !== it.tab || !window.OFFICE_AI || !OFFICE_AI.revert(r)) { toast('אפשר לבטל רק כשהקובץ הזה פתוח. אפשר גם Ctrl+Z בעורך'); return; }
+      it.undone = true; b.textContent = 'השינוי בוטל'; b.disabled = true;
+      // later requests were made on top of this one: they are taken back with it
+      for (const x of AS.list()) if (x !== it && x.res && x.res.mark && x.res.mark.hi >= r.mark.hi && x.tab === it.tab) x.undone = true;
+      renderLog();
+    };
+    w.append(b);
+  }
+  if (r.skipped && n) { const s = h('<span></span>'); s.textContent = `(${r.skipped} לא בוצעו)`; w.append(s); }
+  return w;
 }
 function goPage(n) {
   const P = S.pages[n - 1]; if (!P) return;
@@ -728,23 +758,25 @@ function renderLog() {
     return;
   }
   $('aiQ').disabled = $('aiSend').disabled = AS.busy; $('aiRead').disabled = false;
+  $('aiQ').placeholder = edKind() && window.OFFICE_AI ? 'מה לעשות בקובץ?' : 'שאלו כל דבר על המסמך…';
   const items = AS.list();
   if (!items.length) {
-    log.append(h(`<div class="ai-hello">שאלו כל שאלה על <b></b>, או בחרו:</div>`));
+    if (edKind() && window.OFFICE_AI) log.append(h(`<div class="ai-hello">כתבו או אמרו מה לעשות ב-<b></b>, ואני אבצע: כותרת, עיצוב, טבלאות, תוכן חדש ועוד. אפשר גם לשאול שאלות על הקובץ.</div>`));
+    else log.append(h(`<div class="ai-hello">שאלו כל שאלה על <b></b>, או בחרו:</div>`));
     log.lastChild.querySelector('b').textContent = dispName(docTitle());
     const chips = h('<div class="ai-chips"></div>');
-    for (const [l, q] of CHIPS) { const b = h(`<button class="ai-chip" type="button">${esc(l)}</button>`); b.onclick = () => askQ(q, l); chips.append(b); }
+    for (const [l, q] of chipsNow()) { const b = h(`<button class="ai-chip" type="button">${esc(l)}</button>`); b.onclick = () => askQ(q, l); chips.append(b); }
     log.append(chips);
   }
   for (const it of items) {
     const q = h('<div class="ai-q" dir="auto"></div>'); q.textContent = it.label || it.q; log.append(q);
-    if (it.a) log.append(answerEl(it.a, it.q, it.plain));
+    if (it.a) log.append(answerEl(it.a, it.q, it.plain, it));
     else if (it.err) { const e = h('<div class="ai-err"></div>'); e.textContent = it.err; if (it.scanned) e.append(scannedHelp()); log.append(e); }
     else log.append(h(`<div class="ai-wait" id="aiWait">${it.wait || 'קורא את המסמך וכותב תשובה…'}</div>`));
   }
   if (items.length) {
     const chips = h('<div class="ai-chips"></div>');
-    for (const [l, q] of CHIPS.filter(c => !items.some(i => i.q === c[1])).slice(0, 3)) { const b = h(`<button class="ai-chip" type="button">${esc(l)}</button>`); b.onclick = () => askQ(q, l); chips.append(b); }
+    for (const [l, q] of chipsNow().filter(c => !items.some(i => i.q === c[1])).slice(0, 3)) { const b = h(`<button class="ai-chip" type="button">${esc(l)}</button>`); b.onclick = () => askQ(q, l); chips.append(b); }
     if (!AS.busy && chips.childElementCount) log.append(chips);
   }
   log.scrollTop = log.scrollHeight;
@@ -763,6 +795,14 @@ async function askQ(q, label) {
   const it = { q, label }; list.push(it);
   AS.busy = true; renderLog();
   try {
+    if (onEditor() && window.OFFICE_AI && OFFICE_AI.available()) {
+      it.plain = true; it.tab = tabKey; it.wait = 'קורא את הקובץ ומכין את השינויים…'; renderLog();
+      const history = list.filter(x => x.a && x !== it).slice(-3).map(x => ({ q: x.q, a: x.a }));
+      const r = await OFFICE_AI.run(q, { history, onWait: s => { it.wait = `השירות עמוס, מנסה שוב בעוד ${s} שניות…`; const w = document.getElementById('aiWait'); if (w && AS.key() === tabKey) w.textContent = it.wait; } });
+      it.res = r;
+      it.a = r.reply || (r.done ? 'בוצע.' : 'לא הצלחתי לבצע את זה. נסו לנסח את הבקשה אחרת, או לבקש דבר אחד בכל פעם.');
+      return;
+    }
     const text = await docText();
     it.plain = onEditor();
     const empty = it.plain ? !text.replace(/=====.*?=====/g, '').replace(/שורה \d+:/g, '').trim() : !hasRealText(text);
@@ -772,6 +812,9 @@ async function askQ(q, label) {
   } catch (e) { it.err = e.message || String(e); }
   finally { AS.busy = false; if (AS.key() === tabKey) renderLog(); }
 }
+window.SIMAN_AI = ai;
+window.SIMAN_ASK = (q, label) => { if (panel.classList.contains('hidden')) showAI(); askQ(q, label); };
+{ const s = document.createElement('script'); s.src = 'office-ai.js'; s.defer = true; document.head.append(s); }
 $('aiSend').onclick = () => { const q = $('aiQ').value; $('aiQ').value = ''; $('aiQ').style.height = ''; askQ(q); };
 $('aiQ').addEventListener('input', e => { const t = e.target; t.style.height = 'auto'; t.style.height = Math.min(140, t.scrollHeight) + 'px'; });
 $('aiRead').onclick = () => RA.start(currentPageIndex());
