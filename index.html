@@ -1288,7 +1288,7 @@ body:has(#wed) .busy,body:has(#xed) .busy{z-index:1000}body:has(#wed) .toast,bod
 </dialog>
 
 <header class="bar">
-  <div class="brand"><b title="גרסה 5.1.5">סימן</b><span class="ver">5.1.5</span><span class="fname" id="fname"></span></div>
+  <div class="brand"><b title="גרסה 5.1.6">סימן</b><span class="ver">5.1.6</span><span class="fname" id="fname"></span></div>
 
   <nav class="tools" id="tools" aria-label="כלים">
     <button class="tool" data-tool="select" aria-pressed="true" title="בחירה וגלילה (V)">
@@ -2815,7 +2815,32 @@ function trSystem(target){
   return `You are a professional document translator. Translate the page the user sends into ${t}.\nOutput format, exactly:\nLANG: <ISO 639-1 code of the source text's main language>\n---\n<the translation>\nKeep paragraph breaks, headings, list numbering, numbers, names and line structure. Output only the translation, with no notes or explanations. If the text is already in ${t}, return it unchanged.`;
 }
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+// a translation must be all in the target language: words left in another alphabet (Russian, Arabic…)
+// send the page once more through the second service, and what is still left over in brackets is cleaned
+const SCRIPT={heb:/[\u0590-\u05FF]/,cyr:/[\u0400-\u04FF]/,arb:/[\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF]/};
+const FOREIGN={he:['cyr','arb'],en:['heb','cyr','arb'],fr:['heb','cyr','arb'],es:['heb','cyr','arb'],ru:['heb','arb'],ar:['heb','cyr']};
+const isForeign=(w,target)=>(FOREIGN[target]||[]).some(k=>SCRIPT[k].test(w));
+const foreignWords=(text,target)=>(String(text).match(/\S+/g)||[]).filter(w=>isForeign(w,target));
+function dropForeign(text,target){
+  const bad=w=>isForeign(w,target);
+  return String(text)
+    .replace(/(\S+)\s*\(([^()\n]+)\)/g,(m,w,inner)=>bad(w)&&!bad(inner)?inner:m)      // ישماعيل (ישמעאל) -> ישמעאל
+    .replace(/\(([^()\n]+)\)\s*(\S+)/g,(m,inner,w)=>bad(w)&&!bad(inner)?inner:m)      // (ישמעאל) ישماعيل -> ישמעאל
+    .replace(/(\S*[\u0400-\u04FF\u0600-\u06FF]\S*)\)\s*([^()\s]+)\)/g,(m,w,inner)=>bad(w)&&!bad(inner)?inner:m); // קונפликтирная) סכסכנית) -> סכסכנית
+}
 async function callTranslate(text,target){
+  const sourceForeign=foreignWords(text,target).length; // the original's own words in that alphabet don't count
+  let r=await callTranslateOnce(text,target,false);
+  if(r.error||!r.raw)return r;
+  const bad=raw=>Math.max(0,foreignWords(parseTr(raw).text,target).length-(target==='he'||target==='ar'?0:sourceForeign));
+  if(bad(r.raw)&&FOREIGN[target]){
+    const again=await callTranslateOnce(text,target,true);
+    if(!again.error&&again.raw&&bad(again.raw)<bad(r.raw))r=again;
+  }
+  if(bad(r.raw)){const p=parseTr(r.raw);r={raw:(p.lang?`LANG: ${p.lang}\n---\n`:'')+dropForeign(p.text,target)};}
+  return r;
+}
+async function callTranslateOnce(text,target,second){
   const st=loadST();const key=st.provider==='claude'?st.claudeKey:st.geminiKey;
   if(st.provider!=='builtin'&&!key)return{error:'NO_KEY'};
   try{
@@ -2830,7 +2855,7 @@ async function callTranslate(text,target){
     const body=JSON.stringify({systemInstruction:{parts:[{text:trSystem(target)}]},contents:[{role:'user',parts:[{text:`<page>\n${text}\n</page>`}]}],generationConfig:{temperature:0.2,maxOutputTokens:16384}});
     for(let attempt=0;attempt<5;attempt++){
       const r=st.provider==='builtin'
-        ?(target==='he'||target==='en'
+        ?((target==='he'||target==='en')&&!second
           ?await fetch(TRANSLATE_URL,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({text,target})})
           :await fetch(AI_URL,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({mode:'translate',text,target})}))
         :await fetch(url,{method:'POST',headers:{'content-type':'application/json','x-goog-api-key':key},body});
@@ -5026,7 +5051,7 @@ if('launchQueue' in window){
    ===================================================================== */
 (function(){
   const STATUS_URL=(typeof REGISTER_URL!=='undefined'&&REGISTER_URL)?REGISTER_URL.replace(/\/register$/,'/status'):'';
-  const U_KEY='siman.usage', T_KEY='siman.trial', APP_VER='5.1.5';
+  const U_KEY='siman.usage', T_KEY='siman.trial', APP_VER='5.1.6';
   const today=()=>new Date().toISOString().slice(0,10);
   const rd=k=>{try{return JSON.parse(localStorage.getItem(k)||'null');}catch(_){return null;}};
   const wr=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch(_){}};

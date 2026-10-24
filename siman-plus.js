@@ -1229,6 +1229,14 @@ async function pageToJpeg(page) {
 }
 
 // the service's JSON → clean blocks
+// circled letters and numbers (Ⓐ ① ❶) are in no font the files use: they become (A) (1)
+const unCircle = t => String(t).replace(/[\u24B6-\u24CF]/g, c => `(${String.fromCharCode(c.charCodeAt(0) - 0x24B6 + 65)})`)
+  .replace(/[\u24D0-\u24E9]/g, c => `(${String.fromCharCode(c.charCodeAt(0) - 0x24D0 + 97)})`)
+  .replace(/[\u2460-\u2473]/g, c => `(${c.charCodeAt(0) - 0x2460 + 1})`)
+  .replace(/[\u2776-\u277F]/g, c => `(${c.charCodeAt(0) - 0x2776 + 1})`)
+  .replace(/[\u2780-\u2789]/g, c => `(${c.charCodeAt(0) - 0x2780 + 1})`);
+// an item that already starts with the label the writer wrote (А. / 1) / (ב) / iii.) keeps it, and gets no added number
+const LABEL = /^\s*(?:\(?(?:[A-Za-z\u0400-\u04FF\u05D0-\u05EA]|\d{1,3}|[ivxIVX]{1,4})[.):]|\((?:[A-Za-z\u0400-\u04FF\u05D0-\u05EA]|\d{1,3})\))\s*/;
 function parseBlocks(raw) {
   let j = null;
   const s = String(raw || '').replace(/^\s*```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '');
@@ -1241,11 +1249,11 @@ function parseBlocks(raw) {
     if (!b || typeof b !== 'object') continue;
     const t = ['h1', 'h2', 'p', 'li', 'oli', 'table'].includes(b.t) ? b.t : 'p';
     if (t === 'table') {
-      const rows = (Array.isArray(b.rows) ? b.rows : []).filter(Array.isArray).map(r => r.map(c => String(c ?? '')));
+      const rows = (Array.isArray(b.rows) ? b.rows : []).filter(Array.isArray).map(r => r.map(c => unCircle(String(c ?? ''))));
       if (rows.length) out.push({ t, rows });
     } else {
-      const text = String(b.text ?? '').replace(/\s+/g, ' ').trim();
-      if (text) out.push({ t, text });
+      const text = unCircle(String(b.text ?? '')).replace(/\s+/g, ' ').trim();
+      if (text) out.push({ t: t === 'oli' && LABEL.test(text) ? 'p' : t, text });
     }
   }
   out.lang = typeof j.lang === 'string' ? j.lang.slice(0, 2).toLowerCase() : null;
@@ -1312,9 +1320,9 @@ function blocksDocx(pages) {
   };
   let nextNum = 2; const nums = [];
   const body = [];
+  let lastOl = false, olId = 0;
   pages.forEach((blocks, pi) => {
     if (pi) body.push('<w:p><w:r><w:br w:type="page"/></w:r></w:p>');
-    let lastOl = false, olId = 0;
     for (const b of blocks) {
       if (b.t !== 'oli') lastOl = false;
       if (b.t === 'h1') body.push(para(b.text, { style: 'Heading1', keep: true }));
@@ -1361,6 +1369,11 @@ async function blocksPdf(pages) {
   const doc = await PDFDocument.create(); doc.registerFontkit(fontkit);
   const reg = await doc.embedFont(await fontBytes('rubik', false), { subset: true });
   const bold = await doc.embedFont(await fontBytes('rubik', true), { subset: true });
+  const setOf = f => { try { return new Set(f.getCharacterSet()); } catch (_) { return null; } };
+  const sets = new Map([[reg, setOf(reg)], [bold, setOf(bold)]]);
+  const fits = (f, t) => { const st = sets.get(f); return !st || [...t].every(c => /\s/.test(c) || st.has(c.codePointAt(0))); };
+  const fontFor = (f, t) => f === bold && !fits(bold, t) ? reg : f;
+  const keepable = (f, t) => { const st = sets.get(f); return !st ? t : [...t].filter(c => /\s/.test(c) || SYM.test(c) || st.has(c.codePointAt(0))).join(''); };
   const W = 595.28, H = 841.89, M = 56, maxW = W - 2 * M, ink = rgb(.1, .11, .13), rule = rgb(.55, .56, .55);
   const all = pages.flat().map(b => b.text || (b.rows || []).flat().join(' ')).join(' ');
   const docDir = paraDir(all, 'R');
@@ -1380,7 +1393,7 @@ async function blocksPdf(pages) {
     } else { L(x + w * .18, mid, x + w * .4, yy + sz * .05); L(x + w * .4, yy + sz * .05, x + w * .85, yy + sz * .72); } // ✓
   };
   const lineAt = (line, x0, w, yy, f, sz, dir) => {
-    const { base, runs } = bidiRuns(norm(line), dir);
+    const { base, runs } = bidiRuns(keepable(f, norm(line)), dir);
     const parts = [];
     for (const r of runs) {
       if (!SYM.test(r.text)) { const s = runForPdf(r); parts.push({ s, w: f.widthOfTextAtSize(s, sz) }); continue; }
@@ -1392,6 +1405,7 @@ async function blocksPdf(pages) {
     for (const p of parts) { if (p.sym) drawSym(p.sym, x, yy, sz, p.w); else if (p.s) pg.drawText(p.s, { x, y: yy, size: sz, font: f, color: ink }); x += p.w; }
   };
   const para = (text, { f = reg, sz = 12, lh = 1.5, before = 0, after = 7, mark = null } = {}) => {
+    f = fontFor(f, norm(text));
     const dir = paraDir(text, docDir), ind = mark ? 20 : 0;
     const lines = wrapLines(norm(text), f, sz, maxW - ind);
     y -= before;
@@ -1410,7 +1424,7 @@ async function blocksPdf(pages) {
     const tDir = paraDir(rows.flat().join(' '), docDir);
     y -= 4;
     rows.forEach((r, ri) => {
-      const f = ri === 0 ? bold : reg;
+      const f = ri === 0 && r.every(c => fits(bold, norm(String(c ?? '')))) ? bold : reg;
       const cells = Array.from({ length: n }, (_, k) => wrapLines(String(r[k] ?? ''), f, sz, cw - 2 * pad));
       const rh = Math.max(1, ...cells.map(c => c.length)) * L + 2 * pad;
       if (y - rh < M) newPage();
@@ -1423,9 +1437,9 @@ async function blocksPdf(pages) {
     });
     y -= 10;
   };
+  let k = 0;   // a numbered list that goes on to the next page keeps counting
   pages.forEach(blocks => {
     newPage();
-    let k = 0;
     for (const b of blocks) {
       if (b.t !== 'oli') k = 0;
       if (b.t === 'h1') para(b.text, { f: bold, sz: 18, lh: 1.35, before: 4, after: 10 });
