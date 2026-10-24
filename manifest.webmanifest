@@ -163,9 +163,20 @@
   },
   "shortcuts": [
     {
-      "name": "תמלול שיחה או הקלטה",
-      "short_name": "תמלול",
-      "url": "./?voice",
+      "name": "להקליט ולתמלל",
+      "short_name": "הקלטה",
+      "url": "./?voice=rec",
+      "icons": [
+        {
+          "src": "icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "התמלילים שלי",
+      "short_name": "תמלילים",
+      "url": "./?voice=lib",
       "icons": [
         {
           "src": "icon-192.png",

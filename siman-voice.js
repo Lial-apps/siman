@@ -256,7 +256,7 @@ const CSS = `
 #vx *{box-sizing:border-box}
 #vx button{font:inherit;color:inherit;cursor:pointer}
 #vx svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
-#vx [hidden]{display:none!important}
+#vx[hidden],#vx [hidden]{display:none!important}
 #vx .vx-hero .swipe{display:block;width:min(300px,70%);height:20px;margin:-6px 0 10px}
 #vx :focus-visible{outline:3px solid var(--marker,#FFD43B);outline-offset:2px}
 .vx-top{display:flex;align-items:center;gap:10px;padding:8px 14px;background:var(--navy,#16213A);color:#fff;min-height:54px}
@@ -545,7 +545,6 @@ async function refreshCount() { try { const n = (await DB.all()).length; const c
 /* ---------------- start screen ---------------- */
 function renderNew() {
   const s = root.querySelector('#vxNew');
-  const okd = !!rd(OK_KEY, false);
   if (!LANG_NAMES[prefs.lang]) prefs.lang = 'he';
   if (!KINDS[prefs.kind]) prefs.kind = 'lesson';
   s.innerHTML = `<div class="vx-wrap">
@@ -564,13 +563,11 @@ function renderNew() {
       <div class="vx-row"><span class="vx-lbl">מה יש בהקלטה?</span><div class="vx-seg" id="vxKind">${Object.entries(KINDS).map(([k, v]) => `<button data-k="${k}" aria-pressed="${prefs.kind === k}">${v.label}</button>`).join('')}</div></div>
       <div class="vx-row"><label for="vxLang">שפת הדיבור</label><select id="vxLang">${Object.entries(LANG_NAMES).map(([k, v]) => `<option value="${k}"${prefs.lang === k ? ' selected' : ''}>${v}</option>`).join('')}</select></div>
       <div class="vx-row"><span class="vx-lbl">מנוע התמלול</span><span id="vxEng" class="vx-hint">בודק…</span></div>
-      <label class="vx-ok"><input type="checkbox" id="vxOk"${okd ? ' checked' : ''}><span>אני משתתף/ת בשיחה או בשיעור שהוקלטו, או שקיבלתי הסכמה להקליט.</span></label>
     </div>
     <div class="vx-recent" id="vxRecent"></div>
   </div>`;
   s.querySelectorAll('#vxKind button').forEach(b => b.onclick = () => { prefs.kind = b.dataset.k; wr(PREF_KEY, prefs); s.querySelectorAll('#vxKind button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); });
   s.querySelector('#vxLang').onchange = e => { prefs.lang = e.target.value; wr(PREF_KEY, prefs); engineRow(); };
-  s.querySelector('#vxOk').onchange = e => wr(OK_KEY, e.target.checked);
   engineRow();
   DB.all().then(items => {
     const box = s.querySelector('#vxRecent'); if (!box) return;
@@ -596,17 +593,15 @@ async function engineRow() {
     } catch (e) { say(friendly(e)); b.disabled = false; b.textContent = 'לנסות שוב'; }
   };
 }
-function consentOk() {
-  if (rd(OK_KEY, false)) return true;
-  const c = root && root.querySelector('#vxOk');
-  if (c && c.checked) { wr(OK_KEY, true); return true; }
-  show('new');
-  const box = root.querySelector('.vx-ok');
-  if (box) { box.scrollIntoView({ block: 'center' }); box.style.color = 'var(--ink)'; box.querySelector('input').focus(); }
-  say('סמנו קודם שאתם משתתפים בשיחה או שקיבלתם הסכמה להקליט');
-  return false;
+// no gate before every file: a one-time reminder about recording law, shown while the work starts
+function consentOk() { return true; }
+function lawNote(box) {
+  if (rd(OK_KEY, false) || !box) return;
+  wr(OK_KEY, true);
+  const p = el('p', 'vx-hint vx-law', 'תזכורת חד-פעמית: מותר להקליט ולתמלל שיחה או שיעור שאתם משתתפים בהם. הקלטה של אחרים בלי שאתם צד לשיחה אסורה.');
+  box.append(p);
 }
-function pick() { if (!consentOk()) return; root.querySelector('#vxFile').click(); }
+function pick() { root.querySelector('#vxFile').click(); }
 function waHelp() {
   const d = el('dialog', 'vx-dlg');
   d.innerHTML = `<div class="in"><h2>הודעה קולית או שיחה מוקלטת לסימן</h2>
@@ -652,6 +647,7 @@ function workScreen(name) {
     <p class="vx-hint" id="vxWorkHint">${ico.lock} השמע לא יוצא מהמכשיר. אפשר להמשיך לעבוד בסימן בינתיים, והתמליל יחכה בספרייה.</p>
     <button class="vx-btn" id="vxCancel">ביטול</button></div>`;
   s.querySelector('#vxCancel').onclick = () => { if (JOB.ctl) JOB.ctl.abort(); ASR.stop(); };
+  lawNote(s.querySelector('.vx-work'));
 }
 function step(k, state, note) {
   const li = root && root.querySelector(`#vxWork li[data-s="${k}"]`); if (!li) return;
@@ -1201,6 +1197,7 @@ async function startRec() {
     <p class="vx-hint" id="vxRecE"></p>
     <p class="vx-hint">${ico.lock} ההקלטה והתמלול נשארים במכשיר. המסך יישאר דלוק בזמן ההקלטה. כדאי להניח את הטלפון קרוב למי שמדבר.</p></div>`;
   s.querySelector('#vxRecStop').onclick = stopRec;
+  lawNote(s.querySelector('.vx-rec'));
   s.querySelector('#vxRecX').onclick = () => { if (confirm('למחוק את ההקלטה?')) { REC.cancel = true; stopRec(); } };
   s.querySelector('#vxRecP').onclick = e => {
     if (REC.mr.state === 'recording') { REC.mr.pause(); REC.acc += Date.now() - REC.t0; e.target.textContent = 'המשך'; s.querySelector('#vxRecS').textContent = 'מושהה'; }
@@ -1301,6 +1298,7 @@ async function finishRec() {
   const w = root.querySelector('#vxWork');
   w.innerHTML = `<div class="vx-work"><h2>מסיים לתמלל</h2><div class="f">${esc(name)}</div><div class="vx-wait" style="justify-content:center"><i></i>כותב את המשפטים האחרונים…</div></div>`;
   await REC.chain;
+  if (!REC.segs.length && (REC.dur || 0) > 3) { JOB.queue.push({ file: f, opts: { duration: REC.dur || null, kind: REC.kind, lang: REC.lang } }); if (!JOB.busy) run(); return; }
   const id = uid();
   const segs = normalize(REC.segs.sort((a, b) => a.start - b.start));
   const item = { id, title: name.replace(/\.[a-z0-9]+$/i, ''), fileName: name, created: Date.now(), updated: Date.now(), kind: REC.kind, lang: REC.lang, duration: REC.dur || null,
@@ -1581,7 +1579,6 @@ try {
   openFile = async function (file, handle) {
     if (file && isMedia(file) && !/\.(pdf|docx?|xlsx|pptx)$/i.test(file.name || '')) {
       if (typeof needReg === 'function' && needReg()) return prevOpen(file, handle);   // sign-up first; it comes back here after
-      if (!rd(OK_KEY, false)) { open('new'); pendingFile = file; say('סמנו שאתם צד לשיחה ובחרו ״המשך״'); showContinue(); return; }
       enqueue(file); return;
     }
     return prevOpen(file, handle);
@@ -1603,20 +1600,42 @@ try {
   }
 } catch (_) {}
 // 3. a button on the opening screen, next to the other quick actions
+const MIC = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0013 0M12 17.5V21M8.5 21h7"/></svg>';
+const WAVE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4M8 7v10M12 4v16M16 8v8M20 11v2"/></svg>';
+// a file straight from the picker → transcription starts; no screen in between
+function quickPick() {
+  if (typeof needReg === 'function' && needReg()) { try { showReg(); } catch (_) {} return; }
+  ensure(); count('voice_open');
+  root.querySelector('#vxFile').click();
+}
+function quickRec() {
+  if (!open('new')) return;
+  count('voice_open'); startRec();
+}
 function addEntry() {
   const q = document.querySelector('.wl-quick');
   if (q && !q.querySelector('[data-qa="voice"]')) {
-    const b = el('button', 'qa', `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0013 0M12 17.5V21M8.5 21h7"/></svg>לתמלל שיחה או הקלטה<span style="font-size:11px;font-weight:700;background:var(--marker,#FFD43B);color:#16213A;border-radius:6px;padding:1px 6px;margin-inline-start:4px">חדש</span>`);
-    b.dataset.qa = 'voice';
-    b.onclick = () => { count('voice_open'); open('new'); };
+    const a = el('button', 'qa', WAVE + 'לתמלל הקלטה<span style="font-size:11px;font-weight:700;background:var(--marker,#FFD43B);color:#16213A;border-radius:6px;padding:1px 6px;margin-inline-start:4px">חדש</span>');
+    a.dataset.qa = 'voice'; a.title = 'בוחרים קובץ שמע או וידאו והתמלול מתחיל';
+    a.onclick = quickPick;
+    const b = el('button', 'qa', MIC + 'להקליט ולתמלל');
+    b.dataset.qa = 'voice-rec'; b.title = 'ההקלטה מתחילה מיד, והטקסט נכתב תוך כדי';
+    b.onclick = quickRec;
+    const c = el('button', 'qa', 'התמלילים שלי');
+    c.dataset.qa = 'voice-lib'; c.hidden = true;
+    c.onclick = () => { count('voice_open'); open('lib'); };
     const tr = q.querySelector('[data-qa="tr"]');
-    if (tr) tr.after(b); else q.prepend(b);
+    if (tr) tr.after(a, b, c); else q.prepend(a, b, c);
+    DB.all().then(items => { if (items.length) c.hidden = false; }).catch(() => {});
   }
   const l = document.querySelector('.wl-list');
   if (l && !l.querySelector('.vx-li')) {
-    const li = el('li', 'vx-li', '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0013 0M12 17.5V21"/></svg>תמלול שיחות, הודעות קוליות וישיבות');
+    const li = el('li', 'vx-li', MIC + 'תמלול שיעורים, שיחות והודעות קוליות, במכשיר');
     l.append(li);
   }
+  // the main "open" button accepts recordings too (audio only: on iPhone a video type would change the picker)
+  const fi = document.getElementById('file');
+  if (fi && !/audio\//.test(fi.accept)) fi.accept += ',audio/*,.mp3,.m4a,.wav,.ogg,.opus,.aac,.flac,.amr,.webm';
 }
 addEntry();
 setTimeout(addEntry, 1500);   // the phone layout builds its screen a moment later
@@ -1625,6 +1644,8 @@ async function fromUrl() {
   const u = new URL(location.href); const v = u.searchParams.get('voice');
   if (v == null) return;
   u.searchParams.delete('voice'); history.replaceState(null, '', u.pathname + (u.search || '') + u.hash);
+  if (v === 'rec') { quickRec(); return; }
+  if (v === 'lib') { open('lib'); return; }
   if (v !== 'shared') { open('new'); return; }
   try {
     const c = await caches.open('siman-share');
