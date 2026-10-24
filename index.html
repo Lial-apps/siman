@@ -1288,7 +1288,7 @@ body:has(#wed) .busy,body:has(#xed) .busy{z-index:1000}body:has(#wed) .toast,bod
 </dialog>
 
 <header class="bar">
-  <div class="brand"><b title="גרסה 5.1.3">סימן</b><span class="ver">5.1.3</span><span class="fname" id="fname"></span></div>
+  <div class="brand"><b title="גרסה 5.1.4">סימן</b><span class="ver">5.1.4</span><span class="fname" id="fname"></span></div>
 
   <nav class="tools" id="tools" aria-label="כלים">
     <button class="tool" data-tool="select" aria-pressed="true" title="בחירה וגלילה (V)">
@@ -2604,6 +2604,15 @@ const needsGesture=e=>e&&(e.name==='SecurityError'||e.name==='NotAllowedError'||
 function askToSave(name,label){return new Promise(res=>{const d=$('readyDlg');$('readyName').textContent=dispName(name);$('readySave').textContent=label||'שמירה';
   const done=v=>{d.close();$('readySave').onclick=$('readyCancel').onclick=null;res(v);};
   $('readySave').onclick=()=>done(true);$('readyCancel').onclick=()=>done(false);d.oncancel=()=>done(false);d.showModal();$('readySave').focus();});}
+// Android, above all the installed app, saves a "blob:" link as an empty file (0 bytes):
+// there the file goes inside the link itself (a data: link), which the phone writes in full
+const ANDROID_DL=/Android/i.test(navigator.userAgent);
+function downloadHref(file){
+  if(!ANDROID_DL||file.size>40e6)return Promise.resolve(URL.createObjectURL(file));
+  return new Promise(res=>{const r=new FileReader();
+    r.onload=()=>res(String(r.result).replace(/^data:[^;,]*/,'data:application/octet-stream'));
+    r.onerror=()=>res(URL.createObjectURL(file));r.readAsDataURL(file);});
+}
 async function saveBytes(name,bytes,kind){
   if(FS&&!(navigator.userActivation&&navigator.userActivation.isActive)){if(!await askToSave(name))return false;}
   const isTxt=kind==='txt',isDocx=kind==='docx',isZip=kind==='zip',isOff=kind==='pptx'||kind==='xlsx';
@@ -2632,11 +2641,12 @@ async function saveBytes(name,bytes,kind){
     catch(e){if(e&&e.name==='AbortError')return false;
       if(needsGesture(e)){if(!await askToSave(name))return false;try{await navigator.share({files:[file],title:name});return true;}catch(e2){if(e2&&e2.name==='AbortError')return false;}}}
   }
+  const href=await downloadHref(file);
   if(!fresh()&&!await askToSave(name))return false;
-  const a=document.createElement('a');a.href=URL.createObjectURL(file);a.download=name;
-  document.body.append(a);a.click();a.remove();
+  const a=document.createElement('a');a.href=href;a.download=name;
+  document.body.append(a);a.click();
   // phones ask "download?" before reading the file: the link stays alive long enough for that
-  setTimeout(()=>URL.revokeObjectURL(a.href),180000);
+  setTimeout(()=>{a.remove();if(href.startsWith('blob:'))URL.revokeObjectURL(href);},180000);
   return true;
 }
 
@@ -4726,7 +4736,7 @@ function fillShareName(){
 }
 function renameShareFile(){if(SH.file&&SH.file.name!==fileName())SH.file=new File([SH.file],fileName(),{type:SH.file.type});}
 function canShareFile(f){try{return !!(navigator.share&&navigator.canShare&&navigator.canShare({files:[f]}));}catch(_){return false;}}
-function downloadFile(f){const a=document.createElement('a');a.href=URL.createObjectURL(f);a.download=f.name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),180000);}
+async function downloadFile(f){const href=await downloadHref(f);const a=document.createElement('a');a.href=href;a.download=f.name;document.body.append(a);a.click();setTimeout(()=>{a.remove();if(href.startsWith('blob:'))URL.revokeObjectURL(href);},180000);}
 function shStatus(msg,html){const s=$('shareStatus');if(html)s.innerHTML=msg;else s.textContent=msg;}
 function shareHints(){
   const native=!!navigator.share;
@@ -5009,7 +5019,7 @@ if('launchQueue' in window){
    ===================================================================== */
 (function(){
   const STATUS_URL=(typeof REGISTER_URL!=='undefined'&&REGISTER_URL)?REGISTER_URL.replace(/\/register$/,'/status'):'';
-  const U_KEY='siman.usage', T_KEY='siman.trial', APP_VER='5.1.3';
+  const U_KEY='siman.usage', T_KEY='siman.trial', APP_VER='5.1.4';
   const today=()=>new Date().toISOString().slice(0,10);
   const rd=k=>{try{return JSON.parse(localStorage.getItem(k)||'null');}catch(_){return null;}};
   const wr=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch(_){}};
