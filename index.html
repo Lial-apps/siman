@@ -1288,7 +1288,7 @@ body:has(#wed) .busy,body:has(#xed) .busy{z-index:1000}body:has(#wed) .toast,bod
 </dialog>
 
 <header class="bar">
-  <div class="brand"><b title="גרסה 5.1.0">סימן</b><span class="ver">5.1.0</span><span class="fname" id="fname"></span></div>
+  <div class="brand"><b title="גרסה 5.1.1">סימן</b><span class="ver">5.1.1</span><span class="fname" id="fname"></span></div>
 
   <nav class="tools" id="tools" aria-label="כלים">
     <button class="tool" data-tool="select" aria-pressed="true" title="בחירה וגלילה (V)">
@@ -1751,6 +1751,7 @@ function setDirty(v){S.dirty=v;document.title=(v?'• ':'')+(S.name?S.name+' —
 async function openFile(file,handle){
   if(!file)return;
   if(typeof needReg==='function'&&needReg()){pendingOpen={f:file,h:handle};showReg();return;}
+  if(file.size===0){toast('הקובץ ריק (0 בתים): השמירה או ההורדה שלו לא הושלמה. שמרו אותו שוב ונסו לפתוח');return;}
   if(S.dirty&&!confirm('יש שינויים שלא נשמרו. לפתוח קובץ אחר בכל זאת?'))return;
   if(/\.(docx|xlsx|pptx)$/i.test(file.name)){await openOffice(file,handle);return;}
   if(/\.doc$/i.test(file.name)||file.type==='application/msword'){await openLegacyDoc(file);return;}
@@ -2610,12 +2611,21 @@ async function saveBytes(name,bytes,kind){
   }
   const type=isTxt?'text/plain':isDocx?DOCX_MIME:isZip?'application/zip':isOff?OFFICE_MIME[kind]:'application/pdf';
   const file=new File([bytes],name,{type});
+  // building the file can take longer than the browser counts a tap: then a fresh tap is asked for,
+  // otherwise the phone refuses the share sheet and the download comes out broken
+  const fresh=()=>!navigator.userActivation||navigator.userActivation.isActive;
   // phones: open the share sheet (save to Files, send by WhatsApp/mail…)
   if(matchMedia('(pointer:coarse)').matches&&navigator.canShare&&navigator.canShare({files:[file]})){
-    try{await navigator.share({files:[file],title:name});return true;}catch(e){if(e&&e.name==='AbortError')return false;}
+    if(!fresh()&&!await askToSave(name))return false;
+    try{await navigator.share({files:[file],title:name});return true;}
+    catch(e){if(e&&e.name==='AbortError')return false;
+      if(needsGesture(e)){if(!await askToSave(name))return false;try{await navigator.share({files:[file],title:name});return true;}catch(e2){if(e2&&e2.name==='AbortError')return false;}}}
   }
+  if(!fresh()&&!await askToSave(name))return false;
   const a=document.createElement('a');a.href=URL.createObjectURL(file);a.download=name;
-  document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+  document.body.append(a);a.click();a.remove();
+  // phones ask "download?" before reading the file: the link stays alive long enough for that
+  setTimeout(()=>URL.revokeObjectURL(a.href),180000);
   return true;
 }
 
@@ -4705,7 +4715,7 @@ function fillShareName(){
 }
 function renameShareFile(){if(SH.file&&SH.file.name!==fileName())SH.file=new File([SH.file],fileName(),{type:SH.file.type});}
 function canShareFile(f){try{return !!(navigator.share&&navigator.canShare&&navigator.canShare({files:[f]}));}catch(_){return false;}}
-function downloadFile(f){const a=document.createElement('a');a.href=URL.createObjectURL(f);a.download=f.name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),8000);}
+function downloadFile(f){const a=document.createElement('a');a.href=URL.createObjectURL(f);a.download=f.name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),180000);}
 function shStatus(msg,html){const s=$('shareStatus');if(html)s.innerHTML=msg;else s.textContent=msg;}
 function shareHints(){
   const native=!!navigator.share;
@@ -4988,7 +4998,7 @@ if('launchQueue' in window){
    ===================================================================== */
 (function(){
   const STATUS_URL=(typeof REGISTER_URL!=='undefined'&&REGISTER_URL)?REGISTER_URL.replace(/\/register$/,'/status'):'';
-  const U_KEY='siman.usage', T_KEY='siman.trial', APP_VER='5.1.0';
+  const U_KEY='siman.usage', T_KEY='siman.trial', APP_VER='5.1.1';
   const today=()=>new Date().toISOString().slice(0,10);
   const rd=k=>{try{return JSON.parse(localStorage.getItem(k)||'null');}catch(_){return null;}};
   const wr=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch(_){}};
