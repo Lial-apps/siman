@@ -585,7 +585,13 @@ async function ai(payload, { onWait, signal, timeout = 300000 } = {}) {
       clearTimeout(timer);
       if (signal && signal.aborted) throw e;
       if (e && e.name === 'AbortError') throw new Error('הבקשה לקחה יותר מדי זמן. נסו שוב, או צלמו את הדף קרוב יותר ובאור טוב');
-      throw new Error(navigator.onLine === false ? 'אין חיבור לאינטרנט' : 'השירות החכם לא זמין כרגע. נסו שוב בעוד רגע');
+      // a phone's connection drops for a moment (switching between Wi-Fi and mobile data, a long wait for a page):
+      // the request is sent again a few times before giving up
+      if (attempt < 3) {
+        for (let k = 5 * (attempt + 1); k > 0; k--) { onWait && onWait(k); await sleep(1000); if (signal && signal.aborted) throw new DOMException('stop', 'AbortError'); }
+        continue;
+      }
+      throw new Error(navigator.onLine === false ? 'אין חיבור לאינטרנט' : 'אין חיבור לשירות החכם. בדקו את האינטרנט ונסו שוב');
     }
     clearTimeout(timer);
     status = r.status;
