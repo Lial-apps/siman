@@ -334,7 +334,7 @@ const CSS = `
 .vx-rec canvas{width:100%;height:90px;display:block;margin:16px 0}
 .vx-rec .ctl{display:flex;justify-content:center;gap:14px;align-items:center}
 .vx-rec .big{width:76px;height:76px;border-radius:50%;border:0;background:#C2362B;color:#fff!important;display:grid;place-items:center;box-shadow:0 0 0 6px rgba(194,54,43,.18)}
-.vx-rec .big svg{width:30px;height:30px}
+#vx .vx-rec .big svg{width:34px;height:34px}
 .vx-rec .big.go{background:var(--navy,#16213A);box-shadow:0 0 0 6px rgba(22,33,58,.15)}
 .vx-live{margin-top:22px;text-align:start;background:var(--bar,#fff);border:1px solid var(--line,#D4DBE5);border-radius:12px;padding:12px 14px;min-height:80px;max-height:30vh;overflow:auto;font-size:16px}
 .vx-live:empty::before{content:attr(data-empty);color:var(--muted,#5D6982);font-size:14px}
@@ -488,7 +488,7 @@ function ensure() {
     const a = b.dataset.a;
     if (a === 'close') close();
     else if (a === 'pick') pick();
-    else if (a === 'rec') startRec();
+    else if (a === 'rec') recReady();
     else if (a === 'wa') waHelp();
   });
   const fi = root.querySelector('#vxFile');
@@ -1177,6 +1177,21 @@ function playFrom(t) { if (!audioEl) { say('אין השמעה לתמליל הז�
 function stopAudio() { cancelAnimationFrame(raf); if (audioEl) { audioEl.pause(); audioEl.src = ''; audioEl = null; } if (audioUrl) { URL.revokeObjectURL(audioUrl); audioUrl = ''; } cv = null; }
 
 /* ---------------- recording: the text is written on the device while recording ---------------- */
+// the screen before recording: nothing is recorded until the button is pressed
+function recReady() {
+  if (REC.mr && REC.mr.state !== 'inactive') { show('rec'); return; }
+  show('rec');
+  const s = root.querySelector('#vxRec');
+  s.innerHTML = `<div class="vx-rec"><div class="tm" aria-hidden="true">0:00</div><div class="st">מוכן להקליט</div>
+    <div class="ctl" style="margin:26px 0 8px"><button class="big" id="vxRecGo" title="התחלת הקלטה" aria-label="התחלת הקלטה">${ico.mic}</button></div>
+    <p style="font-weight:700;margin:6px 0 18px">התחלת הקלטה</p>
+    <div class="vx-row" style="justify-content:center;gap:8px"><label for="vxRecLang" class="vx-hint">שפת הדיבור</label><select id="vxRecLang" class="vx-btn sm">${Object.entries(LANG_NAMES).map(([k, v]) => `<option value="${k}"${(prefs.lang || 'he') === k ? ' selected' : ''}>${v}</option>`).join('')}</select></div>
+    <p class="vx-hint" style="margin-top:18px">${ico.lock} ההקלטה והתמלול נשארים במכשיר. כדאי להניח את הטלפון קרוב למי שמדבר.</p>
+    <button class="vx-btn" id="vxRecBack" style="margin-top:6px">חזרה</button></div>`;
+  s.querySelector('#vxRecLang').onchange = e => { prefs.lang = e.target.value; wr(PREF_KEY, prefs); };
+  s.querySelector('#vxRecGo').onclick = startRec;
+  s.querySelector('#vxRecBack').onclick = () => show('new');
+}
 const REC = { mr: null, chunks: [], stream: null, t0: 0, acc: 0, timer: 0, cutT: 0, an: null, ac: null, node: null, lock: null, mime: '', pend: [], pendLen: 0, off: 0, floor: [], segs: [], chain: null, engine: null, engineOk: false, lang: 'he', kind: 'lesson', cancel: false, dur: 0 };
 async function startRec() {
   if (!consentOk()) return;
@@ -1610,7 +1625,7 @@ function quickPick() {
 }
 function quickRec() {
   if (!open('new')) return;
-  count('voice_open'); startRec();
+  count('voice_open'); recReady();
 }
 function addEntry() {
   const q = document.querySelector('.wl-quick');
