@@ -1288,7 +1288,7 @@ body:has(#wed) .busy,body:has(#xed) .busy{z-index:1000}body:has(#wed) .toast,bod
 </dialog>
 
 <header class="bar">
-  <div class="brand"><b title="גרסה 5.1.1">סימן</b><span class="ver">5.1.1</span><span class="fname" id="fname"></span></div>
+  <div class="brand"><b title="גרסה 5.1.2">סימן</b><span class="ver">5.1.2</span><span class="fname" id="fname"></span></div>
 
   <nav class="tools" id="tools" aria-label="כלים">
     <button class="tool" data-tool="select" aria-pressed="true" title="בחירה וגלילה (V)">
@@ -2614,8 +2614,10 @@ async function saveBytes(name,bytes,kind){
   // building the file can take longer than the browser counts a tap: then a fresh tap is asked for,
   // otherwise the phone refuses the share sheet and the download comes out broken
   const fresh=()=>!navigator.userActivation||navigator.userActivation.isActive;
-  // phones: open the share sheet (save to Files, send by WhatsApp/mail…)
-  if(matchMedia('(pointer:coarse)').matches&&navigator.canShare&&navigator.canShare({files:[file]})){
+  // iPhone/iPad: the share sheet ("Save to Files"). Android downloads the file straight into Downloads:
+  // its share sheet often has no way to save the file on the phone at all
+  const IOS=/iP(hone|ad|od)/.test(navigator.userAgent)||(/Macintosh/.test(navigator.userAgent)&&navigator.maxTouchPoints>1);
+  if(IOS&&navigator.canShare&&navigator.canShare({files:[file]})){
     if(!fresh()&&!await askToSave(name))return false;
     try{await navigator.share({files:[file],title:name});return true;}
     catch(e){if(e&&e.name==='AbortError')return false;
@@ -4998,7 +5000,7 @@ if('launchQueue' in window){
    ===================================================================== */
 (function(){
   const STATUS_URL=(typeof REGISTER_URL!=='undefined'&&REGISTER_URL)?REGISTER_URL.replace(/\/register$/,'/status'):'';
-  const U_KEY='siman.usage', T_KEY='siman.trial', APP_VER='5.1.1';
+  const U_KEY='siman.usage', T_KEY='siman.trial', APP_VER='5.1.2';
   const today=()=>new Date().toISOString().slice(0,10);
   const rd=k=>{try{return JSON.parse(localStorage.getItem(k)||'null');}catch(_){return null;}};
   const wr=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch(_){}};

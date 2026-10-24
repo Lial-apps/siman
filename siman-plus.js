@@ -114,6 +114,16 @@ dialog.scan::backdrop{background:color-mix(in srgb,var(--navy) 60%,transparent);
 .sc-opts{display:flex;flex-wrap:wrap;gap:16px;align-items:center;margin:20px 0 0;font-size:14px}
 .sc-opts select{font:inherit;padding:6px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bar);color:var(--ink)}
 .sc-fine{color:var(--muted);font-size:12.5px;margin-top:18px;max-width:70ch;line-height:1.55}
+.sc-tray{list-style:none;margin:0 0 14px;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:12px}
+.sc-tray li{position:relative;border:1px solid var(--line);border-radius:12px;padding:6px;font-size:12.5px;color:var(--muted);text-align:center;background:var(--bar)}
+.sc-tray img{display:block;width:100%;height:150px;object-fit:contain;background:#fff;border-radius:8px;margin-bottom:6px}
+.sc-tray .x{position:absolute;top:10px;inset-inline-end:10px;width:30px;height:30px;border-radius:50%;border:0;background:rgba(20,24,32,.78);color:#fff;font-size:18px;line-height:1;cursor:pointer}
+.sc-tray li.add{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-height:178px;border-style:dashed;cursor:pointer;color:var(--ink);font:inherit;font-weight:600}
+.sc-tray li.add svg{width:30px;height:30px}
+.sc-trayhead{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin:0 0 12px}
+.sc-trayhead h3{margin:0;font-size:20px}
+.sc-trayhead p{margin:0;color:var(--muted)}
+.sc-pg .sc-del{border:0;background:none;color:#B42318;font:inherit;text-decoration:underline;cursor:pointer;padding:0}
 .sc-prog{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px}
 .sc-prog li{border:1px solid var(--line);border-radius:12px;padding:6px;font-size:12.5px;color:var(--muted);text-align:center}
 .sc-prog img{display:block;width:100%;height:150px;object-fit:contain;background:#fff;border-radius:8px;margin-bottom:6px}
@@ -942,7 +952,7 @@ const imgIn = h('<input type="file" accept="image/*" multiple hidden>');
 const pdfIn = h('<input type="file" accept="application/pdf,.pdf" hidden>');
 dlg.append(camIn, imgIn, pdfIn);
 const SC = {
-  pages: [], stop: false, running: false, hint: '', name: '', quality: 'accurate',
+  pages: [], tray: [], stop: false, running: false, hint: '', name: '', quality: 'accurate',
   body: () => dlg.querySelector('.sc-body'), foot: () => dlg.querySelector('.sc-foot'),
   // a modal dialog covers the app's toasts and busy screen, so messages are shown inside it
   note(msg) {
@@ -961,18 +971,18 @@ const SC = {
   },
   close() {
     if (this.running) { this.stop = true; }
-    else if (this.pages.some(p => p.blocks) && !confirm('לסגור? הטקסט שזוהה לא יישמר')) return;
+    else if ((this.pages.some(p => p.blocks) || this.tray.length) && !confirm('לסגור? הטקסט שזוהה לא יישמר')) return;
     dlg.close();
   },
   pick() {
-    this.pages = []; this.stop = false; this.running = false;
+    this.pages = []; this.tray = []; this.stop = false; this.running = false; this.name = '';
     const docN = S.doc ? S.pages.length : 0;
     const b = this.body(); this.foot().classList.add('hidden');
     b.innerHTML = `<div class="sc-pick">
       <h3>מצלמים דף — מקבלים מסמך מודפס</h3>
       <p class="sub">כתב יד, צילום של מסמך או PDF סרוק: סימן קורא את הכתוב, גם בכתב יד, ובונה ממנו קובץ Word או PDF עם כותרות, רשימות וטבלאות. לפני השמירה רואים את התמונה ואת הטקסט זה לצד זה ומתקנים. מילים שהזיהוי לא בטוח בהן מסומנות בצהוב.</p>
       <div class="sc-srcs">
-        <button class="sc-src" type="button" data-s="cam">${ICON.scan}<b>צילום במצלמה</b><span>בטלפון: נפתחת המצלמה. מצלמים ישר מלמעלה, באור טוב</span></button>
+        <button class="sc-src" type="button" data-s="cam">${ICON.scan}<b>צילום במצלמה</b><span>בטלפון: נפתחת המצלמה. מצלמים ישר מלמעלה, באור טוב. אפשר לצלם כמה עמודים לקובץ אחד</span></button>
         <button class="sc-src" type="button" data-s="img"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M21 16l-5-5-8 8"/></svg><b>בחירת תמונות</b><span>אפשר כמה תמונות יחד. כל תמונה היא עמוד</span></button>
         <button class="sc-src" type="button" data-s="pdf"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4"/></svg><b>PDF סרוק</b><span>קובץ שנסרק או צולם, עד 30 עמודים</span></button>
         ${docN ? `<button class="sc-src" type="button" data-s="doc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="1.5"/><path d="M9 8h6M9 12h6M9 16h3"/></svg><b>הקובץ הפתוח</b><span></span></button>` : ''}
@@ -989,26 +999,49 @@ const SC = {
     b.querySelector('[data-s=pdf]').onclick = () => pdfIn.click();
     const d = b.querySelector('[data-s=doc]'); if (d) d.onclick = () => this.fromDoc();
   },
+  // the pages wait in a tray: more can be photographed or added, and then all are read into one file
+  room() { return Math.max(0, 30 - this.pages.length - this.tray.length); },
   async fromImages(files) {
     if (!files.length) return;
-    this.name = files.length === 1 ? files[0].name.replace(/\.[a-z0-9]+$/i, '') : 'כתב יד';
-    const pics = [];
-    for (const f of files.slice(0, 30)) {
-      try { pics.push(await imgToJpeg(f)); }
-      catch (e) { this.note(`לא הצלחתי לקרוא את התמונה ${f.name}${/heic|heif/i.test(f.type + f.name) ? ' (HEIC). צלמו ישר מהמצלמה או שמרו אותה כ-JPG' : ''}`); }
+    if (!this.name && !this.pages.length && !this.tray.length) this.name = files.length === 1 && !/^(image|img|photo|pxl|dsc|תמונה)[-_ ]?\d*/i.test(files[0].name) ? files[0].name.replace(/\.[a-z0-9]+$/i, '') : 'כתב יד';
+    const bad = [], take = files.slice(0, this.room());
+    for (const f of take) {
+      this.wait(`מכין את התמונה${take.length > 1 ? 'ות' : ''}…`);
+      try { this.tray.push(await imgToJpeg(f)); }
+      catch (e) { bad.push(`${f.name}${/heic|heif/i.test(f.type + f.name) ? ' (HEIC: צלמו ישר מהמצלמה או שמרו כ-JPG)' : ''}`); }
     }
-    if (pics.length) this.run(pics);
+    this.showTray();
+    if (files.length > take.length) this.note('אפשר עד 30 עמודים בקובץ אחד');
+    if (bad.length) this.note('לא הצלחתי לקרוא: ' + bad.join(', '));
+  },
+  showTray() {
+    const had = this.pages.filter(p => p.blocks || p.err).length;
+    if (!this.tray.length && !had) { this.pick(); return; }
+    const b = this.body(), f = this.foot(), n = this.tray.length;
+    const pg = k => k === 1 ? 'עמוד אחד' : `${k} עמודים`;
+    b.innerHTML = `<div class="sc-trayhead"><h3>${n ? pg(n) + (had ? ' להוספה' : ' לקריאה') : 'הוספת עמודים'}</h3><p>${had ? `בקובץ כבר יש ${pg(had)}. העמודים החדשים יתווספו אחריהם. ` : ''}הכל נשמר כקובץ אחד, לפי הסדר.</p></div>
+      <ul class="sc-tray">${this.tray.map((p, i) => `<li><img alt="עמוד ${had + i + 1}" src="${p.url}">עמוד ${had + i + 1}<button type="button" class="x" data-del="${i}" aria-label="הסרת עמוד ${had + i + 1}">×</button></li>`).join('')}
+        ${this.room() ? `<li class="add" role="button" tabindex="0" data-add="cam">${ICON.scan}צילום עמוד${n || had ? ' נוסף' : ''}</li><li class="add" role="button" tabindex="0" data-add="img"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M21 16l-5-5-8 8"/></svg>בחירת תמונות</li><li class="add" role="button" tabindex="0" data-add="pdf"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4"/></svg>PDF סרוק</li>` : ''}
+      </ul>`;
+    b.querySelectorAll('[data-del]').forEach(x => x.onclick = () => { this.tray.splice(+x.dataset.del, 1); this.showTray(); });
+    b.querySelectorAll('[data-add]').forEach(x => { const go = () => ({ cam: camIn, img: imgIn, pdf: pdfIn })[x.dataset.add].click(); x.onclick = go; x.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } }; });
+    f.classList.remove('hidden');
+    f.innerHTML = `<span class="hint" style="margin-inline-end:auto"></span>${had ? '<button class="btn" type="button" data-a="back">חזרה לטקסט</button>' : '<button class="btn" type="button" data-a="restart">ביטול</button>'}<button class="btn primary" type="button" data-a="read" ${n ? '' : 'disabled'}>${n > 1 ? `קריאת ${n} העמודים` : 'קריאת העמוד'}</button>`;
+    const back = f.querySelector('[data-a=back]'); if (back) back.onclick = () => { this.tray = []; this.review(); };
+    const rs = f.querySelector('[data-a=restart]'); if (rs) rs.onclick = () => this.pick();
+    f.querySelector('[data-a=read]').onclick = () => { const pics = this.tray; this.tray = []; this.run(pics, '', had > 0); };
   },
   async fromPdf(file) {
     if (!file) return;
-    this.name = file.name.replace(/\.pdf$/i, '');
+    if (!this.name && !this.pages.length && !this.tray.length) this.name = file.name.replace(/\.pdf$/i, '');
     this.wait('קורא את ה-PDF…');
     try {
       const d = await pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()), isEvalSupported: false }).promise;
-      const pics = [];
-      for (let i = 1; i <= Math.min(30, d.numPages); i++) { this.wait(`מכין עמוד ${i} מתוך ${Math.min(30, d.numPages)}…`); pics.push(await pageToJpeg(await d.getPage(i))); }
-      d.destroy(); this.run(pics, d.numPages > 30 ? 'נסרקים 30 העמודים הראשונים. ' : '');
-    } catch (e) { console.error(e); this.pick(); this.note(e && e.name === 'PasswordException' ? 'הקובץ מוגן בסיסמה' : 'לא הצלחתי לפתוח את ה-PDF'); }
+      const n = Math.min(this.room(), d.numPages);
+      for (let i = 1; i <= n; i++) { this.wait(`מכין עמוד ${i} מתוך ${n}…`); this.tray.push(await pageToJpeg(await d.getPage(i))); }
+      d.destroy(); this.showTray();
+      if (d.numPages > n) this.note(`נוספו ${n} עמודים: אפשר עד 30 עמודים בקובץ אחד`);
+    } catch (e) { console.error(e); this.showTray(); this.note(e && e.name === 'PasswordException' ? 'הקובץ מוגן בסיסמה' : 'לא הצלחתי לפתוח את ה-PDF'); }
   },
   async fromDoc() {
     if (!S.doc) return;
@@ -1019,20 +1052,24 @@ const SC = {
       this.run(pics, S.pages.length > 30 ? 'נסרקים 30 העמודים הראשונים. ' : '');
     } catch (e) { console.error(e); this.pick(); this.note('הכנת העמודים נכשלה'); }
   },
-  async run(pics, pre = '') {
-    this.pages = pics.map(p => ({ ...p, blocks: null, err: null }));
+  async run(pics, pre = '', append = false) {
+    this.keepEdits();
+    const fresh = pics.map(p => ({ ...p, blocks: null, err: null }));
+    if (append) this.pages = this.pages.filter(p => p.blocks || p.err);
+    const start = append ? this.pages.length : 0;
+    this.pages = append ? this.pages.concat(fresh) : fresh;
     this.running = true; this.stop = false;
     const b = this.body();
-    b.innerHTML = `<p class="sc-status" role="status" style="margin:0 0 14px;font-size:15px"></p><ul class="sc-prog">${this.pages.map((p, i) => `<li><img alt="עמוד ${i + 1}" src="${p.url}"><span>ממתין</span></li>`).join('')}</ul>`;
+    b.innerHTML = `<p class="sc-status" role="status" style="margin:0 0 14px;font-size:15px"></p><ul class="sc-prog">${fresh.map((p, i) => `<li><img alt="עמוד ${start + i + 1}" src="${p.url}"><span>ממתין</span></li>`).join('')}</ul>`;
     const f = this.foot(); f.classList.remove('hidden');
     f.innerHTML = '<span class="hint" style="margin-inline-end:auto"></span><button class="btn" type="button" data-a="stop">עצירה</button>';
     f.querySelector('[data-a=stop]').onclick = () => { this.stop = true; };
     const st = b.querySelector('.sc-status'), lis = [...b.querySelectorAll('.sc-prog li')];
-    for (let i = 0; i < this.pages.length; i++) {
+    for (let i = 0; i < fresh.length; i++) {
       if (this.stop) break;
-      const p = this.pages[i], li = lis[i];
+      const p = fresh[i], li = lis[i];
       li.className = 'now'; li.querySelector('span').textContent = 'קורא…';
-      const t0 = Date.now(), line = `${i ? '' : pre}קורא את עמוד ${i + 1} מתוך ${this.pages.length}`;
+      const t0 = Date.now(), line = `${i ? '' : pre}קורא את עמוד ${start + i + 1}${fresh.length > 1 ? ` (${i + 1} מתוך ${fresh.length})` : ''}`;
       st.textContent = line + '…';
       const clock = setInterval(() => { const sec = Math.round((Date.now() - t0) / 1000); li.querySelector('span').textContent = `קורא… ${sec} שנ׳`; st.textContent = `${line} · ${sec} שניות${sec > 45 ? ' (כתב יד צפוף לוקח לפעמים עד שתי דקות)' : ''}`; }, 1000);
       try {
@@ -1043,11 +1080,11 @@ const SC = {
         p.err = e.message || String(e); li.className = 'bad'; li.querySelector('span').textContent = 'לא נקרא';
         if (/מכסה|לא הוקם|חוסם|אין חיבור/.test(p.err)) { st.textContent = p.err; this.stop = true; break; }
       }
-      if (i < this.pages.length - 1 && !this.stop) await sleep(1200);   // the free service allows only a few pages a minute
+      if (i < fresh.length - 1 && !this.stop) await sleep(1200);   // the free service allows only a few pages a minute
     }
     this.running = false;
     const done = this.pages.filter(p => p.blocks);
-    if (!done.length) {
+    if (!done.length && !append) {
       st.textContent = (this.pages.find(p => p.err) || {}).err || 'לא זוהה טקסט';
       f.innerHTML = '<span class="hint" style="margin-inline-end:auto"></span><button class="btn" type="button" data-a="again">התחלה מחדש</button>';
       f.querySelector('[data-a=again]').onclick = () => this.pick();
@@ -1055,7 +1092,9 @@ const SC = {
     }
     this.review();
   },
+  keepEdits() { for (const p of this.pages) if (p.ed && p.ed.isConnected) p.html = p.ed.innerHTML; },
   review() {
+    this.keepEdits();
     const b = this.body();
     b.innerHTML = '<div class="sc-rev"></div>';
     const rev = b.firstChild;
@@ -1063,7 +1102,7 @@ const SC = {
       if (!p.blocks && !p.err) return;
       const row = h(`<section class="sc-pg" aria-label="עמוד ${i + 1}"><figure><img alt="המקור, עמוד ${i + 1}" src="${p.url}"><figcaption>המקור · עמוד ${i + 1}${p.err ? ' · לא נקרא: ' + esc(p.err) : ''} · <button type="button" class="sc-again">לקרוא את העמוד שוב במצב מדויק</button></figcaption></figure><div class="sc-ed" contenteditable="true" spellcheck="true"></div></section>`);
       const ed = row.querySelector('.sc-ed');
-      ed.innerHTML = p.blocks && p.blocks.length ? blocksHtml(p.blocks) : '<p class="empty">לא זוהה טקסט בעמוד הזה. אפשר להקליד כאן.</p>';
+      ed.innerHTML = p.html != null ? p.html : p.blocks && p.blocks.length ? blocksHtml(p.blocks) : '<p class="empty">לא זוהה טקסט בעמוד הזה. אפשר להקליד כאן.</p>';
       ed.dir = p.blocks && p.blocks.length ? (blocksRtl(p.blocks) ? 'rtl' : 'ltr') : 'rtl';
       ed.addEventListener('focus', () => { try { document.execCommand('defaultParagraphSeparator', false, 'p'); } catch (_) {} });
       ed.addEventListener('input', () => { ed.querySelectorAll('mark').forEach(m => { if (!m.textContent.trim()) m.remove(); }); this.count(); });
@@ -1071,11 +1110,17 @@ const SC = {
       row.querySelector('img').onclick = () => { const z = h(`<div class="sc-zoom"><img alt="" src="${p.url}"></div>`); z.onclick = () => z.remove(); dlg.append(z); };
       p.ed = ed;
       row.querySelector('.sc-again').onclick = () => this.again(i, row);
+      if (this.pages.filter(x => x.blocks || x.err).length > 1) {
+        const del = h('<button type="button" class="sc-del">הסרת העמוד</button>');
+        del.onclick = () => { if (!confirm(`להסיר את עמוד ${i + 1} מהקובץ?`)) return; this.keepEdits(); this.pages.splice(i, 1); this.review(); };
+        row.querySelector('figcaption').append(' · ', del);
+      }
       rev.append(row);
     });
     const f = this.foot(); f.classList.remove('hidden');
     f.innerHTML = `<label>שם הקובץ <input type="text" data-o="name" dir="auto"></label>
       <span class="hint" data-o="unsure"></span>
+      <button class="btn" type="button" data-a="more" title="צילום או הוספה של עוד עמודים לאותו קובץ">+ הוספת עמודים</button>
       <button class="btn" type="button" data-a="copy">העתקת הטקסט</button>
       <button class="btn" type="button" data-a="edit" title="פתיחה בעורך ה-Word של סימן">עריכה בעורך Word</button>
       <button class="btn" type="button" data-a="pdf">שמירה כ-PDF</button>
@@ -1085,6 +1130,7 @@ const SC = {
     f.querySelector('[data-a=docx]').onclick = () => this.save('docx');
     f.querySelector('[data-a=pdf]').onclick = () => this.save('pdf');
     f.querySelector('[data-a=edit]').onclick = () => this.save('edit');
+    f.querySelector('[data-a=more]').onclick = () => { if (!this.room()) { this.note('אפשר עד 30 עמודים בקובץ אחד'); return; } this.keepEdits(); this.tray = []; this.showTray(); };
     f.querySelector('[data-a=copy]').onclick = async () => { try { await navigator.clipboard.writeText(this.collect().map(pg => pg.map(blockText).join('\n')).join('\n\n')); toast('הטקסט הועתק'); } catch (_) { toast('ההעתקה לא הצליחה'); } };
     this.count();
   },
@@ -1096,7 +1142,7 @@ const SC = {
     try {
       const raw = await ai({ mode: 'scan', image: p.b64, mime: 'image/jpeg', hint: this.hint, quality: 'accurate' });
       const bl = parseBlocks(raw);
-      if (bl.length) { p.blocks = bl; ed.innerHTML = blocksHtml(bl); ed.dir = blocksRtl(bl) ? 'rtl' : 'ltr'; this.count(); btn.textContent = 'נקרא שוב ✓'; }
+      if (bl.length) { p.blocks = bl; p.html = null; ed.innerHTML = blocksHtml(bl); ed.dir = blocksRtl(bl) ? 'rtl' : 'ltr'; this.count(); btn.textContent = 'נקרא שוב ✓'; }
       else btn.textContent = 'לא זוהה טקסט';
     } catch (e) { btn.textContent = 'נכשל: ' + (e.message || e); btn.disabled = false; }
     finally { clearInterval(clock); this.running = false; }
@@ -1121,17 +1167,19 @@ const SC = {
     try {
       if (kind === 'pdf') {
         this.note('בונה PDF…'); const bytes = await blocksPdf(pages);
-        if (await saveBytes(base + '.pdf', bytes, 'pdf')) this.note('נשמר כ-PDF ✓'); else this.count();
+        if (await saveBytes(base + '.pdf', bytes, 'pdf')) this.note(savedNote('PDF', pages.length)); else this.count();
         return;
       }
       const bytes = blocksDocx(pages);
       if (kind === 'edit') { dlg.close(); await openWordEditor(bytes, base + '.docx'); return; }
-      if (await saveBytes(base + '.docx', bytes, 'docx')) this.note('נשמר כקובץ Word ✓'); else this.count();
+      if (await saveBytes(base + '.docx', bytes, 'docx')) this.note(savedNote('Word', pages.length)); else this.count();
     } catch (e) { console.error(e); this.note('השמירה נכשלה: ' + (e.message || e)); }
   },
 };
+const ANDROID = /Android/i.test(navigator.userAgent);
+const savedNote = (k, n) => `נשמר כקובץ ${k} אחד${n > 1 ? ` עם ${n} עמודים` : ''} ✓${ANDROID ? ' · בתיקיית "הורדות" (Downloads)' : ''}`;
 dlg.querySelector('[data-a=close]').onclick = () => SC.close();
-dlg.addEventListener('cancel', e => { if (SC.running || SC.pages.some(p => p.blocks)) { e.preventDefault(); SC.close(); } });
+dlg.addEventListener('cancel', e => { if (SC.running || SC.pages.some(p => p.blocks) || SC.tray.length) { e.preventDefault(); SC.close(); } });
 camIn.onchange = e => { const f = [...e.target.files]; e.target.value = ''; SC.fromImages(f); };
 imgIn.onchange = e => { const f = [...e.target.files]; e.target.value = ''; SC.fromImages(f); };
 pdfIn.onchange = e => { const f = e.target.files[0]; e.target.value = ''; SC.fromPdf(f); };
