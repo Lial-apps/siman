@@ -124,6 +124,9 @@ dialog.scan::backdrop{background:color-mix(in srgb,var(--navy) 60%,transparent);
 .sc-trayhead h3{margin:0;font-size:20px}
 .sc-trayhead p{margin:0;color:var(--muted)}
 .sc-pg .sc-del{border:0;background:none;color:#B42318;font:inherit;text-decoration:underline;cursor:pointer;padding:0}
+.sc-saved{flex-basis:100%;display:flex;flex-direction:column;gap:4px;background:#E7F5EC;border:1px solid #9BD3B1;border-radius:12px;padding:10px 12px;color:#14532D}
+.sc-saved span{font-size:13px;color:#2F5D43;word-break:break-all}
+.sc-saved-a{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
 .sc-prog{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px}
 .sc-prog li{border:1px solid var(--line);border-radius:12px;padding:6px;font-size:12.5px;color:var(--muted);text-align:center}
 .sc-prog img{display:block;width:100%;height:150px;object-fit:contain;background:#fff;border-radius:8px;margin-bottom:6px}
@@ -1159,20 +1162,37 @@ const SC = {
       const r = document.createRange(); r.selectNodeContents(m); const s = getSelection(); s.removeAllRanges(); s.addRange(r); m.closest('.sc-ed').focus();
     };
   },
+  // after saving: where the file went, and two ways out if the phone did not keep it
+  saved(name, bytes, k, n) {
+    const f = this.foot(); f.querySelectorAll('.sc-saved').forEach(x => x.remove());
+    const box = h(`<div class="sc-saved" role="status"><b></b><span></span><div class="sc-saved-a"><button class="btn" type="button" data-s="open">פתיחת הקובץ עכשיו</button></div></div>`);
+    box.querySelector('b').textContent = savedNote(k, n);
+    box.querySelector('span').textContent = `שם הקובץ: ${name}`;
+    const file = () => new File([bytes], name, { type: k === 'PDF' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+    box.querySelector('[data-s=open]').onclick = () => { dlg.close(); openFile(file()); };
+    if (ANDROID && navigator.canShare && navigator.canShare({ files: [file()] })) {
+      const sh = h('<button class="btn" type="button">שליחה / שמירה ב-Drive</button>');
+      sh.onclick = async () => { try { await navigator.share({ files: [file()], title: name }); } catch (_) {} };
+      box.querySelector('.sc-saved-a').append(sh);
+    }
+    f.prepend(box); this.count();
+  },
   collect() { return this.pages.filter(p => p.ed).map(p => domBlocks(p.ed)).filter(pg => pg.length); },
   async save(kind) {
     const pages = this.collect();
     if (!pages.length) { toast('אין טקסט לשמירה'); return; }
-    const base = cleanBase(this.name) || 'סריקה';
+    // a new name each time when the name is the default one: an old broken file of the same name is never opened by mistake
+    let base = cleanBase(this.name) || 'סריקה';
+    if (/^(סריקה|כתב יד)$/.test(base)) { const d = new Date(), z = n => String(n).padStart(2, '0'); base += ` ${z(d.getDate())}-${z(d.getMonth() + 1)} ${z(d.getHours())}-${z(d.getMinutes())}`; }
     try {
       if (kind === 'pdf') {
         this.note('בונה PDF…'); const bytes = await blocksPdf(pages);
-        if (await saveBytes(base + '.pdf', bytes, 'pdf')) this.note(savedNote('PDF', pages.length)); else this.count();
+        if (await saveBytes(base + '.pdf', bytes, 'pdf')) this.saved(base + '.pdf', bytes, 'PDF', pages.length); else this.count();
         return;
       }
       const bytes = blocksDocx(pages);
       if (kind === 'edit') { dlg.close(); await openWordEditor(bytes, base + '.docx'); return; }
-      if (await saveBytes(base + '.docx', bytes, 'docx')) this.note(savedNote('Word', pages.length)); else this.count();
+      if (await saveBytes(base + '.docx', bytes, 'docx')) this.saved(base + '.docx', bytes, 'Word', pages.length); else this.count();
     } catch (e) { console.error(e); this.note('השמירה נכשלה: ' + (e.message || e)); }
   },
 };

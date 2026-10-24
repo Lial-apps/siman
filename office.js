@@ -115,6 +115,7 @@ const OFFICE = (() => {
       return { files, salvaged: false };
     } catch (e) {
       log.push({ lvl: 'err', msg: 'מבנה הקובץ שבור (לרוב: הקובץ לא ירד או לא נשמר עד הסוף). משחזר את החלקים אחד-אחד.' });
+      if (typeof window.fileSig === 'function') log.push({ lvl: 'warn', msg: 'מה יש בקובץ: ' + window.fileSig(bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes)) });
       const files = await salvage(bytes, log);
       return { files, salvaged: true };
     }

@@ -1288,7 +1288,7 @@ body:has(#wed) .busy,body:has(#xed) .busy{z-index:1000}body:has(#wed) .toast,bod
 </dialog>
 
 <header class="bar">
-  <div class="brand"><b title="גרסה 5.1.2">סימן</b><span class="ver">5.1.2</span><span class="fname" id="fname"></span></div>
+  <div class="brand"><b title="גרסה 5.1.3">סימן</b><span class="ver">5.1.3</span><span class="fname" id="fname"></span></div>
 
   <nav class="tools" id="tools" aria-label="כלים">
     <button class="tool" data-tool="select" aria-pressed="true" title="בחירה וגלילה (V)">
@@ -1748,6 +1748,14 @@ function dispName(n){n=String(n||'');return /[\u0590-\u05FF]/.test(n)?n.replace(
 function setDirty(v){S.dirty=v;document.title=(v?'• ':'')+(S.name?S.name+' — ':'')+'סימן';}
 
 /* ===================== open ===================== */
+function fileSig(b){ // what a file that does not open really holds: shown to the user so the cause can be found
+  const n=b.length,kb=n<1024?n+' בתים':(n/1024).toFixed(n<10240?1:0)+' KB';
+  if(!n)return 'הקובץ ריק (0 בתים): הוא לא נשמר';
+  const head=String.fromCharCode(...b.subarray(0,Math.min(16,n)));
+  const what=/^%PDF/.test(head)?'נראה כמו PDF':/^PK/.test(head)?'נראה כמו קובץ Word/Office':/^\s*</.test(head)?'בפנים יש דף אינטרנט ולא המסמך':b.subarray(0,64).every(x=>x===0)?'מלא באפסים':'תוכן לא מוכר';
+  return `גודל ${kb}, ${what}`;
+}
+window.fileSig=fileSig;
 async function openFile(file,handle){
   if(!file)return;
   if(typeof needReg==='function'&&needReg()){pendingOpen={f:file,h:handle};showReg();return;}
@@ -1782,7 +1790,8 @@ async function openFile(file,handle){
     if(!$('pgpanel').classList.contains('hidden'))renderThumbs();
   }catch(e){
     console.error(e);
-    toast(e&&e.name==='PasswordException'?'הקובץ מוגן בסיסמה. הסירו את הסיסמה ונסו שוב.':'לא הצלחתי לפתוח את הקובץ. ייתכן שהוא פגום.');
+    let sig='';try{sig=fileSig(new Uint8Array(await file.arrayBuffer()));}catch(_){}
+    toast(e&&e.name==='PasswordException'?'הקובץ מוגן בסיסמה. הסירו את הסיסמה ונסו שוב.':'לא הצלחתי לפתוח את הקובץ. ייתכן שהוא פגום.'+(sig?' ('+sig+')':''));
   }finally{busy(false);}
 }
 
@@ -5000,7 +5009,7 @@ if('launchQueue' in window){
    ===================================================================== */
 (function(){
   const STATUS_URL=(typeof REGISTER_URL!=='undefined'&&REGISTER_URL)?REGISTER_URL.replace(/\/register$/,'/status'):'';
-  const U_KEY='siman.usage', T_KEY='siman.trial', APP_VER='5.1.2';
+  const U_KEY='siman.usage', T_KEY='siman.trial', APP_VER='5.1.3';
   const today=()=>new Date().toISOString().slice(0,10);
   const rd=k=>{try{return JSON.parse(localStorage.getItem(k)||'null');}catch(_){return null;}};
   const wr=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch(_){}};
