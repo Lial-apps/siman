@@ -1288,7 +1288,7 @@ body:has(#wed) .busy,body:has(#xed) .busy{z-index:1000}body:has(#wed) .toast,bod
 </dialog>
 
 <header class="bar">
-  <div class="brand"><b title="גרסה 5.1.4">סימן</b><span class="ver">5.1.4</span><span class="fname" id="fname"></span></div>
+  <div class="brand"><b title="גרסה 5.1.5">סימן</b><span class="ver">5.1.5</span><span class="fname" id="fname"></span></div>
 
   <nav class="tools" id="tools" aria-label="כלים">
     <button class="tool" data-tool="select" aria-pressed="true" title="בחירה וגלילה (V)">
@@ -2564,13 +2564,20 @@ async function buildPdf(){
   }
   return doc.save();
 }
-const FS=!!(window.showSaveFilePicker&&window.showOpenFilePicker);
+// Android: Chrome's save window there makes the file and then refuses to write into it ("אין הרשאה לכתוב לקובץ",
+// an empty file of 0 bytes is left behind), so on Android files are downloaded instead
+const FS=!!(window.showSaveFilePicker&&window.showOpenFilePicker)&&!/Android/i.test(navigator.userAgent);
 const PDF_TYPE=[{description:'PDF',accept:{'application/pdf':['.pdf']}}];
 const OPEN_TYPES=[{description:'PDF, Word, Excel, PowerPoint',accept:{'application/pdf':['.pdf'],'application/msword':['.doc'],'application/vnd.openxmlformats-officedocument.wordprocessingml.document':['.docx'],'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':['.xlsx'],'application/vnd.openxmlformats-officedocument.presentationml.presentation':['.pptx']}}];
 async function writeHandle(h,bytes){
-  if(h.queryPermission&&(await h.queryPermission({mode:'readwrite'}))!=='granted'){
-    if((await h.requestPermission({mode:'readwrite'}))!=='granted')throw new Error('אין הרשאה לכתוב לקובץ');}
-  const w=await h.createWritable();
+  // a file just picked in the save window may be written straight away: permission is asked only if writing is refused
+  let w;
+  try{w=await h.createWritable();}
+  catch(e){
+    if(!(e&&(e.name==='NotAllowedError'||e.name==='SecurityError'))||!h.requestPermission)throw e;
+    if((await h.requestPermission({mode:'readwrite'}))!=='granted')throw new Error('אין הרשאה לכתוב לקובץ');
+    w=await h.createWritable();
+  }
   try{await w.write(bytes);await w.close();}catch(e){try{await w.abort();}catch(_){}throw e;}
 }
 // the file is open in another program (Acrobat, Edge, Word…) or sits in a place that can't be changed
@@ -5019,7 +5026,7 @@ if('launchQueue' in window){
    ===================================================================== */
 (function(){
   const STATUS_URL=(typeof REGISTER_URL!=='undefined'&&REGISTER_URL)?REGISTER_URL.replace(/\/register$/,'/status'):'';
-  const U_KEY='siman.usage', T_KEY='siman.trial', APP_VER='5.1.4';
+  const U_KEY='siman.usage', T_KEY='siman.trial', APP_VER='5.1.5';
   const today=()=>new Date().toISOString().slice(0,10);
   const rd=k=>{try{return JSON.parse(localStorage.getItem(k)||'null');}catch(_){return null;}};
   const wr=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch(_){}};
