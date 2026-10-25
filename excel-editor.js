@@ -1425,9 +1425,9 @@ function wire(){
   q('xeZoom').oninput=e=>setZoom(+e.target.value/100);
   q('xeSave').onclick=()=>doSave();q('xePdf').onclick=()=>doPdf();q('xeDesk').onclick=()=>doDesk();q('xeClose').onclick=()=>doClose();
   X.onKey=onKey;window.addEventListener('keydown',X.onKey,true);
-  X.onCopy=e=>{if(!X)return;if(!R.contains(e.target)&&e.target!==document.body){e.stopImmediatePropagation();return;}
+  X.onCopy=e=>{if(!X||(e.target.closest&&e.target.closest('#shareDlg')))return;if(!R.contains(e.target)&&e.target!==document.body){e.stopImmediatePropagation();return;}
     if(X.editing||['INPUT','TEXTAREA'].includes(e.target.tagName))return;e.stopImmediatePropagation();e.preventDefault();e.clipboardData.setData('text/plain',doCopy(e.type==='cut'));};
-  X.onPaste=e=>{if(!X)return;if(['INPUT','TEXTAREA'].includes(e.target.tagName)&&R.contains(e.target))return;e.stopImmediatePropagation();
+  X.onPaste=e=>{if(!X||(e.target.closest&&e.target.closest('#shareDlg')))return;if(['INPUT','TEXTAREA'].includes(e.target.tagName)&&R.contains(e.target))return;e.stopImmediatePropagation();
     if(X.dlgOpen)return;e.preventDefault();const t=e.clipboardData&&e.clipboardData.getData('text/plain');if(t)doPaste(t);};
   window.addEventListener('copy',X.onCopy,true);window.addEventListener('cut',X.onCopy,true);window.addEventListener('paste',X.onPaste,true);
   ['keydown','keyup','keypress','input','change'].forEach(t=>R.addEventListener(t,e=>e.stopPropagation()));
@@ -1443,7 +1443,7 @@ function startResize(e,c){
   addEventListener('mousemove',mv);addEventListener('mouseup',up);
 }
 function onKey(e){
-  if(!X)return;const t=e.target,inRoot=X.root.contains(t);
+  if(!X||(e.target.closest&&e.target.closest('#shareDlg')))return;const t=e.target,inRoot=X.root.contains(t);
   if(!inRoot)e.stopImmediatePropagation();
   if(X.dlgOpen){if(!inRoot)e.preventDefault();return;}
   const mod=(e.ctrlKey||e.metaKey)&&!e.altKey,c=e.code,k=e.key;const run=(f,...a)=>{e.preventDefault();f(...a);};
@@ -2399,7 +2399,13 @@ function aiRevert(mark){
   for(let i=mark.sheets;i<X.st.sheets.length;i++){const sh=X.st.sheets[i];if(!sh.hidden){sh.hidden=true;sh.el.setAttribute('state','hidden');X.wbDirty=true;X.dirty=true;}}
   X.si=Math.min(mark.si,X.st.sheets.length-1);buildTabs();render();paintSel();return true;
 }
-window.XLSX_EDITOR={open,close:forceClose,isOpen:()=>!!X,
+async function shareFile(fmt){
+  if(!X)throw new Error('אין גיליון פתוח');if(X.editing)commitEdit();
+  const b=await buildXlsx();
+  if(fmt!=='pdf')return new File([b],fileName(),{type:XLSX_MIME});
+  try{const pdf=await X.opts.toPdf(b);return new File([pdf],fileName().replace(/\.xlsx$/i,'')+'.pdf',{type:'application/pdf'});}finally{X&&X.opts.busy(false);}
+}
+window.XLSX_EDITOR={open,close:forceClose,isOpen:()=>!!X,share:{file:shareFile,name:()=>X?fileName():''},
   assist:{context:aiContext,apply:aiApply,revert:aiRevert,root:()=>X&&X.root},
   _test:{get X(){return X;},filterOf,toggleFilter,setColFilter,applyFilter,addRule,cfPick,cfCss,dvDialog,dvCheck,dvAt,dvItems,removeDups,hideSel,unhideSel,fillDir,cycleRef,region,evalF:(f)=>X.calc.evalF(f,X.si),buildXlsx:()=>buildXlsx(),setInput,select,style,borders,toggleMerge,insRows,insCols,delRows,delCols,sortSel,autoSum,undo,redo,doPaste,doCopy,display:(r,c)=>display(X.si,cellAt(cur(),r,c),r,c).t,parseFormula,moveFormula,shiftFormula}};
 })();

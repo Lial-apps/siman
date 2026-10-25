@@ -1996,7 +1996,12 @@ function aiRevert(mark) {
   if (!X || !mark || !X.hist[mark.hi]) return false; if (X.editing) exitEdit();
   X.hi = mark.hi; restore(X.hist[mark.hi]); renderThumbs(); goSlide(Math.min(mark.cur, X.order.length - 1)); return true;
 }
-window.PPTX_EDITOR = { open, close: forceClose, isOpen: () => !!X, toPdf, textOf,
+async function shareFile(fmt) {
+  if (!X) throw new Error('אין מצגת פתוחה'); commitText();
+  if (fmt !== 'pdf') return new File([await buildPptx()], fileName(), { type: PPTX_MIME });
+  try { const b = await slidesPdf(X, m => X.opts.busy(true, m)); return new File([b], fileName().replace(/\.pptx$/i, '') + '.pdf', { type: 'application/pdf' }); } finally { X && X.opts.busy(false); }
+}
+window.PPTX_EDITOR = { open, close: forceClose, isOpen: () => !!X, toPdf, textOf, share: { file: shareFile, name: () => X ? fileName() : '' },
   assist: { context: aiContext, apply: aiApply, revert: aiRevert, root: () => X && X.root },
   _test: { get X() { return X; }, buildPptx: () => buildPptx(), goSlide, select, enterEdit, exitEdit, commitText, newSlide, dupSlide, delSlide, moveSlide, setSize, setColor, setFont, toggle, align, setDir, bullets, deleteSel, duplicateSel, insertImage, present, undo, redo, keyOf: keyOfNode, findTop, slidesPdf: () => slidesPdf(X), setFill: c => { const t = findTop(X.sel); setFill(t, c); commit(); renderStage(); } }
 };

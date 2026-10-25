@@ -1530,7 +1530,7 @@ function bindEditable(body){
 }
 let mdT=0;function markDirtySoon(){clearTimeout(mdT);mdT=setTimeout(()=>{if(E)markDirty();},300);}
 function onKey(e){
-  if(!E)return;
+  if(!E||(e.target.closest&&e.target.closest('#shareDlg')))return;
   const t=e.target,inBody=E.body.contains(t)||t===E.body,inRoot=E.root.contains(t);
   if(!inRoot)e.stopImmediatePropagation();
   if(E.dlgOpen){if(!inRoot)e.preventDefault();return;}
@@ -2627,7 +2627,13 @@ function aiRevert(mark){
   hfBox('header').innerHTML=mark.hf.header;hfBox('footer').innerHTML=mark.hf.footer;
   after();return true;
 }
-window.WORD_EDITOR={open,close:forceClose,isOpen:()=>!!E,
+async function shareFile(fmt){
+  if(!E)throw new Error('אין מסמך פתוח');
+  const{bytes}=await buildDocx();
+  if(fmt!=='pdf')return new File([bytes],fileName(),{type:DOCX_MIME});
+  try{const pdf=await E.opts.toPdf(bytes);return new File([pdf],fileName().replace(/\.docx$/i,'')+'.pdf',{type:'application/pdf'});}finally{E&&E.opts.busy(false);}
+}
+window.WORD_EDITOR={open,close:forceClose,isOpen:()=>!!E,share:{file:shareFile,name:()=>E?fileName():''},
   assist:{context:aiContext,apply:aiApply,revert:aiRevert,ribbon:()=>E&&E.root.querySelector('.we-ribbon'),root:()=>E&&E.root},
   _test:{get E(){return E;},enterHF,exitHF,pageNumber,removePageNumbers,cmNew,cmAction,cmRemove,tocInsert,tocRemove,wordCount,autoCorrect,countText,buildDocx:()=>buildDocx(),inline,fmt,setFont,setSize,setColor,setHilite,align,setDir,toggleList,indent,applyStyle,galItems,insertTable,tableOp,insertPageBreak,lineSpacing,setPage,undo,redo,getSel,setSel,snap,clearFmt,insertText,findAll,replaceAll:()=>replaceAll(),runFind}};
 })();

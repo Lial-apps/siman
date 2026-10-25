@@ -119,6 +119,8 @@ const I = {
   print: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M5.5 7V3h9v4"/><rect x="3" y="7" width="14" height="7" rx="1.5"/><path d="M6 12h8v5H6z"/></svg>',
   sign: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 15c2.5-4 4-9 6-9 1.5 0-1 7 1 7s2-3 3.5-3c1 0 .5 2 2.5 2"/><path d="M3 17.5h14"/></svg>',
   close: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15"/></svg>',
+  share: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="14.5" cy="4.5" r="2.2"/><circle cx="5.5" cy="10" r="2.2"/><circle cx="14.5" cy="15.5" r="2.2"/><path d="M7.4 8.9l5.2-3.2M7.4 11.1l5.2 3.2"/></svg>',
+  cloud: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M6 15.5h8.5a3.3 3.3 0 0 0 .4-6.6A5 5 0 0 0 5.4 10.2 2.7 2.7 0 0 0 6 15.5z"/></svg>',
   play: '<svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M6 4l10 6-10 6z"/></svg>',
 };
 
@@ -225,6 +227,9 @@ function openMenu(root, k, anchor) {
     ['print', I.print, 'הדפסה', 'Ctrl+P', () => { const b = root.querySelector(`#${ED[k].ribbon} [data-cmd="print"]`); if (b) b.click(); else if (q('Pdf')) q('Pdf').click(); }],
     k === 'pptx' ? ['play', I.play, 'הצגת המצגת', 'F5', () => q('Play') && q('Play').click()] : null,
     '-',
+    ['share', I.share, 'שיתוף', '', () => window.SIMAN_SHARE_EDITOR && window.SIMAN_SHARE_EDITOR(k)],
+    ['drive', I.cloud, 'שמירה ב-Google Drive', '', () => window.SIMAN_SHARE_EDITOR && window.SIMAN_SHARE_EDITOR(k, 'drive')],
+    ['icloud', I.cloud, 'שמירה ב-iCloud Drive', '', () => window.SIMAN_SHARE_EDITOR && window.SIMAN_SHARE_EDITOR(k, 'icloud')],
     ['desk', I.sign, 'לסימון, חתימה ושליחה', '', () => q('Desk') && q('Desk').click()],
     ['ai', I.spark, 'העוזר: עיצוב ועריכה לפי בקשה', '', () => { if (root._oa) root._oa.input.focus(); }],
     '-',

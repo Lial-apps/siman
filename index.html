@@ -1288,7 +1288,7 @@ body:has(#wed) .busy,body:has(#xed) .busy{z-index:1000}body:has(#wed) .toast,bod
 </dialog>
 
 <header class="bar">
-  <div class="brand"><b title="גרסה 5.2.5">סימן</b><span class="ver">5.2.5</span><span class="fname" id="fname"></span></div>
+  <div class="brand"><b title="גרסה 5.2.6">סימן</b><span class="ver">5.2.6</span><span class="fname" id="fname"></span></div>
 
   <nav class="tools" id="tools" aria-label="כלים">
     <button class="tool" data-tool="select" aria-pressed="true" title="בחירה וגלילה (V)">
@@ -4663,7 +4663,7 @@ $('desk').addEventListener('scroll',()=>requestAnimationFrame(markCurrentThumb),
    ===================================================================== */
 // Google Drive: paste the OAuth "Web client ID" from Google Cloud here (see the setup notes).
 // Empty = Drive still works through the phone's share sheet / the Drive folder on the computer.
-const GDRIVE_CLIENT_ID='';
+const GDRIVE_CLIENT_ID='453647394726-nm6qnp7pb9t1smcgvcu9nn4fo1unvn7c.apps.googleusercontent.com';
 
 const UA=navigator.userAgent;
 const IS_APPLE_TOUCH=/iphone|ipad|ipod/i.test(UA)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
@@ -4858,7 +4858,7 @@ document.querySelectorAll('.qa[data-qa]').forEach(b=>b.onclick=()=>{
   el.addEventListener('animationend',e=>{if(e.target===el)el.remove();});setTimeout(()=>el.remove(),2500);})();
 /* --- the file to send: built once when the sheet opens, so taps keep the browser's "user gesture" --- */
 const SH={file:null,job:null,fmt:'pdf',base:null,forBytes:null};
-function defaultShareName(){if(S.office&&SH.fmt==='office')return officeOutName();const n=S.name||'מסמך.pdf';return /\.pdf$/i.test(n)?n:n+'.pdf';}
+function defaultShareName(){if(SH.ext){const n=SH.ext.api.share.name()||'מסמך';return SH.fmt==='pdf'?n.replace(/\.[^.]+$/,'')+'.pdf':n;}if(S.office&&SH.fmt==='office')return officeOutName();const n=S.name||'מסמך.pdf';return /\.pdf$/i.test(n)?n:n+'.pdf';}
 const shareExt=()=>{const n=defaultShareName(),d=n.lastIndexOf('.');return d>0?n.slice(d):'.pdf';};
 // the name the person typed (without the extension), or the automatic one
 const cleanBase=t=>String(t||'').replace(/[\\/:*?"<>|\u0000-\u001f]/g,'').replace(/\s+/g,' ').trim().replace(/[. ]+$/,'').slice(0,120);
@@ -4890,6 +4890,7 @@ function shareHints(){
 }
 function openShare(focusKey){
   if(!S.bytes)return;
+  SH.ext=null;$('shFmt').querySelector('[data-fmt="pdf"]').textContent='PDF חתום';
   closeSaveMenu&&closeSaveMenu();
   document.activeElement&&document.activeElement.blur&&document.activeElement.blur();
   if(!S.office)SH.fmt='pdf';
@@ -4900,12 +4901,25 @@ function openShare(focusKey){
   if(GDRIVE_CLIENT_ID)loadGIS().catch(()=>{});
   prepShare(focusKey);
 }
+// the "שיתוף" item in the editors' File menu: the open file, as it is now, without closing the editor
+window.SIMAN_SHARE_EDITOR=function(kind,focusKey){
+  const api={docx:window.WORD_EDITOR,xlsx:window.XLSX_EDITOR,pptx:window.PPTX_EDITOR}[kind];
+  if(!api||!api.share||!api.isOpen())return;
+  SH.ext={kind,api};SH.fmt='office';SH.base=null;SH.forBytes=null;
+  const f=$('shFmt');f.classList.remove('hidden');
+  f.querySelector('[data-fmt="pdf"]').textContent='PDF';$('shFmtOf').textContent=`${OF_LABEL[kind]} לעריכה`;
+  f.querySelectorAll('.segb').forEach(b=>b.setAttribute('aria-pressed',b.dataset.fmt===SH.fmt));
+  const d=$('shareDlg');if(!d.open)d.showModal();
+  if(GDRIVE_CLIENT_ID)loadGIS().catch(()=>{});
+  prepShare(focusKey);
+};
 function prepShare(focusKey){
   const d=$('shareDlg');SH.waFallback=false;
   SH.file=null;shareHints();
   fillShareName();
   d.classList.add('wait');shStatus('מכין את הקובץ…');
-  const make=S.office&&SH.fmt==='office'?buildOfficeFile().then(r=>{SH.msgs=r.msgs;return r.file;})
+  const make=SH.ext?SH.ext.api.share.file(SH.fmt).then(f=>{SH.msgs=[];return new File([f],fileName(),{type:f.type});})
+    :S.office&&SH.fmt==='office'?buildOfficeFile().then(r=>{SH.msgs=r.msgs;return r.file;})
     :buildPdf().then(bytes=>{SH.msgs=[];return new File([bytes],fileName(),{type:'application/pdf'});});
   const job=SH.job=make.then(f=>{
     if(SH.job!==job)return;
@@ -4918,10 +4932,11 @@ $('shareBtn').onclick=()=>openShare();
 /* SEND FOR SIGNING / SHARE BY LINK — see send.js */
 const loadSend=()=>window.SIMAN_SEND?Promise.resolve():loadScript('send.js');
 async function sendLink(kind){
-  if(!S.bytes){toast('קודם פותחים מסמך');return;}
+  const ext=SH.ext;
+  if(!S.bytes&&!ext){toast('קודם פותחים מסמך');return;}
   if($('shareDlg').open)$('shareDlg').close();
   busy(true,kind==='sign'?'מכין את המסמך לחתימה…':'מכין קישור…');
-  try{await loadSend();const bytes=await buildPdf();busy(false);
+  try{await loadSend();const bytes=ext?new Uint8Array(await (await ext.api.share.file('pdf')).arrayBuffer()):await buildPdf();busy(false);
     const o={bytes,name:fileName(),sender:{name:USER.name||'',mail:USER.mail||''},toast,save:(n,b,k)=>saveBytes(n,b,k)};
     if(kind==='sign')await SIMAN_SEND.open(o);else await SIMAN_SEND.openView(o);}
   catch(e){console.error(e);toast(e.message||String(e));}
@@ -4937,7 +4952,7 @@ $('shFmt').querySelectorAll('.segb').forEach(b=>b.onclick=()=>{if(SH.fmt===b.dat
 $('driveMenuBtn').onclick=()=>openShare('drive');
 $('icloudMenuBtn').onclick=()=>openShare('icloud');
 $('shareClose').onclick=()=>$('shareDlg').close();
-$('shareDlg').addEventListener('close',()=>{SH.job=null;});
+$('shareDlg').addEventListener('close',()=>{SH.job=null;SH.ext=null;});
 $('shareDlg').addEventListener('click',e=>{if(e.target===$('shareDlg'))$('shareDlg').close();});
 
 // true = shared, false = the person closed the menu; throws {shareFail} when the system menu can't take this file
@@ -5040,18 +5055,18 @@ const ACTIONS={
       finally{$('shareDlg').classList.remove('wait');}
       return;}
     if(IS_TOUCH&&canShareFile(f)){if(await shareOr(f,null,()=>{downloadFile(f);done('הקובץ ירד. מעלים אותו מאפליקציית Drive ← הוספה ← העלאה');}))done('בוחרים Drive בתפריט השיתוף');return;}
-    await pickAndWrite(f,'בחלון השמירה בחרו את התיקייה Google Drive (מופיעה כשמותקן Drive למחשב)');
+    await pickAndWrite(f,'בחלון השמירה בחרו את Google Drive (מופיע בצד כשמותקן Drive למחשב). מהפעם הבאה החלון ייפתח שם','siman-gdrive');
   },
   async icloud(f){
     if(IS_APPLE_TOUCH&&canShareFile(f)){shStatus('בתפריט בוחרים "שמירה בקבצים" ואז iCloud Drive');if(await shareOr(f,null,()=>{downloadFile(f);done('הקובץ ירד. מעבירים אותו מההורדות ל-iCloud Drive באפליקציית "קבצים"');}))done('בוחרים "שמירה בקבצים" ← iCloud Drive');return;}
-    await pickAndWrite(f,IS_MAC?'בחלון השמירה בחרו iCloud Drive בצד':'בחלון השמירה בחרו את התיקייה iCloud Drive (מופיעה כשמותקן iCloud למחשב)');
+    await pickAndWrite(f,(IS_MAC?'בחלון השמירה בחרו iCloud Drive בצד':'בחלון השמירה בחרו את iCloud Drive (מופיע בצד כשמותקן iCloud למחשב)')+'. מהפעם הבאה החלון ייפתח שם','siman-icloud');
   }
 };
-async function pickAndWrite(f,hint){
+async function pickAndWrite(f,hint,id){
   if(FS){
     shStatus(hint);
     try{const ty=/\.pdf$/i.test(f.name)?PDF_TYPE:[{description:f.name.split('.').pop().toUpperCase(),accept:{[f.type]:['.'+f.name.split('.').pop()]}}];
-      const h=await showSaveFilePicker({suggestedName:f.name,types:ty,startIn:'documents'});
+      const h=await showSaveFilePicker({suggestedName:f.name,types:ty,id:id||'siman-save',startIn:'documents'});
       await writeHandle(h,new Uint8Array(await f.arrayBuffer()));done('נשמר: '+h.name);}
     catch(e){if(e&&e.name==='AbortError'){shStatus('');return;}throw e;}
     return;}
@@ -5069,14 +5084,14 @@ function waDeskOpen(f){
     else shStatus('הקובץ ירד, אבל וואטסאפ למחשב לא נפתח. אם הוא לא מותקן אפשר <a href="https://www.whatsapp.com/download" target="_blank" rel="noopener">להוריד אותו</a>, או לבחור "וואטסאפ ווב".',true);},1800);
 }
 function refused(f){
-  shStatus(`תפריט השיתוף של המכשיר לא מקבל קובץ ${f.name.split('.').pop().toUpperCase()}. <a href="#" id="shDl">הורדת הקובץ</a> ושליחה מהאפליקציה${S.office&&SH.fmt==='office'?', או בחירה ב-"PDF חתום" למעלה':''}.`,true);
+  shStatus(`תפריט השיתוף של המכשיר לא מקבל קובץ ${f.name.split('.').pop().toUpperCase()}. <a href="#" id="shDl">הורדת הקובץ</a> ושליחה מהאפליקציה${(S.office||SH.ext)&&SH.fmt==='office'?', או בחירה ב-"PDF" למעלה':''}.`,true);
   const a=document.getElementById('shDl');if(a)a.onclick=e=>{e.preventDefault();downloadFile(f);done('הקובץ ירד לתיקיית ההורדות');};
 }
 function done(msg){$('shareDlg').close();if(msg)toast(msg);}
 document.querySelectorAll('.sh[data-share]').forEach(b=>b.addEventListener('click',async()=>{
   const k=b.dataset.share;
   if(!SH.file){shStatus('עוד רגע, הקובץ בהכנה…');return;}
-  if(['airdrop','quick','more'].includes(k)&&!canShareFile(SH.file)){shStatus(`הדפדפן הזה משתף ככה רק PDF. בחרו "PDF חתום" למעלה, או שמרו את קובץ ה-${S.office?OF_LABEL[S.office.kind]:''} ושלחו אותו מהאפליקציה.`);return;}
+  if(['airdrop','quick','more'].includes(k)&&!canShareFile(SH.file)){shStatus(`הדפדפן הזה משתף ככה רק PDF. בחרו "PDF חתום" למעלה, או שמרו את קובץ ה-${SH.ext?OF_LABEL[SH.ext.kind]:S.office?OF_LABEL[S.office.kind]:''} ושלחו אותו מהאפליקציה.`.replace('קובץ ה- ','הקובץ '));return;}
   try{await ACTIONS[k](SH.file);}
   catch(e){console.error(e);$('shareDlg').classList.remove('wait');
     shStatus(e&&e.name==='AbortError'?'':(k==='drive'?'השמירה ב-Drive נכשלה: ':'השיתוף נכשל: ')+(e.message||e));}
@@ -5153,7 +5168,7 @@ if('launchQueue' in window){
    ===================================================================== */
 (function(){
   const STATUS_URL=(typeof REGISTER_URL!=='undefined'&&REGISTER_URL)?REGISTER_URL.replace(/\/register$/,'/status'):'';
-  const U_KEY='siman.usage', T_KEY='siman.trial', APP_VER='5.2.5';
+  const U_KEY='siman.usage', T_KEY='siman.trial', APP_VER='5.2.6';
   const today=()=>new Date().toISOString().slice(0,10);
   const rd=k=>{try{return JSON.parse(localStorage.getItem(k)||'null');}catch(_){return null;}};
   const wr=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch(_){}};
