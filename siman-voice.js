@@ -133,11 +133,11 @@ async function diagnose(e) {
   if (!e || e.name === 'AbortError' || e.checked) return e;
   e.checked = true;
   if (navigator.onLine === false) { e.offline = true; return e; }
-  try {
-    const r = await fetch('https://huggingface.co/itayinbar/Ozen-v1/resolve/main/config.json', { cache: 'no-store' });
-    if (!r.ok) e.raw = 'model site ' + r.status + ' · ' + (e.message || e);
-    else e.engine = true;
-  } catch (_) { e.offline = true; e.raw = 'model site not reachable · ' + (e.message || e); }
+  const ok = async u => { try { return (await fetch(u, { cache: 'no-store' })).ok; } catch (_) { return false; } };
+  const hf = await ok('https://huggingface.co/itayinbar/Ozen-v1/resolve/main/config.json');
+  const mirror = await ok(VOICE_URL + 'hf/itayinbar/Ozen-v1/resolve/main/config.json');
+  e.raw = `hf: ${hf ? 'ok' : 'blocked'} · mirror: ${mirror ? 'ok' : 'blocked'} · ` + (e.message || e);
+  if (!hf && !mirror) e.offline = true; else e.engine = true;
   return e;
 }
 const errInfo = e => [String((e && e.raw) || (e && e.message) || e), 'device: ' + (ASR.device || '?'), 'webgpu: ' + ('gpu' in navigator), navigator.userAgent].join('\n');
@@ -251,7 +251,7 @@ const ASR = (() => {
     stop() { if (!w) return; w.terminate(); w = null; ready = null; cur = ''; for (const p of wait.values()) p.rej(abortErr()); wait.clear(); },
   };
 })();
-async function engineCached(lang) { try { const c = await caches.open('transformers-cache'); return !!(await c.match(ENGINES[ASR.key(lang)].probe)); } catch (_) { return false; } }
+async function engineCached(lang) { try { const c = await caches.open('transformers-cache'); const u = ENGINES[ASR.key(lang)].probe; return !!(await c.match(u) || await c.match(u.replace('https://huggingface.co/', VOICE_URL + 'hf/'))); } catch (_) { return false; } }
 const mb = b => (b / 1048576).toFixed(b > 104857600 ? 0 : 1) + 'MB';
 function progressSum(files) { let l = 0, t = 0; for (const k in files) { const f = files[k]; if (f.total) { t += f.total; l += f.done ? f.total : (f.loaded || 0); } } return { l, t }; }
 

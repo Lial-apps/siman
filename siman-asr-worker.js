@@ -9,6 +9,35 @@ import { env, AutoTokenizer, AutoProcessor, WhisperForConditionalGeneration, pip
 env.allowLocalModels = false;
 env.useBrowserCache = true;
 
+// where the engine files come from: huggingface.co, or — where it is blocked (some phones, browsers, networks) —
+// the same files through סימן's own server (siman-voice worker, /hf/ and /cdn/)
+const HF = 'https://huggingface.co/';
+const MIRROR = 'https://siman-voice.siman-app.workers.dev/hf/';
+const ORT_MIRROR = 'https://siman-voice.siman-app.workers.dev/cdn/';
+const PROBE = 'itayinbar/Ozen-v1/resolve/main/config.json';
+let hostReady = null;
+async function reachable(url) { try { const r = await fetch(url, { cache: 'no-store' }); return r.ok; } catch (_) { return false; } }
+function useMirror() {
+  env.remoteHost = MIRROR;
+  // the runtime's own files (WebAssembly) normally come from cdn.jsdelivr.net: the same files through the mirror
+  try {
+    const wasm = env.backends.onnx.wasm, p = wasm.wasmPaths, to = u => String(u).replace('https://cdn.jsdelivr.net/npm/', ORT_MIRROR);
+    if (p && typeof p === 'object') { if (p.mjs) p.mjs = to(p.mjs); if (p.wasm) p.wasm = to(p.wasm); }
+    else if (typeof p === 'string') wasm.wasmPaths = to(p);
+  } catch (_) {}
+}
+function pickHost() {
+  return hostReady || (hostReady = (async () => {
+    try {
+      const c = await caches.open('transformers-cache');
+      if (await c.match(MIRROR + PROBE)) { useMirror(); return 'mirror'; }   // already downloaded that way
+      if (await c.match(HF + PROBE)) return 'hf';
+    } catch (_) {}
+    if (await reachable(HF + PROBE)) return 'hf';
+    useMirror(); return 'mirror';
+  })());
+}
+
 const ENGINES = {
   // the browser files the model's author checked: fp16 encoder + fp32 decoder (an fp16 decoder does not load,
   // an int8 encoder changes the text)
@@ -60,6 +89,7 @@ async function build(key, device) {
 
 async function load(key) {
   if (E && E.key === key) return E;
+  const host = await pickHost();
   if (E) { try { await E.dispose(); } catch (_) {} E = null; }
   // the graphics card when there is one (much faster); otherwise the processor
   const devices = key === 'he' && await hasGpu() ? ['webgpu', 'wasm'] : ['wasm'];
@@ -71,7 +101,7 @@ async function load(key) {
       if (device === 'webgpu') await e.run(new Float32Array(SR), 'he');
       E = e;
       return E;
-    } catch (err) { fails.push(device + ': ' + ((err && err.message) || err)); console.warn('siman-asr:', device, err); }
+    } catch (err) { fails.push(device + '@' + host + ': ' + ((err && err.message) || err)); console.warn('siman-asr:', device, err); }
   }
   throw new Error(fails.join(' | ') || 'engine did not load');
 }
@@ -80,7 +110,7 @@ async function handle(m) {
   try {
     if (m.type === 'load') {
       const e = await load(m.engine);
-      postMessage({ id: m.id, device: e.device });
+      postMessage({ id: m.id, device: e.device, host: await pickHost() });
     } else if (m.type === 'run') {
       const key = (m.lang || 'he') === 'he' ? 'he' : 'multi';
       const e = await load(key);
