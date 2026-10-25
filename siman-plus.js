@@ -847,6 +847,7 @@ async function askQ(q, label) {
 window.SIMAN_AI = ai;
 window.SIMAN_ASK = (q, label) => { if (panel.classList.contains('hidden')) showAI(); askQ(q, label); };
 { const s = document.createElement('script'); s.src = 'office-ai.js'; s.defer = true; document.head.append(s); }
+{ const s = document.createElement('script'); s.src = 'office-translate.js'; s.defer = true; document.head.append(s); }
 $('aiSend').onclick = () => { const q = $('aiQ').value; $('aiQ').value = ''; $('aiQ').style.height = ''; askQ(q); };
 $('aiQ').addEventListener('input', e => { const t = e.target; t.style.height = 'auto'; t.style.height = Math.min(140, t.scrollHeight) + 'px'; });
 $('aiRead').onclick = () => RA.start(currentPageIndex());

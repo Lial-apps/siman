@@ -198,7 +198,7 @@ function attach(root) {
   const qat = h(`<div class="oa-qat" role="toolbar" aria-label="גישה מהירה"><button type="button" data-a="save" title="שמירה (Ctrl+S)" aria-label="שמירה">${I.save}</button><button type="button" data-a="undo" title="ביטול (Ctrl+Z)" aria-label="ביטול">${I.undo}</button><button type="button" data-a="redo" title="חזרה (Ctrl+Y)" aria-label="חזרה">${I.redo}</button></div>`);
   const brand = top.querySelector(`.${P}-brand`); (brand || top.firstChild).after(qat);
   qat.addEventListener('mousedown', e => e.preventDefault());
-  qat.onclick = e => { const b = e.target.closest('[data-a]'); if (!b) return; if (b.dataset.a === 'save') { const s = q('Save'); if (s) s.click(); return; }
+  qat.onclick = e => { const b = e.target.closest('[data-a]'); if (!b) return; if (b.dataset.a === 'save') { const s = q('Save'); if (s && !s.disabled) { if (typeof s.onclick === 'function') s.onclick.call(s, new MouseEvent('click')); else s.click(); } return; }
     const r = root.querySelector(`#${ED[k].ribbon} [data-cmd="${b.dataset.a}"]`); if (r && !r.disabled) r.click(); };
   // undo/redo state follows the ribbon's own buttons
   const syncQat = () => { for (const a of ['undo', 'redo']) { const r = root.querySelector(`#${ED[k].ribbon} [data-cmd="${a}"]`); const b = qat.querySelector(`[data-a="${a}"]`); if (r && b) b.disabled = !!r.disabled; } };
@@ -219,8 +219,9 @@ function attach(root) {
 function openMenu(root, k, anchor) {
   closeMenu(); const P = ED[k].p, q = id => root.querySelector('#' + P + id);
   const items = [
-    ['save', I.save, 'שמירה', 'Ctrl+S', () => q('Save') && q('Save').click()],
+    ['save', I.save, 'שמירה', 'Ctrl+S', () => { const s = q('Save'); if (s && !s.disabled) { if (typeof s.onclick === 'function') s.onclick.call(s, new MouseEvent('click')); else s.click(); } }],
     ['pdf', I.pdf, 'שמירה כ-PDF', '', () => q('Pdf') && q('Pdf').click()],
+    ['translate', I.spark, 'תרגום הקובץ לשפה אחרת', '', () => { if (window.OFFICE_TR) window.OFFICE_TR.open(k); }],
     ['print', I.print, 'הדפסה', 'Ctrl+P', () => { const b = root.querySelector(`#${ED[k].ribbon} [data-cmd="print"]`); if (b) b.click(); else if (q('Pdf')) q('Pdf').click(); }],
     k === 'pptx' ? ['play', I.play, 'הצגת המצגת', 'F5', () => q('Play') && q('Play').click()] : null,
     '-',

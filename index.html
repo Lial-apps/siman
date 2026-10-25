@@ -1288,7 +1288,7 @@ body:has(#wed) .busy,body:has(#xed) .busy{z-index:1000}body:has(#wed) .toast,bod
 </dialog>
 
 <header class="bar">
-  <div class="brand"><b title="גרסה 5.1.9">סימן</b><span class="ver">5.1.9</span><span class="fname" id="fname"></span></div>
+  <div class="brand"><b title="גרסה 5.2.0">סימן</b><span class="ver">5.2.0</span><span class="fname" id="fname"></span></div>
 
   <nav class="tools" id="tools" aria-label="כלים">
     <button class="tool" data-tool="select" aria-pressed="true" title="בחירה וגלילה (V)">
@@ -2620,18 +2620,18 @@ function downloadHref(file){
     r.onload=()=>res(String(r.result).replace(/^data:[^;,]*/,'data:application/octet-stream'));
     r.onerror=()=>res(URL.createObjectURL(file));r.readAsDataURL(file);});
 }
-async function saveBytes(name,bytes,kind){
+async function saveBytes(name,bytes,kind,wantHandle){
   if(FS&&!(navigator.userActivation&&navigator.userActivation.isActive)){if(!await askToSave(name))return false;}
   const isTxt=kind==='txt',isDocx=kind==='docx',isZip=kind==='zip',isOff=kind==='pptx'||kind==='xlsx';
   const DOCX_MIME='application/vnd.openxmlformats-officedocument.wordprocessingml.document';
   if(FS){
     try{
       const h=await showSaveFilePicker({suggestedName:name,types:isTxt?[{description:'טקסט',accept:{'text/plain':['.txt']}}]:isDocx?[{description:'Word',accept:{[DOCX_MIME]:['.docx']}}]:isZip?[{description:'ZIP',accept:{'application/zip':['.zip']}}]:isOff?[{description:kind==='pptx'?'PowerPoint':'Excel',accept:{[OFFICE_MIME[kind]]:['.'+kind]}}]:PDF_TYPE});
-      await writeHandle(h,bytes);return (isTxt||isDocx||isZip||isOff)?true:{handle:h};
+      await writeHandle(h,bytes);return (!wantHandle&&(isTxt||isDocx||isZip||isOff))?true:{handle:h};
     }catch(e){
       if(e&&e.name==='AbortError')return false;
-      if(isLocked(e)){toast(LOCKED_MSG);if(!await askToSave(name.replace(/(\.[a-z0-9]+)$/i,' (עותק)$1')))return false;return saveBytes(name.replace(/(\.[a-z0-9]+)$/i,' (עותק)$1'),bytes,kind);}
-      if(needsGesture(e)){if(!await askToSave(name))return false;return saveBytes(name,bytes,kind);}
+      if(isLocked(e)){toast(LOCKED_MSG);if(!await askToSave(name.replace(/(\.[a-z0-9]+)$/i,' (עותק)$1')))return false;return saveBytes(name.replace(/(\.[a-z0-9]+)$/i,' (עותק)$1'),bytes,kind,wantHandle);}
+      if(needsGesture(e)){if(!await askToSave(name))return false;return saveBytes(name,bytes,kind,wantHandle);}
       throw e;}
   }
   const type=isTxt?'text/plain':isDocx?DOCX_MIME:isZip?'application/zip':isOff?OFFICE_MIME[kind]:'application/pdf';
@@ -3786,7 +3786,7 @@ async function openOffice(file,handle,opt){
     const res=await OFFICE.repair(bytes,file.name);
     if((res.kind==='docx'||res.kind==='xlsx'||res.kind==='pptx')&&!res.fatal&&!(opt&&opt.desk)){
       busy(false);const mode=await askDocMode(file.name,res.kind);if(!mode)return;
-      if(mode==='edit'){const src=res.changed?await OFFICE.build(res):bytes;await(res.kind==='xlsx'?openExcelEditor(src,file.name):res.kind==='pptx'?openPptEditor(src,file.name):openWordEditor(src,file.name));if(res.changed)toast('הקובץ היה פגום ותוקן');return;}
+      if(mode==='edit'){const src=res.changed?await OFFICE.build(res):bytes;await(res.kind==='xlsx'?openExcelEditor(src,file.name,false,handle):res.kind==='pptx'?openPptEditor(src,file.name,false,handle):openWordEditor(src,file.name,false,handle));if(res.changed)toast('הקובץ היה פגום ותוקן');return;}
       busy(true,'מכין את הקובץ לסימון…');
     }
     // a presentation for marking and signing: every slide becomes a PDF page
@@ -3884,6 +3884,33 @@ const loadEditLibs=k=>editLibs[k]||(editLibs[k]=(async()=>{
   if(!window.OFFICE_EDIT)await loadScript('office-edit.js');
 })().catch(e=>{editLibs[k]=null;throw e;}));
 const OF_LABEL={docx:'Word',xlsx:'Excel',pptx:'PowerPoint'};
+/* SAVING IN THE WORD / EXCEL / POWERPOINT EDITORS — "שמירה" (and the diskette) writes the changes
+   straight into the file that is open, like in Office. A save window opens only the first time
+   (a new file, or a file that came without a link to its place on the computer) or after the file
+   name was changed in the editor ("שמירה בשם"). Phones can't write into an existing file, so there
+   every save is a download, as before. */
+const ED_NAME={docx:'weName',xlsx:'xeName',pptx:'peName'};
+async function saveEditorFile(ctx,name,bytes,kind){
+  if(kind==='pdf'||kind==='txt'||kind==='zip')return saveBytes(name,bytes,kind);
+  if(FS&&ctx.handle&&ctx.handle.name===name){
+    try{await writeHandle(ctx.handle,bytes);return true;}
+    catch(e){
+      if(needsGesture(e)&&await askToSave(name)){
+        try{await writeHandle(ctx.handle,bytes);return true;}catch(e2){console.warn('save into file',e2);}
+      }else if(isLocked(e))toast(LOCKED_MSG);
+      else console.warn('save into file',e);
+      if(e&&e.name==='NotFoundError')ctx.handle=null;
+    }
+  }
+  const r=await saveBytes(name,bytes,kind,true);
+  if(r&&r.handle){
+    ctx.handle=r.handle;
+    // the name picked in the save window becomes the file's name in the editor, so the next save goes there too
+    if(r.handle.name!==name){const inp=document.getElementById(ED_NAME[kind]);if(inp){inp.value=r.handle.name.replace(/\.(docx|xlsx|pptx)$/i,'');inp.dispatchEvent(new Event('input',{bubbles:true}));}}
+  }
+  return !!r;
+}
+const fileCtx=(handle,name)=>({handle:handle&&FS&&handle.kind==='file'&&/\.(docx|xlsx|pptx)$/i.test(handle.name||'')&&(!name||handle.name===name)?handle:null});
 /* WORD EDITOR — a Word file opens for real editing, like in Word */
 function askDocMode(name,kind){return new Promise(res=>{
   const d=$('docModeDlg');$('docModeName').textContent=dispName(name);let done=false;const xl=kind==='xlsx',pp=kind==='pptx';
@@ -3897,13 +3924,14 @@ function askDocMode(name,kind){return new Promise(res=>{
   $('docModeCancel').onclick=()=>fin(null);d.onclose=()=>fin(null);
   d.showModal();d.querySelector('[data-mode=edit]').focus();
 });}
-async function openWordEditor(bytes,name,isNew){
+async function openWordEditor(bytes,name,isNew,handle){
+  const ctx=fileCtx(handle,name);
   busy(true,isNew?'פותח מסמך חדש…':'פותח את המסמך לעריכה…');
   try{
     await loadEditLibs('docx');if(!window.WORD_EDITOR)await loadScript('word-editor.js');
     busy(false);
     await WORD_EDITOR.open({bytes,name,isNew,author:()=>USER.name||(USER.mail||'').split('@')[0]||'',
-      save:(n,b,k)=>saveBytes(n,b,k),toast,busy:(on,m)=>busy(on,m),
+      save:(n,b,k)=>saveEditorFile(ctx,n,b,k),toast,busy:(on,m)=>busy(on,m),
       toPdf:async b=>{const r=await OFFICE_EDIT.toPdf('docx',b,m=>busy(true,m));return r.pdf instanceof Uint8Array?r.pdf:new Uint8Array(r.pdf);},
       toDesk:async f=>{await openOffice(f,null,{desk:true});},
       onClose:()=>{}});
@@ -3912,13 +3940,14 @@ async function openWordEditor(bytes,name,isNew){
 }
 const newWordDoc=()=>{if(needReg()){showReg();return;}openWordEditor(null,'מסמך חדש.docx',true);};
 /* EXCEL EDITOR — an Excel file opens for real editing, like in Excel */
-async function openExcelEditor(bytes,name,isNew){
+async function openExcelEditor(bytes,name,isNew,handle){
+  const ctx=fileCtx(handle,name);
   busy(true,isNew?'פותח גיליון חדש…':'פותח את הגיליון לעריכה…');
   try{
     await loadEditLibs('xlsx');if(!window.XLSX_EDITOR)await loadScript('excel-editor.js');
     busy(false);
     await XLSX_EDITOR.open({bytes,name,isNew,
-      save:(n,b,k)=>saveBytes(n,b,k),toast,busy:(on,m)=>busy(on,m),
+      save:(n,b,k)=>saveEditorFile(ctx,n,b,k),toast,busy:(on,m)=>busy(on,m),
       toPdf:async b=>{const r=await OFFICE_EDIT.toPdf('xlsx',b,m=>busy(true,m));return r.pdf instanceof Uint8Array?r.pdf:new Uint8Array(r.pdf);},
       toDesk:async f=>{await openOffice(f,null,{desk:true});},
       onClose:()=>{}});
@@ -3927,13 +3956,14 @@ async function openExcelEditor(bytes,name,isNew){
 }
 const newExcel=()=>{if(needReg()){showReg();return;}openExcelEditor(null,'גיליון חדש.xlsx',true);};
 /* POWERPOINT EDITOR — a presentation opens for real editing, like in PowerPoint */
-async function openPptEditor(bytes,name,isNew){
+async function openPptEditor(bytes,name,isNew,handle){
+  const ctx=fileCtx(handle,name);
   busy(true,isNew?'פותח מצגת חדשה…':'פותח את המצגת לעריכה…');
   try{
     await loadEditLibs('pptx');
     busy(false);
     await PPTX_EDITOR.open({bytes,name,isNew,
-      save:(n,b,k)=>saveBytes(n,b,k),toast,busy:(on,m)=>busy(on,m),
+      save:(n,b,k)=>saveEditorFile(ctx,n,b,k),toast,busy:(on,m)=>busy(on,m),
       toDesk:async f=>{await openFile(f);},
       onClose:()=>{}});
   }catch(e){console.error(e);toast('לא הצלחתי לפתוח את המצגת לעריכה: '+(e.message||e));}
@@ -5051,7 +5081,7 @@ if('launchQueue' in window){
    ===================================================================== */
 (function(){
   const STATUS_URL=(typeof REGISTER_URL!=='undefined'&&REGISTER_URL)?REGISTER_URL.replace(/\/register$/,'/status'):'';
-  const U_KEY='siman.usage', T_KEY='siman.trial', APP_VER='5.1.9';
+  const U_KEY='siman.usage', T_KEY='siman.trial', APP_VER='5.2.0';
   const today=()=>new Date().toISOString().slice(0,10);
   const rd=k=>{try{return JSON.parse(localStorage.getItem(k)||'null');}catch(_){return null;}};
   const wr=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch(_){}};

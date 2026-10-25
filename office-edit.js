@@ -55,6 +55,19 @@ async function pagesToPdf(pages){
 }
 
 /* ---------- Word ---------- */
+// the top and bottom of every line of text, picture and short table row, in px from the top of the section
+function lineBoxes(sec,R,H){
+  const out=[],rg=document.createRange(),tw=document.createTreeWalker(sec,NodeFilter.SHOW_TEXT);
+  for(let t=tw.nextNode();t;t=tw.nextNode()){
+    if(!t.nodeValue.trim())continue;
+    rg.selectNodeContents(t);
+    for(const r of rg.getClientRects())if(r.height>0&&r.width>0)out.push([r.top-R.top,r.bottom-R.top]);
+  }
+  for(const el of sec.querySelectorAll('img,svg,canvas,tr')){
+    const r=el.getBoundingClientRect();if(r.height>0&&r.height<H*.5)out.push([r.top-R.top,r.bottom-R.top]);
+  }
+  return out;
+}
 async function docxToPages(bytes,progress){
   const host=makeHost(0);
   try{
@@ -83,6 +96,11 @@ async function docxToPages(bytes,progress){
       for(const p of art.children)if(p.tagName==='P')paras.push({sec:si,top:p.getBoundingClientRect().top-R.top});
       // safe places to cut a page that runs longer than one sheet
       const cuts=[...art.querySelectorAll('p,tr,li,img,h1,h2,h3,h4,h5,h6')].map(e=>e.getBoundingClientRect().bottom-R.top).filter(b=>b>0).sort((a,b)=>a-b);
+      // every line of text and every picture: a page is never cut through one of them (a cut through a line
+      // left the bottoms of its letters at the foot of the page, like a dotted line between the pages)
+      const boxes=lineBoxes(sec,R,H);
+      const lineEnds=[...new Set(boxes.map(b=>Math.round(b[1]*2)/2))].sort((a,b)=>a-b);
+      const free=y=>!boxes.some(([a,b])=>a<y-.5&&b>y+.5);
       const slices=[];
       if(total<=H*1.02)slices.push([0,H,0]);
       else{
@@ -90,7 +108,13 @@ async function docxToPages(bytes,progress){
         while(s<total-padB-2){
           const room=H-(first?0:padT)-padB;
           let e=s+room;
-          if(e<total-padB){const ok=cuts.filter(b=>b<=e&&b>s+room*.45);if(ok.length)e=ok[ok.length-1];}
+          if(e<total-padB){
+            const ok=cuts.filter(b=>b<=e&&b>s+room*.45&&free(b));
+            if(ok.length)e=ok[ok.length-1];
+            else{const ln=lineEnds.filter(b=>b<=e&&b>s+room*.3&&free(b));
+              if(ln.length)e=ln[ln.length-1];
+              else{let y=Math.floor(e);while(y>s+room*.3&&!free(y))y--;if(y>s+room*.3)e=y;}}
+          }
           else e=total;
           slices.push([s,e,first?0:padT]);s=e;first=false;
         }
