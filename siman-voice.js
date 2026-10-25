@@ -123,10 +123,24 @@ const friendly = e => {
   if (e && e.status === 429 || /quota|exhausted|rate/i.test(m)) return 'השרת עמוס כרגע. נסו שוב בעוד כמה דקות';
   if (/could not decode|decode/i.test(m)) return 'לא הצלחתי לקרוא את השמע בקובץ. נסו קובץ MP3, M4A או WAV';
   if (/memory|allocation|Array buffer/i.test(m)) return 'אין למכשיר מספיק זיכרון להקלטה הזו. נסו במחשב, או קובץ קצר יותר';
-  if (/fetch|network|Failed to load|NetworkError|ERR_/i.test(m)) return 'ההורדה הראשונה של מנוע התמלול צריכה אינטרנט. התחברו ונסו שוב (אחר כך זה עובד גם בלי)';
+  if (e && e.offline) return 'ההורדה הראשונה של מנוע התמלול צריכה אינטרנט. התחברו ונסו שוב (אחר כך זה עובד גם בלי)';
+  if (e && e.engine) return 'מנוע התמלול לא נטען במכשיר הזה. הפרטים למטה עוזרים לתקן';
   if (/Worker|module/i.test(m)) return 'הדפדפן הזה לא מריץ את מנוע התמלול. נסו Chrome, Edge או Safari מעודכן';
   return 'התמלול נכשל: ' + m;
 };
+// when the engine fails: is the model site reachable from here at all? (tells "no internet" apart from a real fault)
+async function diagnose(e) {
+  if (!e || e.name === 'AbortError' || e.checked) return e;
+  e.checked = true;
+  if (navigator.onLine === false) { e.offline = true; return e; }
+  try {
+    const r = await fetch('https://huggingface.co/itayinbar/Ozen-v1/resolve/main/config.json', { cache: 'no-store' });
+    if (!r.ok) e.raw = 'model site ' + r.status + ' · ' + (e.message || e);
+    else e.engine = true;
+  } catch (_) { e.offline = true; e.raw = 'model site not reachable · ' + (e.message || e); }
+  return e;
+}
+const errInfo = e => [String((e && e.raw) || (e && e.message) || e), 'device: ' + (ASR.device || '?'), 'webgpu: ' + ('gpu' in navigator), navigator.userAgent].join('\n');
 const abortErr = () => Object.assign(new Error('בוטל'), { name: 'AbortError' });
 
 /* ---------------- audio: decoding to 16 kHz, and cutting at pauses ---------------- */
@@ -438,6 +452,8 @@ dialog.vx-dlg::backdrop{background:rgba(13,20,36,.55)}
 .vx-good{color:#0F766E;font-weight:700}
 .vx-wlive{text-align:start;margin:0 0 14px;max-height:34vh}
 .vx-wlive p,.vx-live p{margin:0 0 6px;unicode-bidi:plaintext}
+.vx-tech{margin-top:14px;text-align:start;font-size:13px;color:var(--muted,#5D6982)}
+.vx-tech pre{white-space:pre-wrap;word-break:break-all;background:var(--bar,#fff);border:1px solid var(--line,#D4DBE5);border-radius:8px;padding:8px;font-size:12px;max-height:30vh;overflow:auto}
 .vx-cloud{background:var(--desk,#E2E7EE);border-radius:12px;padding:12px 14px}
 @media (max-width:860px){
   .vx-tiles{grid-template-columns:1fr}
@@ -691,7 +707,8 @@ async function transcribeFile(file, opts) {
     // the audio is kept on the device first: nothing is lost if something fails
     await DB.putAudio(id, file); await DB.put(item);
     // 1. the engine (downloaded once, then from the device)
-    await loadEngine(lang, 'model');
+    try { await loadEngine(lang, 'model'); }
+    catch (err) { const now = root.querySelector('#vxWork li[data-s="model"]'); if (now) now.className = ''; throw await diagnose(err); }
     if (sig.aborted) throw abortErr();
     // 2. the audio
     step('prep', 'now');
@@ -727,7 +744,7 @@ async function transcribeFile(file, opts) {
     if (onWork && !JOB.queue.length) await openItem(id);
     else say('התמליל מוכן: ' + item.title + (root.hidden ? ' (בתמלול ← הספרייה)' : ''));
   } catch (e) {
-    item.status = 'failed'; item.error = friendly(e);
+    item.status = 'failed'; item.error = friendly(e); item.errorInfo = e && e.name !== 'AbortError' ? errInfo(e) : '';
     if (item.segments.length) item.segments = normalize(item.segments);
     try { await DB.put(stripForDb(item)); } catch (_) {}
     const s = root.querySelector('#vxWork');
@@ -737,9 +754,17 @@ async function transcribeFile(file, opts) {
       const c = s.querySelector('#vxCancel'); c.textContent = 'חזרה'; c.onclick = () => show('new');
       const again = el('button', 'vx-btn pri', 'לנסות שוב'); again.style.marginInlineEnd = '8px';
       again.onclick = () => retry(id); c.before(again);
+      if (item.errorInfo) techBox(s.querySelector('.vx-work'), item.errorInfo);
     } else say(item.error);
     throw e;
   }
+}
+function techBox(box, info) {
+  if (!box || box.querySelector('.vx-tech')) return;
+  const d = el('details', 'vx-tech', `<summary>פרטים טכניים</summary><pre dir="ltr"></pre><button class="vx-btn sm">העתקה</button>`);
+  d.querySelector('pre').textContent = info;
+  d.querySelector('button').onclick = () => copy(info);
+  box.append(d);
 }
 async function retry(id) {
   const it = await DB.get(id), blob = await DB.getAudio(id);
@@ -793,6 +818,7 @@ async function openItem(id) {
     const h = s.querySelector('#vxWorkHint'); h.textContent = it.error || (it.status === 'working' ? 'התמליל עוד לא הסתיים' : 'התמלול לא הושלם'); h.style.color = '#C2362B';
     const c = s.querySelector('#vxCancel'); c.textContent = 'חזרה'; c.onclick = () => show('lib');
     const again = el('button', 'vx-btn pri', 'לתמלל שוב'); again.style.marginInlineEnd = '8px'; again.onclick = () => retry(id); c.before(again);
+    if (it.errorInfo) techBox(s.querySelector('.vx-work'), it.errorInfo);
     return;
   }
   if (root && root.hidden) { if (!open('doc')) return; }

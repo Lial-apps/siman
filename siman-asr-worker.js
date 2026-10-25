@@ -63,7 +63,7 @@ async function load(key) {
   if (E) { try { await E.dispose(); } catch (_) {} E = null; }
   // the graphics card when there is one (much faster); otherwise the processor
   const devices = key === 'he' && await hasGpu() ? ['webgpu', 'wasm'] : ['wasm'];
-  let last;
+  const fails = [];
   for (const device of devices) {
     try {
       const e = await build(key, device);
@@ -71,9 +71,9 @@ async function load(key) {
       if (device === 'webgpu') await e.run(new Float32Array(SR), 'he');
       E = e;
       return E;
-    } catch (err) { last = err; console.warn('siman-asr:', device, err); }
+    } catch (err) { fails.push(device + ': ' + ((err && err.message) || err)); console.warn('siman-asr:', device, err); }
   }
-  throw last || new Error('engine did not load');
+  throw new Error(fails.join(' | ') || 'engine did not load');
 }
 
 async function handle(m) {
