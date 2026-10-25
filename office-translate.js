@@ -25,7 +25,6 @@ const RTL = { he: 1, ar: 1 };
 const LETTER = /[A-Za-z\u00C0-\u024F\u0590-\u05FF\u0400-\u04FF\u0600-\u06FF]/;
 const RTL_CH = /[\u0590-\u05FF\u0600-\u06FF]/g, LTR_CH = /[A-Za-z\u00C0-\u024F\u0400-\u04FF]/g;
 const isRtlText = t => ((t.match(RTL_CH) || []).length) > ((t.match(LTR_CH) || []).length);
-const BR = ' ⟦br⟧ ';
 const XML_HEAD = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
 const say = m => { if (typeof toast === 'function') toast(m); else console.log(m); };
 const wait = (on, m) => { if (typeof busy === 'function') busy(on, m); };
@@ -77,66 +76,17 @@ function units(doc, kind) {
 }
 
 /* ------------------------------------------------------------ the translation service */
-// what the translator is told with every part, so the whole file reads as one careful, natural translation
-const KIND_NAME = { docx: 'a Word document', xlsx: 'an Excel spreadsheet (each line is one cell)', pptx: 'a PowerPoint presentation (each line is one paragraph on a slide)' };
-function guide(kind, part, parts, ctxText) {
-  return [
-    `This is part ${part + 1} of ${parts} of ${KIND_NAME[kind] || 'a document'}. Translate it the way a professional human translator would for publication:`,
-    'fluent, natural and idiomatic in the target language, faithful to the meaning and the tone, never word by word;',
-    'keep terms, names and titles consistent across all the lines; keep numbers, dates, codes, e-mail addresses and links exactly as they are;',
-    'quotations from well-known texts (the Bible, prayers, laws) take their accepted standard translation; short headings stay short.',
-    'Translate each numbered line separately. Keep every [number] marker at the start of its line and keep the same count of lines.',
-    'Keep every ⟦number⟧ mark, placed before the translated words it belongs to, and keep every ⟦br⟧ mark.',
-    ctxText ? `For context, the document begins: «${ctxText}»` : '',
-    'Lines to translate:'
-  ].filter(Boolean).join('\n') + '\n';
-}
-// a unit with several formats goes with ⟦n⟧ marks, so each format lands on its own translated words
-const encode = u => (u.segs.length > 1 ? u.segs.map((s, i) => `⟦${i + 1}⟧${s.text}`).join('') : u.text).replace(/\r?\n/g, BR).replace(/\s+/g, ' ').trim();
-function decode(u, t) {
-  t = String(t || '').replace(/\s*⟦br⟧\s*/g, '\n');
-  if (u.segs.length < 2) return [t.replace(/⟦\d+⟧/g, '')];
-  const parts = t.split(/⟦(\d+)⟧/), res = u.segs.map(() => '');
-  let ok = 0;
-  if (parts[0].trim()) res[0] += parts[0];
-  for (let i = 1; i < parts.length; i += 2) { const n = +parts[i] - 1; if (n >= 0 && n < res.length) { res[n] += parts[i + 1] || ''; ok++; } else res[0] += parts[i + 1] || ''; }
-  if (!ok) return [t.replace(/⟦\d+⟧/g, '')];
-  return res;
-}
+// every line of a paragraph / cell goes as its own numbered piece through trLines (index.html), which
+// checks each answer and sends again whatever came back missing or untranslated
+const KIND_NAME = { docx: 'This is a Word document.', xlsx: 'This is an Excel spreadsheet: each line is one cell.', pptx: 'This is a PowerPoint presentation: each line is one paragraph on a slide.' };
+const linesOf = u => u.text.split(/\r?\n/).map(l => l.replace(/\s+/g, ' ').trim());
 async function translateTexts(list, target, progress, kind) {
-  if (typeof callTranslate !== 'function') throw new Error('שירות התרגום לא נטען');
-  const uniq = [...new Set(list)], done = new Map();
-  const ctxText = uniq.join(' ').replace(/⟦\w+⟧/g, '').replace(/\s+/g, ' ').slice(0, 700);
-  const chunks = []; let cur = [], len = 0;
-  for (const s of uniq) { if (cur.length && (len + s.length > 6000 || cur.length >= 90)) { chunks.push(cur); cur = []; len = 0; } cur.push(s); len += s.length + 8; }
-  if (cur.length) chunks.push(cur);
-  let lang = null;
-  for (let c = 0; c < chunks.length; c++) {
-    progress && progress(`מתרגם… ${Math.round(c / chunks.length * 100)}%`);
-    const ch = chunks[c];
-    const text = guide(kind, c, chunks.length, ctxText) + ch.map((s, k) => `[${k + 1}] ${s}`).join('\n');
-    const r = await callTranslate(text, target);
-    if (r.error) throw new Error(typeof errText === 'function' ? errText(r) : String(r.error));
-    const p = typeof parseTr === 'function' ? parseTr(r.raw) : { text: r.raw, lang: null };
-    if (!lang && p.lang) lang = p.lang;
-    const got = {}; let last = null;
-    for (const line of p.text.split('\n')) {
-      const m = /^\s*\[(\d+)\]\s?(.*)$/.exec(line);
-      if (m) { last = +m[1]; got[last] = m[2].trim(); } else if (last && line.trim()) got[last] += ' ' + line.trim();
-    }
-    ch.forEach((s, k) => { if (got[k + 1]) done.set(s, got[k + 1]); });
-  }
-  // lines the service skipped go once more, in small parts
-  const left = uniq.filter(s => !done.has(s));
-  for (let i = 0; i < left.length && left.length < uniq.length; i += 15) {
-    const ch = left.slice(i, i + 15);
-    progress && progress('משלים את התרגום…');
-    const r = await callTranslate(guide(kind, 0, 1, ctxText) + ch.map((s, k) => `[${k + 1}] ${s}`).join('\n'), target);
-    if (r.error) break;
-    const p = typeof parseTr === 'function' ? parseTr(r.raw) : { text: r.raw };
-    for (const line of p.text.split('\n')) { const m = /^\s*\[(\d+)\]\s?(.*)$/.exec(line); if (m && ch[+m[1] - 1] && m[2].trim()) done.set(ch[+m[1] - 1], m[2].trim()); }
-  }
-  return { map: done, lang };
+  if (typeof trLines !== 'function' || typeof callTranslate !== 'function') throw new Error('שירות התרגום לא נטען');
+  const uniq = [...new Set(list.filter(t => LETTER.test(t)))];
+  const R = await trLines(uniq, target, { intro: KIND_NAME[kind], progress: f => progress && progress(`מתרגם… ${Math.round(f * 100)}%`) });
+  if (R.error && !R.res) throw new Error(typeof errText === 'function' ? errText(R.error) : String(R.error.error || R.error));
+  const map = new Map(); uniq.forEach((t, i) => { if (R.res[i]) map.set(t, R.res[i]); });
+  return { map, missing: uniq.length - map.size, partial: R.error ? (typeof errText === 'function' ? errText(R.error) : 'שגיאה') : null };
 }
 
 /* ------------------------------------------------------------ writing it back */
@@ -172,15 +122,13 @@ function slideDir(doc, u, rtl) {
   if (a === 'l') pPr.setAttribute('algn', 'r'); else if (a === 'r') pPr.setAttribute('algn', 'l'); // centered / inherited alignment stays
 }
 function writeUnit(doc, kind, u, t, rtl) {
-  const parts = decode(u, t);
-  u.segs.forEach((s, i) => {
-    let txt = parts.length === 1 ? (i === 0 ? parts[0] : '') : parts[i] || '';
-    if (parts.length > 1 && i < u.segs.length - 1 && txt && !/\s$/.test(txt) && (parts[i + 1] || '') && !/^\s/.test(parts[i + 1])) txt += ' ';
-    s.ts.forEach((el, j) => {
-      el.textContent = j === 0 ? txt : '';
-      if (kind !== 'pptx' && j === 0) el.setAttributeNS('http://www.w3.org/XML/1998/namespace', 'xml:space', 'preserve');
-    });
-  });
+  // the paragraph's translation goes into the run that held most of its text, so it keeps the paragraph's
+  // main look (font, size, color); the other runs are emptied
+  let main = 0; u.segs.forEach((g, i) => { if (g.text.trim().length > u.segs[main].text.trim().length) main = i; });
+  u.segs.forEach((g, i) => g.ts.forEach((el, j) => {
+    el.textContent = i === main && j === 0 ? t : '';
+    if (kind !== 'pptx' && i === main && j === 0) el.setAttributeNS('http://www.w3.org/XML/1998/namespace', 'xml:space', 'preserve');
+  }));
   if (kind === 'docx') wordDir(doc, u, rtl);
   else if (kind === 'pptx') slideDir(doc, u, rtl);
 }
@@ -192,6 +140,7 @@ const PARTS = {
   xlsx: n => n === 'xl/sharedStrings.xml' || /^xl\/worksheets\/sheet\d+\.xml$/.test(n),
 };
 async function translateBytes(kind, bytes, target, progress) {
+  if (!window.JSZip && typeof loadScript === 'function') await loadScript('jszip.min.js');
   if (!window.JSZip) throw new Error('ספריית הקבצים לא נטענה');
   const zip = await JSZip.loadAsync(bytes);
   const names = Object.keys(zip.files).filter(PARTS[kind]).sort((a, b) => a.localeCompare(b, 'en', { numeric: true }));
@@ -205,12 +154,16 @@ async function translateBytes(kind, bytes, target, progress) {
   }
   if (!all.length) throw new Error('לא נמצא בקובץ טקסט לתרגום');
   const rtl = !!RTL[target];
-  const { map, lang } = await translateTexts(all.map(encode), target, progress, kind);
-  if (!map.size) throw new Error('התרגום לא החזיר תוצאה. נסו שוב');
-  let n = 0;
+  const { map, missing, partial } = await translateTexts(all.flatMap(linesOf), target, progress, kind);
+  if (!map.size) throw new Error(partial || 'התרגום לא החזיר תוצאה. נסו שוב');
+  let n = 0, left = 0;
   for (const d of docs) {
     if (!d.doc) continue;
-    for (const u of d.us) { const t = map.get(encode(u)); if (t) { writeUnit(d.doc, kind, u, t, rtl); n++; } }
+    for (const u of d.us) {
+      const ls = linesOf(u); let any = false;
+      const t = ls.map(l => { if (!LETTER.test(l)) return l; const x = map.get(l); if (x) { any = true; return x; } left++; return l; }).join('\n');
+      if (any) { writeUnit(d.doc, kind, u, t, rtl); n++; }
+    }
     let x = new XMLSerializer().serializeToString(d.doc.documentElement);
     zip.file(d.n, XML_HEAD + x);
   }
@@ -225,7 +178,7 @@ async function translateBytes(kind, bytes, target, progress) {
     }
   }
   const out = await zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE' });
-  return { bytes: out, count: n, total: all.length, lang };
+  return { bytes: out, count: n, total: all.length, left, partial };
 }
 
 /* ------------------------------------------------------------ in the editor */
@@ -264,7 +217,7 @@ async function open(kind) {
   const A = window[e.api]; if (!A || !A._test || typeof A._test[e.build] !== 'function') { say('התרגום לא זמין בעורך הזה'); return; }
   const target = await pickLang(e.app); if (!target) return;
   const inp = document.getElementById(e.p + 'Name');
-  const base = ((inp && inp.value) || 'קובץ').trim().replace(/\.(docx|xlsx|pptx)$/i, '');
+  const base = ((inp && inp.value) || 'קובץ').trim().replace(/\.(docx|xlsx|pptx)$/i, '').replace(new RegExp('(\\s-\\s(' + Object.values(SUF).join('|') + '))+$'), '');
   running = true;
   try {
     wait(true, 'מכין את הקובץ לתרגום…');
@@ -273,12 +226,11 @@ async function open(kind) {
     const src = r && r.bytes ? r.bytes : r;
     const res = await translateBytes(kind, src, target, m => wait(true, m));
     wait(false);
-    if (res.lang === target) say('הקובץ כבר כתוב ב' + LANGS.find(x => x[0] === target)[1]);
     const name = `${base} - ${SUF[target]}.${kind}`;
     const fn = window[e.open];
     if (typeof fn !== 'function') throw new Error('לא הצלחתי לפתוח את הקובץ המתורגם');
     await fn(res.bytes, name, false);
-    say(`התרגום מוכן ונפתח בלשונית חדשה (${res.count} קטעים). לחצו "שמירה" כדי לשמור אותו`);
+    say(res.left ? `התרגום נפתח בלשונית חדשה, אבל ${res.left} שורות לא תורגמו${res.partial ? ' (' + res.partial + ')' : ''}. אפשר לתרגם שוב את הקובץ המתורגם כדי להשלים` : 'התרגום של כל הקובץ מוכן ונפתח בלשונית חדשה. לחצו "שמירה" כדי לשמור אותו');
   } catch (err) { console.error(err); wait(false); say('התרגום נכשל: ' + (err.message || err)); }
   finally { running = false; wait(false); }
 }
@@ -297,5 +249,5 @@ new MutationObserver(ms => {
   for (const m of ms) for (const n of m.addedNodes) if (n.nodeType === 1) { const k = Object.keys(ED).find(x => ED[x].id === n.id); if (k) setTimeout(() => addButton(k, n), 0); }
 }).observe(document.body, { childList: true });
 for (const k of Object.keys(ED)) { const r = document.getElementById(ED[k].id); if (r) addButton(k, r); }
-window.OFFICE_TR = { open, translateBytes, _units: units, _decode: decode };
+window.OFFICE_TR = { open, translateBytes, _units: units };
 })();

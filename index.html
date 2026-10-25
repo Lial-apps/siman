@@ -1288,7 +1288,7 @@ body:has(#wed) .busy,body:has(#xed) .busy{z-index:1000}body:has(#wed) .toast,bod
 </dialog>
 
 <header class="bar">
-  <div class="brand"><b title="גרסה 5.2.2">סימן</b><span class="ver">5.2.2</span><span class="fname" id="fname"></span></div>
+  <div class="brand"><b title="גרסה 5.2.3">סימן</b><span class="ver">5.2.3</span><span class="fname" id="fname"></span></div>
 
   <nav class="tools" id="tools" aria-label="כלים">
     <button class="tool" data-tool="select" aria-pressed="true" title="בחירה וגלילה (V)">
@@ -2828,6 +2828,74 @@ function dropForeign(text,target){
     .replace(/\(([^()\n]+)\)\s*(\S+)/g,(m,inner,w)=>bad(w)&&!bad(inner)?inner:m)      // (ישמעאל) ישماعيل -> ישמעאל
     .replace(/(\S*[\u0400-\u04FF\u0600-\u06FF]\S*)\)\s*([^()\s]+)\)/g,(m,w,inner)=>bad(w)&&!bad(inner)?inner:m); // קונפликтирная) סכסכנית) -> סכסכנית
 }
+/* NUMBERED TRANSLATION — used by every translation that puts each piece back in its own place
+   (a PDF translated in place, a Word file on the desk, and the Word / Excel / PowerPoint editors).
+   Pieces go in small numbered parts, so an answer is never cut off. The answer is read even when the
+   service adds direction marks, turns the brackets around or skips a line. Any piece that comes back
+   missing, empty or still in the original language is sent again, in smaller groups and at the end on
+   its own, so nothing is left untranslated. Returns {res:[translation or null per piece], error}. */
+const BIDI_MARKS=/[\u200E\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/g;
+const TR_SCRIPT={he:/[\u0590-\u05FF]/g,ar:/[\u0600-\u06FF]/g,ru:/[\u0400-\u04FF]/g,en:/[A-Za-z]/g,fr:/[A-Za-z\u00C0-\u00FF]/g,es:/[A-Za-z\u00C0-\u00FF]/g};
+const TR_LETTERS=/[A-Za-z\u00C0-\u024F\u0590-\u05FF\u0400-\u04FF\u0600-\u06FF]/g;
+// is this a real translation: not empty, and (when the source was in another alphabet) in the target's letters
+function trGood(src,tr,target){
+  if(!tr||!tr.trim())return false;
+  const n=(t,re)=>(String(t).match(re)||[]).length;
+  const all=n(src,TR_LETTERS);if(all<3)return true;
+  const want=TR_SCRIPT[target]||TR_SCRIPT.en;
+  if(n(src,want)/all>.6)return true; // already in the target language
+  return n(tr,want)/(n(tr,TR_LETTERS)||1)>.5;
+}
+function parseNumbered(raw){
+  const out={};let last=null;
+  for(let line of String(raw||'').split('\n')){
+    line=line.replace(BIDI_MARKS,'');
+    const m=/^\s*[\[\]]\s*(\d{1,4})\s*[\[\]]\s*[:.\-–]?\s?(.*)$/.exec(line);
+    if(m){last=+m[1];out[last]=(out[last]?out[last]+' ':'')+m[2].trim();}
+    else if(last&&line.trim()&&!/^\s*(LANG:|---\s*$)/.test(line))out[last]+=' '+line.trim();
+  }
+  return out;
+}
+const TR_RULES=['Translate the way a professional human translator would: fluent, natural and faithful to the meaning and tone, never word by word.',
+  'Keep names, numbers, dates, links and codes as they are, and keep terms consistent. Quotations from the Bible or prayers take their accepted translation.'];
+const TR_HEAD=intro=>[intro||'',...TR_RULES,
+  'Translate each numbered line separately. Start every line of your answer with its [number] marker, exactly like the input, and return the same count of lines. Do not merge, split or skip lines.'].filter(Boolean).join('\n')+'\n';
+async function trLines(items,target,o={}){
+  const res=items.map(()=>null);
+  const todo=items.map((t,i)=>i).filter(i=>/\p{L}/u.test(items[i]||''));
+  const tell=()=>{if(o.progress)o.progress(res.filter(Boolean).length/Math.max(1,todo.length));};
+  const send=async(idx,size)=>{
+    const parts=[];let part=[],len=0;
+    for(const i of idx){const L=items[i].length;if(part.length&&(part.length>=size||len+L>2500)){parts.push(part);part=[];len=0;}part.push(i);len+=L+8;}
+    if(part.length)parts.push(part);
+    for(const pt of parts){
+      if(o.stop&&o.stop())return null;
+      tell();
+      if(pt.length===1){
+        // one piece on its own: no numbers to keep, just the translation
+        const r=await callTranslate([o.intro||'',...TR_RULES,'Return only the translation of this text:'].filter(Boolean).join('\n')+'\n'+items[pt[0]],target);
+        if(r.error)return r;
+        const t=parseTr(r.raw).text.replace(BIDI_MARKS,'').replace(/^\s*[\[\]]\s*1\s*[\[\]]\s*/,'').trim();
+        if(trGood(items[pt[0]],t,target))res[pt[0]]=t;
+        continue;
+      }
+      const r=await callTranslate(TR_HEAD(o.intro)+pt.map((i,k)=>`[${k+1}] ${items[i].replace(/\s*\n\s*/g,' ')}`).join('\n'),target);
+      if(r.error)return r;
+      const got=parseNumbered(parseTr(r.raw).text);
+      pt.forEach((i,k)=>{const t=got[k+1];if(t&&trGood(items[i],t,target))res[i]=t;});
+    }
+    return null;
+  };
+  let err=await send(todo,25);
+  for(const size of [6,1]){
+    if(err||(o.stop&&o.stop()))break;
+    const left=todo.filter(i=>!res[i]);if(!left.length)break;
+    err=await send(left,size);
+  }
+  tell();
+  if(err&&!res.some(Boolean))return{error:err};
+  return{res,error:err||null};
+}
 async function callTranslate(text,target){
   const sourceForeign=foreignWords(text,target).length; // the original's own words in that alphabet don't count
   let r=await callTranslateOnce(text,target,false);
@@ -2940,16 +3008,11 @@ async function translateInPlace(){
       for(const ch of chunks){
         if(TR.stop)break;
         status(`מתרגם עמוד ${i+1}…`);
-        const text='Translate each numbered line separately. Keep every [number] marker at the start of its line and keep the same count of lines.\n'+ch.map((u,k)=>`[${k+1}] ${u.text}`).join('\n');
-        const r=await callTranslate(text,target);
-        if(r.error){failed=r;break;}
-        const out={};let lastN=null;
-        for(const line of parseTr(r.raw).text.split('\n')){
-          const m=/^\s*\[(\d+)\]\s?(.*)$/.exec(line);
-          if(m){lastN=+m[1];out[lastN]=m[2].trim();}else if(lastN&&line.trim())out[lastN]+=' '+line.trim();
-        }
+        const R=await trLines(ch.map(u=>u.text),target,{intro:'This is one page of a PDF document.',stop:()=>TR.stop});
+        if(R.error&&!R.res){failed=R.error;break;}
+        if(R.error)failed=R.error;
         ch.forEach((u,k)=>{
-          const t=out[k+1];if(!t)return;
+          const t=R.res[k];if(!t)return;
           const{bg,fg}=sampleColors(P,u);const fn=fontNameOf(P,u.font);
           const a={id:S.nextId++,type:'edit',page:i,rects:u.lines.map(l=>[l.x0,l.y0,l.x1,l.y1]),x0:u.x0,x1:u.x1,base:u.base,size:Math.round(u.size*10)/10,lh:u.lh,
             dir:paraDir(t,trRtl(target)?'R':'L'),align:u.align,font:(TR_LANG[target]&&TR_LANG[target].font)||(P.ocr?'heebo':guessFont(fn.name)),bold:fn.bold||/bold|black|heavy|semibold/i.test(fn.name)||u.lines.some(l=>l.bold),color:fg,bg,text:t,orig:u.text,dx:0,dy:0,tr:true};
@@ -3083,24 +3146,9 @@ async function translateOfficeDocx(){
     const{parts,paras}=await docxParas(zip);
     const units=paras.filter(x=>/\p{L}/u.test(x.text));
     if(!units.length){status('לא נמצא טקסט בקובץ ה-Word.',true);return;}
-    const chunks=[];let cur=[],len=0;
-    for(const u of units){if(cur.length&&len+u.text.length>4500){chunks.push(cur);cur=[];len=0;}cur.push(u);len+=u.text.length+8;}
-    if(cur.length)chunks.push(cur);
-    let done=0;
-    for(const ch of chunks){
-      if(TR.stop)break;
-      status(`מתרגם את המסמך… ${Math.round(done/units.length*100)}%`);
-      const text='Translate each numbered line separately. Keep every [number] marker at the start of its line and keep the same count of lines.\n'+ch.map((u,k)=>`[${k+1}] ${u.text}`).join('\n');
-      const r=await callTranslate(text,target);
-      if(r.error){failed=r;break;}
-      const out={};let lastN=null;
-      for(const line of parseTr(r.raw).text.split('\n')){
-        const m=/^\s*\[(\d+)\]\s?(.*)$/.exec(line);
-        if(m){lastN=+m[1];out[lastN]=m[2].trim();}else if(lastN&&line.trim())out[lastN]+=' '+line.trim();
-      }
-      ch.forEach((u,k)=>{if(out[k+1])u.tr=out[k+1];});
-      done+=ch.length;
-    }
+    const R=await trLines(units.map(u=>u.text),target,{intro:'This is a Word document.',stop:()=>TR.stop,progress:f=>status(`מתרגם את המסמך… ${Math.round(f*100)}%`)});
+    if(R.error&&!R.res)failed=R.error;else if(R.error)status(errText(R.error)+' — חלק מהמסמך תורגם.',true);
+    if(R.res)units.forEach((u,k)=>{if(R.res[k])u.tr=R.res[k];});
     if(failed){status(errText(failed),true);if(failed.error==='NO_KEY'||failed.status===401)openSettings(true);return;}
     if(TR.stop){status('התרגום נעצר. הקובץ לא שונה.');return;}
     let n=0;
@@ -5081,7 +5129,7 @@ if('launchQueue' in window){
    ===================================================================== */
 (function(){
   const STATUS_URL=(typeof REGISTER_URL!=='undefined'&&REGISTER_URL)?REGISTER_URL.replace(/\/register$/,'/status'):'';
-  const U_KEY='siman.usage', T_KEY='siman.trial', APP_VER='5.2.2';
+  const U_KEY='siman.usage', T_KEY='siman.trial', APP_VER='5.2.3';
   const today=()=>new Date().toISOString().slice(0,10);
   const rd=k=>{try{return JSON.parse(localStorage.getItem(k)||'null');}catch(_){return null;}};
   const wr=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch(_){}};
