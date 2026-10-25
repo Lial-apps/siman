@@ -20,10 +20,10 @@ const MAX_IMAGE = 7 * 1024 * 1024;  // base64 characters of one page picture
 // handwriting can take longer, so "scan" and "ask" answer at once and keep the line open with spaces
 // until Gemini is done. The app reads the JSON at the end (JSON allows spaces before it).
 const STREAM_MODES = ['scan', 'scanAccurate', 'ask'];
-const MODEL_TIMEOUT = { scan: 80000, scanAccurate: 170000, ask: 80000, translate: 80000 }; // ms per model before trying the next one
+const MODEL_TIMEOUT = { scan: 80000, scanAccurate: 170000, ask: 80000, translate: 80000, corners: 30000 }; // ms per model before trying the next one
 // reading a page: "accurate" = the main model, thinking a little (best for handwriting, ~20–90 s);
 // "fast" = the light model, no thinking (a few seconds, guesses more)
-const MODELS_FOR = { scan: ['gemini-flash-lite-latest', 'gemini-flash-latest'], scanAccurate: ['gemini-flash-latest', 'gemini-flash-lite-latest'] };
+const MODELS_FOR = { scan: ['gemini-flash-lite-latest', 'gemini-flash-latest'], scanAccurate: ['gemini-flash-latest', 'gemini-flash-lite-latest'], corners: ['gemini-flash-latest', 'gemini-flash-lite-latest'] };
 // no "thinking" for reading and translating = a much faster answer; a little for questions
 // Models differ in which setting they take (older: thinkingBudget, newer: thinkingLevel), and one that does
 // not take a setting answers "invalid argument" — so each is tried in turn, and at the end none at all.
@@ -33,6 +33,7 @@ const THINKING = {
   scanAccurate: [{ thinkingLevel: 'medium' }, { thinkingLevel: 'low' }, { thinkingBudget: 4096 }, null],
   ask: [{ thinkingBudget: 512 }, { thinkingLevel: 'low' }, null],
   translate: [{ thinkingBudget: 0 }, { thinkingLevel: 'minimal' }, null],
+  corners: [{ thinkingLevel: 'minimal' }, { thinkingBudget: 0 }, null],
 };
 const LANGS = { he: 'Hebrew', en: 'English', ru: 'Russian', fr: 'French', es: 'Spanish', ar: 'Arabic' };
 
@@ -70,6 +71,21 @@ After every fact, cite the page it came from: [עמ' 3] when you answer in Hebre
 Answer in the language the question is written in. Be clear and short: plain short paragraphs, or lines that start with "• ". No markdown headings, no bold, no tables.`,
 };
 
+// finding the sheet of paper in a photo: its four corners, so the app can cut it out and straighten it
+const CORNERS_PROMPT = `You find the document in a photo taken to scan it: the sheet of paper, page, notebook page, form or receipt the person is photographing.
+Ignore everything around it: the table, hands, other papers, bags, plastic sleeves, shadows.
+When several papers are visible, choose the one in the middle that takes the most space and has the writing.
+Return its 4 corners as points [y, x], each normalized to 0-1000 over the whole image (y down from the top, x right from the left), in this order: top-left, top-right, bottom-right, bottom-left of the sheet as it appears in the photo.
+Follow the real edges of the paper, also when it is tilted or photographed at an angle. A corner outside the photo goes on the photo's edge.
+If no document is visible, return {"found":false,"corners":[]}.`;
+const CORNERS_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    found: { type: 'BOOLEAN' },
+    corners: { type: 'ARRAY', items: { type: 'ARRAY', items: { type: 'INTEGER' } } },
+  },
+  required: ['found', 'corners'],
+};
 const SCAN_SCHEMA = {
   type: 'OBJECT',
   properties: {
@@ -131,6 +147,15 @@ function build(body) {
       contents: [{ role: 'user', parts }],
       // the exact shape of the answer: the fast model then always returns valid JSON
       generationConfig: { temperature: 0, maxOutputTokens: 16384, responseMimeType: 'application/json', responseSchema: SCAN_SCHEMA },
+    };
+  }
+  if (mode === 'corners') {
+    const image = String(body.image || '');
+    if (!image || image.length > MAX_IMAGE || !/^[A-Za-z0-9+/=]+$/.test(image.slice(0, 200))) return { err: 'image missing or too large' };
+    return {
+      systemInstruction: { parts: [{ text: CORNERS_PROMPT }] },
+      contents: [{ role: 'user', parts: [{ inlineData: { mimeType: 'image/jpeg', data: image } }, { text: 'Find the document and its 4 corners.' }] }],
+      generationConfig: { temperature: 0, maxOutputTokens: 512, responseMimeType: 'application/json', responseSchema: CORNERS_SCHEMA },
     };
   }
   if (mode === 'ask') {

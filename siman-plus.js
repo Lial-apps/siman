@@ -14,6 +14,7 @@ const esc = t => String(t ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '
 const isBusy = () => !$('busy').classList.contains('hidden');
 const h = html => { const t = document.createElement('template'); t.innerHTML = html.trim(); return t.content.firstElementChild; };
 const ICON = {
+  crop: '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2v14a2 2 0 002 2h14"/><path d="M18 22V8a2 2 0 00-2-2H2"/></svg>',
   spark: '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>',
   speak: '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3.5L12 5v14l-4.5-4.5H4z"/><path d="M15.5 9a4 4 0 010 6M18 6.5a7.5 7.5 0 010 11"/></svg>',
   scan: '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V5a1 1 0 011-1h3M16 4h3a1 1 0 011 1v3M20 16v3a1 1 0 01-1 1h-3M8 20H5a1 1 0 01-1-1v-3"/><path d="M7.5 13c1.5-2.5 2.5-3 3-1.5s1.5 1.5 2.5-.5 2-2 3.5.5"/></svg>',
@@ -117,6 +118,18 @@ dialog.scan::backdrop{background:color-mix(in srgb,var(--navy) 60%,transparent);
 .sc-tray{list-style:none;margin:0 0 14px;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:12px}
 .sc-tray li{position:relative;border:1px solid var(--line);border-radius:12px;padding:6px;font-size:12.5px;color:var(--muted);text-align:center;background:var(--bar)}
 .sc-tray img{display:block;width:100%;height:150px;object-fit:contain;background:#fff;border-radius:8px;margin-bottom:6px}
+.sc-tray .fr{position:absolute;bottom:34px;inset-inline-start:10px;display:inline-flex;align-items:center;gap:4px;height:30px;padding:0 10px;border-radius:999px;border:0;background:rgba(20,24,32,.78);color:#fff;font:inherit;font-size:12.5px;cursor:pointer}
+.sc-tray .fr svg{width:15px;height:15px}
+.sc-frame{display:flex;flex-direction:column;align-items:center;gap:10px}
+.sc-fhelp{margin:0;color:var(--muted);text-align:center}
+.sc-fwrap{position:relative;display:inline-block;max-width:100%;touch-action:none;user-select:none;-webkit-user-select:none}
+.sc-fwrap img{display:block;max-width:100%;max-height:62vh;border-radius:6px;pointer-events:none}
+.sc-fwrap svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.sc-fwrap .shade{fill:rgba(10,14,22,.55)}
+.sc-fwrap .edge{fill:none;stroke:#FFD93D;stroke-width:.6;vector-effect:non-scaling-stroke;stroke-width:3}
+.sc-hd{position:absolute;width:34px;height:34px;margin:-17px 0 0 -17px;border-radius:50%;border:3px solid #FFD93D;background:rgba(255,217,61,.25);cursor:grab;touch-action:none;padding:0}
+.sc-hd::after{content:"";position:absolute;inset:-12px;border-radius:50%}
+.sc-hd.on,.sc-hd:focus-visible{background:rgba(255,217,61,.6);outline:2px solid #fff}
 .sc-tray .x{position:absolute;top:10px;inset-inline-end:10px;width:30px;height:30px;border-radius:50%;border:0;background:rgba(20,24,32,.78);color:#fff;font-size:18px;line-height:1;cursor:pointer}
 .sc-tray li.add{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-height:178px;border-style:dashed;cursor:pointer;color:var(--ink);font:inherit;font-weight:600}
 .sc-tray li.add svg{width:30px;height:30px}
@@ -1010,18 +1023,58 @@ const SC = {
   },
   // the pages wait in a tray: more can be photographed or added, and then all are read into one file
   room() { return Math.max(0, 30 - this.pages.length - this.tray.length); },
-  async fromImages(files) {
+  async fromImages(files, fromCamera = false) {
     if (!files.length) return;
     if (!this.name && !this.pages.length && !this.tray.length) this.name = files.length === 1 && !/^(image|img|photo|pxl|dsc|תמונה)[-_ ]?\d*/i.test(files[0].name) ? files[0].name.replace(/\.[a-z0-9]+$/i, '') : 'כתב יד';
     const bad = [], take = files.slice(0, this.room());
-    for (const f of take) {
-      this.wait(`מכין את התמונה${take.length > 1 ? 'ות' : ''}…`);
+    for (const [i, f] of take.entries()) {
+      this.wait(take.length > 1 ? `מזהה את הדף ומכין אותו… (${i + 1} מתוך ${take.length})` : 'מזהה את הדף ומכין אותו…');
       try { this.tray.push(await imgToJpeg(f)); }
       catch (e) { bad.push(`${f.name}${/heic|heif/i.test(f.type + f.name) ? ' (HEIC: צלמו ישר מהמצלמה או שמרו כ-JPG)' : ''}`); }
     }
+    // a photo just taken: its frame is shown at once, to confirm or fix
+    if (fromCamera && take.length === 1 && this.tray.length && !bad.length) { this.frame(this.tray.length - 1); return; }
     this.showTray();
     if (files.length > take.length) this.note('אפשר עד 30 עמודים בקובץ אחד');
     if (bad.length) this.note('לא הצלחתי לקרוא: ' + bad.join(', '));
+  },
+  // the frame of one photo: four corners to drag onto the edges of the sheet
+  frame(i) {
+    const it = this.tray[i]; if (!it) return this.showTray();
+    const b = this.body(), f = this.foot();
+    let q = (it.quad || FULL).map(p => [...p]);
+    b.innerHTML = `<div class="sc-frame"><p class="sc-fhelp">${it.auto ? 'זה הדף שזיהיתי. אם צריך, גררו את הפינות לקצוות הדף.' : 'גררו את ארבע הפינות לקצוות הדף, כדי שרק הדף ייקרא.'}</p>
+      <div class="sc-fwrap"><img alt="התמונה שצולמה" src="${it.view}" draggable="false">
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><path class="shade" fill-rule="evenodd"/><polygon class="edge"/></svg>
+      ${[0, 1, 2, 3].map(k => `<button type="button" class="sc-hd" data-k="${k}" aria-label="${['פינה ימנית עליונה', 'פינה שמאלית עליונה', 'פינה שמאלית תחתונה', 'פינה ימנית תחתונה'][k === 0 ? 1 : k === 1 ? 0 : k === 2 ? 3 : 2]}"></button>`).join('')}</div></div>`;
+    const wrap = b.querySelector('.sc-fwrap'), path = b.querySelector('.shade'), poly = b.querySelector('.edge'), hs = [...b.querySelectorAll('.sc-hd')];
+    const draw = () => {
+      const pts = q.map(([x, y]) => `${x * 100},${y * 100}`);
+      poly.setAttribute('points', pts.join(' '));
+      path.setAttribute('d', `M0,0H100V100H0Z M${pts.join(' L')}Z`);
+      hs.forEach((hd, k) => { hd.style.left = q[k][0] * 100 + '%'; hd.style.top = q[k][1] * 100 + '%'; });
+    };
+    draw();
+    hs.forEach((hd, k) => {
+      hd.onpointerdown = e => { e.preventDefault(); hd.setPointerCapture(e.pointerId); hd.classList.add('on'); };
+      hd.onpointermove = e => { if (!hd.hasPointerCapture(e.pointerId)) return; const r = wrap.getBoundingClientRect();
+        q[k] = [Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)), Math.max(0, Math.min(1, (e.clientY - r.top) / r.height))]; draw(); };
+      hd.onpointerup = hd.onpointercancel = e => { hd.classList.remove('on'); try { hd.releasePointerCapture(e.pointerId); } catch (_) {} };
+      hd.onkeydown = e => { const st = e.shiftKey ? 0.05 : 0.01, mv = { ArrowLeft: [-st, 0], ArrowRight: [st, 0], ArrowUp: [0, -st], ArrowDown: [0, st] }[e.key];
+        if (!mv) return; e.preventDefault(); q[k] = [Math.max(0, Math.min(1, q[k][0] + mv[0])), Math.max(0, Math.min(1, q[k][1] + mv[1]))]; draw(); };
+    });
+    f.classList.remove('hidden');
+    f.innerHTML = `<span class="hint" style="margin-inline-end:auto"></span><button class="btn" type="button" data-a="full">כל התמונה</button>${it.auto ? '<button class="btn" type="button" data-a="auto">הדף שזוהה</button>' : '<button class="btn" type="button" data-a="detect">זיהוי הדף</button>'}<button class="btn primary" type="button" data-a="ok">אישור</button>`;
+    f.querySelector('[data-a=full]').onclick = () => { q = FULL.map(p => [...p]); draw(); };
+    const au = f.querySelector('[data-a=auto]'); if (au) au.onclick = () => { q = it.auto.map(p => [...p]); draw(); };
+    const de = f.querySelector('[data-a=detect]');
+    if (de) de.onclick = async () => { de.disabled = true; de.textContent = 'מזהה…'; const a = await detectSheet(it);
+      if (a) { it.auto = a; q = a.map(p => [...p]); draw(); de.textContent = 'זוהה ✓'; } else { de.textContent = 'לא זוהה. גררו ידנית'; } };
+    f.querySelector('[data-a=ok]').onclick = async () => {
+      if (quadArea(q) < 0.03) { this.note('המסגרת קטנה מדי'); return; }
+      it.quad = q; this.wait('מיישר את הדף…'); try { await cutSheet(it); } catch (e) { console.warn(e); this.note('לא הצלחתי לחתוך. נשארה התמונה המלאה'); }
+      this.showTray();
+    };
   },
   showTray() {
     const had = this.pages.filter(p => p.blocks || p.err).length;
@@ -1029,10 +1082,11 @@ const SC = {
     const b = this.body(), f = this.foot(), n = this.tray.length;
     const pg = k => k === 1 ? 'עמוד אחד' : `${k} עמודים`;
     b.innerHTML = `<div class="sc-trayhead"><h3>${n ? pg(n) + (had ? ' להוספה' : ' לקריאה') : 'הוספת עמודים'}</h3><p>${had ? `בקובץ כבר יש ${pg(had)}. העמודים החדשים יתווספו אחריהם. ` : ''}הכל נשמר כקובץ אחד, לפי הסדר.</p></div>
-      <ul class="sc-tray">${this.tray.map((p, i) => `<li><img alt="עמוד ${had + i + 1}" src="${p.url}">עמוד ${had + i + 1}<button type="button" class="x" data-del="${i}" aria-label="הסרת עמוד ${had + i + 1}">×</button></li>`).join('')}
+      <ul class="sc-tray">${this.tray.map((p, i) => `<li><img alt="עמוד ${had + i + 1}" src="${p.url}">עמוד ${had + i + 1}<button type="button" class="x" data-del="${i}" aria-label="הסרת עמוד ${had + i + 1}">×</button>${p.srcBlob ? `<button type="button" class="fr" data-frame="${i}" aria-label="מסגרת לעמוד ${had + i + 1}">${ICON.crop} מסגרת</button>` : ''}</li>`).join('')}
         ${this.room() ? `<li class="add" role="button" tabindex="0" data-add="cam">${ICON.scan}צילום עמוד${n || had ? ' נוסף' : ''}</li><li class="add" role="button" tabindex="0" data-add="img"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M21 16l-5-5-8 8"/></svg>בחירת תמונות</li><li class="add" role="button" tabindex="0" data-add="pdf"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4"/></svg>PDF סרוק</li>` : ''}
       </ul>`;
     b.querySelectorAll('[data-del]').forEach(x => x.onclick = () => { this.tray.splice(+x.dataset.del, 1); this.showTray(); });
+    b.querySelectorAll('[data-frame]').forEach(x => x.onclick = () => this.frame(+x.dataset.frame));
     b.querySelectorAll('[data-add]').forEach(x => { const go = () => ({ cam: camIn, img: imgIn, pdf: pdfIn })[x.dataset.add].click(); x.onclick = go; x.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } }; });
     f.classList.remove('hidden');
     f.innerHTML = `<span class="hint" style="margin-inline-end:auto"></span>${had ? '<button class="btn" type="button" data-a="back">חזרה לטקסט</button>' : '<button class="btn" type="button" data-a="restart">ביטול</button>'}<button class="btn primary" type="button" data-a="read" ${n ? '' : 'disabled'}>${n > 1 ? `קריאת ${n} העמודים` : 'קריאת העמוד'}</button>`;
@@ -1206,7 +1260,7 @@ const ANDROID = /Android/i.test(navigator.userAgent);
 const savedNote = (k, n) => `נשמר כקובץ ${k} אחד${n > 1 ? ` עם ${n} עמודים` : ''} ✓${ANDROID ? ' · בתיקיית "הורדות" (Downloads)' : ''}`;
 dlg.querySelector('[data-a=close]').onclick = () => SC.close();
 dlg.addEventListener('cancel', e => { if (SC.running || SC.pages.some(p => p.blocks) || SC.tray.length) { e.preventDefault(); SC.close(); } });
-camIn.onchange = e => { const f = [...e.target.files]; e.target.value = ''; SC.fromImages(f); };
+camIn.onchange = e => { const f = [...e.target.files]; e.target.value = ''; SC.fromImages(f, true); };
 imgIn.onchange = e => { const f = [...e.target.files]; e.target.value = ''; SC.fromImages(f); };
 pdfIn.onchange = e => { const f = e.target.files[0]; e.target.value = ''; SC.fromPdf(f); };
 window.SIMAN_SCAN = SC;
@@ -1249,15 +1303,90 @@ async function stripsOf(src, w, hh) {
   }
   return out;
 }
-async function imgToJpeg(file) {
-  let bmp;
-  try { bmp = await createImageBitmap(file, { imageOrientation: 'from-image' }); }
-  catch (_) { bmp = await new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = URL.createObjectURL(file); }); }
-  const w = bmp.width || bmp.naturalWidth, hh = bmp.height || bmp.naturalHeight;
-  const page = await canvasJpeg((x, cw, ch) => { x.drawImage(bmp, 0, 0, cw, ch); levels(x, cw, ch); }, w, hh);
-  page.strips = await stripsOf(bmp, w, hh);
-  return page;
+/* ---- framing a photographed page: find the sheet, let the person fix the frame, cut it out straight ---- */
+async function decodeImg(src) {
+  try { return await createImageBitmap(src, { imageOrientation: 'from-image' }); }
+  catch (_) { return await new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = URL.createObjectURL(src); }); }
 }
+function scaled(img, w, hh, max) {
+  const k = Math.min(1, max / Math.max(w, hh)), c = document.createElement('canvas');
+  c.width = Math.max(1, Math.round(w * k)); c.height = Math.max(1, Math.round(hh * k));
+  c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); return c;
+}
+const jpegBlob = (c, q = 0.92) => new Promise(r => c.toBlob(r, 'image/jpeg', q));
+const FULL = [[0, 0], [1, 0], [1, 1], [0, 1]];
+// a photo, kept once (up to 3200 dots) so the frame can be changed later without losing sharpness
+async function prepPhoto(file) {
+  const bmp = await decodeImg(file), w = bmp.width || bmp.naturalWidth, hh = bmp.height || bmp.naturalHeight;
+  const src = scaled(bmp, w, hh, 3200), view = scaled(bmp, w, hh, 1100);
+  if (bmp.close) bmp.close();
+  const vu = view.toDataURL('image/jpeg', 0.8);
+  const it = { srcBlob: await jpegBlob(src), sw: src.width, sh: src.height, view: vu, viewB64: vu.slice(vu.indexOf(',') + 1), quad: null, auto: null };
+  src.width = src.height = 0;
+  return it;
+}
+// four corners in order: top-left, top-right, bottom-right, bottom-left
+function orderQuad(q) {
+  const cx = q.reduce((a, p) => a + p[0], 0) / 4, cy = q.reduce((a, p) => a + p[1], 0) / 4;
+  const s = [...q].sort((a, b) => Math.atan2(a[1] - cy, a[0] - cx) - Math.atan2(b[1] - cy, b[0] - cx)); // clockwise on screen
+  let k = 0; for (let i = 1; i < 4; i++) if (s[i][0] + s[i][1] < s[k][0] + s[k][1]) k = i;
+  return [0, 1, 2, 3].map(i => s[(k + i) % 4]);
+}
+const quadArea = q => Math.abs(q.reduce((a, p, i) => { const n = q[(i + 1) % 4]; return a + p[0] * n[1] - n[0] * p[1]; }, 0)) / 2;
+// the smart service points at the sheet's corners; an older server, or no answer, leaves the whole photo
+async function detectSheet(it) {
+  try {
+    const raw = await ai({ mode: 'corners', image: it.viewB64 }, { timeout: 45000 });
+    const j = JSON.parse(String(raw).replace(/^\s*```(?:json)?|```\s*$/g, ''));
+    if (!j || !j.found || !Array.isArray(j.corners) || j.corners.length !== 4) return null;
+    const q = orderQuad(j.corners.map(p => [Math.max(0, Math.min(1, (+p[1] || 0) / 1000)), Math.max(0, Math.min(1, (+p[0] || 0) / 1000))]));
+    const a = quadArea(q);
+    return a > 0.12 && a < 0.985 ? q : null;
+  } catch (_) { return null; }
+}
+// the frame → a straight, flat page (a perspective cut), sharp enough for the reader
+async function cutSheet(it) {
+  const bmp = await decodeImg(it.srcBlob), W0 = it.sw, H0 = it.sh;
+  const q = (it.quad || FULL).map(([x, y]) => [x * W0, y * H0]);
+  const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+  let W = Math.max(dist(q[0], q[1]), dist(q[3], q[2])), H = Math.max(dist(q[0], q[3]), dist(q[1], q[2]));
+  const k = Math.min(1, 2800 / Math.max(W, H)); W = Math.max(8, Math.round(W * k)); H = Math.max(8, Math.round(H * k));
+  const out = document.createElement('canvas');
+  if (!it.quad || it.quad.every((p, i) => Math.abs(p[0] - FULL[i][0]) < 0.003 && Math.abs(p[1] - FULL[i][1]) < 0.003)) {
+    out.width = W; out.height = H; out.getContext('2d').drawImage(bmp, 0, 0, W, H);
+  } else {
+    const sc = document.createElement('canvas'); sc.width = W0; sc.height = H0;
+    const sx = sc.getContext('2d', { willReadFrequently: true }); sx.drawImage(bmp, 0, 0, W0, H0);
+    const S = sx.getImageData(0, 0, W0, H0).data; sc.width = sc.height = 0;
+    // unit square → the four corners (Heckbert's square-to-quad mapping)
+    const [[x0, y0], [x1, y1], [x2, y2], [x3, y3]] = q;
+    const dx1 = x1 - x2, dx2 = x3 - x2, dx3 = x0 - x1 + x2 - x3, dy1 = y1 - y2, dy2 = y3 - y2, dy3 = y0 - y1 + y2 - y3;
+    let a, b, c, d, e, f, g = 0, hh = 0;
+    if (Math.abs(dx3) < 1e-9 && Math.abs(dy3) < 1e-9) { a = x1 - x0; b = x2 - x1; c = x0; d = y1 - y0; e = y2 - y1; f = y0; }
+    else { const det = dx1 * dy2 - dx2 * dy1; g = (dx3 * dy2 - dx2 * dy3) / det; hh = (dx1 * dy3 - dx3 * dy1) / det;
+      a = x1 - x0 + g * x1; b = x3 - x0 + hh * x3; c = x0; d = y1 - y0 + g * y1; e = y3 - y0 + hh * y3; f = y0; }
+    out.width = W; out.height = H;
+    const ox = out.getContext('2d'), img = ox.createImageData(W, H), D = img.data;
+    for (let Y = 0; Y < H; Y++) {
+      const v = (Y + 0.5) / H;
+      for (let X = 0; X < W; X++) {
+        const u = (X + 0.5) / W, z = g * u + hh * v + 1, px = (a * u + b * v + c) / z - 0.5, py = (d * u + e * v + f) / z - 0.5;
+        const ix = Math.max(0, Math.min(W0 - 2, px | 0)), iy = Math.max(0, Math.min(H0 - 2, py | 0)), fx = Math.max(0, Math.min(1, px - ix)), fy = Math.max(0, Math.min(1, py - iy));
+        const i00 = (iy * W0 + ix) * 4, i10 = i00 + 4, i01 = i00 + W0 * 4, i11 = i01 + 4, o = (Y * W + X) * 4;
+        for (let ch = 0; ch < 3; ch++) D[o + ch] = (S[i00 + ch] * (1 - fx) + S[i10 + ch] * fx) * (1 - fy) + (S[i01 + ch] * (1 - fx) + S[i11 + ch] * fx) * fy;
+        D[o + 3] = 255;
+      }
+    }
+    ox.putImageData(img, 0, 0);
+  }
+  if (bmp.close) bmp.close();
+  const page = await canvasJpeg((x, cw, ch) => { x.drawImage(out, 0, 0, cw, ch); levels(x, cw, ch); }, W, H);
+  page.strips = await stripsOf(out, W, H);
+  out.width = out.height = 0;
+  Object.assign(it, { url: page.url, b64: page.b64, w: page.w, h: page.h, strips: page.strips });
+  return it;
+}
+async function imgToJpeg(file) { const it = await prepPhoto(file); it.quad = it.auto = await detectSheet(it); return cutSheet(it); }
 async function pageToJpeg(page) {
   const v1 = page.getViewport({ scale: 1 }), fast = SC.quality === 'fast';
   // drawn once, big, and the page and its strips are taken from that drawing
