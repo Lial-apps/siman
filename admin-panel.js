@@ -177,7 +177,7 @@
     try {
       const r = await fetch(API, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ key }), cache: 'no-store' });
       if (r.status === 403) { setKey(''); data = null; return showLogin('המפתח לא נכון. נסו שוב.'); }
-      if (!r.ok) throw new Error('http ' + r.status);
+      if (!r.ok) throw new Error('השרת החזיר שגיאה ' + r.status + (r.status === 404 ? ' (הכתובת ‎/admin לא קיימת ב־worker)' : ''));
       data = await r.json();
       el('admDot').classList.add('on');
       el('admUpd').textContent = 'עודכן ' + new Date().toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
@@ -186,7 +186,8 @@
       el('admDot').classList.remove('on');
       if (!data) {
         el('admBody').innerHTML = `<div class="a-card a-login"><h3>אין חיבור לשרת</h3>
-          <p class="a-mu" style="line-height:1.6">בדקו שיש אינטרנט ושה־worker ‏siman-register עודכן לגרסה 4.9 (עם הכתובת ‎/admin).</p>
+          <p class="a-mu" style="line-height:1.6">${e && /שגיאה/.test(e.message) ? esc(e.message) + '.' : 'הדפדפן חסם את התשובה מה־worker ‏siman-register. כמעט תמיד זה אומר שהכתובת שממנה סימן פתוחה עכשיו לא נמצאת ברשימת הכתובות המורשות שלו.'}</p>
+          <p class="a-mu" style="line-height:1.6">סימן פתוחה עכשיו מ־<b dir="ltr">${esc(location.origin)}</b>. ב־Cloudflare ← siman-register ← Edit code, השורה <span dir="ltr">const ALLOWED</span> צריכה לכלול את הכתובת הזו.</p>
           <button type="button" id="admRetry">לנסות שוב</button> <button type="button" class="a-gh" id="admNewKey" style="color:var(--a-tx)">להזין מפתח אחר</button></div>`;
         el('admRetry').onclick = () => load();
         el('admNewKey').onclick = () => { setKey(''); showLogin(''); };
