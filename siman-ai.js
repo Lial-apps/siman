@@ -11,7 +11,8 @@
 //
 // The key never reaches the app. Only requests coming from the app's own address are answered.
 
-const ALLOWED = ['https://lial-apps.github.io'];
+// the app is served from both addresses: GitHub Pages and the Cloudflare one (siman-worker.js)
+const ALLOWED = ['https://lial-apps.github.io', 'https://siman.siman-app.workers.dev'];
 const MODELS = ['gemini-flash-latest', 'gemini-flash-lite-latest'];
 const MAX_TEXT = 400000;            // characters of document text for "ask"
 const MAX_IMAGE = 7 * 1024 * 1024;  // base64 characters of one page picture
@@ -28,7 +29,8 @@ const MODELS_FOR = { scan: ['gemini-flash-lite-latest', 'gemini-flash-latest'], 
 // not take a setting answers "invalid argument" — so each is tried in turn, and at the end none at all.
 const THINKING = {
   scan: [{ thinkingBudget: 0 }, { thinkingLevel: 'minimal' }, { thinkingLevel: 'low' }, null],
-  scanAccurate: [{ thinkingLevel: 'low' }, { thinkingBudget: 2048 }, null],
+  // handwriting is read better with more thinking: each step down is tried only if the model refuses the one above
+  scanAccurate: [{ thinkingLevel: 'medium' }, { thinkingLevel: 'low' }, { thinkingBudget: 4096 }, null],
   ask: [{ thinkingBudget: 512 }, { thinkingLevel: 'low' }, null],
   translate: [{ thinkingBudget: 0 }, { thinkingLevel: 'minimal' }, null],
 };
@@ -54,7 +56,9 @@ Each block is one of:
 {"t":"table","rows":[["cell","cell"],["cell","cell"]]}  a table, first row first, cells in reading order
 Rules:
 - Read slowly, letter by letter. Write the writer's words exactly as written. Do not correct spelling, do not complete, summarize or translate.
-- Never invent a word to make a sentence sound right. Prefer marking over guessing: any word you are not sure of, give your best reading inside [[ ]], for example [[שלום]]. A word you cannot read at all: [[?]]. It is normal for a handwritten page to have several marked words.
+- Read every line of the page, top to bottom, including small, faint or crowded writing, notes in the margins and the name or date at the top. Do not skip a line because it is hard to read.
+- When the letters of a word are unclear, decide between the possible readings by the letters you can see together with the sentence, the subject and the language (for example a Bible text: Бог, Авраам, Сара, אברהם, שרה). Never invent a word that the letters do not support.
+- A word you are not sure of: your best reading inside [[ ]], for example [[שלום]]. Use [[?]] only when not even a guess is possible. A best guess in [[ ]] is always better than [[?]].
 - Arrows drawn between words (→ ← ↓) are kept as → or ← or ↓ in the text, in the place they appear. Abbreviations, codes and English or Latin letters inside Hebrew text are kept exactly as written.
 - Skip crossed-out words, page decorations and doodles. Keep numbers, dates, math and signs as written.
 - Right-to-left languages (Hebrew, Arabic) in normal logical order.
@@ -113,9 +117,18 @@ function build(body) {
     if (!image || image.length > MAX_IMAGE || !/^[A-Za-z0-9+/=]+$/.test(image.slice(0, 200))) return { err: 'image missing or too large' };
     const mime = /^image\/(jpeg|png|webp)$/.test(body.mime) ? body.mime : 'image/jpeg';
     const hint = LANGS[body.hint] || '';
+    // the same page in sharp strips from top to bottom (the app sends them for an accurate reading)
+    const strips = (Array.isArray(body.strips) ? body.strips : []).slice(0, 4).map(String)
+      .filter(s => s && s.length <= MAX_IMAGE && /^[A-Za-z0-9+/=]+$/.test(s.slice(0, 200)));
+    const parts = [{ inlineData: { mimeType: mime, data: image } }];
+    if (strips.length) {
+      parts.push({ text: `The same page again in ${strips.length} sharper strips, from top to bottom. Neighbouring strips overlap a little, so a line can appear in two strips: write it only once. Use the whole page above for the order and the layout, and the strips to read every word.` });
+      for (const s of strips) parts.push({ inlineData: { mimeType: 'image/jpeg', data: s } });
+    }
+    parts.push({ text: 'Transcribe this page.' });
     return {
       systemInstruction: { parts: [{ text: PROMPTS.scan(hint) }] },
-      contents: [{ role: 'user', parts: [{ inlineData: { mimeType: mime, data: image } }, { text: 'Transcribe this page.' }] }],
+      contents: [{ role: 'user', parts }],
       // the exact shape of the answer: the fast model then always returns valid JSON
       generationConfig: { temperature: 0, maxOutputTokens: 16384, responseMimeType: 'application/json', responseSchema: SCAN_SCHEMA },
     };

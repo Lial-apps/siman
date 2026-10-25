@@ -1082,7 +1082,7 @@ const SC = {
       st.textContent = line + '…';
       const clock = setInterval(() => { const sec = Math.round((Date.now() - t0) / 1000); li.querySelector('span').textContent = `קורא… ${sec} שנ׳`; st.textContent = `${line} · ${sec} שניות${sec > 45 ? ' (כתב יד צפוף לוקח לפעמים עד שתי דקות)' : ''}`; }, 1000);
       try {
-        const raw = await ai({ mode: 'scan', image: p.b64, mime: 'image/jpeg', hint: this.hint, quality: this.quality }, { onWait: s => { st.textContent = `השירות עמוס, ממשיך בעוד ${s} שניות…`; } }).finally(() => clearInterval(clock));
+        const raw = await ai({ mode: 'scan', image: p.b64, strips: p.strips || [], mime: 'image/jpeg', hint: this.hint, quality: this.quality }, { onWait: s => { st.textContent = `השירות עמוס, ממשיך בעוד ${s} שניות…`; } }).finally(() => clearInterval(clock));
         p.blocks = parseBlocks(raw); p.lang = p.blocks.lang;
         li.className = 'ok'; li.querySelector('span').textContent = p.blocks.length ? `${p.blocks.length} קטעים` : 'עמוד ריק';
       } catch (e) {
@@ -1149,7 +1149,7 @@ const SC = {
     this.running = true; btn.disabled = true;
     const t0 = Date.now(), clock = setInterval(() => { btn.textContent = `קורא שוב… ${Math.round((Date.now() - t0) / 1000)} שנ׳`; }, 1000);
     try {
-      const raw = await ai({ mode: 'scan', image: p.b64, mime: 'image/jpeg', hint: this.hint, quality: 'accurate' });
+      const raw = await ai({ mode: 'scan', image: p.b64, strips: p.strips || [], mime: 'image/jpeg', hint: this.hint, quality: 'accurate' });
       const bl = parseBlocks(raw);
       if (bl.length) { p.blocks = bl; p.html = null; ed.innerHTML = blocksHtml(bl); ed.dir = blocksRtl(bl) ? 'rtl' : 'ltr'; this.count(); btn.textContent = 'נקרא שוב ✓'; }
       else btn.textContent = 'לא זוהה טקסט';
@@ -1221,17 +1221,54 @@ function canvasJpeg(draw, w, hgt) {
     return { url, b64: url.slice(url.indexOf(',') + 1), w: c.width, h: c.height };
   });
 }
+// The reader sees one picture as a fixed number of dots, however big the photo is: a whole page of small
+// handwriting comes out blurred to it. So beside the whole page, the page also goes in strips from top to
+// bottom (overlapping a little), each at full sharpness. The reader uses the page for the layout and the
+// strips for the words. Darker ink, whiter paper: the 1% darkest and lightest tones become black and white.
+function levels(x, cw, ch) {
+  try {
+    const img = x.getImageData(0, 0, cw, ch), d = img.data, hist = new Uint32Array(256), step = Math.max(1, Math.floor(d.length / 4 / 200000));
+    for (let i = 0; i < d.length; i += 4 * step) hist[(d[i] * 3 + d[i + 1] * 6 + d[i + 2]) / 10 | 0]++;
+    let tot = 0; for (const v of hist) tot += v;
+    let lo = 0, hi = 255, acc = 0;
+    for (let t = 0; t < 256; t++) { acc += hist[t]; if (acc > tot * 0.01) { lo = t; break; } }
+    acc = 0; for (let t = 255; t >= 0; t--) { acc += hist[t]; if (acc > tot * 0.01) { hi = t; break; } }
+    if (hi - lo < 60 || (lo < 8 && hi > 247)) return;
+    const lut = new Uint8ClampedArray(256); for (let t = 0; t < 256; t++) lut[t] = (t - lo) * 255 / (hi - lo);
+    for (let i = 0; i < d.length; i += 4) { d[i] = lut[d[i]]; d[i + 1] = lut[d[i + 1]]; d[i + 2] = lut[d[i + 2]]; }
+    x.putImageData(img, 0, 0);
+  } catch (_) {}
+}
+async function stripsOf(src, w, hh) {
+  if (SC.quality === 'fast' || Math.max(w, hh) < 1400) return [];
+  const n = hh > w * 1.15 ? 3 : 2, ov = 0.07, out = [];
+  for (let i = 0; i < n; i++) {
+    const y0 = Math.max(0, hh * (i / n - ov)), y1 = Math.min(hh, hh * ((i + 1) / n + ov));
+    const st = await canvasJpeg((x, cw, ch) => { x.drawImage(src, 0, y0, w, y1 - y0, 0, 0, cw, ch); levels(x, cw, ch); }, w, y1 - y0, 2000);
+    out.push(st.b64);
+  }
+  return out;
+}
 async function imgToJpeg(file) {
   let bmp;
   try { bmp = await createImageBitmap(file, { imageOrientation: 'from-image' }); }
   catch (_) { bmp = await new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = URL.createObjectURL(file); }); }
   const w = bmp.width || bmp.naturalWidth, hh = bmp.height || bmp.naturalHeight;
-  return canvasJpeg((x, cw, ch) => x.drawImage(bmp, 0, 0, cw, ch), w, hh);
+  const page = await canvasJpeg((x, cw, ch) => { x.drawImage(bmp, 0, 0, cw, ch); levels(x, cw, ch); }, w, hh);
+  page.strips = await stripsOf(bmp, w, hh);
+  return page;
 }
 async function pageToJpeg(page) {
-  const v1 = page.getViewport({ scale: 1 }), sc = Math.min(4, (SC.quality === 'fast' ? 1700 : 2400) / Math.max(v1.width, v1.height));
-  const vp = page.getViewport({ scale: sc });
-  return canvasJpeg(async x => { await page.render({ canvasContext: x, viewport: vp }).promise; }, vp.width, vp.height);
+  const v1 = page.getViewport({ scale: 1 }), fast = SC.quality === 'fast';
+  // drawn once, big, and the page and its strips are taken from that drawing
+  const vp = page.getViewport({ scale: Math.min(5, (fast ? 1700 : 3600) / Math.max(v1.width, v1.height)) });
+  const big = document.createElement('canvas'); big.width = Math.round(vp.width); big.height = Math.round(vp.height);
+  const bx = big.getContext('2d'); bx.fillStyle = '#fff'; bx.fillRect(0, 0, big.width, big.height);
+  await page.render({ canvasContext: bx, viewport: vp }).promise;
+  const out = await canvasJpeg(x => { x.drawImage(big, 0, 0, x.canvas.width, x.canvas.height); }, big.width, big.height);
+  out.strips = await stripsOf(big, big.width, big.height);
+  big.width = big.height = 0;
+  return out;
 }
 
 // the service's JSON → clean blocks
