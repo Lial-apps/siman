@@ -1288,7 +1288,7 @@ body:has(#wed) .busy,body:has(#xed) .busy{z-index:1000}body:has(#wed) .toast,bod
 </dialog>
 
 <header class="bar">
-  <div class="brand"><b title="גרסה 5.2.3">סימן</b><span class="ver">5.2.3</span><span class="fname" id="fname"></span></div>
+  <div class="brand"><b title="גרסה 5.2.4">סימן</b><span class="ver">5.2.4</span><span class="fname" id="fname"></span></div>
 
   <nav class="tools" id="tools" aria-label="כלים">
     <button class="tool" data-tool="select" aria-pressed="true" title="בחירה וגלילה (V)">
@@ -2821,6 +2821,29 @@ const SCRIPT={heb:/[\u0590-\u05FF]/,cyr:/[\u0400-\u04FF]/,arb:/[\u0600-\u06FF\u0
 const FOREIGN={he:['cyr','arb'],en:['heb','cyr','arb'],fr:['heb','cyr','arb'],es:['heb','cyr','arb'],ru:['heb','arb'],ar:['heb','cyr']};
 const isForeign=(w,target)=>(FOREIGN[target]||[]).some(k=>SCRIPT[k].test(w));
 const foreignWords=(text,target)=>(String(text).match(/\S+/g)||[]).filter(w=>isForeign(w,target));
+/* LETTERS FROM THE WRONG ALPHABET — the translation service sometimes slips an Arabic letter into a Hebrew
+   word (בפسוק instead of בפסוק) or the other way round. Inside a word that is mostly Hebrew (or Arabic),
+   such letters are turned into the matching letter of the right alphabet; a whole word in the wrong
+   alphabet is changed too when the original had no such words. Used on every translation. */
+const AR2HE={'ا':'א','أ':'א','إ':'א','آ':'א','ء':'א','ب':'ב','ت':'ת','ث':'ת','ج':'ג','ح':'ח','خ':'ח','د':'ד','ذ':'ד','ر':'ר','ز':'ז','س':'ס','ش':'ש','ص':'צ','ض':'צ','ط':'ט','ظ':'ט','ع':'ע','غ':'ע','ف':'פ','ق':'ק','ك':'כ','ک':'כ','ل':'ל','م':'מ','ن':'נ','ه':'ה','ة':'ה','و':'ו','ؤ':'ו','ي':'י','ى':'י','ئ':'י','ی':'י','پ':'פ','چ':'צ','گ':'ג'};
+const HE2AR={'א':'ا','ב':'ب','ג':'ج','ד':'د','ה':'ه','ו':'و','ז':'ز','ח':'ح','ט':'ط','י':'ي','כ':'ك','ך':'ك','ל':'ل','מ':'م','ם':'م','נ':'ن','ן':'ن','ס':'س','ע':'ع','פ':'ف','ף':'ف','צ':'ص','ץ':'ص','ק':'ق','ר':'ر','ש':'ش','ת':'ت'};
+const HE_FINAL={'כ':'ך','מ':'ם','נ':'ן','פ':'ף','צ':'ץ'};
+const RE_AR=/[\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF]/,RE_HE=/[\u0590-\u05FF]/;
+function fixScripts(text,target,src){
+  if(target!=='he'&&target!=='ar')return text;
+  const srcHasWrong=target==='he'?RE_AR.test(src||''):RE_HE.test(src||'');
+  return String(text).replace(/[\p{L}\p{M}'"״׳-]+/gu,w=>{
+    const he=RE_HE.test(w),ar=RE_AR.test(w);
+    if(target==='he'){
+      if(!ar||(!he&&srcHasWrong))return w;
+      let o='';for(const ch of w.normalize('NFKC'))o+=AR2HE[ch]!==undefined?AR2HE[ch]:(/[\u064B-\u065F\u0670\u0640]/.test(ch)?'':ch);
+      return o.replace(/([כמנפצ])([\u0591-\u05C7]*)$/,(m,l,n)=>HE_FINAL[l]+n);
+    }
+    if(!he||(!ar&&srcHasWrong))return w;
+    let o='';for(const ch of w)o+=HE2AR[ch]!==undefined?HE2AR[ch]:(/[\u0591-\u05C7]/.test(ch)?'':ch);
+    return o;
+  });
+}
 function dropForeign(text,target){
   const bad=w=>isForeign(w,target);
   return String(text)
@@ -2906,6 +2929,7 @@ async function callTranslate(text,target){
     if(!again.error&&again.raw&&bad(again.raw)<bad(r.raw))r=again;
   }
   if(bad(r.raw)){const p=parseTr(r.raw);r={raw:(p.lang?`LANG: ${p.lang}\n---\n`:'')+dropForeign(p.text,target)};}
+  if(target==='he'||target==='ar'){const p=parseTr(r.raw);r={...r,raw:(p.lang?`LANG: ${p.lang}\n---\n`:'')+fixScripts(p.text,target,text)};}
   return r;
 }
 async function callTranslateOnce(text,target,second){
@@ -5129,7 +5153,7 @@ if('launchQueue' in window){
    ===================================================================== */
 (function(){
   const STATUS_URL=(typeof REGISTER_URL!=='undefined'&&REGISTER_URL)?REGISTER_URL.replace(/\/register$/,'/status'):'';
-  const U_KEY='siman.usage', T_KEY='siman.trial', APP_VER='5.2.3';
+  const U_KEY='siman.usage', T_KEY='siman.trial', APP_VER='5.2.4';
   const today=()=>new Date().toISOString().slice(0,10);
   const rd=k=>{try{return JSON.parse(localStorage.getItem(k)||'null');}catch(_){return null;}};
   const wr=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch(_){}};
