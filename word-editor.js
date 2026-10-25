@@ -794,7 +794,7 @@ function after(){markDirty();refreshCounters();schedule();updateUI();}
 const cmSig=()=>JSON.stringify([...E.cm.values()].filter(c=>!c.fresh&&(c.keep||cmLive(c))).map(c=>[c.id,c.text,c.done,c.parent]));
 function markDirty(){const d=E.main.innerHTML!==E.cleanHtml||E.pageDirty||hfChanged()||cmSig()!==E.cmClean;if(d!==E.dirty){E.dirty=d;}
   const s=q('weState');s.textContent=E.dirty?'שינויים שלא נשמרו':(E.savedOnce?'נשמר':'');s.classList.toggle('dirty',E.dirty);}
-let schT=0;function schedule(){clearTimeout(schT);schT=setTimeout(()=>{if(!E)return;guides();words();posImgBox();cmRender();},250);}
+let schT=0;function schedule(){clearTimeout(schT);schT=setTimeout(()=>{if(!E)return;if(!E.hf&&!E.composing&&liftBlocks(E.main))snap();guides();words();posImgBox();cmRender();},250);}
 function hint(m){const h=q('weHint');h.textContent=m;clearTimeout(E.hintT);E.hintT=setTimeout(()=>{if(E)h.textContent='';},3000);}
 
 /* ---------- character formatting ---------- */
@@ -1772,6 +1772,58 @@ function listXml(list,ctx,lvl){
   return x;
 }
 const hasBlockKid=n=>[...n.children].some(c=>/^(P|H[1-6]|LI|UL|OL|TABLE|DIV|BLOCKQUOTE|PRE|HR)$/.test(c.tagName));
+/* A paragraph that holds whole paragraphs inside it (left by pasting, by the assistant or by a converted file)
+   looks like separate lines on screen, but Word keeps only one paragraph: the lines ran together into one block
+   and the page count stopped growing. Such a paragraph is split into real paragraphs, each keeping the
+   outer paragraph's alignment, direction and look where it has none of its own. */
+const BLOCK_TAGS=/^(P|H[1-6]|DIV|UL|OL|TABLE|BLOCKQUOTE|PRE|HR|SECTION|ARTICLE|FIGURE|CENTER)$/;
+const BLOCK_SEL='p,h1,h2,h3,h4,h5,h6,div,ul,ol,table,blockquote,pre,hr,section,article,figure,center';
+const INHERIT=['textAlign','direction','fontFamily','fontSize','color','lineHeight','marginTop','marginBottom','textIndent'];
+function liftBlocks(scope){
+  if(!scope||!scope.querySelector(':is(p,h1,h2,h3,h4,h5,h6) :is('+BLOCK_SEL+')'))return 0;
+  const sel=getSelection(),r=sel&&sel.rangeCount&&scope.contains(sel.anchorNode)?sel.getRangeAt(0):null;
+  const keep=r?[r.startContainer,r.startOffset,r.endContainer,r.endOffset]:null;
+  const n=liftBlocksIn(scope);
+  if(keep&&keep[0].isConnected&&keep[2].isConnected){try{const nr=document.createRange();nr.setStart(keep[0],keep[1]);nr.setEnd(keep[2],keep[3]);sel.removeAllRanges();sel.addRange(nr);}catch(_){}}
+  return n;
+}
+function liftBlocksIn(scope){
+  let n=0;
+  const isEmpty=el=>!el.textContent.replace(ZW,'').trim()&&!el.querySelector('img,[data-atom],.we-pb,.we-fld');
+  for(const p of [...scope.querySelectorAll('p,h1,h2,h3,h4,h5,h6')]){
+    if(!p.isConnected||!p.querySelector(BLOCK_SEL))continue;
+    if(p.closest('[data-atom],[contenteditable="false"]'))continue;
+    // an inline wrapper (span, b…) around a block: its look goes onto the pieces, then it is taken away
+    let guard=0;
+    for(let w=[...p.querySelectorAll(BLOCK_SEL)].map(b=>b.parentElement).find(x=>x!==p&&!BLOCK_TAGS.test(x.tagName));w&&guard++<400;
+        w=[...p.querySelectorAll(BLOCK_SEL)].map(b=>b.parentElement).find(x=>x!==p&&!BLOCK_TAGS.test(x.tagName))){
+      const parts=[];
+      for(const c of [...w.childNodes]){
+        if(c.nodeType===1&&BLOCK_TAGS.test(c.tagName)){if(w.style.cssText)c.style.cssText=w.style.cssText+';'+c.style.cssText;parts.push(c);}
+        else{const sh=w.cloneNode(false);sh.removeAttribute('id');sh.append(c);parts.push(sh);}
+      }
+      w.replaceWith(...parts);
+    }
+    const cs=p.style,out=[];let cur=null,first=true;
+    const shells=new Set();
+    const shell=()=>{const c=p.cloneNode(false);c.removeAttribute('id');if(!first)c.removeAttribute('data-src');first=false;shells.add(c);return c;};
+    for(const c of [...p.childNodes]){
+      if(c.nodeType===1&&BLOCK_TAGS.test(c.tagName)){
+        cur=null;
+        if(/^(P|H[1-6]|DIV|BLOCKQUOTE|PRE|CENTER)$/.test(c.tagName)){
+          for(const k of INHERIT)if(cs[k]&&!c.style[k])c.style[k]=cs[k];
+          if(!c.getAttribute('dir')&&p.getAttribute('dir'))c.setAttribute('dir',p.getAttribute('dir'));
+          if(!c.className&&p.className&&c.tagName==='P')c.className=p.className;
+        }
+        out.push(c);
+      }else{if(!cur){cur=shell();out.push(cur);}cur.append(c);}
+    }
+    const keep=out.filter(x=>!(shells.has(x)&&isEmpty(x)));
+    p.replaceWith(...(keep.length?keep:out));
+    n++;
+  }
+  return n;
+}
 function exportContainer(container,ctx){
   let x='';let inl=[];
   const host=container.nodeType===1?container:E.body;
@@ -1860,6 +1912,7 @@ function patchSect(sect){
 async function buildDocx(){
   if(E.hf)exitHF(true);
   if(E.snapT)snap();
+  if(liftBlocks(E.main)){snap();guides();}
   const st=E.st;const files=new Map(st.files);
   let head=st.docStr.slice(0,st.docStr.search(/<w:body[\s>]/));
   const rootTag=head.match(/<w:document\b[^>]*>/);
