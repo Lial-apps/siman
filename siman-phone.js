@@ -20,6 +20,7 @@
     menu.innerHTML = `
       <button type="button" role="menuitem" data-go="save"><span class="ic" style="background:${k.c}">${k.tag}</span><span>שמירה כקובץ ${k.name}<small>לעריכה בהמשך</small></span></button>
       <button type="button" role="menuitem" data-go="pdf"><span class="ic" style="background:#D93F2E">PDF</span><span>שמירה כקובץ PDF<small>לשליחה ולהדפסה</small></span></button>
+      <button type="button" role="menuitem" data-go="tr"><span class="ic" style="background:#E0A100;color:#1B1C1F">א→A</span><span>תרגום הקובץ<small>לעברית, אנגלית, רוסית, ערבית, צרפתית או ספרדית</small></span></button>
       <hr>
       <button type="button" role="menuitem" class="sec" data-go="desk">פתיחה לחתימה וסימון</button>`;
     menu.dataset.save = btn.id; menu.dataset.pdf = k.pdf; menu.dataset.desk = k.desk;
@@ -42,6 +43,7 @@
   menu.addEventListener('click', e => {
     const b = e.target.closest('[data-go]'); if (!b) return;
     const go = b.dataset.go; close();
+    if (go === 'tr') { if (window.OFFICE_TR) window.OFFICE_TR.open({ weSave: 'docx', xeSave: 'xlsx', peSave: 'pptx' }[menu.dataset.save]); return; }
     run(go === 'save' ? menu.dataset.save : go === 'pdf' ? menu.dataset.pdf : menu.dataset.desk);
   });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && !menu.hidden) close(); });

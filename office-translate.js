@@ -1,5 +1,5 @@
 /* =====================================================================
-   סימן — office-translate.js (5.2.0)
+   סימן — office-translate.js (5.2.2)
    Translating a Word, Excel or PowerPoint file from inside its editor.
    The translation is written into the file itself, so the design stays as it was:
    fonts, sizes, colors, tables, pictures, slides and cells. Each paragraph / cell / text
@@ -77,6 +77,20 @@ function units(doc, kind) {
 }
 
 /* ------------------------------------------------------------ the translation service */
+// what the translator is told with every part, so the whole file reads as one careful, natural translation
+const KIND_NAME = { docx: 'a Word document', xlsx: 'an Excel spreadsheet (each line is one cell)', pptx: 'a PowerPoint presentation (each line is one paragraph on a slide)' };
+function guide(kind, part, parts, ctxText) {
+  return [
+    `This is part ${part + 1} of ${parts} of ${KIND_NAME[kind] || 'a document'}. Translate it the way a professional human translator would for publication:`,
+    'fluent, natural and idiomatic in the target language, faithful to the meaning and the tone, never word by word;',
+    'keep terms, names and titles consistent across all the lines; keep numbers, dates, codes, e-mail addresses and links exactly as they are;',
+    'quotations from well-known texts (the Bible, prayers, laws) take their accepted standard translation; short headings stay short.',
+    'Translate each numbered line separately. Keep every [number] marker at the start of its line and keep the same count of lines.',
+    'Keep every ⟦number⟧ mark, placed before the translated words it belongs to, and keep every ⟦br⟧ mark.',
+    ctxText ? `For context, the document begins: «${ctxText}»` : '',
+    'Lines to translate:'
+  ].filter(Boolean).join('\n') + '\n';
+}
 // a unit with several formats goes with ⟦n⟧ marks, so each format lands on its own translated words
 const encode = u => (u.segs.length > 1 ? u.segs.map((s, i) => `⟦${i + 1}⟧${s.text}`).join('') : u.text).replace(/\r?\n/g, BR).replace(/\s+/g, ' ').trim();
 function decode(u, t) {
@@ -89,17 +103,18 @@ function decode(u, t) {
   if (!ok) return [t.replace(/⟦\d+⟧/g, '')];
   return res;
 }
-async function translateTexts(list, target, progress) {
+async function translateTexts(list, target, progress, kind) {
   if (typeof callTranslate !== 'function') throw new Error('שירות התרגום לא נטען');
   const uniq = [...new Set(list)], done = new Map();
+  const ctxText = uniq.join(' ').replace(/⟦\w+⟧/g, '').replace(/\s+/g, ' ').slice(0, 700);
   const chunks = []; let cur = [], len = 0;
-  for (const s of uniq) { if (cur.length && (len + s.length > 3500 || cur.length >= 60)) { chunks.push(cur); cur = []; len = 0; } cur.push(s); len += s.length + 8; }
+  for (const s of uniq) { if (cur.length && (len + s.length > 6000 || cur.length >= 90)) { chunks.push(cur); cur = []; len = 0; } cur.push(s); len += s.length + 8; }
   if (cur.length) chunks.push(cur);
   let lang = null;
   for (let c = 0; c < chunks.length; c++) {
     progress && progress(`מתרגם… ${Math.round(c / chunks.length * 100)}%`);
     const ch = chunks[c];
-    const text = 'Translate each numbered line separately. Keep every [number] marker at the start of its line and keep the same count of lines. Keep every ⟦number⟧ mark, placed before the translated words it belongs to, and keep every ⟦br⟧ mark.\n' + ch.map((s, k) => `[${k + 1}] ${s}`).join('\n');
+    const text = guide(kind, c, chunks.length, ctxText) + ch.map((s, k) => `[${k + 1}] ${s}`).join('\n');
     const r = await callTranslate(text, target);
     if (r.error) throw new Error(typeof errText === 'function' ? errText(r) : String(r.error));
     const p = typeof parseTr === 'function' ? parseTr(r.raw) : { text: r.raw, lang: null };
@@ -110,6 +125,16 @@ async function translateTexts(list, target, progress) {
       if (m) { last = +m[1]; got[last] = m[2].trim(); } else if (last && line.trim()) got[last] += ' ' + line.trim();
     }
     ch.forEach((s, k) => { if (got[k + 1]) done.set(s, got[k + 1]); });
+  }
+  // lines the service skipped go once more, in small parts
+  const left = uniq.filter(s => !done.has(s));
+  for (let i = 0; i < left.length && left.length < uniq.length; i += 15) {
+    const ch = left.slice(i, i + 15);
+    progress && progress('משלים את התרגום…');
+    const r = await callTranslate(guide(kind, 0, 1, ctxText) + ch.map((s, k) => `[${k + 1}] ${s}`).join('\n'), target);
+    if (r.error) break;
+    const p = typeof parseTr === 'function' ? parseTr(r.raw) : { text: r.raw };
+    for (const line of p.text.split('\n')) { const m = /^\s*\[(\d+)\]\s?(.*)$/.exec(line); if (m && ch[+m[1] - 1] && m[2].trim()) done.set(ch[+m[1] - 1], m[2].trim()); }
   }
   return { map: done, lang };
 }
@@ -180,7 +205,7 @@ async function translateBytes(kind, bytes, target, progress) {
   }
   if (!all.length) throw new Error('לא נמצא בקובץ טקסט לתרגום');
   const rtl = !!RTL[target];
-  const { map, lang } = await translateTexts(all.map(encode), target, progress);
+  const { map, lang } = await translateTexts(all.map(encode), target, progress, kind);
   if (!map.size) throw new Error('התרגום לא החזיר תוצאה. נסו שוב');
   let n = 0;
   for (const d of docs) {
@@ -214,7 +239,9 @@ const CSS = `
 .otr-langs button:hover,.otr-langs button:focus-visible{border-color:#E0A100;background:#FFF6D6;outline:none}
 .otr-acts{display:flex;justify-content:flex-start}
 .otr-acts button{font:inherit;font-size:14px;padding:7px 14px;border-radius:8px;border:1px solid #CBD3DF;background:#fff;cursor:pointer;color:#1B1C1F}
-@media (max-width:720px){#weTr,#xeTr,#peTr{display:none}}
+/* on a phone the button stays in the row of action buttons, next to "שמירה" */
+#weTr,#xeTr,#peTr{display:inline-flex!important;align-items:center;justify-content:center;gap:5px}
+#weTr svg,#xeTr svg,#peTr svg{width:16px;height:16px;flex:none}
 `;
 function injectCss() { if (document.getElementById('otrCss')) return; const s = document.createElement('style'); s.id = 'otrCss'; s.textContent = CSS; document.head.append(s); }
 function pickLang(app) {
@@ -255,15 +282,16 @@ async function open(kind) {
   } catch (err) { console.error(err); wait(false); say('התרגום נכשל: ' + (err.message || err)); }
   finally { running = false; wait(false); }
 }
-// a "תרגום" button in each editor's title bar, next to "שמירה כ-PDF"
+// a "תרגום" button right beside "שמירה" in each editor's title bar, on a computer and on a phone
 function addButton(k, root) {
   const e = ED[k]; if (root.querySelector('#' + e.p + 'Tr')) return;
-  const pdf = root.querySelector('#' + e.p + 'Pdf'); if (!pdf) return;
+  const save = root.querySelector('#' + e.p + 'Save'), pdf = root.querySelector('#' + e.p + 'Pdf'); if (!save && !pdf) return;
   injectCss();
-  const b = document.createElement('button'); b.type = 'button'; b.id = e.p + 'Tr'; b.className = pdf.className.replace(/\bpri\b/, '').trim();
-  b.textContent = 'תרגום'; b.title = 'תרגום הקובץ לעברית, אנגלית, רוסית, ערבית, צרפתית או ספרדית, בלי לשנות את העיצוב';
+  const b = document.createElement('button'); b.type = 'button'; b.id = e.p + 'Tr'; b.className = (pdf || save).className.replace(/\bpri\b/, '').trim();
+  b.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h8M8 3v2M5.5 5c.8 3 3 5.5 6 7M10.5 5c-.8 3-3 5.5-6.5 7"/><path d="M13 21l4-9 4 9M14.5 18h5"/></svg><span>תרגום</span>';
+  b.title = 'תרגום הקובץ לעברית, אנגלית, רוסית, ערבית, צרפתית או ספרדית, בלי לשנות את העיצוב'; b.setAttribute('aria-label', 'תרגום הקובץ');
   b.onclick = () => open(k);
-  pdf.before(b);
+  if (save) save.after(b); else pdf.before(b);
 }
 new MutationObserver(ms => {
   for (const m of ms) for (const n of m.addedNodes) if (n.nodeType === 1) { const k = Object.keys(ED).find(x => ED[x].id === n.id); if (k) setTimeout(() => addButton(k, n), 0); }
