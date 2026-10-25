@@ -688,7 +688,7 @@ const panel = h(`<aside class="tpanel aip hidden" id="aiPanel" aria-label="הע�
   <div class="tp-head"><h2>העוזר של סימן</h2><button class="icon-btn" id="aiClose" title="סגירה" aria-label="סגירת העוזר">×</button></div>
   <div class="ai-tools">
     <button class="btn" id="aiRead" type="button">${ICON.speak}<span>הקראה בקול</span></button>
-    <button class="btn" id="aiScan" type="button">${ICON.scan}<span>כתב יד ל-Word / PDF</span></button>
+    <button class="btn" id="aiScan" type="button">${ICON.scan}<span>מדף למסמך</span></button>
   </div>
   <div class="ai-log" id="aiLog" aria-live="polite"></div>
   <div class="ai-ask"><textarea id="aiQ" rows="1" placeholder="שאלו כל דבר על המסמך…" aria-label="שאלה על המסמך"></textarea><button class="btn primary" id="aiSend" type="button">שליחה</button></div>
@@ -814,7 +814,7 @@ function renderLog() {
   log.scrollTop = log.scrollHeight;
 }
 function scannedHelp() {
-  const w = h('<div><button class="btn" type="button">זיהוי טקסט בכל העמודים</button> <button class="btn" type="button">כתב יד / סריקה חכמה</button></div>');
+  const w = h('<div><button class="btn" type="button">זיהוי טקסט בכל העמודים</button> <button class="btn" type="button">מדף למסמך</button></div>');
   w.children[0].onclick = async () => { await runOCR(S.pages.map((_, i) => i)); textCache.delete(S.doc); };
   w.children[1].onclick = () => SC.open('doc');
   return w;
@@ -854,7 +854,7 @@ $('aiRead').onclick = () => RA.start(currentPageIndex());
 $('aiScan').onclick = () => SC.open();
 
 // the assistant's button in the toolbar
-const aiBtn = h(`<button class="btn ai" id="aiBtn" type="button" title="העוזר: שאלות על המסמך, סיכום, הקראה וכתב יד ל-Word">${ICON.spark}<span>עוזר</span></button>`);
+const aiBtn = h(`<button class="btn ai" id="aiBtn" type="button" title="העוזר: שאלות על המסמך, סיכום, הקראה והפיכת דף למסמך">${ICON.spark}<span>עוזר</span></button>`);
 $('trBtn').after(aiBtn);
 aiBtn.onclick = toggleAI;
 
@@ -964,8 +964,8 @@ window.SIMAN_READ = RA;
    5. SMART SCAN — handwriting and scanned pages → printed Word / PDF
    ===================================================================== */
 const SC_LANGS = [['', 'זיהוי אוטומטי'], ['he', 'עברית'], ['en', 'אנגלית'], ['ru', 'רוסית'], ['ar', 'ערבית'], ['fr', 'צרפתית'], ['es', 'ספרדית']];
-const dlg = h(`<dialog class="scan" id="scanDlg" aria-label="כתב יד וסריקות למסמך מודפס">
-  <div class="sc-head"><h2>כתב יד וסריקות ← מסמך מודפס</h2><button class="icon-btn" type="button" data-a="close" aria-label="סגירה">×</button></div>
+const dlg = h(`<dialog class="scan" id="scanDlg" aria-label="מדף למסמך">
+  <div class="sc-head"><h2>מדף למסמך ← קובץ ערוך</h2><button class="icon-btn" type="button" data-a="close" aria-label="סגירה">×</button></div>
   <div class="sc-body"></div>
   <div class="sc-foot hidden"></div>
 </dialog>`);
@@ -1002,7 +1002,7 @@ const SC = {
     const docN = S.doc ? S.pages.length : 0;
     const b = this.body(); this.foot().classList.add('hidden');
     b.innerHTML = `<div class="sc-pick">
-      <h3>מצלמים דף — מקבלים מסמך מודפס</h3>
+      <h3>מצלמים דף, מקבלים מסמך מוכן</h3>
       <p class="sub">כתב יד, צילום של מסמך או PDF סרוק: סימן קורא את הכתוב, גם בכתב יד, ובונה ממנו קובץ Word או PDF עם כותרות, רשימות וטבלאות. לפני השמירה רואים את התמונה ואת הטקסט זה לצד זה ומתקנים. מילים שהזיהוי לא בטוח בהן מסומנות בצהוב.</p>
       <div class="sc-srcs">
         <button class="sc-src" type="button" data-s="cam">${ICON.scan}<b>צילום במצלמה</b><span>בטלפון: נפתחת המצלמה. מצלמים ישר מלמעלה, באור טוב. אפשר לצלם כמה עמודים לקובץ אחד</span></button>
@@ -1655,7 +1655,7 @@ const more = [
   { l: 'סיכום המסמך', k: 'סכם סיכום תקציר תמצית קצר נקודות עיקריות summary summarize', doc: 1, run: () => askQ(CHIPS[0][1], CHIPS[0][0]) },
   { l: 'הנקודות העיקריות במסמך', k: 'נקודות עיקריות עיקר חשוב רשימה key points', doc: 1, run: () => askQ(CHIPS[1][1], CHIPS[1][0]) },
   { l: 'הקראה בקול', k: 'הקרא הקראה קרא תקריא בקול שמע שמיעה דיבור קול read aloud speak tts', doc: 1, run: () => RA.start(currentPageIndex()) },
-  { l: 'כתב יד או סריקה ל-Word / PDF', k: 'כתב יד כתוב ביד סריקה סרוק צילום מצלמה תמונה הקלדה מודפס הפוך המר וורד word pdf handwriting scan photo camera', run: () => SC.open() },
+  { l: 'מדף למסמך: צילום או סריקה ל-Word / PDF', k: 'כתב יד כתוב ביד סריקה סרוק צילום מצלמה תמונה הקלדה מודפס הפוך המר וורד word pdf handwriting scan photo camera', run: () => SC.open() },
   { l: 'תרגום לרוסית', k: 'תרגם תרגום רוסית רוסי translate russian русский', doc: 1, run: () => trQuick('ru') },
   { l: 'תרגום לערבית', k: 'תרגם תרגום ערבית ערבי translate arabic عربي', doc: 1, run: () => trQuick('ar') },
   { l: 'תרגום לצרפתית', k: 'תרגם תרגום צרפתית צרפתי translate french français', doc: 1, run: () => trQuick('fr') },
@@ -1670,7 +1670,7 @@ CMDS.splice(2, 0, ...more);
 // first screen: two more quick actions + the updated list
 const quick = document.querySelector('.wl-quick');
 if (quick) {
-  const scanQ = h(`<button class="qa" type="button">${ICON.scan}כתב יד ל-Word</button>`);
+  const scanQ = h(`<button class="qa" type="button">${ICON.scan}מדף למסמך</button>`);
   const askQa = h(`<button class="qa" type="button">${ICON.spark}לשאול את המסמך</button>`);
   scanQ.onclick = () => SC.open();
   askQa.onclick = () => { if (typeof needReg === 'function' && needReg()) { showReg(); return; } afterOpen = showAI; $('openBtn2').click(); };
@@ -1680,7 +1680,7 @@ if (quick) {
 document.querySelectorAll('.wl-list li').forEach(li => { if (/תרגום לעברית ולאנגלית/.test(li.textContent)) li.lastChild.textContent = 'תרגום ל-6 שפות, כולל רוסית וערבית'; });
 const wl = document.querySelector('.wl-list');
 if (wl) {
-  wl.append(h(`<li>${ICON.scan}כתב יד וסריקות למסמך מודפס</li>`));
+  wl.append(h(`<li>${ICON.scan}מדף למסמך: צילום או סריקה לקובץ ערוך</li>`));
   wl.append(h(`<li>${ICON.spark}שאלות, סיכום והקראה של המסמך</li>`));
 }
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && RA.on && !document.querySelector('dialog[open]')) RA.stop(); });
