@@ -1,4 +1,6 @@
-/* סימן — כפתור "חזרה" של הטלפון (5.2.7)
+/* סימן — כפתור "חזרה" (5.2.8)
+   בטלפון יש עכשיו גם כפתור חזרה עגול על המסך (בפינה הימנית התחתונה). הוא מופיע רק כשיש לאן לחזור,
+   ועובד בדיוק כמו כפתור / החלקת "חזרה" של המכשיר — גם באייפון, שאין לו כפתור חזרה בכלל.
    לחיצה על "חזרה" (או החלקת חזרה באנדרואיד) לוקחת צעד אחד אחורה בתוך סימן ולא סוגרת את האפליקציה:
    1. חלון, תפריט או חלונית פתוחים — נסגרים (העליון קודם), בדיוק כמו Esc או ×
    2. העורכים (Word / Excel / PowerPoint) — קודם נסגר מה שפתוח בתוכם, אחר כך העורך עצמו (עם השאלה על שינויים שלא נשמרו)
@@ -156,4 +158,49 @@
     if (cur && typeof T.closeTab === 'function') { T.closeTab(cur); return true; }
     return false;
   }
+  // the same checks, without doing anything: is there a step to go back to?
+  function canStep() {
+    const L = topLayer();
+    if (L && !(L.id === 'regDlg')) return true;
+    const ra = document.querySelector('.ra:not(.hidden)'); if (ra && shown(ra)) return true;
+    const T = window.SIMAN_TABS, cur = T && T.TB && T.TB.cur;
+    const hasS = typeof S !== 'undefined' && S;
+    if (hasS && S.doc && !(cur && cur.ed) && (S.picked || (S.tool && S.tool !== 'select'))) return true;
+    return !!cur;
+  }
+
+  /* ---------- the round back button on the screen (phones only) ---------- */
+  const css = document.createElement('style');
+  css.textContent = `
+.sb-back{position:fixed;z-index:2147482998;right:16px;bottom:calc(76px + env(safe-area-inset-bottom,0px));width:52px;height:52px;border-radius:50%;
+  border:0;padding:0;display:none;align-items:center;justify-content:center;cursor:pointer;background:#1B1C1F;color:#E8F55A;
+  box-shadow:0 8px 22px -6px rgba(0,0,0,.45),0 0 0 2px rgba(232,245,90,.55);-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+.sb-back svg{width:26px;height:26px}
+.sb-back:active{transform:scale(.92)}
+.sb-back:focus-visible{outline:3px solid #2E58CC;outline-offset:3px}
+@media (max-width:720px){.sb-back.on{display:flex}}
+@media print{.sb-back{display:none!important}}`;
+  document.head.append(css);
+  const btn = document.createElement('button');
+  btn.type = 'button'; btn.className = 'sb-back'; btn.setAttribute('aria-label', 'חזרה צעד אחד אחורה'); btn.title = 'חזרה';
+  btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>';
+  document.body.append(btn);
+  btn.addEventListener('pointerdown', e => e.preventDefault()); // keep the focus (and the keyboard) where it was
+  btn.addEventListener('click', e => {
+    e.preventDefault(); e.stopPropagation();
+    if (handling) return;
+    handling = true;
+    try { if (!stepBack()) say('אין לאן לחזור — זה המסך הראשי'); } catch (err) { console.error(err); }
+    finally { setTimeout(() => { handling = false; refresh(); }, 150); }
+  });
+  let last = null;
+  function refresh() {
+    let on = false;
+    try { on = matchMedia('(max-width:720px)').matches && canStep(); } catch (_) {}
+    if (on !== last) { btn.classList.toggle('on', on); last = on; }
+  }
+  setInterval(() => { if (!document.hidden) refresh(); }, 500);
+  addEventListener('resize', refresh);
+  document.addEventListener('click', () => setTimeout(refresh, 60), true);
+  refresh();
 })();
