@@ -1288,7 +1288,7 @@ body:has(#wed) .busy,body:has(#xed) .busy{z-index:1000}body:has(#wed) .toast,bod
 </dialog>
 
 <header class="bar">
-  <div class="brand"><b title="גרסה 5.2.8">סימן</b><span class="ver">5.2.8</span><span class="fname" id="fname"></span></div>
+  <div class="brand"><b title="גרסה 5.2.9">סימן</b><span class="ver">5.2.9</span><span class="fname" id="fname"></span></div>
 
   <nav class="tools" id="tools" aria-label="כלים">
     <button class="tool" data-tool="select" aria-pressed="true" title="בחירה וגלילה (V)">
@@ -5168,7 +5168,7 @@ if('launchQueue' in window){
    ===================================================================== */
 (function(){
   const STATUS_URL=(typeof REGISTER_URL!=='undefined'&&REGISTER_URL)?REGISTER_URL.replace(/\/register$/,'/status'):'';
-  const U_KEY='siman.usage', T_KEY='siman.trial', APP_VER='5.2.8';
+  const U_KEY='siman.usage', T_KEY='siman.trial', APP_VER='5.2.9';
   const today=()=>new Date().toISOString().slice(0,10);
   const rd=k=>{try{return JSON.parse(localStorage.getItem(k)||'null');}catch(_){return null;}};
   const wr=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch(_){}};
@@ -5234,7 +5234,7 @@ if('launchQueue' in window){
 <script src="siman-phone.js" defer></script>
 <script src="a11y.js" defer></script>
 <script src="siman-voice.js" defer></script>
-<script src="siman-back.js" defer></script>
+<script src="siman-back.js?v=5.2.9" defer></script>
 <script>
 /* the new design is off for everyone; open the app with ?beta=1 to try it on this device, ?beta=0 to go back */
 (function(){try{var q=new URLSearchParams(location.search).get('beta');if(q==='1')localStorage.setItem('siman.beta','1');if(q==='0')localStorage.removeItem('siman.beta');
