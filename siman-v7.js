@@ -49,13 +49,13 @@
 
   /* ================================================================ צבעים */
   var PAL = [
-    { id: 'sky', bg: '#EEF3FB', surface: '#FFFFFF', ink: '#0F213F', muted: '#4B5B77', line: '#D6E0F0', accent: '#1D4ED8', on: '#FFFFFF', dash: '#8FAEEB', soft: '#DCE6FA', art: '#1D4ED8', dark: false },
-    { id: 'sea', bg: '#EEF6F4', surface: '#FFFFFF', ink: '#12302C', muted: '#4E6B66', line: '#D3E6E1', accent: '#0F766E', on: '#FFFFFF', dash: '#7FB8AF', soft: '#D6F0EB', art: '#0F766E', dark: false },
-    { id: 'lavender', bg: '#F5F3FA', surface: '#FFFFFF', ink: '#221E3D', muted: '#5E5878', line: '#E2DDF0', accent: '#5A48D6', on: '#FFFFFF', dash: '#B1A6EC', soft: '#E6E1FA', art: '#5A48D6', dark: false },
-    { id: 'sunset', bg: '#FFF5EF', surface: '#FFFFFF', ink: '#3A1E14', muted: '#7A5446', line: '#F3DDD0', accent: '#C2410C', on: '#FFFFFF', dash: '#EBA27E', soft: '#FBE1D3', art: '#C2410C', dark: false },
-    { id: 'raspberry', bg: '#FCF2F6', surface: '#FFFFFF', ink: '#3B1028', muted: '#7A4A62', line: '#F1D9E4', accent: '#BE185D', on: '#FFFFFF', dash: '#E79BBE', soft: '#F8DCE8', art: '#BE185D', dark: false },
-    { id: 'forest', bg: '#F2F6EE', surface: '#FFFFFF', ink: '#1C2B16', muted: '#55654B', line: '#DCE6D2', accent: '#3F6212', on: '#FFFFFF', dash: '#A3BE84', soft: '#E1EBD5', art: '#3F6212', dark: false },
-    { id: 'night', bg: '#14161C', surface: '#1E2129', ink: '#F1F2F5', muted: '#A9AFBC', line: '#2E323C', accent: '#7DD3C0', on: '#0B1F1B', dash: '#4C7F75', soft: '#253A37', art: '#2C8C79', dark: true }
+    { id: 'sky', deep: '#0F213F', deep2: '#1B2F55', bg: '#EEF3FB', surface: '#FFFFFF', ink: '#0F213F', muted: '#4B5B77', line: '#D6E0F0', accent: '#1D4ED8', on: '#FFFFFF', dash: '#8FAEEB', soft: '#DCE6FA', art: '#1D4ED8', dark: false },
+    { id: 'sea', deep: '#12302C', deep2: '#1D4440', bg: '#EEF6F4', surface: '#FFFFFF', ink: '#12302C', muted: '#4E6B66', line: '#D3E6E1', accent: '#0F766E', on: '#FFFFFF', dash: '#7FB8AF', soft: '#D6F0EB', art: '#0F766E', dark: false },
+    { id: 'lavender', deep: '#221E3D', deep2: '#332D57', bg: '#F5F3FA', surface: '#FFFFFF', ink: '#221E3D', muted: '#5E5878', line: '#E2DDF0', accent: '#5A48D6', on: '#FFFFFF', dash: '#B1A6EC', soft: '#E6E1FA', art: '#5A48D6', dark: false },
+    { id: 'sunset', deep: '#3A1E14', deep2: '#52301F', bg: '#FFF5EF', surface: '#FFFFFF', ink: '#3A1E14', muted: '#7A5446', line: '#F3DDD0', accent: '#C2410C', on: '#FFFFFF', dash: '#EBA27E', soft: '#FBE1D3', art: '#C2410C', dark: false },
+    { id: 'raspberry', deep: '#3B1028', deep2: '#561A3B', bg: '#FCF2F6', surface: '#FFFFFF', ink: '#3B1028', muted: '#7A4A62', line: '#F1D9E4', accent: '#BE185D', on: '#FFFFFF', dash: '#E79BBE', soft: '#F8DCE8', art: '#BE185D', dark: false },
+    { id: 'forest', deep: '#1C2B16', deep2: '#2B3F22', bg: '#F2F6EE', surface: '#FFFFFF', ink: '#1C2B16', muted: '#55654B', line: '#DCE6D2', accent: '#3F6212', on: '#FFFFFF', dash: '#A3BE84', soft: '#E1EBD5', art: '#3F6212', dark: false },
+    { id: 'night', deep: '#0E1015', deep2: '#1A1D24', bg: '#14161C', surface: '#1E2129', ink: '#F1F2F5', muted: '#A9AFBC', line: '#2E323C', accent: '#7DD3C0', on: '#0B1F1B', dash: '#4C7F75', soft: '#253A37', art: '#2C8C79', dark: true }
   ];
   var colorId = LS.get('siman.v7.color');
   if (!PAL.some(function (p) { return p.id === colorId; })) {
@@ -64,7 +64,7 @@
   function applyColor(id) {
     var p = PAL.filter(function (x) { return x.id === id; })[0] || PAL[0];
     colorId = p.id;
-    ['bg', 'surface', 'ink', 'muted', 'line', 'accent', 'on', 'dash', 'soft', 'art'].forEach(function (k) { root.style.setProperty('--v7-' + k, p[k]); });
+    ['bg', 'surface', 'ink', 'muted', 'line', 'accent', 'on', 'dash', 'soft', 'art', 'deep', 'deep2'].forEach(function (k) { root.style.setProperty('--v7-' + k, p[k]); });
     root.setAttribute('data-theme', p.dark ? 'dark' : 'light');
     var m = document.querySelector('meta[name="theme-color"]');
     if (m) m.setAttribute('content', p.surface);

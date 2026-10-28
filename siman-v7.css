@@ -7,7 +7,7 @@
 html.v7:not(#_){
   --desk:var(--v7-bg);--bar:var(--v7-surface);--ink:var(--v7-ink);--muted:var(--v7-muted);--line:var(--v7-line);
   --blue:var(--v7-accent);--sky:var(--v7-accent);
-  --navy:var(--v7-surface);--navy-2:var(--v7-bg);--chrome-text:var(--v7-ink);--chrome-mute:var(--v7-muted);
+  --navy:var(--v7-deep);--navy-2:var(--v7-deep2);--chrome-text:#EEF1F6;--chrome-mute:#B4BDCE;
   --marker:var(--v7-accent);--marker-hi:var(--v7-accent);--marker-ink:var(--v7-on);
   --paper-shadow:0 1px 0 rgba(15,33,63,.04),0 18px 40px -18px rgba(15,33,63,.35);
   --shadow:0 1px 2px rgba(15,33,63,.08),0 8px 24px rgba(15,33,63,.08);
@@ -16,7 +16,7 @@ html.v7:not(#_) body{font-family:"SF-rubik",Rubik,"Noto Sans Arabic","Segoe UI",
 html.v7 .intro{display:none!important}
 
 /* ---------- סרגל עליון בהיר ---------- */
-html.v7:not(#_) .bar{background:var(--v7-surface);border-bottom:1px solid var(--v7-line);box-shadow:0 1px 0 rgba(15,33,63,.03)}
+html.v7:not(#_) .bar{color:var(--v7-ink);background:var(--v7-surface);border-bottom:1px solid var(--v7-line);box-shadow:0 1px 0 rgba(15,33,63,.03)}
 html.v7:not(#_) .brand b{font-family:"SF-rubik",Rubik,sans-serif;font-weight:700;font-size:23px;color:var(--v7-ink);background:none;display:inline-flex;align-items:center;gap:9px}
 html.v7:not(#_) .brand b::after{display:none}
 html.v7:not(#_) .brand b::before{content:"ס";display:grid;place-items:center;width:34px;height:34px;border-radius:11px;background:var(--v7-accent);color:var(--v7-on);font-size:20px;font-weight:700}
@@ -188,3 +188,9 @@ html.v7 #zoomIn,html.v7 #zoomOut{display:inline-grid;place-items:center;width:36
 html.v7 #zoomIn svg,html.v7 #zoomOut svg{width:19px;height:19px}
 @media (max-width:720px){html.v7 .bar .group.zoom{display:none!important}}
 html.v7 .v7-pinch{transition:none!important;will-change:transform}
+
+/* ---------- מסך התמלול: הכרטיס הראשי בצבע הראשי, והאייקון בצבע הטקסט שעליו ---------- */
+html.v7:not(#_) .vx-tile.main{background:var(--v7-accent);border-color:var(--v7-accent);color:var(--v7-on)!important}
+html.v7:not(#_) .vx-tile.main span{color:color-mix(in srgb,var(--v7-on) 82%,transparent)}
+html.v7:not(#_) .vx-tile.main svg{color:var(--v7-on)}
+html.v7:not(#_) .vx-top{background:var(--v7-deep)}
