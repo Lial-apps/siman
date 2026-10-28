@@ -34,6 +34,7 @@ const KINDS = {
   dictation: { label: 'הכתבה למסמך' },
 };
 const SPK = [['auto', 'זיהוי אוטומטי'], ['1', 'דובר אחד'], ['2', '2'], ['3', '3'], ['4', '4'], ['5', '5 ומעלה']];
+const QUALITY = [['fast', 'מהיר · טלפון ומחשב'], ['accurate', 'מדויק · מחשב']];
 const PREF_KEY = 'siman.voice.prefs', OK_KEY = 'siman.voice.ok', CLOUD_KEY = 'siman.voice.cloud';
 
 /* ---------------- small helpers ---------------- */
@@ -124,6 +125,7 @@ const friendly = e => {
   if (e && e.status === 429 || /quota|exhausted|rate/i.test(m)) return 'השרת עמוס כרגע. נסו שוב בעוד כמה דקות';
   if (/could not decode|decode/i.test(m)) return 'לא הצלחתי לקרוא את השמע בקובץ. נסו קובץ MP3, M4A או WAV';
   if (/memory|allocation|Array buffer/i.test(m)) return 'אין למכשיר מספיק זיכרון להקלטה הזו. נסו במחשב, או קובץ קצר יותר';
+  if (e && e.space) return e.message;
   if (e && e.offline) return 'ההורדה הראשונה של מנוע התמלול צריכה אינטרנט. התחברו ונסו שוב (אחר כך זה עובד גם בלי)';
   if (e && e.engine) return 'מנוע התמלול לא נטען במכשיר הזה. הפרטים למטה עוזרים לתקן';
   if (/Worker|module/i.test(m)) return 'הדפדפן הזה לא מריץ את מנוע התמלול. נסו Chrome, Edge או Safari מעודכן';
@@ -276,24 +278,64 @@ const ASR = (() => {
     return w;
   }
   const ask = (msg, tr) => new Promise((res, rej) => { const id = ++seq; wait.set(id, { res, rej }); worker().postMessage(Object.assign({ id }, msg), tr || []); });
-  const key = lang => (lang || 'he') === 'he' ? 'he' : 'multi';
+  let model = '';
   return {
-    key,
     get device() { return device; },
-    load(lang, progress) {
-      const k = key(lang); onProg = progress || null;
+    get engine() { return cur; },
+    // spec: { key: 'he' | 'multi' | 'acc', model } (see engineFor)
+    load(spec, progress) {
+      const k = spec.key + '|' + (spec.model || ''); onProg = progress || null;
       if (ready && cur === k) return ready;
-      cur = k;
-      ready = ask({ type: 'load', engine: k }).then(d => { device = d.device; return d; }, e => { ready = null; cur = ''; throw e; });
+      cur = k; model = spec.model || '';
+      ready = ask({ type: 'load', engine: spec.key, model }).then(d => { device = d.device; return d; }, e => { ready = null; cur = ''; throw e; });
       return ready;
     },
-    text: (pcm, lang) => ask({ type: 'run', audio: pcm, lang: lang || 'he' }, [pcm.buffer]),
+    text: (pcm, lang) => ask({ type: 'run', audio: pcm, lang: lang || 'he', engine: cur.split('|')[0] || undefined, model: model || undefined }, [pcm.buffer]),
     call: (msg, tr) => ask(msg, tr),
     dzLoad(progress) { onProg = progress || null; return ask({ type: 'dz-load' }); },
     stop() { if (!w) return; w.terminate(); w = null; ready = null; cur = ''; for (const p of wait.values()) p.rej(abortErr()); wait.clear(); },
   };
 })();
-async function engineCached(lang) { try { const c = await caches.open('transformers-cache'); const u = ENGINES[ASR.key(lang)].probe; return !!(await c.match(u) || await c.match(u.replace('https://huggingface.co/', VOICE_URL + 'hf/'))); } catch (_) { return false; } }
+async function cached(u) { try { const c = await caches.open('transformers-cache'); return !!(await c.match(u) || await c.match(u.replace('https://huggingface.co/', VOICE_URL + 'hf/'))); } catch (_) { return false; } }
+const engineCached = spec => cached(spec.probe);
+// the accurate engine: siman-models.json, written to the repo by the GitHub workflow that converted it
+let ACC;
+async function accInfo() {
+  if (ACC !== undefined) return ACC;
+  try { const r = await fetch('./siman-models.json', { cache: 'no-store' }); ACC = r.ok ? ((await r.json()).accurate || null) : null; } catch (_) { ACC = null; }
+  return ACC;
+}
+let GPU;
+async function gpuInfo() {
+  if (GPU !== undefined) return GPU;
+  try { const a = navigator.gpu && await navigator.gpu.requestAdapter(); GPU = a ? { f16: a.features.has('shader-f16') } : null; } catch (_) { GPU = null; }
+  return GPU;
+}
+// which engine runs: the accurate one when asked for, installed and possible here; otherwise the fast one
+async function engineFor(lang, quality) {
+  let why = '';
+  if (quality === 'accurate') {
+    const acc = await accInfo(), gpu = await gpuInfo();
+    if (acc && acc.id && gpu) {
+      const v = gpu.f16 ? 'fp16' : 'q4';
+      return { key: 'acc', model: acc.id, mb: (acc.mb && acc.mb[v]) || 1600, probe: `https://huggingface.co/${acc.id}/resolve/main/onnx/encoder_model_${v}.onnx`, label: 'מדויק' };
+    }
+    why = !acc ? 'המנוע המדויק עוד לא הותקן בסימן, תומלל במנוע המהיר' : 'המנוע המדויק צריך מחשב עם כרטיס מסך (WebGPU), תומלל במנוע המהיר';
+  }
+  const k = (lang || 'he') === 'he' ? 'he' : 'multi';
+  return { key: k, mb: ENGINES[k].mb, probe: ENGINES[k].probe, label: 'מהיר', why };
+}
+// enough free space on the device for a download? (and the browser is asked to keep the engines)
+async function roomFor(mbNeed) {
+  try {
+    const e = navigator.storage && navigator.storage.estimate && await navigator.storage.estimate();
+    if (e && e.quota) {
+      const free = (e.quota - (e.usage || 0)) / 1048576;
+      if (free < mbNeed * 1.15) throw Object.assign(new Error(`אין מספיק מקום פנוי במכשיר להורדת מנוע התמלול: צריך עוד כ-${Math.ceil(mbNeed * 1.15 - free)}MB. אפשר לפנות מקום (תמונות, סרטונים, אפליקציות) ולנסות שוב.`), { space: true });
+    }
+  } catch (err) { if (err.space) throw err; }
+}
+async function keepEngines() { try { if (navigator.storage && navigator.storage.persist && !(await navigator.storage.persisted())) await navigator.storage.persist(); } catch (_) {} }
 const mb = b => (b / 1048576).toFixed(b > 104857600 ? 0 : 1) + 'MB';
 function progressSum(files) { let l = 0, t = 0; for (const k in files) { const f = files[k]; if (f.total) { t += f.total; l += f.done ? f.total : (f.loaded || 0); } } return { l, t }; }
 
@@ -302,7 +344,7 @@ const JOB = { busy: false, queue: [], ctl: null };
 let V = null;              // the open transcript
 let audioEl = null, audioUrl = '';
 let saveT = 0;
-const prefs = Object.assign({ kind: 'lesson', lang: 'he', spk: 'auto' }, rd(PREF_KEY, {}));
+const prefs = Object.assign({ kind: 'lesson', lang: 'he', spk: 'auto', quality: 'fast' }, rd(PREF_KEY, {}));
 const save = (now) => { if (!V) return; clearTimeout(saveT); const go = () => { V.updated = Date.now(); DB.put(stripForDb(V)).catch(e => console.error(e)); }; if (now) go(); else saveT = setTimeout(go, 700); };
 const stripForDb = v => { const o = Object.assign({}, v); delete o.blob; return o; };
 
@@ -621,9 +663,11 @@ function renderNew() {
       <div class="vx-row"><span class="vx-lbl">מה יש בהקלטה?</span><div class="vx-seg" id="vxKind">${Object.entries(KINDS).map(([k, v]) => `<button data-k="${k}" aria-pressed="${prefs.kind === k}">${v.label}</button>`).join('')}</div></div>
       <div class="vx-row"><span class="vx-lbl">כמה מדברים?</span><div class="vx-seg" id="vxSpkN">${SPK.map(([k, v]) => `<button data-n="${k}" aria-pressed="${String(prefs.spk) === k}">${v}</button>`).join('')}</div><span class="vx-hint" style="flex-basis:100%">מי שיודע כמה אנשים מדברים בהקלטה, עדיף לבחור: ההפרדה בין הדוברים מדויקת יותר.</span></div>
       <div class="vx-row"><label for="vxLang">שפת הדיבור</label><select id="vxLang">${Object.entries(LANG_NAMES).map(([k, v]) => `<option value="${k}"${prefs.lang === k ? ' selected' : ''}>${v}</option>`).join('')}</select></div>
+      <div class="vx-row"><span class="vx-lbl">דיוק התמלול</span><div class="vx-seg" id="vxQ">${QUALITY.map(([k, v]) => `<button data-q="${k}" aria-pressed="${(prefs.quality || 'fast') === k}">${v}</button>`).join('')}</div><span class="vx-hint" id="vxQHint" style="flex-basis:100%"></span></div>
       <div class="vx-row"><span class="vx-lbl">מנוע התמלול</span><span id="vxEng" class="vx-hint">בודק…</span></div>
     </div>
     <div class="vx-recent" id="vxRecent"></div>
+    <p class="vx-hint" style="margin-top:26px">מנועי התמלול: Ozen-v1 (itayinbar) והמנוע העברי של <a href="https://huggingface.co/ivrit-ai" target="_blank" rel="noopener">ivrit.ai</a>, ברישיון Apache-2.0. הפרדת הדוברים: pyannote ו-WeSpeaker.</p>
   </div>`;
   const setSpk = n => { prefs.spk = String(n); wr(PREF_KEY, prefs); s.querySelectorAll('#vxSpkN button').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.n === prefs.spk))); };
   s.querySelectorAll('#vxSpkN button').forEach(b => b.onclick = () => setSpk(b.dataset.n));
@@ -635,6 +679,8 @@ function renderNew() {
     else if (prefs.spk === '1') setSpk('auto');
   });
   s.querySelector('#vxLang').onchange = e => { prefs.lang = e.target.value; wr(PREF_KEY, prefs); engineRow(); };
+  s.querySelectorAll('#vxQ button').forEach(b => b.onclick = () => { prefs.quality = b.dataset.q; wr(PREF_KEY, prefs); s.querySelectorAll('#vxQ button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); qualityHint(); engineRow(); });
+  qualityHint();
   engineRow();
   DB.all().then(items => {
     const box = s.querySelector('#vxRecent'); if (!box) return;
@@ -645,17 +691,28 @@ function renderNew() {
     if (items.length > 4) { const m = el('button', 'vx-btn sm', 'לכל הספרייה (' + items.length + ')'); m.style.marginTop = '10px'; m.onclick = () => show('lib'); box.append(m); }
   }).catch(() => {});
 }
+async function qualityHint() {
+  const h = root && root.querySelector('#vxQHint'); if (!h) return;
+  const acc = await accInfo(), gpu = await gpuInfo();
+  if (prefs.quality !== 'accurate') { h.textContent = 'המהיר מתאים לכל מכשיר. במדויק יש בערך חצי מהטעויות, אבל הוא דורש מחשב עם כרטיס מסך והורדה גדולה.'; return; }
+  if (!acc) h.textContent = 'המנוע המדויק עוד לא הותקן בסימן. עד אז התמלול נעשה במנוע המהיר.';
+  else if (!gpu) h.textContent = 'במכשיר הזה אין תמיכה בכרטיס מסך לדפדפן (WebGPU), לכן התמלול ייעשה במנוע המהיר. במחשב עם Chrome או Edge המדויק יעבוד.';
+  else h.textContent = 'המנוע המדויק של ivrit.ai, במחשב שלך. הורדה גדולה פעם אחת, ותמלול מדויק בהרבה, במיוחד בשיחות טלפון.';
+}
 // is the engine already on this device? if not: what it costs, and a button to get it now (on Wi-Fi)
 async function engineRow() {
   const box = root && root.querySelector('#vxEng'); if (!box) return;
-  const lang = prefs.lang, E = ENGINES[ASR.key(lang)];
-  const have = await engineCached(lang);
-  if (have) { box.innerHTML = `<span class="vx-good">✓</span> מותקן במכשיר. עובד גם בלי אינטרנט`; return; }
-  box.innerHTML = `יורד פעם אחת בשימוש הראשון (כ-${E.mb}MB, עדיף ב-Wi-Fi) <button class="vx-btn sm" id="vxGetEng">להוריד עכשיו</button>`;
+  const lang = prefs.lang, spec = await engineFor(lang, prefs.quality);
+  const have = await engineCached(spec);
+  const name = spec.key === 'acc' ? 'המנוע המדויק' : 'המנוע המהיר';
+  if (have) { box.innerHTML = `<span class="vx-good">✓</span> ${name} מותקן במכשיר. עובד גם בלי אינטרנט`; return; }
+  box.innerHTML = `${spec.why ? esc(spec.why.replace(', תומלל במנוע המהיר', '')) + '. ' : ''}${name} יורד פעם אחת בשימוש הראשון (כ-${spec.mb}MB, עדיף ב-Wi-Fi) <button class="vx-btn sm" id="vxGetEng">להוריד עכשיו</button>`;
   box.querySelector('#vxGetEng').onclick = async ev => {
     const b = ev.currentTarget; b.disabled = true; const files = {};
     try {
-      await ASR.load(lang, p => { files[p.file] = p; const { l, t } = progressSum(files); if (t > 1e6) b.textContent = 'מוריד… ' + Math.round(l / t * 100) + '%'; });
+      await roomFor(spec.mb);
+      await ASR.load(spec, p => { files[p.file] = p; const { l, t } = progressSum(files); if (t > 1e6) b.textContent = 'מוריד… ' + Math.round(l / t * 100) + '%'; });
+      keepEngines();
       engineRow();
     } catch (e) { say(friendly(e)); b.disabled = false; b.textContent = 'לנסות שוב'; }
   };
@@ -733,34 +790,49 @@ function liveLine(t) {
   box.scrollTop = box.scrollHeight;
 }
 const eta = s => s < 60 ? 'פחות מדקה' : s < 3600 ? 'עוד כ-' + Math.round(s / 60) + ' דק׳' : 'עוד כ-' + (s / 3600).toFixed(1) + ' שע׳';
-async function loadEngine(lang, k) {
+async function loadEngine(spec, k) {
   const files = {};
-  const have = await engineCached(lang);
+  const have = await engineCached(spec);
   step(k, 'now', have ? '' : 'הורדה חד-פעמית');
-  await ASR.load(lang, p => {
+  if (!have) await roomFor(spec.mb);
+  await ASR.load(spec, p => {
     files[p.file] = p; const { l, t } = progressSum(files);
     if (t > 2e6 && !have) { bar(k, l / t); step(k, 'now', mb(l) + ' מתוך ' + mb(t)); }
   });
-  step(k, 'done', ASR.device === 'webgpu' ? 'כרטיס מסך' : '');
+  if (!have) keepEngines();
+  step(k, 'done', spec.label + (ASR.device === 'webgpu' ? ' · כרטיס מסך' : ''));
   const b = root.querySelector(`#vxWork li[data-s="${k}"] .vx-bar`); if (b) b.remove();
 }
 async function transcribeFile(file, opts) {
   const kind = opts.kind || prefs.kind;
   const lang = opts.lang || prefs.lang || 'he';
   const spkMode = String(opts.spk || prefs.spk || 'auto');
+  const quality = opts.quality || prefs.quality || 'fast';
   const id = opts.id || uid();
   workScreen(file.name || 'הקלטה', spkMode !== '1');
   const item = {
     id, title: (file.name || 'הקלטה').replace(/\.[a-z0-9]+$/i, ''), fileName: file.name || '', created: opts.created || Date.now(), updated: Date.now(),
-    kind, lang, spk: spkMode, duration: opts.duration || null, segments: [], speakers: {}, analysis: null, tr: {}, chat: [], tasksDone: {}, status: 'working', engine: 'local',
+    kind, lang, spk: spkMode, quality, duration: opts.duration || null, segments: [], speakers: {}, analysis: null, tr: {}, chat: [], tasksDone: {}, status: 'working', engine: 'local',
   };
   const sig = JOB.ctl.signal;
   try {
     // the audio is kept on the device first: nothing is lost if something fails
     await DB.putAudio(id, file); await DB.put(item);
     // 1. the engine (downloaded once, then from the device)
-    try { await loadEngine(lang, 'model'); }
-    catch (err) { const now = root.querySelector('#vxWork li[data-s="model"]'); if (now) now.className = ''; throw await diagnose(err); }
+    let spec = await engineFor(lang, quality);
+    if (spec.why) say(spec.why);
+    try { await loadEngine(spec, 'model'); }
+    catch (err) {
+      if (err.space && spec.key !== 'acc') throw err;
+      if (spec.key === 'acc') {
+        // the accurate engine did not start here (or there is no room for it): the fast one, so the transcript is still made
+        console.warn('accurate engine', err);
+        say(err.space ? 'אין מספיק מקום במכשיר למנוע המדויק, ממשיך במנוע המהיר' : 'המנוע המדויק לא נטען במחשב הזה, ממשיך במנוע המהיר');
+        spec = await engineFor(lang, 'fast');
+        try { await loadEngine(spec, 'model'); } catch (e2) { const now = root.querySelector('#vxWork li[data-s="model"]'); if (now) now.className = ''; throw e2.space ? e2 : await diagnose(e2); }
+      } else { const now = root.querySelector('#vxWork li[data-s="model"]'); if (now) now.className = ''; throw await diagnose(err); }
+    }
+    item.engine = spec.key === 'acc' ? 'accurate' : 'fast';
     if (sig.aborted) throw abortErr();
     // 2. the audio
     step('prep', 'now');
@@ -773,6 +845,7 @@ async function transcribeFile(file, opts) {
       step('spk', 'now');
       try {
         const files = {};
+        if (!(await cached('https://huggingface.co/onnx-community/wespeaker-voxceleb-resnet34-LM/resolve/main/config.json'))) await roomFor(40);
         await ASR.dzLoad(p => { files[p.file] = p; const { l, t } = progressSum(files); if (t > 2e6 && l < t) { bar('spk', l / t); step('spk', 'now', 'הורדה חד-פעמית ' + mb(l) + ' מתוך ' + mb(t)); } });
         const K = spkMode === 'auto' ? 0 : +spkMode;
         const r = await diarize(pcm, K, f => { bar('spk', f); step('spk', 'now', Math.round(f * 100) + '%'); });
@@ -841,7 +914,7 @@ async function retry(id) {
   const it = await DB.get(id), blob = await DB.getAudio(id);
   if (!blob) { say('השמע של התמליל הזה לא נשמר'); return; }
   const f = blob instanceof File ? blob : new File([blob], (it && it.fileName) || 'הקלטה.webm', { type: blob.type });
-  JOB.queue.push({ file: f, opts: { id, kind: it && it.kind, lang: it && it.lang, created: it && it.created, spk: it && it.spk } });
+  JOB.queue.push({ file: f, opts: { id, kind: it && it.kind, lang: it && it.lang, created: it && it.created, spk: it && it.spk, quality: it && it.quality } });
   if (!JOB.busy) run();
 }
 // labels in order of appearance: spk_1, spk_2…
@@ -1324,7 +1397,7 @@ async function startRec() {
   capture();
   // the engine starts while the recording runs (the first time it is downloaded)
   const files = {}; const note = root.querySelector('#vxRecE');
-  REC.engine = ASR.load(REC.lang, p => { files[p.file] = p; const { l, t } = progressSum(files); if (t > 2e6 && note) note.textContent = 'מוריד את מנוע התמלול (פעם אחת): ' + Math.round(l / t * 100) + '%'; })
+  REC.engine = engineFor(REC.lang, prefs.quality).then(spec => ASR.load(spec, p => { files[p.file] = p; const { l, t } = progressSum(files); if (t > 2e6 && note) note.textContent = 'מוריד את מנוע התמלול (פעם אחת): ' + Math.round(l / t * 100) + '%'; }))
     .then(() => { REC.engineOk = true; if (note) note.textContent = ''; }, e => { REC.engineOk = false; if (note) note.textContent = 'מנוע התמלול לא נטען (' + friendly(e) + '). ההקלטה נשמרת ותתומלל אחר כך.'; });
   REC.cutT = setInterval(() => liveCut(false), 1000);
   addEventListener('beforeunload', recGuard);

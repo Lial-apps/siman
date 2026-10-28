@@ -2,6 +2,7 @@
 // השמע לא יוצא מהמכשיר. מה שיורד מהאינטרנט הוא רק המנוע עצמו, פעם אחת:
 //   עברית: Ozen-v1 (itayinbar/Ozen-v1, Apache-2.0) — מודל עברי קטן שזוקק מ-ivrit.ai whisper-large-v3-turbo
 //   שפות אחרות: Whisper small (Xenova/whisper-small)
+//   מדויק (מחשב עם כרטיס מסך): ivrit-ai/whisper-large-v3-turbo בגרסה לדפדפן — המאגר שתהליך ההמרה בגיטהאב יצר
 // הקבצים נשמרים במטמון של הדפדפן ("transformers-cache"), ואחר כך התמלול עובד גם בלי אינטרנט.
 // הספרייה: transformers.min.js (Transformers.js 4.3.1), מונחת ליד האפליקציה.
 import { env, AutoTokenizer, AutoProcessor, WhisperForConditionalGeneration, pipeline, AutoModelForAudioFrameClassification, AutoModel, AutoFeatureExtractor } from './transformers.min.js';
@@ -58,7 +59,28 @@ async function hasGpu() {
   try { if (!self.navigator || !navigator.gpu) return false; return !!(await navigator.gpu.requestAdapter()); } catch (_) { return false; }
 }
 
-async function build(key, device) {
+async function gpuF16() {
+  try { const a = navigator.gpu && await navigator.gpu.requestAdapter(); return a ? a.features.has('shader-f16') : null; } catch (_) { return null; }
+}
+async function build(key, device, model) {
+  if (key === 'acc') {
+    // ivrit.ai whisper-large-v3-turbo for the browser (the repo the GitHub workflow made): graphics card only
+    const f16 = await gpuF16();
+    if (f16 === null) throw new Error('no-webgpu');
+    const [tok, proc, m] = await Promise.all([
+      AutoTokenizer.from_pretrained(model, { progress_callback: progress }),
+      AutoProcessor.from_pretrained(model, { progress_callback: progress }),
+      WhisperForConditionalGeneration.from_pretrained(model, { dtype: { encoder_model: f16 ? 'fp16' : 'q4', decoder_model_merged: 'q4' }, device: 'webgpu', progress_callback: progress }),
+    ]);
+    return {
+      key, device: 'webgpu', model, dispose: () => m.dispose(),
+      run: async (audio, lang) => {
+        const { input_features } = await proc(audio);
+        const ids = await m.generate({ inputs: input_features, language: lang || 'he', task: 'transcribe', max_new_tokens: 220 });
+        return tok.batch_decode(ids, { skip_special_tokens: true })[0] || '';
+      },
+    };
+  }
   const c = ENGINES[key];
   if (key === 'he') {
     const [tok, proc, model] = await Promise.all([
@@ -87,9 +109,15 @@ async function build(key, device) {
   };
 }
 
-async function load(key) {
-  if (E && E.key === key) return E;
+async function load(key, model) {
+  if (E && E.key === key && (key !== 'acc' || E.model === model)) return E;
   const host = await pickHost();
+  if (key === 'acc') {
+    if (!model) throw new Error('accurate engine not installed');
+    if (E) { try { await E.dispose(); } catch (_) {} E = null; }
+    try { E = await build('acc', 'webgpu', model); await E.run(new Float32Array(SR), 'he'); return E; }
+    catch (err) { E = null; throw new Error('acc@' + host + ': ' + ((err && err.message) || err)); }
+  }
   if (E) { try { await E.dispose(); } catch (_) {} E = null; }
   // the graphics card when there is one (much faster); otherwise the processor
   const devices = key === 'he' && await hasGpu() ? ['webgpu', 'wasm'] : ['wasm'];
@@ -109,19 +137,19 @@ async function load(key) {
 async function handle(m) {
   try {
     if (m.type === 'load') {
-      const e = await load(m.engine);
+      const e = await load(m.engine, m.model);
       postMessage({ id: m.id, device: e.device, host: await pickHost() });
     } else if (/^dz-/.test(m.type)) {
       postMessage(Object.assign({ id: m.id }, await dzHandle(m)));
     } else if (m.type === 'run') {
-      const key = (m.lang || 'he') === 'he' ? 'he' : 'multi';
-      const e = await load(key);
+      const key = m.engine || ((m.lang || 'he') === 'he' ? 'he' : 'multi');
+      const e = await load(key, m.model);
       const t0 = performance.now();
       let text;
       try { text = await e.run(m.audio, m.lang); }
       catch (err) {
         // a graphics-card failure in the middle: once more on the processor
-        if (e.device !== 'wasm') { try { await e.dispose(); } catch (_) {} E = await build(key, 'wasm'); text = await E.run(m.audio, m.lang); }
+        if (e.device !== 'wasm' && key !== 'acc') { try { await e.dispose(); } catch (_) {} E = await build(key, 'wasm'); text = await E.run(m.audio, m.lang); }
         else throw err;
       }
       postMessage({ id: m.id, text: String(text || '').trim(), ms: Math.round(performance.now() - t0) });
