@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>סימן – חותמים, מסמנים, מתרגמים ושולחים מסמכים</title>
+<meta name="description" content="סימן: חותמים וממלאים טפסים, מסמנים ומתקנים טקסט, מתרגמים ושומרים על העיצוב, ממירים PDF לוורד ושולחים בוואטסאפ. PDF, וורד ואקסל, בעברית מלאה.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://siman.siman-app.workers.dev/start.html">
+<meta property="og:title" content="סימן – כל מה שעושים עם מסמך, באפליקציה אחת">
+<meta property="og:description" content="חותמים, מסמנים, מתקנים, מתרגמים ושולחים. PDF, וורד ואקסל, בעברית מלאה. כרגע בחינם.">
+<meta property="og:image" content="https://siman.siman-app.workers.dev/siman-share.jpg">
+<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#2B8FE8">
+<link rel="icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700&family=Rubik:wght@500;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#13233A;--ink2:#47566D;--sky:#2B8FE8;--sky-d:#1D6FBA;--wash:#E6F2FD;--paper:#fff;--marker:#FFD43B;--green:#1F9D6B;--red:#D9443A;--line:#DCE6F2;color-scheme:light}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:Heebo,"Assistant",Arial,sans-serif;color:var(--ink);background:var(--paper);direction:rtl;text-align:right;line-height:1.6;font-size:18px;-webkit-font-smoothing:antialiased}
+h1,h2,h3,.btn,.brand{font-family:Rubik,Heebo,Arial,sans-serif}
+a{color:inherit}
+.wrap{max-width:1120px;margin:0 auto;padding:0 22px}
+:focus-visible{outline:3px solid var(--sky);outline-offset:3px;border-radius:6px}
+/* top */
+.top{position:sticky;top:0;z-index:20;background:rgba(255,255,255,.92);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line);padding-top:env(safe-area-inset-top,0px)}
+.top .wrap{display:flex;align-items:center;justify-content:space-between;height:64px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:22px;text-decoration:none}
+.logo{width:38px;height:38px;border-radius:11px;background:var(--marker);display:grid;place-items:center;font-weight:900;font-size:24px;box-shadow:0 3px 0 #E0B400;font-family:Rubik}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-weight:700;text-decoration:none;border-radius:14px;padding:15px 26px;font-size:19px;transition:transform .12s,box-shadow .12s}
+.btn-main{background:var(--ink);color:#fff;box-shadow:0 4px 0 #000}
+.btn-main:hover{transform:translateY(-1px)}
+.btn-main:active{transform:translateY(3px);box-shadow:0 1px 0 #000}
+.btn-soft{background:var(--wash);color:var(--sky-d)}
+.btn-sm{padding:9px 16px;font-size:16px;border-radius:11px;box-shadow:0 3px 0 #000}
+/* hero */
+.hero{background:linear-gradient(180deg,var(--wash),#fff 85%);padding:54px 0 70px;overflow:hidden}
+.hero .wrap{display:grid;grid-template-columns:1.15fr .85fr;gap:48px;align-items:center}
+.hero h1{font-weight:900;font-size:clamp(2.3rem,5.4vw,4rem);line-height:1.08;letter-spacing:-.5px}
+.lead{font-size:clamp(1.1rem,1.9vw,1.3rem);color:var(--ink2);margin-top:18px;max-width:34ch}
+.verbs{display:flex;flex-wrap:wrap;gap:8px;margin-top:24px}
+.verbs span{background:#fff;border:1.5px solid var(--line);border-radius:30px;padding:6px 14px;font-weight:500;font-size:16px}
+.ctas{display:flex;flex-wrap:wrap;gap:12px;margin-top:30px}
+.free{margin-top:14px;font-size:15px;color:var(--ink2)}
+.phone{justify-self:center;width:min(310px,78vw);aspect-ratio:9/16;border-radius:38px;background:var(--ink);padding:10px;box-shadow:0 30px 60px rgba(19,35,58,.25);transform:rotate(-2.5deg);position:relative}
+.phone video{width:100%;height:100%;border-radius:29px;display:block;object-fit:cover;background:var(--wash)}
+.sound{position:absolute;bottom:22px;left:50%;transform:translateX(-50%);background:rgba(19,35,58,.85);color:#fff;border:0;border-radius:30px;padding:8px 16px;font:600 15px Heebo,Arial,sans-serif;cursor:pointer;white-space:nowrap}
+/* features */
+section.block{padding:76px 0}
+h2{font-weight:800;font-size:clamp(1.8rem,3.6vw,2.6rem);line-height:1.15;letter-spacing:-.3px}
+.sub{color:var(--ink2);margin-top:10px;max-width:56ch}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:38px}
+.feat{border:1.5px solid var(--line);border-radius:20px;padding:22px 22px 24px;background:#fff}
+.feat h3{font-size:21px;font-weight:700;margin-top:18px}
+.feat p{color:var(--ink2);margin-top:6px;font-size:17px}
+.mini{height:128px;border-radius:14px;background:var(--wash);position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center}
+.sheet{width:150px;height:104px;background:#fff;border-radius:8px;box-shadow:0 6px 14px rgba(19,35,58,.12);padding:14px 14px;position:relative}
+.sheet i{display:block;height:7px;border-radius:4px;background:#D3DDE9;margin-bottom:9px}
+.sheet .hl{background:var(--marker);height:11px}
+.tag{position:absolute;top:-10px;left:-12px;font:800 13px Rubik,Arial;color:#fff;padding:4px 9px;border-radius:7px}
+.chip{font:700 15px Rubik,Arial;background:#fff;border-radius:20px;padding:7px 13px;box-shadow:0 4px 10px rgba(19,35,58,.1)}
+.arrow{color:var(--sky);font:800 22px Rubik,Arial;margin:0 10px}
+.pg{width:56px;height:74px;background:#fff;border-radius:6px;box-shadow:0 5px 12px rgba(19,35,58,.14);display:grid;place-items:end center;padding-bottom:6px;font:700 15px Rubik,Arial;color:var(--sky);margin:0 4px}
+.ico{width:46px;height:46px;border-radius:14px;display:grid;place-items:center;margin:0 5px}
+/* facts */
+.facts{background:var(--ink);color:#fff;padding:44px 0}
+.facts .wrap{display:grid;grid-template-columns:repeat(3,1fr);gap:28px}
+.facts b{display:block;font-family:Rubik;font-size:21px}
+.facts span{color:#B9C8DC;font-size:16px}
+/* install */
+.inst{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:34px}
+.inst a{display:block;text-decoration:none;border-radius:20px;padding:24px;background:var(--wash);border:1.5px solid transparent;transition:border-color .15s}
+.inst a:hover{border-color:var(--sky)}
+.inst b{display:block;font-family:Rubik;font-size:21px;margin-bottom:4px}
+.inst span{color:var(--ink2);font-size:16px}
+.inst em{display:inline-block;margin-top:14px;font-style:normal;font-weight:700;color:var(--sky-d)}
+/* final */
+.final{background:var(--marker);padding:70px 0;text-align:center}
+.final h2{max-width:20ch;margin:0 auto}
+.final p{margin:12px auto 26px;color:#3a3200;max-width:44ch}
+footer{padding:30px 0 calc(30px + env(safe-area-inset-bottom,0px));font-size:15px;color:var(--ink2)}
+footer .wrap{display:flex;flex-wrap:wrap;gap:12px 28px;justify-content:space-between}
+footer a{color:var(--sky-d)}
+@media (max-width:860px){
+ .hero{padding-top:30px}
+ .hero .wrap{grid-template-columns:1fr;gap:40px}
+ .grid,.inst{grid-template-columns:1fr 1fr}
+ .facts .wrap{grid-template-columns:1fr;gap:18px}
+}
+@media (max-width:560px){
+ body{font-size:17px}
+ .grid,.inst{grid-template-columns:1fr}
+ .top .btn-sm{padding:8px 12px;font-size:15px}
+ .ctas .btn{flex:1 1 100%}
+ section.block{padding:58px 0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+<header class="top"><div class="wrap">
+ <a class="brand" href="#"><span class="logo" aria-hidden="true">ס</span>סימן</a>
+ <a class="btn btn-main btn-sm" href="https://siman.siman-app.workers.dev/">לפתוח את סימן</a>
+</div></header>
+
+<main>
+<section class="hero"><div class="wrap">
+ <div>
+  <h1>כל מה שעושים עם מסמך, באפליקציה אחת.</h1>
+  <p class="lead">חותמים, ממלאים, מסמנים, מתקנים, מתרגמים ושולחים. PDF, וורד ואקסל, בעברית מלאה, בטלפון ובמחשב.</p>
+  <div class="verbs" aria-label="מה עושים בסימן"><span>חתימה</span><span>מילוי טפסים</span><span>מרקר והערות</span><span>תיקון טקסט</span><span>תרגום</span><span>איחוד ופיצול</span><span>PDF לוורד</span><span>שליחה בוואטסאפ</span></div>
+  <div class="ctas">
+   <a class="btn btn-main" href="https://siman.siman-app.workers.dev/">לפתוח את סימן בחינם</a>
+   <a class="btn btn-soft" href="#install">להתקנה בטלפון או במחשב</a>
+  </div>
+  <p class="free">כרגע בחינם, עם כל היכולות. בלי כרטיס אשראי.</p>
+ </div>
+ <div class="phone">
+  <video id="vid" src="siman-short.mp4" poster="siman-short-poster.jpg" autoplay muted loop playsinline preload="metadata" aria-label="סרטון הדגמה של סימן, פחות מדקה"></video>
+  <button class="sound" id="sound" type="button">להפעלה עם סאונד</button>
+ </div>
+</div></section>
+
+<section class="block" id="features"><div class="wrap">
+ <h2>שש פעולות שחוסכות לכם מדפסת</h2>
+ <p class="sub">כל מה שהייתם מדפיסים, סורקים או שולחים למישהו אחר לסדר, עושים עכשיו לבד, מהטלפון או מהמחשב.</p>
+ <div class="grid">
+  <article class="feat">
+   <div class="mini"><div class="sheet"><i></i><i style="width:70%"></i><svg viewBox="0 0 300 100" width="118" height="40" aria-hidden="true"><path d="M14 70 C 30 20, 46 18, 50 52 S 66 90, 80 50 S 104 18, 112 54 C 118 80, 130 74, 140 48 C 150 26, 160 40, 158 60 C 156 78, 176 72, 190 46 S 220 30, 230 56 C 236 70, 252 66, 286 40" fill="none" stroke="#13233A" stroke-width="7" stroke-linecap="round"/></svg></div></div>
+   <h3>חותמים וממלאים טפסים</h3><p>ממלאים שדות, מסמנים וי וחותמים באצבע או בעכבר. בלי מדפסת ובלי סורק.</p>
+  </article>
+  <article class="feat">
+   <div class="mini"><div class="sheet"><i></i><i class="hl"></i><i style="width:60%"></i><i></i><svg style="position:absolute;top:44px;right:30px" width="64" height="26" aria-hidden="true"><ellipse cx="32" cy="13" rx="29" ry="10" fill="none" stroke="#D9443A" stroke-width="3"/></svg></div></div>
+   <h3>מסמנים, כותבים ומתקנים</h3><p>מרקר, עט והערות בעברית. משנים מילה או מספר, והטקסט המקורי באמת מוחלף.</p>
+  </article>
+  <article class="feat">
+   <div class="mini"><span class="chip">שלום</span><span class="arrow" aria-hidden="true">←</span><span class="chip" dir="ltr">Hello</span></div>
+   <h3>מתרגמים ושומרים על העיצוב</h3><p>לעברית, לאנגלית ולעוד שפות. התרגום נכנס למקום המקורי, והעיצוב נשאר כמו שהיה.</p>
+  </article>
+  <article class="feat">
+   <div class="mini"><div class="pg">1</div><div class="pg" style="transform:translateY(-12px) rotate(-4deg)">4</div><div class="pg">2</div><div class="pg">3</div></div>
+   <h3>מאחדים, מפצלים ומסדרים</h3><p>גוררים עמודים למקום, מחברים כמה קבצים לאחד, ומפצלים קובץ גדול לכמה קטנים.</p>
+  </article>
+  <article class="feat">
+   <div class="mini"><div class="sheet" style="width:92px"><span class="tag" style="background:var(--red)">PDF</span><i></i><i></i><i style="width:60%"></i></div><span class="arrow" aria-hidden="true">←</span><div class="sheet" style="width:92px"><span class="tag" style="background:#2B5CC9">וורד</span><i></i><i></i><i style="width:60%"></i></div></div>
+   <h3>ממירים PDF לוורד</h3><p>הופכים PDF לקובץ וורד וממשיכים לערוך אותו כמו מסמך רגיל.</p>
+  </article>
+  <article class="feat">
+   <div class="mini"><span class="ico" style="background:#25D366"><svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18l1.3-3.6A8 8 0 1 1 8.6 19z" fill="#fff"/></svg></span><span class="ico" style="background:var(--sky)"><svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2" fill="#fff"/><path d="M3.5 7l8.5 6 8.5-6" stroke="#2B8FE8" stroke-width="1.8" fill="none"/></svg></span><span class="ico" style="background:#F3A13A"><svg width="28" height="28" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 18a4.5 4.5 0 0 1-.6-9A6 6 0 0 1 18 9.5 4.3 4.3 0 0 1 17.5 18z" fill="#fff"/></svg></span></div>
+   <h3>שולחים בלחיצה</h3><p>במייל, בוואטסאפ או לענן, ישר מתוך האפליקציה. בלי לשמור ולחפש את הקובץ.</p>
+  </article>
+ </div>
+</div></section>
+
+<section class="facts" aria-label="עוד על סימן"><div class="wrap">
+ <div><b>PDF, וורד ואקסל</b><span>וגם קבצי פאוורפוינט. הכול נפתח באותה אפליקציה.</span></div>
+ <div><b>עברית מלאה</b><span>ממשק, גופנים וכיווניות בעברית, בלי טקסט הפוך.</span></div>
+ <div><b>הקובץ נשאר אצלכם</b><span>סימון, עריכה וחתימה נעשים במכשיר שלכם, בלי להעלות את הקובץ.</span></div>
+</div></section>
+
+<section class="block" id="install"><div class="wrap">
+ <h2>מתקינים בפחות מדקה</h2>
+ <p class="sub">סימן עובד גם ישר מהדפדפן. מי שמתקין מקבל אייקון משלו וחלון נפרד, והעדכונים מגיעים לבד.</p>
+ <div class="inst">
+  <a href="https://siman.siman-app.workers.dev/install.html"><b>בטלפון</b><span>אנדרואיד ואייפון. הדף מזהה את הטלפון ומראה מה ללחוץ.</span><br><em>להתקנה בטלפון</em></a>
+  <a href="https://apps.microsoft.com/detail/9NWJTDTM2JJX?hl=he&amp;gl=IL"><b>במחשב Windows</b><span>מורידים מ־Microsoft Store, כמו כל תוכנה.</span><br><em>ל־Microsoft Store</em></a>
+  <a href="https://siman.siman-app.workers.dev/"><b>בכל דפדפן</b><span>גם במק ובכל מחשב אחר. בלי התקנה בכלל.</span><br><em>לפתוח את סימן</em></a>
+ </div>
+</div></section>
+
+<section class="final"><div class="wrap">
+ <h2>המסמך הבא כבר לא יחכה למדפסת</h2>
+ <p>כרגע בחינם עם כל היכולות, בכפוף לתנאי השימוש. כשנוסיף מסלול בתשלום, נודיע מראש במייל.</p>
+ <a class="btn btn-main" href="https://siman.siman-app.workers.dev/">לפתוח את סימן בחינם</a>
+</div></section>
+</main>
+
+<footer><div class="wrap">
+ <span><b>סימן</b> של Almos Apps</span>
+ <span>רוצים לראות הכול? <a href="https://siman.siman-app.workers.dev/about.html">המדריך המלא והסרטון הארוך</a></span>
+ <span><a href="https://siman.siman-app.workers.dev/terms.html">תנאי שימוש</a></span>
+ <span>יצירת קשר: <a href="mailto:almos.apps@gmail.com" dir="ltr">almos.apps@gmail.com</a></span>
+</div></footer>
+
+<script>
+const v=document.getElementById('vid'),s=document.getElementById('sound');
+s.addEventListener('click',()=>{v.muted=false;v.loop=false;v.currentTime=0;v.controls=true;v.play();s.remove();});
+if(window.matchMedia('(prefers-reduced-motion: reduce)').matches){v.removeAttribute('autoplay');v.pause();v.controls=true;}
+</script>
+</body>
+</html>
