@@ -141,9 +141,9 @@
   var origText = new WeakMap(), setText = new WeakMap(), origAttr = new WeakMap();
   var ATTRS = ['title', 'aria-label', 'placeholder'];
   function trFor(he) { var d = DICT[he]; return d && lang !== 'he' ? d[lang] : null; }
-  function doText(n) {
+  function doText(n, force) {
     var v = n.nodeValue;
-    if (setText.get(n) === v) return;
+    if (!force && setText.get(n) === v) return;
     var key = v.trim();
     if (!key) return;
     if (!/[\u0590-\u05FF]/.test(key) && !origText.has(n)) return;
@@ -155,12 +155,12 @@
     setText.set(n, nv);
     n.nodeValue = nv;
   }
-  function doAttrs(el) {
+  function doAttrs(el, force) {
     var rec = origAttr.get(el) || {};
     ATTRS.forEach(function (a) {
       if (!el.hasAttribute(a)) return;
       var v = el.getAttribute(a);
-      if (rec[a] && rec[a].set === v) return;
+      if (!force && rec[a] && rec[a].set === v) return;
       var he = /[\u0590-\u05FF]/.test(v) ? v : (rec[a] && rec[a].he);
       if (!he) return;
       var out = lang === 'he' ? he : (trFor(he) || he);
@@ -169,14 +169,14 @@
     });
     origAttr.set(el, rec);
   }
-  function translateTree(rootEl) {
+  function translateTree(rootEl, force) {
     if (!rootEl) return;
-    doAttrs(rootEl);
+    doAttrs(rootEl, force);
     var w = document.createTreeWalker(rootEl, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
     var n;
     while ((n = w.nextNode())) {
-      if (n.nodeType === 3) { if (n.parentNode && !/^(SCRIPT|STYLE)$/.test(n.parentNode.nodeName)) doText(n); }
-      else doAttrs(n);
+      if (n.nodeType === 3) { if (n.parentNode && !/^(SCRIPT|STYLE)$/.test(n.parentNode.nodeName)) doText(n, force); }
+      else doAttrs(n, force);
     }
   }
   var TR_ROOTS = function () { return [document.querySelector('header.bar'), $('opts'), $('cmdDlg')]; };
@@ -383,7 +383,7 @@
     [document.querySelector('header.bar'), $('opts'), $('cmdDlg')].forEach(function (el) { if (el) el.dir = L.dir; });
     buildHome(); buildDock(); renderPops();
     trBusy = true;
-    try { TR_ROOTS().forEach(translateTree); } finally { trBusy = false; }
+    try { TR_ROOTS().forEach(function (el) { translateTree(el, true); }); } finally { trBusy = false; }
   }
 
   /* ================================================================ הפעלה */
