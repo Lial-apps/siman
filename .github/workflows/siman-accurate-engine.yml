@@ -1,0 +1,147 @@
+# סימן — הכנת "המנוע המדויק" לתמלול (פעם אחת)
+#
+# מוריד את מנוע התמלול העברי של ivrit.ai (whisper-large-v3-turbo, Apache-2.0),
+# ממיר אותו לגרסה שרצה בדפדפן (ONNX: מקודד 16-bit ו-4-bit, מפענח 4-bit),
+# מעלה אותו לחשבון ה-Hugging Face שלך (מאגר ציבורי siman-ivrit-turbo),
+# וכותב לסימן איפה הוא נמצא (siman-models.json). אחרי זה "מדויק" מופיע בסימן לבד.
+#
+# הקובץ הזה נשמר בריפו בנתיב:  .github/workflows/siman-accurate-engine.yml
+# לפני ההפעלה: Settings → Secrets and variables → Actions → New repository secret
+#   Name: HF_TOKEN   Value: מפתח Hugging Face עם הרשאת Write
+# הפעלה: Actions → "סימן: מנוע תמלול מדויק" → Run workflow. לוקח בערך שעה. חינמי בריפו ציבורי.
+
+name: "סימן: מנוע תמלול מדויק"
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  convert:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Make room on the machine
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+          sudo docker image prune --all --force > /dev/null 2>&1 || true
+          df -h /
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install the conversion tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          # the exact versions this conversion was tested with
+          pip install "transformers==4.57.6" "optimum==2.1.0" "optimum-onnx[onnxruntime]==0.1.0" "onnx==1.23.2" "onnxruntime==1.31.1" "onnxconverter-common==1.16.0" onnx_ir accelerate huggingface_hub
+
+      - name: Check the Hugging Face key
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          if [ -z "$HF_TOKEN" ]; then echo "::error::חסר HF_TOKEN בהגדרות הריפו (Settings → Secrets and variables → Actions)"; exit 1; fi
+          python -c "from huggingface_hub import HfApi; import os; print('Hugging Face user:', HfApi(token=os.environ['HF_TOKEN']).whoami()['name'])"
+
+      - name: Download ivrit.ai whisper-large-v3-turbo
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          python -c "from huggingface_hub import snapshot_download; snapshot_download('ivrit-ai/whisper-large-v3-turbo', local_dir='src', allow_patterns=['*.json','*.txt','*.safetensors'])"
+          ls -la src
+
+      - name: Convert to ONNX
+        run: |
+          optimum-cli export onnx --model src --task automatic-speech-recognition-with-past --opset 17 out
+          ls -la out
+          rm -rf src/*.safetensors
+          df -h /
+
+      - name: Make it small enough for a browser (16-bit and 4-bit)
+        run: |
+          mkdir -p web/onnx
+          cat > shrink.py << 'PY'
+          import os, onnx
+          from onnxconverter_common import float16
+          from onnxruntime.quantization.matmul_nbits_quantizer import MatMulNBitsQuantizer
+          SRC, DST = 'out', 'web/onnx'
+          def save(m, path):
+              onnx.save_model(m, path)
+              print('saved', path, round(os.path.getsize(path) / 1e6), 'MB', flush=True)
+          def q4(path_in, path_out):
+              m = onnx.load(path_in)
+              q = MatMulNBitsQuantizer(m, block_size=32, is_symmetric=True)
+              q.process()
+              save(q.model.model, path_out)
+          enc = os.path.join(SRC, 'encoder_model.onnx')
+          dec = os.path.join(SRC, 'decoder_model_merged.onnx')
+          # encoder: 16-bit (graphics cards with 16-bit support) and 4-bit (the others)
+          m = onnx.load(enc)
+          save(float16.convert_float_to_float16(m, keep_io_types=True, disable_shape_infer=True), os.path.join(DST, 'encoder_model_fp16.onnx'))
+          del m
+          q4(enc, os.path.join(DST, 'encoder_model_q4.onnx'))
+          # decoder: 4-bit
+          q4(dec, os.path.join(DST, 'decoder_model_merged_q4.onnx'))
+          PY
+          python shrink.py
+          # the settings the browser library needs, next to the model files
+          for f in config.json generation_config.json preprocessor_config.json tokenizer.json tokenizer_config.json vocab.json merges.txt added_tokens.json special_tokens_map.json normalizer.json; do
+            if [ -f "out/$f" ]; then cp "out/$f" web/; elif [ -f "src/$f" ]; then cp "src/$f" web/; fi
+          done
+          ls -la web web/onnx
+
+      - name: Publish to Hugging Face
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          cat > publish.py << 'PY'
+          import os, json, datetime
+          from huggingface_hub import HfApi
+          api = HfApi(token=os.environ['HF_TOKEN'])
+          user = api.whoami()['name']
+          repo = f'{user}/siman-ivrit-turbo'
+          open('web/README.md', 'w', encoding='utf-8').write(f'''---
+          license: apache-2.0
+          library_name: transformers.js
+          base_model: ivrit-ai/whisper-large-v3-turbo
+          language:
+          - he
+          pipeline_tag: automatic-speech-recognition
+          ---
+          # ivrit.ai whisper-large-v3-turbo, for the browser
+
+          [ivrit-ai/whisper-large-v3-turbo](https://huggingface.co/ivrit-ai/whisper-large-v3-turbo) in ONNX for
+          Transformers.js (WebGPU): encoder in 16-bit (`encoder_model_fp16.onnx`) and 4-bit (`encoder_model_q4.onnx`),
+          decoder in 4-bit (`decoder_model_merged_q4.onnx`). No retraining — a format conversion only.
+
+          All credit for the Hebrew model belongs to **ivrit.ai** (Apache-2.0). Used by the סימן app to transcribe
+          on the user's own device: audio never leaves it.
+          '''.replace('\n          ', '\n'))
+          api.create_repo(repo, repo_type='model', private=False, exist_ok=True)
+          api.upload_folder(folder_path='web', repo_id=repo, repo_type='model', commit_message='ivrit.ai turbo for the browser (סימן)')
+          size = lambda f: round(os.path.getsize(os.path.join('web/onnx', f)) / 1048576)
+          info = {'accurate': {
+              'id': repo,
+              'base': 'ivrit-ai/whisper-large-v3-turbo',
+              'mb': {'fp16': size('encoder_model_fp16.onnx') + size('decoder_model_merged_q4.onnx'),
+                     'q4': size('encoder_model_q4.onnx') + size('decoder_model_merged_q4.onnx')},
+              'updated': datetime.date.today().isoformat()}}
+          json.dump(info, open('siman-models.json', 'w', encoding='utf-8'), ensure_ascii=False, indent=2)
+          print(json.dumps(info, ensure_ascii=False, indent=2))
+          print(f'https://huggingface.co/{repo}')
+          PY
+          python publish.py
+
+      - name: Tell סימן where the engine is
+        run: |
+          git config user.name "siman-bot"
+          git config user.email "siman-bot@users.noreply.github.com"
+          git add siman-models.json
+          git commit -m "מנוע תמלול מדויק: siman-models.json" || echo "nothing to commit"
+          git push
