@@ -33,6 +33,7 @@ const KINDS = {
   voice: { label: 'הודעה קולית' },
   dictation: { label: 'הכתבה למסמך' },
 };
+const SPK = [['auto', 'זיהוי אוטומטי'], ['1', 'דובר אחד'], ['2', '2'], ['3', '3'], ['4', '4'], ['5', '5 ומעלה']];
 const PREF_KEY = 'siman.voice.prefs', OK_KEY = 'siman.voice.ok', CLOUD_KEY = 'siman.voice.cloud';
 
 /* ---------------- small helpers ---------------- */
@@ -167,6 +168,8 @@ async function decode16k(blob) {
   let mono = nc === 1 ? audio.getChannelData(0).slice() : new Float32Array(n);
   if (nc > 1) { for (let c = 0; c < nc; c++) { const ch = audio.getChannelData(c); for (let i = 0; i < n; i++) mono[i] += ch[i]; } for (let i = 0; i < n; i++) mono[i] /= nc; }
   mono = resample(mono, audio.sampleRate, SR);
+  // rumble, hum and wind under 80 Hz are removed: they only confuse the engine
+  { const a = 0.9695; let px = 0, py = 0; for (let i = 0; i < mono.length; i++) { const x = mono[i]; py = a * (py + x - px); px = x; mono[i] = py; } }
   // a quiet phone recording is brought up to a good level (peak ~90%)
   let peak = 0; for (let i = 0; i < mono.length; i += 7) { const v = Math.abs(mono[i]); if (v > peak) peak = v; }
   if (peak > 0.01 && peak < 0.9) { const g = Math.min(8, 0.9 / peak); for (let i = 0; i < mono.length; i++) mono[i] *= g; }
@@ -211,6 +214,43 @@ function plan(pcm) {
   }
   return out;
 }
+// each piece at a good level before the engine hears it (the far side of a phone call is often much quieter)
+function level(a) {
+  let pk = 0; for (let i = 0; i < a.length; i += 3) { const v = Math.abs(a[i]); if (v > pk) pk = v; }
+  if (pk > 0.004 && pk < 0.7) { const g = Math.min(10, 0.8 / pk); for (let i = 0; i < a.length; i++) a[i] *= g; }
+  return a;
+}
+// who spoke when (in the engine worker): 10-second windows, 5 seconds apart
+async function diarize(pcm, K, onProg) {
+  await ASR.call({ type: 'dz-begin' });
+  const W = 10 * SR, H = 5 * SR;
+  for (let o = 0, first = true; o < pcm.length; o += H, first = false) {
+    const last = o + W >= pcm.length;
+    const win = pcm.slice(o, Math.min(pcm.length, o + W));
+    await ASR.call({ type: 'dz-win', audio: win, offset: o / SR, first, last }, [win.buffer]);
+    if (onProg) onProg(Math.min(1, (o + W) / pcm.length));
+    if (last) break;
+  }
+  return ASR.call({ type: 'dz-end', speakers: K || 0 });
+}
+// the speaker turns become the lines: a long turn is cut at a pause, a turn is never mixed with another
+function partsFromTurns(pcm, turns) {
+  const E = energies(pcm), thr = threshold(E.filter((_, i) => i % 5 === 0));
+  const T = [];
+  for (const t of turns) { const p = T[T.length - 1]; if (p && p.spk === t.spk && t.s - p.e < 1 && t.e - p.s <= MAX_CHUNK) p.e = t.e; else T.push({ ...t }); }
+  const out = [];
+  for (const t of T) {
+    const a = Math.max(0, Math.floor(t.s * FPS) - 3), b = Math.min(E.length, Math.ceil(t.e * FPS) + 3);
+    let s0 = a;
+    while (s0 < b) {
+      let e0 = findCut(E, s0, b, thr, true); if (e0 <= s0) e0 = b;
+      const sp = speech(E, s0, e0, thr * 0.8);
+      if (sp) out.push({ s: sp[0] * F, e: sp[1] * F, spk: 'd' + t.spk });
+      s0 = e0;
+    }
+  }
+  return out;
+}
 // what the engine wrote: loops of the same words (a known Whisper habit) are cut down
 function clean(t, kind) {
   t = String(t || '').replace(/\s+/g, ' ').trim();
@@ -248,6 +288,8 @@ const ASR = (() => {
       return ready;
     },
     text: (pcm, lang) => ask({ type: 'run', audio: pcm, lang: lang || 'he' }, [pcm.buffer]),
+    call: (msg, tr) => ask(msg, tr),
+    dzLoad(progress) { onProg = progress || null; return ask({ type: 'dz-load' }); },
     stop() { if (!w) return; w.terminate(); w = null; ready = null; cur = ''; for (const p of wait.values()) p.rej(abortErr()); wait.clear(); },
   };
 })();
@@ -260,7 +302,7 @@ const JOB = { busy: false, queue: [], ctl: null };
 let V = null;              // the open transcript
 let audioEl = null, audioUrl = '';
 let saveT = 0;
-const prefs = Object.assign({ kind: 'lesson', lang: 'he' }, rd(PREF_KEY, {}));
+const prefs = Object.assign({ kind: 'lesson', lang: 'he', spk: 'auto' }, rd(PREF_KEY, {}));
 const save = (now) => { if (!V) return; clearTimeout(saveT); const go = () => { V.updated = Date.now(); DB.put(stripForDb(V)).catch(e => console.error(e)); }; if (now) go(); else saveT = setTimeout(go, 700); };
 const stripForDb = v => { const o = Object.assign({}, v); delete o.blob; return o; };
 
@@ -577,12 +619,21 @@ function renderNew() {
     </div>
     <div class="vx-set">
       <div class="vx-row"><span class="vx-lbl">מה יש בהקלטה?</span><div class="vx-seg" id="vxKind">${Object.entries(KINDS).map(([k, v]) => `<button data-k="${k}" aria-pressed="${prefs.kind === k}">${v.label}</button>`).join('')}</div></div>
+      <div class="vx-row"><span class="vx-lbl">כמה מדברים?</span><div class="vx-seg" id="vxSpkN">${SPK.map(([k, v]) => `<button data-n="${k}" aria-pressed="${String(prefs.spk) === k}">${v}</button>`).join('')}</div><span class="vx-hint" style="flex-basis:100%">מי שיודע כמה אנשים מדברים בהקלטה, עדיף לבחור: ההפרדה בין הדוברים מדויקת יותר.</span></div>
       <div class="vx-row"><label for="vxLang">שפת הדיבור</label><select id="vxLang">${Object.entries(LANG_NAMES).map(([k, v]) => `<option value="${k}"${prefs.lang === k ? ' selected' : ''}>${v}</option>`).join('')}</select></div>
       <div class="vx-row"><span class="vx-lbl">מנוע התמלול</span><span id="vxEng" class="vx-hint">בודק…</span></div>
     </div>
     <div class="vx-recent" id="vxRecent"></div>
   </div>`;
-  s.querySelectorAll('#vxKind button').forEach(b => b.onclick = () => { prefs.kind = b.dataset.k; wr(PREF_KEY, prefs); s.querySelectorAll('#vxKind button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); });
+  const setSpk = n => { prefs.spk = String(n); wr(PREF_KEY, prefs); s.querySelectorAll('#vxSpkN button').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.n === prefs.spk))); };
+  s.querySelectorAll('#vxSpkN button').forEach(b => b.onclick = () => setSpk(b.dataset.n));
+  s.querySelectorAll('#vxKind button').forEach(b => b.onclick = () => {
+    prefs.kind = b.dataset.k; wr(PREF_KEY, prefs); s.querySelectorAll('#vxKind button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+    // a voice message or dictation is one person; a call is usually two
+    if (prefs.kind === 'voice' || prefs.kind === 'dictation') setSpk('1');
+    else if (prefs.kind === 'call' && prefs.spk === '1') setSpk('2');
+    else if (prefs.spk === '1') setSpk('auto');
+  });
   s.querySelector('#vxLang').onchange = e => { prefs.lang = e.target.value; wr(PREF_KEY, prefs); engineRow(); };
   engineRow();
   DB.all().then(items => {
@@ -653,12 +704,12 @@ async function run() {
     finally { JOB.busy = false; JOB.ctl = null; }
   }
 }
-const STEPS = [['model', 'מכין את מנוע התמלול'], ['prep', 'קורא את השמע'], ['tx', 'מתמלל במכשיר']];
-function workScreen(name) {
+const STEPS = [['model', 'מכין את מנוע התמלול'], ['prep', 'קורא את השמע'], ['spk', 'מזהה מי מדבר'], ['tx', 'מתמלל במכשיר']];
+function workScreen(name, withSpk) {
   show('work');
   const s = root.querySelector('#vxWork');
   s.innerHTML = `<div class="vx-work"><h2>מתמלל</h2><div class="f">${esc(name)}</div>
-    <ul class="vx-steps">${STEPS.map(([k, t]) => `<li data-s="${k}"><i></i><span>${t}</span><small></small></li>`).join('')}</ul>
+    <ul class="vx-steps">${STEPS.filter(([k]) => k !== 'spk' || withSpk).map(([k, t]) => `<li data-s="${k}"><i></i><span>${t}</span><small></small></li>`).join('')}</ul>
     <div class="vx-live vx-wlive" id="vxWorkLive" dir="auto" data-empty="הטקסט יופיע כאן כשהתמלול יתחיל"></div>
     <p class="vx-hint" id="vxWorkHint">${ico.lock} השמע לא יוצא מהמכשיר. אפשר להמשיך לעבוד בסימן בינתיים, והתמליל יחכה בספרייה.</p>
     <button class="vx-btn" id="vxCancel">ביטול</button></div>`;
@@ -696,11 +747,12 @@ async function loadEngine(lang, k) {
 async function transcribeFile(file, opts) {
   const kind = opts.kind || prefs.kind;
   const lang = opts.lang || prefs.lang || 'he';
+  const spkMode = String(opts.spk || prefs.spk || 'auto');
   const id = opts.id || uid();
-  workScreen(file.name || 'הקלטה');
+  workScreen(file.name || 'הקלטה', spkMode !== '1');
   const item = {
     id, title: (file.name || 'הקלטה').replace(/\.[a-z0-9]+$/i, ''), fileName: file.name || '', created: opts.created || Date.now(), updated: Date.now(),
-    kind, lang, duration: opts.duration || null, segments: [], speakers: {}, analysis: null, tr: {}, chat: [], tasksDone: {}, status: 'working', engine: 'local',
+    kind, lang, spk: spkMode, duration: opts.duration || null, segments: [], speakers: {}, analysis: null, tr: {}, chat: [], tasksDone: {}, status: 'working', engine: 'local',
   };
   const sig = JOB.ctl.signal;
   try {
@@ -714,8 +766,27 @@ async function transcribeFile(file, opts) {
     step('prep', 'now');
     const pcm = await decode16k(file);
     item.duration = pcm.length / SR;
-    const parts = plan(pcm);
     step('prep', 'done', longDur(item.duration));
+    // who spoke when (on the device); if it fails, the transcript is still made, as one speaker
+    let parts = null;
+    if (spkMode !== '1' && item.duration > 4) {
+      step('spk', 'now');
+      try {
+        const files = {};
+        await ASR.dzLoad(p => { files[p.file] = p; const { l, t } = progressSum(files); if (t > 2e6 && l < t) { bar('spk', l / t); step('spk', 'now', 'הורדה חד-פעמית ' + mb(l) + ' מתוך ' + mb(t)); } });
+        const K = spkMode === 'auto' ? 0 : +spkMode;
+        const r = await diarize(pcm, K, f => { bar('spk', f); step('spk', 'now', Math.round(f * 100) + '%'); });
+        if (sig.aborted) throw abortErr();
+        if (r.turns && r.turns.length) parts = partsFromTurns(pcm, r.turns);
+        step('spk', 'done', r.speakers === 1 ? 'דובר אחד' : r.speakers + ' דוברים');
+      } catch (err) {
+        if (err.name === 'AbortError') throw err;
+        console.warn('speakers', err); step('spk', '', 'לא הצליח, ממשיך בלי');
+        if (!item.errorInfo) item.dzError = String(err && err.message || err);
+      }
+      const b = root.querySelector('#vxWork li[data-s="spk"] .vx-bar'); if (b) b.remove();
+    }
+    if (!parts || !parts.length) parts = plan(pcm);
     if (!parts.length) throw new Error('לא נשמע דיבור בהקלטה');
     // 3. part by part; the text shows up as it is written
     step('tx', 'now', '0%');
@@ -724,9 +795,9 @@ async function transcribeFile(file, opts) {
     for (let k = 0; k < parts.length; k++) {
       if (sig.aborted) throw abortErr();
       const p = parts[k];
-      const r = await ASR.text(pcm.slice(p.s, p.e), lang);
+      const r = await ASR.text(level(pcm.slice(p.s, p.e)), lang);
       const text = clean(r.text, kind);
-      if (text) { item.segments.push({ spk: 'spk_1', start: p.s / SR, end: p.e / SR, text }); liveLine(text); }
+      if (text) { item.segments.push({ spk: p.spk || 'spk_1', start: p.s / SR, end: p.e / SR, text }); liveLine(text); }
       done += (p.e - p.s) / SR;
       const spent = (Date.now() - t0) / 1000;
       bar('tx', done / total);
@@ -770,7 +841,7 @@ async function retry(id) {
   const it = await DB.get(id), blob = await DB.getAudio(id);
   if (!blob) { say('השמע של התמליל הזה לא נשמר'); return; }
   const f = blob instanceof File ? blob : new File([blob], (it && it.fileName) || 'הקלטה.webm', { type: blob.type });
-  JOB.queue.push({ file: f, opts: { id, kind: it && it.kind, lang: it && it.lang, created: it && it.created } });
+  JOB.queue.push({ file: f, opts: { id, kind: it && it.kind, lang: it && it.lang, created: it && it.created, spk: it && it.spk } });
   if (!JOB.busy) run();
 }
 // labels in order of appearance: spk_1, spk_2…
@@ -1211,10 +1282,12 @@ function recReady() {
   s.innerHTML = `<div class="vx-rec"><div class="tm" aria-hidden="true">0:00</div><div class="st">מוכן להקליט</div>
     <div class="ctl" style="margin:26px 0 8px"><button class="big" id="vxRecGo" title="התחלת הקלטה" aria-label="התחלת הקלטה">${ico.mic}</button></div>
     <p style="font-weight:700;margin:6px 0 18px">התחלת הקלטה</p>
+    <div class="vx-row" style="justify-content:center;gap:8px;margin-bottom:8px"><label for="vxRecSpk" class="vx-hint">כמה מדברים?</label><select id="vxRecSpk" class="vx-btn sm">${SPK.map(([k, v]) => `<option value="${k}"${String(prefs.spk) === k ? ' selected' : ''}>${v}</option>`).join('')}</select></div>
     <div class="vx-row" style="justify-content:center;gap:8px"><label for="vxRecLang" class="vx-hint">שפת הדיבור</label><select id="vxRecLang" class="vx-btn sm">${Object.entries(LANG_NAMES).map(([k, v]) => `<option value="${k}"${(prefs.lang || 'he') === k ? ' selected' : ''}>${v}</option>`).join('')}</select></div>
     <p class="vx-hint" style="margin-top:18px">${ico.lock} ההקלטה והתמלול נשארים במכשיר. כדאי להניח את הטלפון קרוב למי שמדבר.</p>
     <button class="vx-btn" id="vxRecBack" style="margin-top:6px">חזרה</button></div>`;
   s.querySelector('#vxRecLang').onchange = e => { prefs.lang = e.target.value; wr(PREF_KEY, prefs); };
+  s.querySelector('#vxRecSpk').onchange = e => { prefs.spk = e.target.value; wr(PREF_KEY, prefs); };
   s.querySelector('#vxRecGo').onclick = startRec;
   s.querySelector('#vxRecBack').onclick = () => show('new');
 }
@@ -1227,7 +1300,7 @@ async function startRec() {
   const types = ['audio/webm;codecs=opus', 'audio/ogg;codecs=opus', 'audio/mp4', 'audio/webm'];
   REC.mime = types.find(t => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)) || '';
   REC.mr = new MediaRecorder(REC.stream, REC.mime ? { mimeType: REC.mime, audioBitsPerSecond: 48000 } : undefined);
-  Object.assign(REC, { chunks: [], acc: 0, pend: [], pendLen: 0, off: 0, floor: [], segs: [], chain: Promise.resolve(), engineOk: false, cancel: false, lang: prefs.lang || 'he', kind: prefs.kind });
+  Object.assign(REC, { chunks: [], acc: 0, pend: [], pendLen: 0, off: 0, floor: [], segs: [], chain: Promise.resolve(), engineOk: false, cancel: false, abandon: false, lang: prefs.lang || 'he', kind: prefs.kind, spk: String(prefs.spk || 'auto') });
   REC.mr.ondataavailable = e => { if (e.data && e.data.size) REC.chunks.push(e.data); };
   REC.mr.onstop = finishRec;
   show('rec');
@@ -1235,6 +1308,7 @@ async function startRec() {
   s.innerHTML = `<div class="vx-rec"><div class="tm" id="vxRecT">0:00</div><div class="st" id="vxRecS">מקליט</div><canvas id="vxRecC"></canvas>
     <div class="ctl"><button class="vx-btn" id="vxRecP">השהיה</button><button class="big" id="vxRecStop" title="סיום" aria-label="סיום ההקלטה">${ico.stop}</button><button class="vx-btn" id="vxRecX">ביטול</button></div>
     <div class="vx-live" id="vxLive" dir="auto" data-empty="הטקסט נכתב כאן תוך כדי ההקלטה, בתוך המכשיר."></div>
+    ${String(prefs.spk) !== '1' ? '<p class="vx-hint">הטקסט כאן הוא טיוטה מהירה. בסוף ההקלטה נכתב התמליל המלא, עם הפרדה בין הדוברים.</p>' : ''}
     <p class="vx-hint" id="vxRecE"></p>
     <p class="vx-hint">${ico.lock} ההקלטה והתמלול נשארים במכשיר. המסך יישאר דלוק בזמן ההקלטה. כדאי להניח את הטלפון קרוב למי שמדבר.</p></div>`;
   s.querySelector('#vxRecStop').onclick = stopRec;
@@ -1303,7 +1377,7 @@ function liveCut(final) {
   if (sp) {
     const audio = piece.slice(sp[0] * F, sp[1] * F), start = (base + sp[0] * F) / SR, end = (base + sp[1] * F) / SR;
     REC.chain = REC.chain.then(async () => {
-      await REC.engine; if (!REC.engineOk) return;
+      await REC.engine; if (!REC.engineOk || REC.abandon) return;
       const r = await ASR.text(audio, REC.lang);
       const text = clean(r.text, REC.kind);
       if (!text) return;
@@ -1333,13 +1407,13 @@ async function finishRec() {
   const f = new File(chunks, name, { type: mime.split(';')[0] });
   count('voice_record');
   // the engine never loaded (e.g. no internet the first time): the file is transcribed later, like any file
-  if (!REC.engineOk) { JOB.queue.push({ file: f, opts: { duration: REC.dur || null, kind: REC.kind, lang: REC.lang } }); if (!JOB.busy) run(); return; }
+  if (!REC.engineOk || REC.spk !== '1') { REC.abandon = true; REC.pend = []; REC.pendLen = 0; JOB.queue.push({ file: f, opts: { duration: REC.dur || null, kind: REC.kind, lang: REC.lang, spk: REC.spk } }); if (!JOB.busy) run(); return; }
   liveCut(true);
   show('work');
   const w = root.querySelector('#vxWork');
   w.innerHTML = `<div class="vx-work"><h2>מסיים לתמלל</h2><div class="f">${esc(name)}</div><div class="vx-wait" style="justify-content:center"><i></i>כותב את המשפטים האחרונים…</div></div>`;
   await REC.chain;
-  if (!REC.segs.length && (REC.dur || 0) > 3) { JOB.queue.push({ file: f, opts: { duration: REC.dur || null, kind: REC.kind, lang: REC.lang } }); if (!JOB.busy) run(); return; }
+  if (!REC.segs.length && (REC.dur || 0) > 3) { JOB.queue.push({ file: f, opts: { duration: REC.dur || null, kind: REC.kind, lang: REC.lang, spk: REC.spk } }); if (!JOB.busy) run(); return; }
   const id = uid();
   const segs = normalize(REC.segs.sort((a, b) => a.start - b.start));
   const item = { id, title: name.replace(/\.[a-z0-9]+$/i, ''), fileName: name, created: Date.now(), updated: Date.now(), kind: REC.kind, lang: REC.lang, duration: REC.dur || null,

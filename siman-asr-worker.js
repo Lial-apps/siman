@@ -4,7 +4,7 @@
 //   שפות אחרות: Whisper small (Xenova/whisper-small)
 // הקבצים נשמרים במטמון של הדפדפן ("transformers-cache"), ואחר כך התמלול עובד גם בלי אינטרנט.
 // הספרייה: transformers.min.js (Transformers.js 4.3.1), מונחת ליד האפליקציה.
-import { env, AutoTokenizer, AutoProcessor, WhisperForConditionalGeneration, pipeline } from './transformers.min.js';
+import { env, AutoTokenizer, AutoProcessor, WhisperForConditionalGeneration, pipeline, AutoModelForAudioFrameClassification, AutoModel, AutoFeatureExtractor } from './transformers.min.js';
 
 env.allowLocalModels = false;
 env.useBrowserCache = true;
@@ -111,6 +111,8 @@ async function handle(m) {
     if (m.type === 'load') {
       const e = await load(m.engine);
       postMessage({ id: m.id, device: e.device, host: await pickHost() });
+    } else if (/^dz-/.test(m.type)) {
+      postMessage(Object.assign({ id: m.id }, await dzHandle(m)));
     } else if (m.type === 'run') {
       const key = (m.lang || 'he') === 'he' ? 'he' : 'multi';
       const e = await load(key);
@@ -127,6 +129,162 @@ async function handle(m) {
   } catch (err) {
     postMessage({ id: m.id, error: String((err && err.message) || err) });
   }
+}
+
+/* ---------------- who spoke when: speaker separation, also on this device ----------------
+   pyannote segmentation-3.0 (MIT) finds up to 3 voices inside every 10-second window (5-second steps);
+   WeSpeaker ResNet34 (voxceleb, CC-BY-4.0) gives each voice a "voiceprint"; voiceprints that are alike are
+   joined into one speaker across the whole recording. About 32MB, downloaded once like the main engine. */
+const DZ = { seg: 'onnx-community/pyannote-segmentation-3.0', emb: 'onnx-community/wespeaker-voxceleb-resnet34-LM' };
+let D = null;          // { seg, segProc, emb, embProc }
+let DS = null;         // the recording being separated: windows and voiceprints
+async function dzLoad() {
+  if (D) return D;
+  await pickHost();
+  const [seg, segProc, emb, embProc] = await Promise.all([
+    AutoModelForAudioFrameClassification.from_pretrained(DZ.seg, { device: 'wasm', dtype: 'fp32', progress_callback: progress }),
+    AutoProcessor.from_pretrained(DZ.seg, { progress_callback: progress }),
+    AutoModel.from_pretrained(DZ.emb, { device: 'wasm', dtype: 'fp32', progress_callback: progress }),
+    AutoFeatureExtractor.from_pretrained(DZ.emb, { progress_callback: progress }),
+  ]);
+  D = { seg, segProc, emb, embProc };
+  return D;
+}
+const softmaxRow = (a, o, n, out) => { let m = -Infinity; for (let i = 0; i < n; i++) if (a[o + i] > m) m = a[o + i]; let s = 0; for (let i = 0; i < n; i++) { out[i] = Math.exp(a[o + i] - m); s += out[i]; } for (let i = 0; i < n; i++) out[i] /= s; };
+// the 7 classes of segmentation-3.0: none, A, B, C, A+B, A+C, B+C
+const HAS = [[], [0], [1], [2], [0, 1], [0, 2], [1, 2]];
+async function voiceprint(audio) {
+  const inp = await D.embProc(audio);
+  const out = await D.emb(inp);
+  const t = out.embeddings || out.last_hidden_state || out.pooler_output || Object.values(out)[0];
+  const v = Float32Array.from(t.data);
+  let n = 0; for (const x of v) n += x * x; n = Math.sqrt(n) || 1;
+  for (let i = 0; i < v.length; i++) v[i] /= n;
+  return v;
+}
+async function dzWindow(audio, offset, first, last) {
+  const { logits } = await D.seg(await D.segProc(audio));
+  const [, F, C] = logits.dims, L = logits.data;
+  const fd = audio.length / F / SR;                 // seconds per frame
+  const act = [new Float32Array(F), new Float32Array(F), new Float32Array(F)], lab = new Int8Array(F), p = new Float32Array(C);
+  for (let f = 0; f < F; f++) {
+    softmaxRow(L, f * C, C, p);
+    let best = 0; for (let c = 1; c < C; c++) if (p[c] > p[best]) best = c;
+    lab[f] = best;
+    for (let c = 1; c < C; c++) for (const k of HAS[c]) act[k][f] += p[c];
+  }
+  const w = { offset, fd, F, act, local: [null, null, null], runs: [] };
+  // a voiceprint for each voice heard alone for at least 0.6 s in this window
+  for (let k = 0; k < 3; k++) {
+    const parts = []; let n = 0;
+    for (let f = 0; f < F; f++) if (lab[f] === 1 + k && act[k][f] > 0.5) { const a = Math.floor(f * fd * SR), b = Math.floor((f + 1) * fd * SR); parts.push([a, b]); n += b - a; }
+    if (n >= 0.6 * SR) {
+      const buf = new Float32Array(Math.min(n, 6 * SR)); let o = 0;
+      for (const [a, b] of parts) { if (o >= buf.length) break; const take = Math.min(b - a, buf.length - o); buf.set(audio.subarray(a, a + take), o); o += take; }
+      try { w.local[k] = { v: await voiceprint(buf), sec: n / SR }; } catch (e) { console.warn('voiceprint', e); }
+    }
+  }
+  // what this window decides: its middle 5 seconds (the edges belong to the neighbouring windows)
+  const c0 = first ? 0 : 2.5, c1 = last ? Infinity : 7.5;
+  let cur = null;
+  for (let f = 0; f < F; f++) {
+    const t = f * fd; if (t < c0 || t >= c1) { cur = null; continue; }
+    let k = -1, m = 0.5; for (let j = 0; j < 3; j++) if (act[j][f] > m) { m = act[j][f]; k = j; }
+    if (cur && cur.k === k) cur.e = offset + (f + 1) * fd;
+    else { cur = { k, s: offset + f * fd, e: offset + (f + 1) * fd }; w.runs.push(cur); }
+  }
+  w.runs = w.runs.filter(r => r.k >= 0);
+  DS.windows.push(w);
+}
+const dot = (a, b) => { let s = 0; for (let i = 0; i < a.length; i++) s += a[i] * b[i]; return s; };
+function clusterAll(K) {
+  const items = [];
+  DS.windows.forEach((w, wi) => w.local.forEach((l, k) => { if (l) items.push({ wi, k, v: l.v, sec: l.sec }); }));
+  if (!items.length) return new Map();
+  // 1. very similar voiceprints are joined first (keeps the next step small)
+  let C = [];
+  for (const it of items) {
+    let best = null, bs = 0.72;
+    for (const c of C) { const s = dot(c.n, it.v); if (s > bs) { bs = s; best = c; } }
+    if (!best) { C.push({ sum: Float32Array.from(it.v, x => x * it.sec), sec: it.sec, n: it.v, items: [it] }); continue; }
+    for (let i = 0; i < it.v.length; i++) best.sum[i] += it.v[i] * it.sec;
+    best.sec += it.sec; best.items.push(it);
+    let nn = 0; for (const x of best.sum) nn += x * x; nn = Math.sqrt(nn) || 1; best.n = best.sum.map(x => x / nn);
+  }
+  // 2. then the most alike groups are joined, until the number of speakers asked for — or, when not given,
+  //    until the closest two are clearly different voices (pyannote's threshold for this voiceprint model)
+  const T = 0.30;
+  const merge = (a, b) => { for (let i = 0; i < a.sum.length; i++) a.sum[i] += b.sum[i]; a.sec += b.sec; a.items.push(...b.items); let nn = 0; for (const x of a.sum) nn += x * x; nn = Math.sqrt(nn) || 1; a.n = a.sum.map(x => x / nn); };
+  // (a table of how alike every two groups are; after each join only one row is worked out again)
+  const N = C.length, S = new Float32Array(N * N), alive = new Uint8Array(N).fill(1);
+  for (let i = 0; i < N; i++) for (let j = i + 1; j < N; j++) S[i * N + j] = S[j * N + i] = dot(C[i].n, C[j].n);
+  let left = N;
+  while (left > 1) {
+    let bi = -1, bj = -1, bs = -2;
+    for (let i = 0; i < N; i++) if (alive[i]) for (let j = i + 1; j < N; j++) if (alive[j] && S[i * N + j] > bs) { bs = S[i * N + j]; bi = i; bj = j; }
+    if (K ? left <= K : bs < T) break;
+    merge(C[bi], C[bj]); alive[bj] = 0; left--;
+    for (let j = 0; j < N; j++) if (alive[j] && j !== bi) S[bi * N + j] = S[j * N + bi] = dot(C[bi].n, C[j].n);
+  }
+  C = C.filter((_, i) => alive[i]);
+  // 3. without a given number: a "speaker" with very little speech is joined to the closest one
+  if (!K) {
+    const total = C.reduce((a, c) => a + c.sec, 0);
+    C.sort((a, b) => b.sec - a.sec);
+    for (let i = C.length - 1; i > 0; i--) if (C[i].sec < total * 0.04 || C[i].sec < 4) {
+      let bj = 0, bs = -2; for (let j = 0; j < i; j++) { const s = dot(C[i].n, C[j].n); if (s > bs) { bs = s; bj = j; } }
+      merge(C[bj], C[i]); C.splice(i, 1);
+    }
+  }
+  const map = new Map();
+  C.forEach((c, ci) => c.items.forEach(it => map.set(it.wi + ':' + it.k, ci)));
+  return map;
+}
+// a voice with no voiceprint in its window: the voice it overlaps in the window before (or after)
+function linkByOverlap(map) {
+  const W = DS.windows;
+  const corr = (wa, ka, wb, kb, aFrom) => { // wa's frames from aFrom, against wb's frames from 0
+    const A = W[wa].act[ka], B = W[wb].act[kb], n = Math.min(A.length - aFrom, B.length);
+    let s = 0; for (let i = 0; i < n; i++) s += A[aFrom + i] * B[i]; return s / Math.max(1, n);
+  };
+  for (let pass = 0; pass < 2; pass++) for (let wi = 0; wi < W.length; wi++) for (let k = 0; k < 3; k++) {
+    const key = wi + ':' + k; if (map.has(key)) continue;
+    if (!W[wi].runs.some(r => r.k === k)) continue;
+    let best = null, bs = 0.2;
+    if (wi > 0) { const half = Math.floor(W[wi - 1].F / 2); for (let j = 0; j < 3; j++) { const m = map.get((wi - 1) + ':' + j); if (m == null) continue; const s = corr(wi - 1, j, wi, k, half); if (s > bs) { bs = s; best = m; } } }
+    if (wi + 1 < W.length) { const half = Math.floor(W[wi].F / 2); for (let j = 0; j < 3; j++) { const m = map.get((wi + 1) + ':' + j); if (m == null) continue; const s = corr(wi, k, wi + 1, j, half); if (s > bs) { bs = s; best = m; } } }
+    if (best != null) map.set(key, best);
+  }
+}
+function dzEnd(K) {
+  const map = clusterAll(K);
+  linkByOverlap(map);
+  let turns = [];
+  DS.windows.forEach((w, wi) => w.runs.forEach(r => { const c = map.get(wi + ':' + r.k); if (c != null) turns.push({ s: r.s, e: r.e, spk: c }); }));
+  turns.sort((a, b) => a.s - b.s);
+  // smoothing: same speaker across a short gap is one turn; a flicker under 0.4 s goes to its neighbour
+  const out = [];
+  for (const t of turns) { const p = out[out.length - 1]; if (p && p.spk === t.spk && t.s - p.e < 0.5) p.e = Math.max(p.e, t.e); else out.push({ ...t }); }
+  for (let i = 0; i < out.length; i++) {
+    const t = out[i]; if (t.e - t.s >= 0.4 || out.length < 2) continue;
+    const p = out[i - 1], n = out[i + 1];
+    const to = p && n ? ((p.e - p.s) >= (n.e - n.s) ? p : n) : (p || n);
+    if (to === p) p.e = Math.max(p.e, t.e); else { n.s = Math.min(n.s, t.s); }
+    out.splice(i, 1); i--;
+  }
+  const merged = [];
+  for (const t of out) { const p = merged[merged.length - 1]; if (p && p.spk === t.spk && t.s - p.e < 0.8) p.e = Math.max(p.e, t.e); else merged.push(t); }
+  const order = new Map(); merged.forEach(t => { if (!order.has(t.spk)) order.set(t.spk, order.size); t.spk = order.get(t.spk); });
+  const n = order.size;
+  DS = null;
+  return { turns: merged.map(t => ({ s: +t.s.toFixed(3), e: +t.e.toFixed(3), spk: t.spk })), speakers: n };
+}
+async function dzHandle(m) {
+  if (m.type === 'dz-load') { await dzLoad(); return {}; }
+  if (m.type === 'dz-begin') { await dzLoad(); DS = { windows: [] }; return {}; }
+  if (m.type === 'dz-win') { await dzWindow(m.audio, m.offset, !!m.first, !!m.last); return {}; }
+  if (m.type === 'dz-end') return dzEnd(m.speakers ? +m.speakers : 0);
+  return null;
 }
 
 // one job at a time: the model is not run twice in parallel
