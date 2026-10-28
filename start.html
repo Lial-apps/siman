@@ -4,11 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>סימן – חותמים, מסמנים, מתרגמים ושולחים מסמכים</title>
-<meta name="description" content="סימן: חותמים וממלאים טפסים, מסמנים ומתקנים טקסט, מתרגמים ושומרים על העיצוב, ממירים PDF לוורד ושולחים בוואטסאפ. PDF, וורד ואקסל, בעברית מלאה.">
+<meta name="description" content="סימן: חותמים וממלאים טפסים, אוספים חתימות בקישור, מסמנים ומתקנים טקסט, מתרגמים, מתמללים שיחות והקלטות, הופכים צילום של דף למסמך ושולחים בוואטסאפ. PDF, וורד, אקסל ופאוורפוינט, בעברית מלאה.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://siman.siman-app.workers.dev/start.html">
 <meta property="og:title" content="סימן – כל מה שעושים עם מסמך, באפליקציה אחת">
-<meta property="og:description" content="חותמים, מסמנים, מתקנים, מתרגמים ושולחים. PDF, וורד ואקסל, בעברית מלאה. כרגע בחינם.">
+<meta property="og:description" content="חותמים, מסמנים, מתקנים, מתרגמים, מתמללים ושולחים. PDF, וורד, אקסל ופאוורפוינט, בעברית מלאה. כרגע בחינם.">
 <meta property="og:image" content="https://siman.siman-app.workers.dev/siman-share.jpg">
 <meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
@@ -56,6 +56,7 @@ h2{font-weight:800;font-size:clamp(1.8rem,3.6vw,2.6rem);line-height:1.15;letter-
 .feat{border:1.5px solid var(--line);border-radius:20px;padding:22px 22px 24px;background:#fff}
 .feat h3{font-size:21px;font-weight:700;margin-top:18px}
 .feat p{color:var(--ink2);margin-top:6px;font-size:17px}
+.more{margin-top:28px;color:var(--ink2);font-size:17px;max-width:70ch}
 .mini{height:128px;border-radius:14px;background:var(--wash);position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center}
 .sheet{width:150px;height:104px;background:#fff;border-radius:8px;box-shadow:0 6px 14px rgba(19,35,58,.12);padding:14px 14px;position:relative}
 .sheet i{display:block;height:7px;border-radius:4px;background:#D3DDE9;margin-bottom:9px}
@@ -110,8 +111,8 @@ footer a{color:var(--sky-d)}
 <section class="hero"><div class="wrap">
  <div>
   <h1>כל מה שעושים עם מסמך, באפליקציה אחת.</h1>
-  <p class="lead">חותמים, ממלאים, מסמנים, מתקנים, מתרגמים ושולחים. PDF, וורד ואקסל, בעברית מלאה, בטלפון ובמחשב.</p>
-  <div class="verbs" aria-label="מה עושים בסימן"><span>חתימה</span><span>מילוי טפסים</span><span>מרקר והערות</span><span>תיקון טקסט</span><span>תרגום</span><span>איחוד ופיצול</span><span>PDF לוורד</span><span>שליחה בוואטסאפ</span></div>
+  <p class="lead">חותמים, מסמנים, מתקנים, מתרגמים, מתמללים ושולחים. PDF, וורד, אקסל ופאוורפוינט, בעברית מלאה, בטלפון ובמחשב.</p>
+  <div class="verbs" aria-label="מה עושים בסימן"><span>חתימה</span><span>מילוי טפסים</span><span>מרקר והערות</span><span>תיקון טקסט</span><span>תרגום</span><span>איחוד ופיצול</span><span>תמלול שיחות</span><span>צילום למסמך</span><span>PDF לוורד</span><span>שליחה בוואטסאפ</span></div>
   <div class="ctas">
    <a class="btn btn-main" href="https://siman.siman-app.workers.dev/">לפתוח את סימן בחינם</a>
    <a class="btn btn-soft" href="#install">להתקנה בטלפון או במחשב</a>
@@ -125,40 +126,65 @@ footer a{color:var(--sky-d)}
 </div></section>
 
 <section class="block" id="features"><div class="wrap">
- <h2>שש פעולות שחוסכות לכם מדפסת</h2>
- <p class="sub">כל מה שהייתם מדפיסים, סורקים או שולחים למישהו אחר לסדר, עושים עכשיו לבד, מהטלפון או מהמחשב.</p>
+ <h2>כל מה שסימן יודע לעשות</h2>
+ <p class="sub">כל מה שהייתם מדפיסים, סורקים, מקלידים מחדש או שולחים למישהו אחר לסדר, עושים עכשיו לבד, מהטלפון או מהמחשב.</p>
  <div class="grid">
   <article class="feat">
    <div class="mini"><div class="sheet"><i></i><i style="width:70%"></i><svg viewBox="0 0 300 100" width="118" height="40" aria-hidden="true"><path d="M14 70 C 30 20, 46 18, 50 52 S 66 90, 80 50 S 104 18, 112 54 C 118 80, 130 74, 140 48 C 150 26, 160 40, 158 60 C 156 78, 176 72, 190 46 S 220 30, 230 56 C 236 70, 252 66, 286 40" fill="none" stroke="#13233A" stroke-width="7" stroke-linecap="round"/></svg></div></div>
    <h3>חותמים וממלאים טפסים</h3><p>ממלאים שדות, מסמנים וי וחותמים באצבע או בעכבר. בלי מדפסת ובלי סורק.</p>
   </article>
   <article class="feat">
+   <div class="mini"><div style="text-align:center"><div class="chip">חתמו <b style="color:var(--green)">26</b> מתוך 28</div><div style="width:150px;height:9px;border-radius:5px;background:#fff;margin:12px auto 0;overflow:hidden"><i style="display:block;width:93%;height:100%;background:var(--green)"></i></div></div></div>
+   <h3>אוספים חתימות בקישור</h3><p>קישור אישי לכל חותם, או קישור אחד לכל הקבוצה, למשל להורים בכיתה. רואים מי כבר חתם.</p>
+  </article>
+  <article class="feat">
    <div class="mini"><div class="sheet"><i></i><i class="hl"></i><i style="width:60%"></i><i></i><svg style="position:absolute;top:44px;right:30px" width="64" height="26" aria-hidden="true"><ellipse cx="32" cy="13" rx="29" ry="10" fill="none" stroke="#D9443A" stroke-width="3"/></svg></div></div>
    <h3>מסמנים, כותבים ומתקנים</h3><p>מרקר, עט והערות בעברית. משנים מילה או מספר, והטקסט המקורי באמת מוחלף.</p>
   </article>
   <article class="feat">
-   <div class="mini"><span class="chip">שלום</span><span class="arrow" aria-hidden="true">←</span><span class="chip" dir="ltr">Hello</span></div>
-   <h3>מתרגמים ושומרים על העיצוב</h3><p>לעברית, לאנגלית ולעוד שפות. התרגום נכנס למקום המקורי, והעיצוב נשאר כמו שהיה.</p>
+   <div class="mini"><span class="chip">שלום</span><span class="arrow" aria-hidden="true">←</span><span class="chip" dir="ltr">Hello</span><span class="chip" dir="ltr" style="margin-right:6px">Привет</span></div>
+   <h3>מתרגמים ושומרים על העיצוב</h3><p>לעברית, לאנגלית, לרוסית, לערבית, לצרפתית ולספרדית. התרגום נכנס למקום המקורי, והעיצוב נשאר.</p>
   </article>
   <article class="feat">
-   <div class="mini"><div class="pg">1</div><div class="pg" style="transform:translateY(-12px) rotate(-4deg)">4</div><div class="pg">2</div><div class="pg">3</div></div>
-   <h3>מאחדים, מפצלים ומסדרים</h3><p>גוררים עמודים למקום, מחברים כמה קבצים לאחד, ומפצלים קובץ גדול לכמה קטנים.</p>
+   <div class="mini"><div style="display:flex;align-items:center;gap:3px;height:46px"><i style="display:block;width:5px;height:12px;border-radius:3px;background:var(--sky)"></i><i style="display:block;width:5px;height:26px;border-radius:3px;background:var(--sky)"></i><i style="display:block;width:5px;height:40px;border-radius:3px;background:var(--sky)"></i><i style="display:block;width:5px;height:22px;border-radius:3px;background:var(--sky)"></i><i style="display:block;width:5px;height:34px;border-radius:3px;background:var(--sky)"></i><i style="display:block;width:5px;height:16px;border-radius:3px;background:var(--sky)"></i><i style="display:block;width:5px;height:44px;border-radius:3px;background:var(--sky)"></i><i style="display:block;width:5px;height:28px;border-radius:3px;background:var(--sky)"></i><i style="display:block;width:5px;height:18px;border-radius:3px;background:var(--sky)"></i><i style="display:block;width:5px;height:36px;border-radius:3px;background:var(--sky)"></i><i style="display:block;width:5px;height:24px;border-radius:3px;background:var(--sky)"></i><i style="display:block;width:5px;height:14px;border-radius:3px;background:var(--sky)"></i><i style="display:block;width:5px;height:30px;border-radius:3px;background:var(--sky)"></i><i style="display:block;width:5px;height:42px;border-radius:3px;background:var(--sky)"></i><i style="display:block;width:5px;height:20px;border-radius:3px;background:var(--sky)"></i><i style="display:block;width:5px;height:12px;border-radius:3px;background:var(--sky)"></i></div><span class="arrow" aria-hidden="true">←</span><span class="chip">התמליל</span></div>
+   <h3>מתמללים שיחות והקלטות</h3><p>שיחות, שיעורים, ישיבות והודעות קוליות מוואטסאפ. הדוברים מופרדים, והתמליל נפתח כקובץ וורד. ההקלטה לא יוצאת מהמכשיר.</p>
+  </article>
+  <article class="feat">
+   <div class="mini"><div class="sheet" style="width:84px;height:100px;background:#EDE5D3;transform:rotate(-8deg)"><i style="background:#8b826f"></i><i style="background:#8b826f;width:70%"></i><i style="background:#8b826f"></i></div><span class="arrow" aria-hidden="true">←</span><div class="sheet" style="width:84px;height:100px"><span class="tag" style="background:#2B5CC9">וורד</span><i></i><i style="width:70%"></i><i></i></div></div>
+   <h3>מצלמים דף ומקבלים מסמך</h3><p>צילום או סריקה של דף, מודפס או כתוב, הופכים למסמך וורד או PDF מסודר. זיהוי טקסט בעברית ובאנגלית.</p>
+  </article>
+  <article class="feat">
+   <div class="mini"><div class="chip" style="max-width:190px;line-height:1.4">עד מתי צריך להגיש?</div></div>
+   <h3>שואלים את המסמך</h3><p>עוזר חכם עונה על שאלות עם הפניה לסעיף, ומקריא את המסמך בקול.</p>
+  </article>
+  <article class="feat">
+   <div class="mini"><span class="tag" style="position:static;background:#2B5CC9;margin:0 4px">וורד</span><span class="tag" style="position:static;background:#1E8A4C;margin:0 4px">אקסל</span><span class="tag" style="position:static;background:#C2410C;margin:0 4px">פאוורפוינט</span></div>
+   <h3>וורד, אקסל ופאוורפוינט</h3><p>עורכים קבצי אופיס, ואומרים לעוזר מה לעשות, בכתיבה או בקול: "הכן לי כותרת". מצגת שלא נפתחת? סימן מנסה לתקן אותה.</p>
   </article>
   <article class="feat">
    <div class="mini"><div class="sheet" style="width:92px"><span class="tag" style="background:var(--red)">PDF</span><i></i><i></i><i style="width:60%"></i></div><span class="arrow" aria-hidden="true">←</span><div class="sheet" style="width:92px"><span class="tag" style="background:#2B5CC9">וורד</span><i></i><i></i><i style="width:60%"></i></div></div>
-   <h3>ממירים PDF לוורד</h3><p>הופכים PDF לקובץ וורד וממשיכים לערוך אותו כמו מסמך רגיל.</p>
+   <h3>ממירים PDF לקבצים עריכים</h3><p>לוורד, לאקסל או לפאוורפוינט, ובוחרים בדיוק אילו עמודים להמיר.</p>
+  </article>
+  <article class="feat">
+   <div class="mini"><div class="pg">1</div><div class="pg" style="transform:translateY(-12px) rotate(-4deg)">4</div><div class="pg">2</div><div class="pg">3</div></div>
+   <h3>מאחדים, מפצלים ומסדרים</h3><p>גוררים עמודים, מסובבים ומוחקים. מחברים קבצים, ומפצלים קובץ גדול לקבצים עם שמות שנוצרים לבד.</p>
+  </article>
+  <article class="feat">
+   <div class="mini"><div class="sheet"><i></i><i style="background:#13233A;height:11px;width:65%"></i><i></i><i style="width:55%"></i></div></div>
+   <h3>משחירים, מוסיפים תמונות ומדפיסים</h3><p>מסתירים פרטים רגישים, מוסיפים תמונות, מעתיקים אזור ממסמך אחד ומדביקים באחר.</p>
   </article>
   <article class="feat">
    <div class="mini"><span class="ico" style="background:#25D366"><svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18l1.3-3.6A8 8 0 1 1 8.6 19z" fill="#fff"/></svg></span><span class="ico" style="background:var(--sky)"><svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2" fill="#fff"/><path d="M3.5 7l8.5 6 8.5-6" stroke="#2B8FE8" stroke-width="1.8" fill="none"/></svg></span><span class="ico" style="background:#F3A13A"><svg width="28" height="28" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 18a4.5 4.5 0 0 1-.6-9A6 6 0 0 1 18 9.5 4.3 4.3 0 0 1 17.5 18z" fill="#fff"/></svg></span></div>
-   <h3>שולחים בלחיצה</h3><p>במייל, בוואטסאפ או לענן, ישר מתוך האפליקציה. בלי לשמור ולחפש את הקובץ.</p>
+   <h3>שולחים ושומרים</h3><p>בוואטסאפ ובמייל, ל־Google Drive ול־iCloud, ב־AirDrop וב־Quick Share. ישר מתוך האפליקציה.</p>
   </article>
  </div>
+ <p class="more">ועוד: כמה מסמכים פתוחים במקביל בלשוניות, פעולות על כמה קבצים בבת אחת, תפריט נגישות, ממשק בעברית ובשפות נוספות, ובחירת צבע לאפליקציה.</p>
 </div></section>
 
 <section class="facts" aria-label="עוד על סימן"><div class="wrap">
- <div><b>PDF, וורד ואקסל</b><span>וגם קבצי פאוורפוינט. הכול נפתח באותה אפליקציה.</span></div>
+ <div><b>PDF, וורד, אקסל ופאוורפוינט</b><span>וגם קובצי שמע, וידאו ותמונות. הכול נפתח באותה אפליקציה.</span></div>
  <div><b>עברית מלאה</b><span>ממשק, גופנים וכיווניות בעברית, בלי טקסט הפוך.</span></div>
- <div><b>הקובץ נשאר אצלכם</b><span>סימון, עריכה וחתימה נעשים במכשיר שלכם, בלי להעלות את הקובץ.</span></div>
+ <div><b>הקובץ נשאר אצלכם</b><span>סימון, עריכה וחתימה נעשים במכשיר שלכם, וגם התמלול: ההקלטה לא יוצאת ממנו.</span></div>
 </div></section>
 
 <section class="block" id="install"><div class="wrap">
