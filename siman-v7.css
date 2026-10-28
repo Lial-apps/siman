@@ -169,3 +169,14 @@ html[dir="ltr"] .v7-arrow,.v7-home[dir="ltr"] .v7-arrow{transform:scaleX(-1)}
   html.v7.v7-doc[data-v7grp="select"] .a11y-fab,html.v7.v7-doc[data-v7grp="select"] .sb-back,
   html.v7.v7-doc[data-v7grp="sign"] .a11y-fab,html.v7.v7-doc[data-v7grp="sign"] .sb-back{bottom:calc(80px + env(safe-area-inset-bottom,0px))!important}
 }
+
+/* ---------- לוח הניהול באותם צבעים ---------- */
+html.v7 #admPanel{--a-ink:var(--v7-accent);--a-ink2:var(--v7-accent);--a-mk:var(--v7-accent);--a-mks:var(--v7-soft);--a-bg:var(--v7-bg);--a-card:var(--v7-surface);--a-tx:var(--v7-ink);--a-mu:var(--v7-muted);--a-ln:var(--v7-line);
+  font-family:"SF-rubik",Rubik,"Noto Sans Arabic",Arial,sans-serif}
+html.v7[data-theme="dark"] #admPanel{--a-ink:#1E2129}
+html.v7 #admPanel .a-top{color:var(--v7-on)}
+html.v7[data-theme="dark"] #admPanel .a-top{color:var(--v7-ink);border-bottom:1px solid var(--v7-line)}
+html.v7 #admPanel .a-top mark{background:none;font-weight:800}
+html.v7 #admPanel button{color:var(--v7-on);border-radius:12px}
+html.v7 #admPanel button.a-gh{color:inherit;background:transparent}
+html.v7 #admPanel .a-badge{color:var(--v7-on)}
