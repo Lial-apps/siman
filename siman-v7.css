@@ -1,0 +1,171 @@
+/* סימן — עיצוב 7 ("לפני ← אחרי", כחול שמיים)
+   שכבת עיצוב בלבד: כל הכללים כאן פועלים רק כש-<html> מקבל את המחלקה v7.
+   בלי המחלקה (העיצוב הקודם) הקובץ הזה לא משנה שום דבר.
+   שום כפתור קיים לא מוזז ב-DOM, כך שכל הפעולות של האפליקציה ממשיכות לעבוד. */
+
+/* ---------- צבעים: הטוקנים של האפליקציה נלקחים מהערכה שהמשתמש בחר ---------- */
+html.v7:not(#_){
+  --desk:var(--v7-bg);--bar:var(--v7-surface);--ink:var(--v7-ink);--muted:var(--v7-muted);--line:var(--v7-line);
+  --blue:var(--v7-accent);--sky:var(--v7-accent);
+  --navy:var(--v7-surface);--navy-2:var(--v7-bg);--chrome-text:var(--v7-ink);--chrome-mute:var(--v7-muted);
+  --marker:var(--v7-accent);--marker-hi:var(--v7-accent);--marker-ink:var(--v7-on);
+  --paper-shadow:0 1px 0 rgba(15,33,63,.04),0 18px 40px -18px rgba(15,33,63,.35);
+  --shadow:0 1px 2px rgba(15,33,63,.08),0 8px 24px rgba(15,33,63,.08);
+}
+html.v7:not(#_) body{font-family:"SF-rubik",Rubik,"Noto Sans Arabic","Segoe UI",Arial,sans-serif}
+html.v7 .intro{display:none!important}
+
+/* ---------- סרגל עליון בהיר ---------- */
+html.v7:not(#_) .bar{background:var(--v7-surface);border-bottom:1px solid var(--v7-line);box-shadow:0 1px 0 rgba(15,33,63,.03)}
+html.v7:not(#_) .brand b{font-family:"SF-rubik",Rubik,sans-serif;font-weight:700;font-size:23px;color:var(--v7-ink);background:none;display:inline-flex;align-items:center;gap:9px}
+html.v7:not(#_) .brand b::after{display:none}
+html.v7:not(#_) .brand b::before{content:"ס";display:grid;place-items:center;width:34px;height:34px;border-radius:11px;background:var(--v7-accent);color:var(--v7-on);font-size:20px;font-weight:700}
+html.v7:not(#_) .ver{color:var(--v7-muted);border-color:var(--v7-line)}
+html.v7:not(#_) .fname{color:var(--v7-muted)}
+html.v7:not(#_) .bar .btn,html.v7:not(#_) .bar .icon-btn{background:var(--v7-surface);border:1px solid var(--v7-line);color:var(--v7-ink);border-radius:12px}
+html.v7:not(#_) .bar .btn:hover:not(:disabled),html.v7:not(#_) .bar .icon-btn:hover{background:var(--v7-soft);border-color:var(--v7-dash)}
+html.v7:not(#_) .bar .btn.primary,html.v7:not(#_) .bar .btn.primary:hover:not(:disabled){background:var(--v7-accent);border-color:var(--v7-accent);color:var(--v7-on)}
+html.v7:not(#_) .split-btn .caret{border-inline-start-color:color-mix(in srgb,var(--v7-on) 35%,transparent)}
+html.v7:not(#_) .bar .btn.share{border-color:var(--v7-accent);color:var(--v7-accent)}
+html.v7:not(#_) .bar .btn.share svg{color:var(--v7-accent)}
+html.v7:not(#_) .bar .btn.share:hover:not(:disabled){background:var(--v7-soft)}
+html.v7:not(#_) .bar .btn.cmd{background:var(--v7-bg);border-color:var(--v7-line);color:var(--v7-muted);border-radius:22px}
+html.v7:not(#_) .bar .btn.cmd svg{color:var(--v7-accent)}
+html.v7:not(#_) .bar .btn.cmd:hover{color:var(--v7-ink)}
+html.v7:not(#_) .bar .btn.install{background:var(--v7-surface);border-color:var(--v7-accent);color:var(--v7-accent)}
+html.v7:not(#_) .zoomval{color:var(--v7-muted)}
+html.v7:not(#_) .toast{background:var(--v7-ink);color:var(--v7-surface);border-inline-start-color:var(--v7-accent)}
+
+/* כפתורי צבע ושפה שנוספו לסרגל */
+.v7-hbtn{display:none}
+html.v7 .v7-hbtn{display:inline-grid;place-items:center;width:38px;height:38px;padding:0;border-radius:19px!important}
+html.v7 .v7-hbtn svg{width:20px;height:20px}
+
+/* ---------- סרגל הכלים: קבוצות ברורות בלי להזיז כפתורים (order בלבד) ---------- */
+html.v7:not(#_) .tools{background:var(--v7-surface);border:1px solid var(--v7-line);border-radius:18px;padding:4px;box-shadow:0 4px 14px rgba(15,33,63,.06)}
+html.v7:not(#_) .tool{color:var(--v7-ink);border-radius:12px}
+html.v7:not(#_) .tool span{color:inherit}
+html.v7:not(#_) .tool:hover{background:var(--v7-soft)}
+html.v7:not(#_) .tool[aria-pressed="true"],html.v7:not(#_) .tool[aria-pressed="true"] span,html.v7:not(#_) .tool[aria-pressed="true"] svg{background:var(--v7-accent);color:var(--v7-on)}
+html.v7:not(#_) .tool[aria-pressed="true"] span,html.v7:not(#_) .tool[aria-pressed="true"] svg{background:none}
+html.v7 .tool[data-tool="select"]{order:0}
+html.v7 .tool[data-tool="highlight"],html.v7 .tool[data-tool="pen"],html.v7 .tool[data-tool="eraser"]{order:1}
+html.v7 .tool[data-tool="text"],html.v7 .tool[data-tool="edit"]{order:2}
+html.v7 .tool[data-tool="redact"],html.v7 .tool[data-tool="snip"],html.v7 .tool[data-action="image"]{order:3}
+html.v7 .tool[data-action="sign"]{order:4}
+html.v7 .tool[data-tool="highlight"],html.v7 .tool[data-tool="text"],html.v7 .tool[data-tool="redact"],html.v7 .tool[data-action="sign"]{margin-inline-start:9px}
+html.v7 .tool[data-tool="highlight"]::before,html.v7 .tool[data-tool="text"]::before,html.v7 .tool[data-tool="redact"]::before,html.v7 .tool[data-action="sign"]::before{
+  content:"";position:absolute;inset-inline-start:-6px;top:10px;bottom:10px;width:1px;background:var(--v7-line)}
+html.v7:not(#_) .opts{background:var(--v7-surface);border-bottom:1px solid var(--v7-line);color:var(--v7-muted)}
+
+/* ---------- מסך הפתיחה החדש ---------- */
+html.v7 .wl-text > :not(.wl-hi):not(.wl-trial):not(.ios-hint){display:none!important}
+html.v7 .welcome .wl-art{display:none!important}
+html.v7:not(#_) .welcome{display:block;width:min(1180px,100%)}
+html.v7:not(#_) .wl-text{align-items:center;text-align:center}
+html.v7:not(#_) .desk{background-image:none}
+html.v7:not(#_) .empty{place-items:start center}
+.v7-home{display:none}
+html.v7 .v7-home{display:flex;flex-direction:column;gap:22px;width:min(1180px,100%);margin:0 auto;color:var(--v7-ink);padding-bottom:40px}
+.v7-home h1{margin:10px 0 0;font-size:clamp(30px,4.6vw,54px);font-weight:700;line-height:1.12;text-align:center;letter-spacing:0}
+.v7-home .v7-sub{margin:0;text-align:center;font-size:clamp(15px,1.6vw,19px);color:var(--v7-muted)}
+.v7-search{display:flex;align-items:center;gap:10px;min-height:54px;max-width:620px;width:100%;margin:0 auto;box-sizing:border-box;border-radius:27px;background:var(--v7-surface);border:1px solid var(--v7-line);padding:0 18px;cursor:text}
+.v7-search input{flex:1;min-width:0;border:0;outline:none;background:transparent;font:inherit;font-size:16px;color:var(--v7-ink)}
+.v7-search:focus-within{border-color:var(--v7-accent);box-shadow:0 0 0 3px var(--v7-soft)}
+.v7-search svg{width:20px;height:20px;color:var(--v7-muted);flex:none}
+.v7-drop{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:18px;border:2px dashed var(--v7-dash);border-radius:28px;background:var(--v7-surface);padding:22px 26px}
+.v7-drop .v7-ic{width:56px;height:56px;border-radius:18px;background:var(--v7-soft);color:var(--v7-accent);display:grid;place-items:center;flex:none}
+.v7-drop .v7-ic svg{width:28px;height:28px}
+.v7-drop .v7-dt{display:flex;flex-direction:column;gap:2px;text-align:start;min-width:0;flex:1 1 260px}
+.v7-drop .v7-dt b{font-size:20px}
+.v7-drop .v7-dt span{font-size:15px;color:var(--v7-muted)}
+.v7-drop .v7-acts{display:flex;flex-wrap:wrap;gap:10px}
+.v7-b{min-height:50px;padding:0 22px;border-radius:16px;border:1px solid var(--v7-line);background:var(--v7-surface);color:var(--v7-ink);font:inherit;font-size:16px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px}
+.v7-b:hover{background:var(--v7-soft)}
+.v7-b.pri{background:var(--v7-accent);border-color:var(--v7-accent);color:var(--v7-on);font-weight:600}
+.v7-b.pri:hover{filter:brightness(1.08)}
+.v7-b svg{width:20px;height:20px}
+.v7-h2{margin:8px 0 0;font-size:22px;font-weight:700}
+.v7-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px}
+.v7-grid.fav{grid-template-columns:repeat(auto-fill,minmax(320px,1fr))}
+.v7-card{display:flex;flex-direction:column;gap:10px;text-align:start;background:var(--v7-surface);border:1px solid var(--v7-line);border-radius:22px;padding:10px 10px 14px;color:var(--v7-ink);font:inherit;cursor:pointer;transition:transform .15s,box-shadow .15s,border-color .15s}
+.v7-card:hover{transform:translateY(-2px);box-shadow:0 12px 28px -14px rgba(15,33,63,.35);border-color:var(--v7-dash)}
+.v7-card:focus-visible{outline:3px solid var(--v7-accent);outline-offset:3px}
+.v7-art{height:104px;border-radius:16px;display:flex;align-items:center;justify-content:center;gap:10px;overflow:hidden}
+.v7-grid.fav .v7-art{height:170px}
+.v7-grid.fav .v7-art > span{transform:scale(1.5)}
+.v7-art > span{display:flex;align-items:center;justify-content:center;gap:10px}
+.v7-card b{font-size:16px;padding:0 4px}
+.v7-grid.fav .v7-card b{font-size:20px}
+.v7-card small{font-size:13px;color:var(--v7-muted);padding:0 4px;line-height:1.4}
+.v7-new{display:flex;flex-wrap:wrap;align-items:center;gap:10px;color:var(--v7-muted);font-size:15px}
+.v7-private{display:flex;align-items:center;justify-content:center;gap:8px;color:var(--v7-muted);font-size:14px}
+.v7-private svg{width:18px;height:18px}
+/* הדף הקטן שבאיורים */
+.v7-pg{width:46px;height:60px;background:#fff;border-radius:6px;border:1px solid #D9DEEA;padding:6px;box-sizing:border-box;display:flex;flex-direction:column;gap:4px}
+.v7-pg.on{border:1.5px solid var(--v7-art)}
+.v7-ln{height:3px;border-radius:2px;background:#BCC5D6}
+.v7-pg.on .v7-ln{background:color-mix(in srgb,var(--v7-art) 45%,#fff)}
+.v7-arrow{width:22px;height:22px;color:var(--v7-art);flex:none}
+html[dir="ltr"] .v7-arrow,.v7-home[dir="ltr"] .v7-arrow{transform:scaleX(-1)}
+
+/* ---------- חלונות קטנים: צבע ושפה ---------- */
+.v7-pop{position:fixed;z-index:2147482500;width:min(330px,calc(100vw - 24px));box-sizing:border-box;background:var(--v7-surface);color:var(--v7-ink);border:1px solid var(--v7-line);border-radius:22px;padding:18px;box-shadow:0 14px 40px rgba(15,33,63,.22);display:flex;flex-direction:column;gap:14px;font-family:"SF-rubik",Rubik,"Noto Sans Arabic",Arial,sans-serif}
+.v7-pop[hidden]{display:none}
+.v7-pop h3{margin:0;font-size:17px}
+.v7-sw{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.v7-sw button{display:flex;flex-direction:column;align-items:center;gap:6px;border:0;background:transparent;padding:0;cursor:pointer;font:inherit;font-size:12px;color:var(--v7-ink)}
+.v7-sw i{width:46px;height:46px;border-radius:23px;display:grid;place-items:center}
+.v7-sw button[aria-pressed="true"] i{outline:2px solid var(--v7-ink);outline-offset:3px}
+.v7-sw i svg{width:20px;height:20px;visibility:hidden}
+.v7-sw button[aria-pressed="true"] i svg{visibility:visible}
+.v7-note{font-size:13px;color:var(--v7-muted);margin:0}
+.v7-link{border:0;background:none;padding:6px 0;color:var(--v7-accent);font:inherit;font-size:14px;cursor:pointer;text-align:start;text-decoration:underline;text-underline-offset:3px}
+.v7-langs{display:flex;flex-direction:column;gap:8px}
+.v7-langs button{display:flex;align-items:center;justify-content:space-between;min-height:50px;padding:0 16px;border-radius:14px;border:1px solid var(--v7-line);background:var(--v7-surface);color:var(--v7-ink);font:inherit;font-size:17px;cursor:pointer}
+.v7-langs button[aria-pressed="true"]{border-color:var(--v7-accent);background:var(--v7-soft)}
+.v7-langs svg{width:20px;height:20px;color:var(--v7-accent);visibility:hidden}
+.v7-langs button[aria-pressed="true"] svg{visibility:visible}
+
+/* ---------- טלפון: מסך הפתיחה ---------- */
+@media (max-width:720px){
+  .v7-home h1{text-align:start}
+  .v7-home .v7-sub{text-align:start}
+  .v7-drop{padding:16px;border-style:solid;border-width:1px;border-color:var(--v7-line);gap:12px}
+  .v7-drop .v7-ic,.v7-drop .v7-dt{display:none}
+  .v7-drop .v7-acts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));width:100%}
+  .v7-drop .v7-b{flex-direction:column;min-height:84px;padding:8px 4px;border-radius:20px;font-size:14px;gap:6px;text-align:center}
+  .v7-drop .v7-b svg{width:24px;height:24px}
+  .v7-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+  .v7-grid.fav{grid-template-columns:1fr}
+  .v7-grid.fav .v7-art{height:150px}
+  .v7-card small{font-size:12.5px}
+  .v7-drop .v7-only-wide{display:none}
+}
+@media (min-width:721px){.v7-drop .v7-only-narrow{display:none}}
+
+/* ---------- טלפון: סרגל קבוצות בתחתית בזמן עבודה על מסמך ---------- */
+.v7-dock{display:none}
+@media (max-width:720px){
+  html.v7.v7-doc .v7-dock{display:flex;position:fixed;inset:auto 0 0 0;z-index:15;background:var(--v7-surface);border-top:1px solid var(--v7-line);padding:4px 6px calc(4px + env(safe-area-inset-bottom,0px));box-shadow:0 -8px 24px rgba(15,33,63,.08)}
+  .v7-dock button{flex:1;min-height:58px;border:0;background:transparent;color:var(--v7-muted);font:inherit;font-size:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;position:relative;padding:0}
+  .v7-dock button svg{width:22px;height:22px}
+  .v7-dock button[aria-pressed="true"]{color:var(--v7-accent);font-weight:600}
+  .v7-dock button[aria-pressed="true"]::before{content:"";position:absolute;top:0;width:28px;height:3px;border-radius:2px;background:var(--v7-accent)}
+  html.v7.v7-doc:not(#_) .tools{position:fixed;inset:auto 10px calc(70px + env(safe-area-inset-bottom,0px)) 10px;z-index:15;width:auto;margin:0;justify-content:center;gap:6px;border-radius:20px;padding:6px;box-shadow:0 -6px 22px rgba(15,33,63,.12)}
+  html.v7.v7-doc[data-v7grp="select"]:not(#_) .tools,html.v7.v7-doc[data-v7grp="sign"]:not(#_) .tools{display:none}
+  html.v7.v7-doc[data-v7grp="mark"] .tools .tool:not([data-tool="highlight"]):not([data-tool="pen"]):not([data-tool="eraser"]),
+  html.v7.v7-doc[data-v7grp="text"] .tools .tool:not([data-tool="text"]):not([data-tool="edit"]),
+  html.v7.v7-doc[data-v7grp="doc"] .tools .tool:not([data-tool="redact"]):not([data-tool="snip"]):not([data-action="image"]){display:none}
+  html.v7.v7-doc .tools .tool{min-width:72px;margin-inline-start:0}
+  html.v7.v7-doc .tools .tool::before{display:none}
+  html.v7.v7-doc:not(#_) .desk{padding-bottom:180px}
+  html.v7:not(.v7-doc):not(#_) .tools{display:none}
+}
+
+/* טלפון: כפתור הנגישות וכפתור החזרה עולים מעל סרגל הקבוצות ומגש הכלים */
+@media (max-width:720px){
+  html.v7.v7-doc .a11y-fab,html.v7.v7-doc .sb-back{bottom:calc(158px + env(safe-area-inset-bottom,0px))!important}
+  html.v7.v7-doc[data-v7grp="select"] .a11y-fab,html.v7.v7-doc[data-v7grp="select"] .sb-back,
+  html.v7.v7-doc[data-v7grp="sign"] .a11y-fab,html.v7.v7-doc[data-v7grp="sign"] .sb-back{bottom:calc(80px + env(safe-area-inset-bottom,0px))!important}
+}

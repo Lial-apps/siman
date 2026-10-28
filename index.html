@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="he" dir="rtl">
 <head>
+<script>/* עיצוב 7: מונע הבהוב של העיצוב הקודם אצל מי שכבר בחר בעיצוב החדש */try{var _d=new URLSearchParams(location.search).get("design")||localStorage.getItem("siman.design");if(_d==="new")document.documentElement.classList.add("v7");}catch(e){}</script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>סימן</title>
@@ -1288,7 +1289,7 @@ body:has(#wed) .busy,body:has(#xed) .busy{z-index:1000}body:has(#wed) .toast,bod
 </dialog>
 
 <header class="bar">
-  <div class="brand"><b title="גרסה 5.2.9">סימן</b><span class="ver">5.2.9</span><span class="fname" id="fname"></span></div>
+  <div class="brand"><b title="גרסה 5.3.0">סימן</b><span class="ver">5.3.0</span><span class="fname" id="fname"></span></div>
 
   <nav class="tools" id="tools" aria-label="כלים">
     <button class="tool" data-tool="select" aria-pressed="true" title="בחירה וגלילה (V)">
@@ -5240,5 +5241,7 @@ if('launchQueue' in window){
 (function(){try{var q=new URLSearchParams(location.search).get('beta');if(q==='1')localStorage.setItem('siman.beta','1');if(q==='0')localStorage.removeItem('siman.beta');
 if(localStorage.getItem('siman.beta')==='1'){var l=document.createElement('link');l.rel='stylesheet';l.href='siman-shell.css';document.body.appendChild(l);var s=document.createElement('script');s.src='siman-shell.js';s.defer=true;document.body.appendChild(s);}}catch(e){}})();
 </script>
+<link rel="stylesheet" href="siman-v7.css?v=5.3.0">
+<script src="siman-v7.js?v=5.3.0" defer></script>
 </body>
 </html>
