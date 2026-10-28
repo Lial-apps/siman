@@ -10,7 +10,7 @@
    וכל פעולה שלו לוחצת על הכפתור המקורי של האפליקציה. */
 (function () {
   'use strict';
-  var DEFAULT_DESIGN = 'classic';
+  var DEFAULT_DESIGN = 'new';
 
   var LS = {
     get: function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } },

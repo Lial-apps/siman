@@ -1,5 +1,5 @@
 // סימן — service worker: works offline, picks up new versions automatically
-const CACHE = 'siman-v69';
+const CACHE = 'siman-v70';
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './pdf.min.js', './pdf.worker.min.js',
   './pdf-lib.min.js', './fontkit.umd.min.js', './icon-192.png', './icon-512.png', './icon-maskable-512.png', './jszip.min.js', './pptxgen.min.js', './office.js', './office-edit.js', './word-editor.js', './excel-editor.js', './docx-preview.min.js', './html2canvas.min.js', './xlsx.mini.min.js', './font-secular-he.woff2', './font-secular-lat.woff2', './send.js', './siman-plus.js', './ppt-editor.js', './office-ai.js', './office-translate.js', './a11y.js', './admin-panel.js', './font-rubik-400.ttf', './font-rubik-700.ttf', './siman-phone.css', './siman-phone.js', './siman-voice.js', './siman-asr-worker.js', './transformers.min.js', './siman-back.js', './siman-v7.css', './siman-v7.js'];
 
@@ -34,7 +34,7 @@ self.addEventListener('fetch', e => {
   const path = new URL(req.url).pathname;
   const isPage = req.mode === 'navigate' || /\/(index\.html)?$/.test(path);
   // the app's own code: always the newest version when online, so an upload shows up on the next refresh
-  const isAppCode = /\/(office|office-edit|word-editor|excel-editor|siman-register|send|siman-plus|ppt-editor|a11y|office-ai|office-translate|siman-voice|siman-asr-worker|siman-back)\.js$/.test(path) || /\/siman-phone\.(css|js)$/.test(path);
+  const isAppCode = /\/(office|office-edit|word-editor|excel-editor|siman-register|send|siman-plus|ppt-editor|a11y|office-ai|office-translate|siman-voice|siman-asr-worker|siman-back)\.js$/.test(path) || /\/siman-(phone|v7)\.(css|js)$/.test(path);
   if (isAppCode) {
     e.respondWith(fetch(req, { cache: 'no-cache' }).then(r => { if (r.ok) { const copy = r.clone(); caches.open(CACHE).then(c => c.put(req, copy)); } return r; })
       .catch(() => caches.match(req)));
