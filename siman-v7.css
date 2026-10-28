@@ -180,3 +180,11 @@ html.v7 #admPanel .a-top mark{background:none;font-weight:800}
 html.v7 #admPanel button{color:var(--v7-on);border-radius:12px}
 html.v7 #admPanel button.a-gh{color:inherit;background:transparent}
 html.v7 #admPanel .a-badge{color:var(--v7-on)}
+
+/* ---------- זום: אייקונים ברורים, אחוז גלוי, רק כשמסמך פתוח; בטלפון צביטה במקום כפתורים ---------- */
+html.v7:not(.v7-doc) .bar .group.zoom{display:none}
+html.v7:not(#_) .bar .group.zoom .zoomval{display:inline-block;min-width:4.5ch;color:var(--v7-muted);font-size:13px}
+html.v7 #zoomIn,html.v7 #zoomOut{display:inline-grid;place-items:center;width:36px;height:36px;padding:0}
+html.v7 #zoomIn svg,html.v7 #zoomOut svg{width:19px;height:19px}
+@media (max-width:720px){html.v7 .bar .group.zoom{display:none!important}}
+html.v7 .v7-pinch{transition:none!important;will-change:transform}

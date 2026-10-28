@@ -38,6 +38,8 @@
     globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/>',
     pal: '<path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.8-.8 1.8-1.8 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.2 0-1 .8-1.8 1.8-1.8H17a4 4 0 0 0 4-4c0-4.4-4-8-9-8z"/><circle cx="7.5" cy="11" r="1.2"/><circle cx="10.5" cy="7.5" r="1.2"/><circle cx="15" cy="7.5" r="1.2"/>',
     check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+    zin: '<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4 4"/><path d="M8.5 11h5"/><path d="M11 8.5v5"/>',
+    zout: '<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4 4"/><path d="M8.5 11h5"/>',
     arrow: '<path d="M19 12H5"/><path d="M10 7l-5 5 5 5"/>',
     select: '<path d="M6 3l13 7-5.5 1.8L11.5 18z"/>',
     mark: '<path d="M9.5 14.5l7-8.5 3 3-8.5 7z"/><path d="M9.5 14.5L7 18h3.5l.5-1.5"/><path d="M4 21h16"/>',
@@ -386,10 +388,50 @@
     try { TR_ROOTS().forEach(function (el) { translateTree(el, true); }); } finally { trBusy = false; }
   }
 
+
+  /* ================================================================ זום */
+  function setupZoom() {
+    var zi = $('zoomIn'), zo = $('zoomOut'), fw = $('fitW');
+    if (zi) zi.innerHTML = svg(I.zin, 19);
+    if (zo) zo.innerHTML = svg(I.zout, 19);
+    if (fw && fw.textContent.trim() === 'רוחב') fw.textContent = 'התאמה לרוחב';
+    // טלפון: צביטה בשתי אצבעות על המסמך מגדילה ומקטינה אותו (במקום הכפתורים)
+    var desk = $('desk'), pages = $('pages');
+    if (!desk || !pages || typeof setZoom !== 'function') return;
+    var start = 0, startZoom = 1, scale = 1, on = false;
+    var dist = function (t) { var dx = t[0].clientX - t[1].clientX, dy = t[0].clientY - t[1].clientY; return Math.sqrt(dx * dx + dy * dy); };
+    var curZoom = function () { try { return S.zoom; } catch (e) { return 1; } };
+    desk.addEventListener('touchstart', function (e) {
+      if (e.touches.length !== 2 || !root.classList.contains('v7-doc')) return;
+      on = true; start = dist(e.touches); startZoom = curZoom(); scale = 1;
+      var r = desk.getBoundingClientRect();
+      var cx = (e.touches[0].clientX + e.touches[1].clientX) / 2 - r.left + desk.scrollLeft;
+      var cy = (e.touches[0].clientY + e.touches[1].clientY) / 2 - r.top + desk.scrollTop;
+      pages.style.transformOrigin = (cx - pages.offsetLeft) + 'px ' + (cy - pages.offsetTop) + 'px';
+      pages.classList.add('v7-pinch');
+      e.preventDefault();
+    }, { passive: false, capture: true });
+    desk.addEventListener('touchmove', function (e) {
+      if (!on || e.touches.length !== 2) return;
+      e.preventDefault(); e.stopPropagation();
+      scale = Math.max(0.4, Math.min(4, dist(e.touches) / (start || 1)));
+      pages.style.transform = 'scale(' + scale + ')';
+    }, { passive: false, capture: true });
+    var end = function () {
+      if (!on) return;
+      on = false;
+      pages.style.transform = ''; pages.style.transformOrigin = ''; pages.classList.remove('v7-pinch');
+      if (Math.abs(scale - 1) > 0.04) { try { setZoom(startZoom * scale); } catch (e) {} }
+    };
+    desk.addEventListener('touchend', function (e) { if (e.touches.length < 2) end(); }, { capture: true });
+    desk.addEventListener('touchcancel', end, { capture: true });
+  }
+
   /* ================================================================ הפעלה */
   function start() {
     if (!document.querySelector('header.bar') || !$('empty')) { root.classList.remove('v7'); return; }
     addHeaderButtons();
+    try { setupZoom(); } catch (e) {}
     applyColor(colorId);
     applyLang(lang);
     // האם פתוח מסמך? (מסך הפתיחה מוסתר)
