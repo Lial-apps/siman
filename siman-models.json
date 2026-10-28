@@ -1,0 +1,11 @@
+{
+  "accurate": {
+    "id": "lial-apps/siman-ivrit-turbo",
+    "base": "ivrit-ai/whisper-large-v3-turbo",
+    "mb": {
+      "fp16": 1534,
+      "q4": 724
+    },
+    "updated": "2026-10-28"
+  }
+}
