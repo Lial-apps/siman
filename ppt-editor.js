@@ -1956,6 +1956,18 @@ function aiAddSlide(a, done) {
   X.files.set(p, ser(doc)); done.push(i);
   return i;
 }
+// a table's columns mirrored: the grid and every row, a merged cell (gridSpan + hMerge) moving as one
+function aiTableMirror(tbl) {
+  const kidsA = (el, n) => el ? [...el.childNodes].filter(x => x.nodeType === 1 && x.namespaceURI === NS.a && x.localName === n) : [];
+  const grid = kidsA(tbl, 'tblGrid')[0], cols = kidsA(grid, 'gridCol'); if (cols.length < 2) return false;
+  const gx = kidsA(grid, 'extLst')[0] || null; for (let i = cols.length - 1; i >= 0; i--) grid.insertBefore(cols[i], gx);
+  for (const tr of kidsA(tbl, 'tr')) {
+    const groups = [];
+    for (const tc of kidsA(tr, 'tc')) { if (tc.getAttribute('hMerge') === '1' && groups.length) groups[groups.length - 1].push(tc); else groups.push([tc]); }
+    const tx = kidsA(tr, 'extLst')[0] || null; for (let g = groups.length - 1; g >= 0; g--) for (const tc of groups[g]) tr.insertBefore(tc, tx);
+  }
+  return true;
+}
 function aiApply(actions) {
   if (!X) throw new Error('העורך סגור'); if (X.editing) exitEdit();
   const mark = { hi: X.hi, cur: X.cur }; let done = 0, skipped = 0; let goTo = null;
@@ -1980,6 +1992,8 @@ function aiApply(actions) {
       else if (op === 'move' || op === 'resize' || op === 'position') { let k = 0; for (const i of aiSlides(a.slide)) { const d = docFor(i); const ctx = ctxOf(X, X.order[i]);
           for (const n of aiTargetsIn(d, a.shape)) { const b = topBox(X, ctx, n); const cur = { x: b.x / X.size.w * 100, y: b.y / X.size.h * 100, w: b.w / X.size.w * 100, h: b.h / X.size.h * 100 }; setBox(n, ctx, pctBox(a, cur)); k++; } } k ? done++ : skipped++; }
       else if (op === 'delete' || op === 'deleteshape' || op === 'remove') { let k = 0; for (const i of aiSlides(a.slide)) for (const n of aiTargetsIn(docFor(i), a.shape)) { n.remove(); k++; } k ? done++ : skipped++; }
+      else if (op === 'reversecols' || op === 'reversecolumns' || op === 'mirrorcols' || op === 'flipcols') { let k = 0;
+        for (const i of aiSlides(a.slide ?? 'all')) for (const t of docFor(i).getElementsByTagNameNS(NS.a, 'tbl')) if (aiTableMirror(t)) k++; k ? done++ : skipped++; }
       else if (op === 'goto') { const s = aiSlides(a.slide)[0]; if (s !== undefined) goTo = s; }
       else skipped++;
     } catch (e) { console.warn('assistant action', a, e); skipped++; }

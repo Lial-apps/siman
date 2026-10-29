@@ -230,7 +230,7 @@ async function prepare(bytes){
   for(const s of kids(kid(wbDoc.documentElement,'sheets'),'sheet')){wi++;
     const rid=s.getAttributeNS(NS.r,'id');const rel=wr.find(r=>r.id===rid);if(!rel||rel.type!==RT_SHEET)continue;
     const path=resolveTarget(wbPart,rel.target);if(!files.has(path))continue;
-    const sh=readSheet(files,path,sst);sh.name=s.getAttribute('name');sh.wbIndex=wi;
+    const sh=readSheet(files,path,sst);readPics(files,path,sh);sh.name=s.getAttribute('name');sh.wbIndex=wi;
     const pa=dns.find(d=>d.getAttribute('name')==='_xlnm.Print_Area'&&+d.getAttribute('localSheetId')===wi);
     if(pa){const m=/!?\$?([A-Z]{1,3})\$?(\d+)(?::\$?([A-Z]{1,3})\$?(\d+))?/.exec(pa.textContent.split(',')[0].split('!').pop());if(m)sh.printArea=parseRange(m[0].replace(/[$!]/g,''));}sh.hidden=s.getAttribute('state')==='hidden'||s.getAttribute('state')==='veryHidden';sh.el=s;sheets.push(sh);
   }
@@ -721,6 +721,9 @@ const CSS=`
 #xed .xe-fxin{flex:1;height:26px;border:1px solid transparent;border-radius:5px;padding:0 6px;font:14px Arial,"Heebo",sans-serif;outline:none;-webkit-user-select:text;user-select:text}
 #xed .xe-fxin:focus{border-color:var(--xg)}
 #xed .xe-wrap{flex:1;overflow:auto;position:relative;outline:none;background:#fff;overscroll-behavior:contain}
+#xed .xe-pics{position:absolute;overflow:hidden;pointer-events:none;z-index:6}
+#xed .xe-pics img{position:absolute;max-width:none}
+@media print{#xed .xe-pics{display:none}}
 #xed .xe-grid{border-collapse:collapse;table-layout:fixed;font:11pt Arial,sans-serif;color:#000;width:max-content}
 #xed .xe-grid td{height:20px;padding:0 3px;border:1px solid #E1E5EA;white-space:nowrap;overflow:visible;vertical-align:bottom;position:relative;cursor:cell;line-height:1.2}
 #xed .xe-grid.nogrid td{border-color:transparent}
@@ -906,6 +909,7 @@ function render(){
   h+='</tbody>';
   const grid=q('xeGrid');grid.innerHTML=h;grid.style.direction=sh.rtl?'rtl':'ltr';grid.classList.toggle('nogrid',!sh.grid);grid.style.zoom=z;
   paintSel();
+  try{paintPics();}catch(e){console.warn(e);}
 }
 let rT=0;const renderSoon=()=>{cancelAnimationFrame(rT);rT=requestAnimationFrame(()=>{if(X)render();});};
 function paintSel(){
@@ -1061,6 +1065,55 @@ function structural(axis,at,n){
   },true);
   select(X.act.r,X.act.c);
 }
+/* columns in a new order — the assistant's "reverseCols" / "reorderCols" ("מק"ט מימין, יח' במפעל משמאל").
+   The cells move with their values, formulas and looks; formulas anywhere that point at a moved cell follow it;
+   widths, merges, conditional formats, validations, links and filters move too.
+   g = the block (columns c1..c2, all rows or only rows r1..r2), perm = the old columns in their new order. */
+function reorderCols(g,perm){
+  const sh=cur(),name=sh.name,c1=g.c1;
+  const to=new Map();perm.forEach((old,i)=>to.set(old,c1+i));
+  if(![...to].some(([o,n])=>o!==n))return false;
+  const whole=g.r1<=0&&g.r2>=sh.maxR;
+  const inR=r=>whole||(r>=g.r1&&r<=g.r2);
+  const rect=m=>{if(!m)return m;if(!(to.has(m.c1)&&to.has(m.c2)&&inR(m.r1)&&inR(m.r2)))return m;
+    let a=Infinity,b=-Infinity;for(let c=m.c1;c<=m.c2;c++){const n=to.has(c)?to.get(c):c;a=Math.min(a,n);b=Math.max(b,n);}return{...m,c1:a,c2:b};};
+  const mapF=(f,own)=>mapRefs(f,(a,b)=>{
+    if(a.sheet?a.sheet!==name:!own)return undefined;
+    if(!b){if(!to.has(a.c)||!inR(a.r))return undefined;return[{...a,c:to.get(a.c)},null];}
+    const m=rect({r1:Math.min(a.r,b.r),r2:Math.max(a.r,b.r),c1:Math.min(a.c,b.c),c2:Math.max(a.c,b.c)});
+    if(m.c1===Math.min(a.c,b.c)&&m.c2===Math.max(a.c,b.c))return undefined;
+    return[{...a,c:m.c1},{...b,c:m.c2}];});
+  const mapSq=sq=>String(sq).split(/\s+/).map(x=>{const r=parseRange(x);return r?rangeStr(rect(r)):x;}).join(' ');
+  change(()=>{
+    const nm=new Map();
+    for(const c of sh.cells.values()){if(to.has(c.c)&&inR(c.r)&&to.get(c.c)!==c.c){c.c=to.get(c.c);c.mod=true;}nm.set(key(c.r,c.c),c);}
+    sh.cells=nm;
+    for(const s2 of X.st.sheets)for(const c of s2.cells.values())if(c.f){const nf=mapF(c.f,s2===sh);if(nf!==c.f){c.f=nf;delete c.ast;c.mod=true;s2.dirty=true;}}
+    if(whole){const o=new Map();for(const [k,v] of sh.cols)o.set(to.has(k)?to.get(k):k,v);
+      // a column with no width of its own takes the sheet's default where it lands
+      sh.cols=o;}
+    sh.merges=sh.merges.map(rect);
+    const R=sh.root;
+    for(const tag of ['conditionalFormatting','dataValidation'])for(const e of R.getElementsByTagNameNS(S,tag))e.setAttribute('sqref',mapSq(e.getAttribute('sqref')||''));
+    for(const e of R.getElementsByTagNameNS(S,'formula'))e.textContent=mapF(e.textContent,true);
+    for(const e of R.getElementsByTagNameNS(S,'hyperlink'))if(e.getAttribute('ref'))e.setAttribute('ref',mapSq(e.getAttribute('ref')));
+    for(const e of R.getElementsByTagNameNS(S,'autoFilter')){const af=parseRange(e.getAttribute('ref')||'');if(!af)continue;
+      for(const fc of kids(e,'filterColumn')){const old=af.c1+(+fc.getAttribute('colId')||0);if(to.has(old)&&inR(af.r1))fc.setAttribute('colId',String(to.get(old)-af.c1));}
+      e.setAttribute('ref',rangeStr(rect(af)));}
+    for(const dn of X.st.wbDoc.getElementsByTagNameNS(S,'definedName')){const nf=mapF(dn.textContent,false);if(nf!==dn.textContent){dn.textContent=nf;X.wbDirty=true;}}
+    X.structChanged=true;if(sh.g){sh.g.rows=0;sh.g.cols=0;}
+  },true);
+  return true;
+}
+// the block a reverse / reorder works on: the given range, or the table around the data
+function colsBlock(spec){
+  const sh=cur();let g=aiRange(spec||'used');if(!g)return null;
+  if(!spec||/^(used|all)$/i.test(String(spec).trim())){ // the used columns only, without empty ones at the edges
+    let a=Infinity,b=-1;for(const c of sh.cells.values())if(c.v!==null&&c.v!==''||c.f){a=Math.min(a,c.c);b=Math.max(b,c.c);}
+    if(b<0)return null;g={...g,c1:a,c2:b};}
+  return g;
+}
+function reverseCols(spec){const g=colsBlock(spec);if(!g||g.c2<=g.c1)return false;const perm=[];for(let c=g.c2;c>=g.c1;c--)perm.push(c);return reorderCols(g,perm);}
 const insRows=()=>structural('r',X.sel.r1,X.sel.r2-X.sel.r1+1);
 const insCols=()=>structural('c',X.sel.c1,X.sel.c2-X.sel.c1+1);
 const delRows=()=>structural('r',X.sel.r1,-(X.sel.r2-X.sel.r1+1));
@@ -2204,6 +2257,61 @@ async function buildXlsx(){
   return z.generateAsync({type:'uint8array',compression:'DEFLATE',compressionOptions:{level:6}});
 }
 
+/* ------------------------------------------------------------ pictures on the sheet (a logo, a photo)
+   They are shown where Excel shows them, over the cells, and are kept in the file exactly as they were. */
+const XDR='http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing';
+const RT_DRAW='http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing';
+function readPics(files,path,sh){
+  sh.pics=[];
+  try{
+    const dEl=sh.root&&[...sh.root.childNodes].find(n=>n.nodeType===1&&n.localName==='drawing');if(!dEl)return;
+    const rid=dEl.getAttributeNS(NS.r,'id');const rl=rels(files,path).find(r=>r.id===rid&&r.type===RT_DRAW);if(!rl)return;
+    const dp=resolveTarget(path,rl.target);const ds=txt(files,dp);if(!ds)return;
+    const dd=parseXml(ds),drl=rels(files,dp);
+    const pos=el=>{if(!el)return null;const g=n=>{const e=[...el.childNodes].find(x=>x.nodeType===1&&x.localName===n);return e?+e.textContent||0:0;};return{c:g('col'),co:g('colOff')/9525,r:g('row'),ro:g('rowOff')/9525};};
+    for(const an of [...dd.documentElement.childNodes].filter(n=>n.nodeType===1&&/Anchor$/.test(n.localName))){
+      const pic=an.getElementsByTagNameNS(XDR,'pic')[0];if(!pic)continue;
+      const blip=pic.getElementsByTagNameNS(NS.a,'blip')[0];const eid=blip&&blip.getAttributeNS(NS.r,'embed');
+      const ir=eid&&drl.find(r=>r.id===eid);if(!ir)continue;const ip=resolveTarget(dp,ir.target);const b=files.get(ip);if(!b)continue;
+      const kid1=n=>[...an.childNodes].find(x=>x.nodeType===1&&x.localName===n);
+      const from=pos(kid1('from')),to=pos(kid1('to'));
+      const xe=pic.getElementsByTagNameNS(NS.a,'ext')[0],ex=kid1('ext');const sz=ex||xe;
+      let w=sz?(+sz.getAttribute('cx')||0)/9525:0,h=sz?(+sz.getAttribute('cy')||0)/9525:0;
+      const absPos=kid1('pos');
+      const ext=(/\.(\w+)$/.exec(ip)||[])[1]||'png';const mime=ext==='jpg'?'image/jpeg':ext==='svg'?'image/svg+xml':'image/'+ext;
+      if(!/^image\/(png|jpeg|gif|bmp|webp|svg\+xml)$/.test(mime))continue;
+      sh.pics.push({from,to,w,h,abs:absPos?{x:(+absPos.getAttribute('x')||0)/9525,y:(+absPos.getAttribute('y')||0)/9525}:null,url:URL.createObjectURL(new Blob([b],{type:mime}))});
+    }
+  }catch(e){console.warn('pictures',e);}
+}
+function paintPics(){
+  let layer=q('xePics');const sh=cur();
+  if(!sh.pics||!sh.pics.length){if(layer)layer.innerHTML='';return;}
+  if(!layer){layer=document.createElement('div');layer.id='xePics';layer.className='xe-pics';X.root.append(layer);}
+  const wrap=q('xeWrap'),grid=q('xeGrid'),z=X.zoom,R=X.root.getBoundingClientRect(),W=wrap.getBoundingClientRect(),g=sh.g;
+  const head=grid.querySelector('thead');const hb=head?head.getBoundingClientRect().bottom:W.top;
+  const lead=grid.querySelector('thead th.corner');const lb=lead?lead.getBoundingClientRect():null;
+  // the visible part of the grid, under the headings
+  const clipT=Math.max(W.top,hb),clipL=W.left+(lb&&!sh.rtl?lb.width:0),clipR=W.right-(lb&&sh.rtl?lb.width:0);
+  Object.assign(layer.style,{left:(clipL-R.left)+'px',top:(clipT-R.top)+'px',width:Math.max(0,Math.min(clipR,W.left+wrap.clientWidth)-clipL)+'px',height:Math.max(0,W.top+wrap.clientHeight-clipT)+'px'});
+  // where a cell starts on screen, worked out from a cell that is drawn (rows far away are not)
+  const anyTd=grid.querySelector('tbody td[data-r]');if(!anyTd){layer.innerHTML='';return;}
+  const ar=+anyTd.dataset.r,ac=+anyTd.dataset.c,tb=anyTd.getBoundingClientRect();
+  const colX=c=>{let x=0;const a=Math.min(c,ac),b=Math.max(c,ac);for(let i=a;i<b;i++)x+=(g.cw[i]||0);return(c>=ac?x:-x)*z;};
+  const cellX=(c,off)=>sh.rtl?tb.right-colX(c)-off*z:tb.left+colX(c)+off*z;
+  const cellY=(r,off)=>tb.top+((g.top[r]||0)-(g.top[ar]||0)+off)*z;
+  let h='';
+  for(const p of sh.pics){
+    let x,y,w=p.w,hh=p.h;
+    if(p.from){x=cellX(p.from.c,p.from.co);y=cellY(p.from.r,p.from.ro);
+      if((!w||!hh)&&p.to){const x2=cellX(p.to.c,p.to.co),y2=cellY(p.to.r,p.to.ro);w=Math.abs(x2-x)/z;hh=Math.abs(y2-y)/z;}}
+    else if(p.abs){x=sh.rtl?tb.right-p.abs.x*z:tb.left+p.abs.x*z;y=cellY(0,p.abs.y);}
+    else continue;
+    if(sh.rtl)x-=w*z;
+    h+=`<img src="${p.url}" alt="" draggable="false" style="left:${x-clipL}px;top:${y-clipT}px;width:${w*z}px;height:${hh*z}px">`;
+  }
+  layer.innerHTML=h;
+}
 /* ------------------------------------------------------------ opening and closing */
 function injectCss(){if(document.getElementById('xeCss'))return;const s=document.createElement('style');s.id='xeCss';s.textContent=CSS;document.head.append(s);}
 async function open(opts){
@@ -2256,6 +2364,7 @@ async function forceClose(){
   window.removeEventListener('keydown',x.onKey,true);window.removeEventListener('copy',x.onCopy,true);window.removeEventListener('cut',x.onCopy,true);window.removeEventListener('paste',x.onPaste,true);
   window.removeEventListener('dragover',x.onDrag,true);window.removeEventListener('drop',x.onDrag,true);window.removeEventListener('beforeunload',x.onUnload);
   document.removeEventListener('pointerdown',x.onDown,true);window.removeEventListener('resize',x.onResize);window.removeEventListener('mouseup',x.onUp);
+  for(const sh of (x.st&&x.st.sheets)||[])for(const p of sh.pics||[])try{URL.revokeObjectURL(p.url);}catch(_){}
   x.root.remove();X=null;
 }
 /* ---------- the assistant: describes the workbook and makes the changes it is asked for ---------- */
@@ -2373,6 +2482,20 @@ function aiApply(actions){
         one(()=>{for(let c=g.c1;c<=g.c2;c++){if(op==='autofit'||a.width==='auto'||!(+a.width>0))aiAutoFit(c);else{const ci=sh.cols.get(c)||{style:null};sh.cols.set(c,{...ci,w:+a.width,custom:'1',hidden:false});}}if(sh.g){sh.g.rows=0;sh.g.cols=0;}});done.push(op);}
       else if(op==='rowheight'||op==='height'){const g=aiRange(a.rows||a.range||'1');const v=+a.height;if(!g||!(v>0)){skipped.push(op);continue;}const sh=cur();
         one(()=>{for(let i=g.r1;i<=g.r2;i++){let info=sh.rows.get(i);if(!info){info={attrs:{},ht:null,hidden:false};sh.rows.set(i,info);}info.ht=v;info.attrs.ht=String(v);info.attrs.customHeight='1';}if(sh.g){sh.g.rows=0;sh.g.cols=0;}});done.push(op);}
+      else if(op==='reversecols'||op==='reversecolumns'||op==='mirrorcols'||op==='flipcols'){
+        reverseCols(a.range||a.cols||'used')?done.push(op):skipped.push(op);}
+      else if(op==='reordercols'||op==='ordercols'||op==='movecols'){
+        // "order": the columns from left to right in the new order — letters ("C","A","B") or header texts ("מק\"ט")
+        const g=colsBlock(a.range||a.cols||'used');const list=Array.isArray(a.order)?a.order:Array.isArray(a.columns)?a.columns:null;
+        if(!g||!list){skipped.push(op);continue;}
+        const sh=cur();let hr=Infinity;for(const c of sh.cells.values())if(c.c>=g.c1&&c.c<=g.c2&&c.r>=g.r1&&c.v!=null&&c.v!=='')hr=Math.min(hr,c.r);if(!isFinite(hr))hr=g.r1;const heads=new Map();for(let c=g.c1;c<=g.c2;c++){const h=cellAt(sh,hr,c);if(h&&h.v!=null)heads.set(String(display(X.si,h,hr,c).t).trim(),c);}
+        const seen=new Set(),perm=[];
+        for(const it of list){let c=null;const t=String(it).trim();
+          if(/^[A-Za-z]{1,3}$/.test(t))c=aiCol(t);else if(/^\d+$/.test(t))c=g.c1+(+t)-1;else if(heads.has(t))c=heads.get(t);
+          else{for(const [h,cc] of heads)if(h.replace(/["'״׳\s]/g,'')===t.replace(/["'״׳\s]/g,'')){c=cc;break;}}
+          if(c!==null&&c>=g.c1&&c<=g.c2&&!seen.has(c)){seen.add(c);perm.push(c);}}
+        for(let c=g.c1;c<=g.c2;c++)if(!seen.has(c))perm.push(c); // columns not named keep their order, after the named ones
+        reorderCols(g,perm)?done.push(op):skipped.push(op);}
       else if(op==='freeze'){const sh=cur();const r=Math.max(0,+a.rows||0),c=Math.max(0,+a.cols||0);sh.freeze=r||c?{r,c}:null;sh.viewDirty=true;touch();done.push(op);}
       else if(op==='sort'){const g=aiRange(a.range||'used');if(!g){skipped.push(op);continue;}
         const by=a.by!==undefined?(/^\d+$/.test(String(a.by))?g.c1+(+a.by)-1:aiCol(a.by)):g.c1;
@@ -2407,5 +2530,5 @@ async function shareFile(fmt){
 }
 window.XLSX_EDITOR={open,close:forceClose,isOpen:()=>!!X,share:{file:shareFile,name:()=>X?fileName():''},
   assist:{context:aiContext,apply:aiApply,revert:aiRevert,root:()=>X&&X.root},
-  _test:{get X(){return X;},filterOf,toggleFilter,setColFilter,applyFilter,addRule,cfPick,cfCss,dvDialog,dvCheck,dvAt,dvItems,removeDups,hideSel,unhideSel,fillDir,cycleRef,region,evalF:(f)=>X.calc.evalF(f,X.si),buildXlsx:()=>buildXlsx(),setInput,select,style,borders,toggleMerge,insRows,insCols,delRows,delCols,sortSel,autoSum,undo,redo,doPaste,doCopy,display:(r,c)=>display(X.si,cellAt(cur(),r,c),r,c).t,parseFormula,moveFormula,shiftFormula}};
+  _test:{get X(){return X;},reverseCols,reorderCols,colsBlock,filterOf,toggleFilter,setColFilter,applyFilter,addRule,cfPick,cfCss,dvDialog,dvCheck,dvAt,dvItems,removeDups,hideSel,unhideSel,fillDir,cycleRef,region,evalF:(f)=>X.calc.evalF(f,X.si),buildXlsx:()=>buildXlsx(),setInput,select,style,borders,toggleMerge,insRows,insCols,delRows,delCols,sortSel,autoSum,undo,redo,doPaste,doCopy,display:(r,c)=>display(X.si,cellAt(cur(),r,c),r,c).t,parseFormula,moveFormula,shiftFormula}};
 })();

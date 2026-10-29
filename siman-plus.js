@@ -52,6 +52,10 @@ body.ed-live #aiPanel{position:fixed;z-index:960;top:40px;bottom:0;inset-inline-
 .tab.ed.docx .kd{background:#2B579A}
 .tab.ed.xlsx .kd{background:#217346}
 .tab.ed.pptx .kd{background:#C43E1C}
+.tab .aiw{color:#E8A400;font-size:12px;line-height:1;animation:aiwP 1.2s ease-in-out infinite}
+.tab .aiw.ready{color:#1E9E5A;animation:none}
+@keyframes aiwP{50%{opacity:.35}}
+@media (prefers-reduced-motion:reduce){.tab .aiw{animation:none}}
 .tab-menu{position:fixed;z-index:60;min-width:230px;background:var(--bar);border:1px solid var(--line);border-radius:12px;box-shadow:0 18px 40px -16px rgba(0,0,0,.45);padding:6px}
 .tab-menu button{display:block;width:100%;text-align:start;border:0;background:none;font:inherit;font-size:14px;color:var(--ink);padding:9px 12px;border-radius:8px;cursor:pointer}
 .tab-menu button:hover,.tab-menu button:focus-visible{background:color-mix(in srgb,var(--marker) 45%,var(--bar));outline:none}
@@ -236,7 +240,7 @@ async function leave() {
   if (c.ed) { if (edLive(c)) await park(c); } else stash();
   TB.cur = null;
 }
-async function enter(t) { if (t.ed) await unpark(t); else restore(t); renderTabs(); AS.onTab(); }
+async function enter(t) { if (t.ed) { await unpark(t); await new Promise(r => setTimeout(r, 0)); aiFlush(t); } else restore(t); renderTabs(); AS.onTab(); }
 
 function observe() {
   if (io) io.disconnect();
@@ -452,7 +456,7 @@ function renderTabs() {
     strip.innerHTML = '';
     for (const t of TB.list) {
       const on = t === TB.cur, d = tabInfo(t);
-      const b = h(`<div class="tab${d.edit ? ' ed ' + t.ed : ''}" role="tab" tabindex="${on ? 0 : -1}" aria-selected="${on}" draggable="true"><span class="kd">${d.kind}</span><span class="nm"></span>${d.dirty ? '<span class="dot" title="יש שינויים שלא נשמרו"></span>' : ''}<span class="x" role="button" aria-label="סגירת הקובץ" title="סגירה">×</span></div>`);
+      const b = h(`<div class="tab${d.edit ? ' ed ' + t.ed : ''}" role="tab" tabindex="${on ? 0 : -1}" aria-selected="${on}" draggable="true"><span class="kd">${d.kind}</span><span class="nm"></span>${AS.busySet.has(t.id) ? '<span class="aiw" title="העוזר עובד על הקובץ הזה">✦</span>' : t.aiQueue && t.aiQueue.some(x => x.plan && x.plan.actions.length) ? '<span class="aiw ready" title="העוזר סיים. השינויים ייכנסו כשתחזרו לקובץ">✦</span>' : ''}${d.dirty ? '<span class="dot" title="יש שינויים שלא נשמרו"></span>' : ''}<span class="x" role="button" aria-label="סגירת הקובץ" title="סגירה">×</span></div>`);
       b.querySelector('.nm').textContent = dispName(d.name);
       b.title = d.name + (d.edit ? ' (עריכה)' : '');
       b.onclick = e => { if (e.target.closest('.x')) { closeTab(t); return; } switchTo(t); };
@@ -716,7 +720,8 @@ const AS = {
   forget(t) { this.hist.delete(t.id); },
   forgetAll() { this.hist.clear(); },
   onTab() { if (!panel.classList.contains('hidden')) renderLog(); },
-  busy: false,
+  busySet: new Set(),        // tabs the assistant is working on (each file has its own)
+  isBusy() { return this.busySet.has(this.key()); },
 };
 const hideAI = () => { panel.classList.add('hidden'); setTimeout(fitWidth, 0); };
 function showAI() {
@@ -789,7 +794,7 @@ function renderLog() {
     $('aiQ').disabled = $('aiSend').disabled = true; $('aiRead').disabled = true;
     return;
   }
-  $('aiQ').disabled = $('aiSend').disabled = AS.busy; $('aiRead').disabled = false;
+  $('aiQ').disabled = $('aiSend').disabled = AS.isBusy(); $('aiRead').disabled = false;
   $('aiQ').placeholder = edKind() && window.OFFICE_AI ? 'מה לעשות בקובץ?' : 'שאלו כל דבר על המסמך…';
   const items = AS.list();
   if (!items.length) {
@@ -809,7 +814,7 @@ function renderLog() {
   if (items.length) {
     const chips = h('<div class="ai-chips"></div>');
     for (const [l, q] of chipsNow().filter(c => !items.some(i => i.q === c[1])).slice(0, 3)) { const b = h(`<button class="ai-chip" type="button">${esc(l)}</button>`); b.onclick = () => askQ(q, l); chips.append(b); }
-    if (!AS.busy && chips.childElementCount) log.append(chips);
+    if (!AS.isBusy() && chips.childElementCount) log.append(chips);
   }
   log.scrollTop = log.scrollHeight;
 }
@@ -821,18 +826,30 @@ function scannedHelp() {
 }
 async function askQ(q, label) {
   q = String(q || '').trim();
-  if (!q || AS.busy || !hasDoc()) return;
+  const tabKey = AS.key();
+  if (!q || AS.busySet.has(tabKey) || !hasDoc()) return;
   if (panel.classList.contains('hidden')) showAI();
-  const list = AS.list(), tabKey = AS.key();
+  const list = AS.list();
   const it = { q, label }; list.push(it);
-  AS.busy = true; renderLog();
+  AS.busySet.add(tabKey); renderLog(); renderTabs();
   try {
     if (onEditor() && window.OFFICE_AI && OFFICE_AI.available()) {
       it.plain = true; it.tab = tabKey; it.wait = 'קורא את הקובץ ומכין את השינויים…'; renderLog();
       const history = list.filter(x => x.a && x !== it).slice(-3).map(x => ({ q: x.q, a: x.a }));
-      const r = await OFFICE_AI.run(q, { history, onWait: s => { it.wait = `השירות עמוס, מנסה שוב בעוד ${s} שניות…`; const w = document.getElementById('aiWait'); if (w && AS.key() === tabKey) w.textContent = it.wait; } });
-      it.res = r;
-      it.a = r.reply || (r.done ? 'בוצע.' : 'לא הצלחתי לבצע את זה. נסו לנסח את הבקשה אחרת, או לבקש דבר אחד בכל פעם.');
+      const onWait = s => { it.wait = `השירות עמוס, מנסה שוב בעוד ${s} שניות…`; const w = document.getElementById('aiWait'); if (w && AS.key() === tabKey) w.textContent = it.wait; };
+      if (!OFFICE_AI.plan) { const r = await OFFICE_AI.run(q, { history, onWait }); it.res = r; it.a = r.reply || (r.done ? 'בוצע.' : 'לא הצלחתי לבצע את זה. נסו לנסח את הבקשה אחרת, או לבקש דבר אחד בכל פעם.'); return; }
+      const plan = await OFFICE_AI.plan(q, { history, onWait });
+      it.plan = plan;
+      const t = TB.list.find(x => x.id === tabKey);
+      if (!t) { it.err = 'הקובץ נסגר לפני שהעוזר סיים'; return; }
+      // the file is still in front: the changes are made now. Otherwise they wait for the file to come back
+      if (TB.cur === t && edLive(t)) { aiFinish(it); return; }
+      (t.aiQueue = t.aiQueue || []).push(it);
+      it.a = plan.reply || 'התשובה מוכנה.';
+      if (plan.actions.length) {
+        it.queued = true;
+        toast(`העוזר סיים ב"${dispName(tabName(t))}". השינויים ייכנסו לקובץ כשתחזרו אליו`);
+      }
       return;
     }
     const text = await docText();
@@ -842,7 +859,24 @@ async function askQ(q, label) {
     const history = list.filter(x => x.a && x !== it).slice(-4).map(x => ({ q: x.q, a: x.a }));
     it.a = await ai({ mode: 'ask', text, question: q, history }, { onWait: s => { it.wait = `השירות עמוס, מנסה שוב בעוד ${s} שניות…`; const w = document.getElementById('aiWait'); if (w && AS.key() === tabKey) w.textContent = it.wait; } });
   } catch (e) { it.err = e.message || String(e); }
-  finally { AS.busy = false; if (AS.key() === tabKey) renderLog(); }
+  finally { AS.busySet.delete(tabKey); renderTabs(); if (AS.key() === tabKey) renderLog(); }
+}
+// the assistant's changes go into the file in front
+function aiFinish(it) {
+  try {
+    const r = OFFICE_AI.applyPlan(it.plan);
+    it.res = r; it.queued = false;
+    it.a = r.reply || (r.done ? 'בוצע.' : 'לא הצלחתי לבצע את זה. נסו לנסח את הבקשה אחרת, או לבקש דבר אחד בכל פעם.');
+  } catch (e) { it.err = e.message || String(e); it.a = null; }
+}
+// a file comes back to the front: what the assistant finished for it meanwhile is put in now, in order
+function aiFlush(t) {
+  if (!t || !t.aiQueue || !t.aiQueue.length || TB.cur !== t || !edLive(t)) return;
+  const q = t.aiQueue; t.aiQueue = [];
+  let n = 0;
+  for (const it of q) { if (!it.plan.actions.length) continue; aiFinish(it); if (it.res && it.res.done) n++; }
+  if (n) toast(n === 1 ? 'השינויים שהעוזר הכין נכנסו לקובץ' : `${n} בקשות של העוזר נכנסו לקובץ`);
+  renderTabs(); if (!panel.classList.contains('hidden')) renderLog();
 }
 window.SIMAN_AI = ai;
 window.SIMAN_ASK = (q, label) => { if (panel.classList.contains('hidden')) showAI(); askQ(q, label); };

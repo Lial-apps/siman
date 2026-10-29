@@ -121,6 +121,7 @@ const I = {
   close: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15"/></svg>',
   share: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="14.5" cy="4.5" r="2.2"/><circle cx="5.5" cy="10" r="2.2"/><circle cx="14.5" cy="15.5" r="2.2"/><path d="M7.4 8.9l5.2-3.2M7.4 11.1l5.2 3.2"/></svg>',
   cloud: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M6 15.5h8.5a3.3 3.3 0 0 0 .4-6.6A5 5 0 0 0 5.4 10.2 2.7 2.7 0 0 0 6 15.5z"/></svg>',
+  open: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 5.5a1.5 1.5 0 011.5-1.5h3.6l1.8 2H16a1.5 1.5 0 011.5 1.5V15a1.5 1.5 0 01-1.5 1.5H4A1.5 1.5 0 012.5 15z"/><path d="M10 9v5M7.5 11.5h5" stroke-linecap="round"/></svg>',
   play: '<svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M6 4l10 6-10 6z"/></svg>',
 };
 
@@ -221,6 +222,7 @@ function attach(root) {
 function openMenu(root, k, anchor) {
   closeMenu(); const P = ED[k].p, q = id => root.querySelector('#' + P + id);
   const items = [
+    ['open', I.open, 'פתיחת קובץ נוסף', '', () => { if (typeof window.pickFile === 'function') window.pickFile(); }],
     ['save', I.save, 'שמירה', 'Ctrl+S', () => { const s = q('Save'); if (s && !s.disabled) { if (typeof s.onclick === 'function') s.onclick.call(s, new MouseEvent('click')); else s.click(); } }],
     ['pdf', I.pdf, 'שמירה כ-PDF', '', () => q('Pdf') && q('Pdf').click()],
     ['translate', I.spark, 'תרגום הקובץ לשפה אחרת', '', () => { if (window.OFFICE_TR) window.OFFICE_TR.open(k); }],
@@ -327,6 +329,7 @@ Rules:
 - New text goes in the language of the file (Hebrew unless the file is in another language), written well and fitting the content.
 - Colors are 6-digit hex without # (e.g. "1F3864"). Sizes are in points.
 - Keep everything the user did not ask to change. Do not delete content unless asked.
+- Moving, flipping or reordering table columns: use "reverseCols" / "reorderCols", never rewrite the cells one by one.
 - At most 40 actions. Use only the actions listed below; unknown fields are ignored.
 - If the request cannot be done with these actions, say so briefly in "reply" and return the closest useful actions or none.
 `;
@@ -350,6 +353,8 @@ Actions:
 {"op":"pageNumbers","where":"footer"|"header","format":"xofy"|"page","align":"center"}
 {"op":"page","orientation":"portrait"|"landscape","margins":"normal"|"narrow"|"moderate"|"wide"}
 {"op":"toc"}  (a table of contents from the headings, at the start)
+{"op":"reverseCols","refs":"tables"|[N]}  (mirrors the order of a table's columns: the column now on one side moves to the other side, cells and widths with it)
+{"op":"reorderCols","refs":[N],"order":["header text"|column number from 1,…]}  (the columns in a new order, in reading order; columns not listed keep their order after the listed ones)
 Examples: "הכן לי כותרת לקובץ" → {"op":"insert","at":"start","blocks":[{"type":"title","text":"<a short fitting title from the content>"}]}
 "הדגש את המילה חשוב" → {"op":"format","refs":"all","find":"חשוב","style":{"bold":true}}`,
   xlsx: `Cells use A1 notation. A "range" is like "A1:D1", "B:B", "3:3", "A1", "used" (the whole used range) or "selection".
@@ -364,6 +369,9 @@ Actions (add "sheet":"name" to work on another sheet):
 {"op":"sort","range":"A1:D9","by":"B","desc":false,"header":true}
 {"op":"clear","range":"A1:B2","formats":false}
 {"op":"direction","rtl":true}
+{"op":"reverseCols","range":"used"|"A:F"|"A1:F30"}  (mirrors the order of the columns in the block: the column on one side of the table moves to the other side, with its values, formulas, formats and width; formulas that point at moved cells follow them)
+{"op":"reorderCols","range":"used","order":["header text"|"C"|column number from 1,…]}  (the columns from left to right — column A first — in the new order; columns not listed keep their order after the listed ones)
+Moving columns: when the user asks to flip the table's sides, move the columns "from right to left", put the first column on the other side, or swap which side of the table each column is on (e.g. 'מק"ט ותיאור מוצר שבצד שמאל יעברו לצד ימין ו-יח' במפעל לצד שמאל'), use ONE "reverseCols" on the used range — do NOT rewrite the values with "set" and do NOT change "direction" as well. Use "direction" only when the user asks to change how the sheet is displayed.
 {"op":"addSheet","name":"…"} (stays on the current sheet: give later actions for the new sheet "sheet":"<its name>") / {"op":"renameSheet","name":"…"}
 Formulas are written in English Excel syntax (SUM, AVERAGE, IF, VLOOKUP, XLOOKUP, COUNTIF…), starting with "=". Inserted rows shift the rows below them: plan cell addresses accordingly.
 Example: "הוסף שורת סיכום" (data in A1:C9) → [{"op":"set","cells":{"A10":"סה\\"כ","B10":"=SUM(B2:B9)","C10":"=SUM(C2:C9)"}},{"op":"format","range":"A10:C10","style":{"bold":true,"border":"top"}}]`,
@@ -378,6 +386,7 @@ Actions:
 {"op":"addText","slide":N,"text":"…","x":10,"y":70,"w":80,"h":12,"style":FMT}
 {"op":"addShape","slide":N,"shape":"rect"|"roundRect"|"ellipse"|"triangle"|"rightArrow"|"leftArrow"|"star5"|"chevron","x":…,"y":…,"w":…,"h":…,"color":"RRGGBB","text":"…","textColor":"FFFFFF"}
 {"op":"move","slide":N,"shape":N,"x":…,"y":…,"w":…,"h":…}
+{"op":"reverseCols","slide":N|"all"}  (mirrors the order of the columns of the tables on those slides)
 {"op":"delete","slide":N,"shape":N} / {"op":"deleteSlide","slide":N} / {"op":"duplicateSlide","slide":N} / {"op":"moveSlide","from":N,"to":M} / {"op":"goto","slide":N}
 Hebrew slides read right to left: align Hebrew text "right" unless centered.
 Example: "הכן שקף פתיחה" → {"op":"addSlide","layout":"title","after":"start","title":"<title>","subtitle":"<subtitle>"}`,
@@ -393,7 +402,9 @@ function parseReply(raw) {
   try { return JSON.parse(s); } catch (_) { return null; }
 }
 const cleanReply = t => String(t || '').replace(/\s*\[(?:עמ['׳]?|עמוד|עמודים|p\.|pp\.|page)\s*[\d\s,–-]+\]/gi, '').trim();
-async function run(question, opts = {}) {
+// the request is read against the file that is open NOW; the answer may come back after the user moved to
+// another file, so asking (plan) and making the changes (applyPlan) are two steps
+async function plan(question, opts = {}) {
   const k = liveKind(); const A = apiOf(k);
   if (!k || !A || !A.assist) throw new Error('העוזר עובד בתוך עורך ה-Word, ה-Excel או ה-PowerPoint');
   if (typeof window.SIMAN_AI !== 'function') throw new Error('השירות החכם לא נטען. רעננו את הדף');
@@ -401,12 +412,23 @@ async function run(question, opts = {}) {
   const prompt = COMMON.replace('{APP}', ED[k].app) + '\n' + SPEC[k] + `\n\nThe file name: "${ctx.name}".\nThe user's request: """${question}"""`;
   const raw = await window.SIMAN_AI({ mode: 'ask', text: ctx.text, question: prompt, history: opts.history || [] }, { onWait: opts.onWait, signal: opts.signal });
   const obj = parseReply(raw);
-  if (!obj || typeof obj !== 'object') return { kind: k, reply: cleanReply(raw), done: 0, skipped: 0, raw };
+  if (!obj || typeof obj !== 'object') return { kind: k, reply: cleanReply(raw), actions: [], raw };
   const acts = Array.isArray(obj.actions) ? obj.actions : obj.action ? [obj.action] : [];
+  return { kind: k, reply: cleanReply(obj.reply || obj.answer || ''), actions: acts };
+}
+function applyPlan(p) {
+  const k = p.kind;
   if (!liveKind() || liveKind() !== k) throw new Error('הקובץ נסגר לפני שהעוזר סיים');
   let res = { done: 0, skipped: 0, mark: null };
-  if (acts.length) res = apiOf(k).assist.apply(acts);
-  return { kind: k, reply: cleanReply(obj.reply || obj.answer || ''), done: res.done, skipped: res.skipped, mark: res.mark, asked: acts.length };
+  if (p.actions.length) res = apiOf(k).assist.apply(p.actions);
+  return { kind: k, reply: p.reply, done: res.done, skipped: res.skipped, mark: res.mark, asked: p.actions.length };
+}
+async function run(question, opts = {}) {
+  const k = liveKind(), root = k && document.getElementById(ED[k].id);
+  const p = await plan(question, opts);
+  // the file the request was made on is not the one in front any more: nothing is changed in the wrong file
+  if (document.getElementById(ED[k].id) !== root) throw new Error('הקובץ נסגר לפני שהעוזר סיים');
+  return applyPlan(p);
 }
 function revert(r) {
   if (!r || !r.mark) return false; const k = liveKind(); if (k !== r.kind) return false;
@@ -429,5 +451,5 @@ watch.observe(document.body, { childList: true });
 for (const e of Object.values(ED)) { const r = document.getElementById(e.id); if (r) attach(r); }
 micInPanel(); setTimeout(micInPanel, 1500);
 
-window.OFFICE_AI = { run, revert, kind: liveKind, available: () => !!(liveKind() && apiOf(liveKind()) && apiOf(liveKind()).assist), parseReply, _ui: UI };
+window.OFFICE_AI = { run, plan, applyPlan, revert, kind: liveKind, available: () => !!(liveKind() && apiOf(liveKind()) && apiOf(liveKind()).assist), parseReply, _ui: UI };
 })();

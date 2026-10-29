@@ -308,7 +308,8 @@ async function prepare(bytes){
   const view=norm.cloneNode(true);
   const nr=[...norm.getElementsByTagNameNS(W,'r')],vr=[...view.getElementsByTagNameNS(W,'r')];
   const atoms=[];
-  nr.forEach((r,i)=>{
+  // pictures, objects and page breaks are kept whole ("atoms"): on screen a marked link, in the file their own XML
+  const markAtoms=(nr,vr,view)=>nr.forEach((r,i)=>{
     if(insideObject(r)||(r.parentNode&&r.parentNode.localName==='hyperlink'))return;
     const c=[...r.childNodes].filter(n=>n.nodeType===1&&!(n.namespaceURI===W&&n.localName==='rPr'));
     if(c.length!==1||!isAtomChild(c[0]))return;
@@ -316,6 +317,7 @@ async function prepare(bytes){
     atoms.push({xml:r,pb,draw:!pb&&!!r.getElementsByTagNameNS(NS.wp,'extent').length});
     const v=vr[i],h=wNew(view,'hyperlink',{anchor:`__${pb?'p':'a'}${k}`});v.parentNode.insertBefore(h,v);h.appendChild(v);
   });
+  markAtoms(nr,vr,view);
   // comments: a marker where each one starts and ends, so it shows on screen and survives editing
   for(const [tag,k] of [['commentRangeStart','cs'],['commentRangeEnd','ce']])for(const m of [...view.getElementsByTagNameNS(W,tag)]){
     const par=m.parentNode;if(!par||par.namespaceURI!==W||par.localName!=='p')continue;
@@ -335,7 +337,15 @@ async function prepare(bytes){
     const refs=kids(sect0,kind+'Reference');const ref=(titlePg&&refs.find(r=>wAttr(r,'type')==='first'))||refs.find(r=>(wAttr(r,'type')||'default')==='default')||null;
     let path=null;if(ref){const rl=drl.find(x=>x.id===(ref.getAttributeNS(NS.r,'id')||ref.getAttribute('r:id')));if(rl)path=resolveTarget(docPart,rl.target);}
     hf[kind]={type:ref?(wAttr(ref,'type')||'default'):'default',path:path&&files.has(path)?path:null};
-    if(hf[kind].path){try{const hd=parseXml(txt(files,path));markFields(hd);put(vfiles,path,ser(hd));}catch(_){}}
+    if(hf[kind].path){try{
+      const src=txt(files,path),hn=parseXml(src);unwrap(hn.documentElement);splitAtomRuns(hn);
+      const hd=hn.cloneNode(true);
+      markAtoms([...hn.getElementsByTagNameNS(W,'r')],[...hd.getElementsByTagNameNS(W,'r')],hd);
+      markFields(hd);put(vfiles,path,ser(hd));
+      // the paragraphs, tables, pictures (a company logo) and page numbers of the header are written back
+      // from here, exactly as they were, unless the person changed them
+      hf[kind].norm=hn.documentElement;hf[kind].root=(src.match(/<w:(?:hdr|ftr)\b[^>]*>/)||[null])[0];
+    }catch(e){console.warn('header',e);}}
   }
   const cm=readComments(files,docPart);
   const vz=new JSZip();for(const [p,b] of vfiles)vz.file(p,b);
@@ -794,7 +804,7 @@ function after(){markDirty();refreshCounters();schedule();updateUI();}
 const cmSig=()=>JSON.stringify([...E.cm.values()].filter(c=>!c.fresh&&(c.keep||cmLive(c))).map(c=>[c.id,c.text,c.done,c.parent]));
 function markDirty(){const d=E.main.innerHTML!==E.cleanHtml||E.pageDirty||hfChanged()||cmSig()!==E.cmClean;if(d!==E.dirty){E.dirty=d;}
   const s=q('weState');s.textContent=E.dirty?'שינויים שלא נשמרו':(E.savedOnce?'נשמר':'');s.classList.toggle('dirty',E.dirty);}
-let schT=0;function schedule(){clearTimeout(schT);schT=setTimeout(()=>{if(!E)return;if(!E.hf&&!E.composing&&liftBlocks(E.main))snap();guides();words();posImgBox();cmRender();},250);}
+let schT=0;function schedule(){clearTimeout(schT);schT=setTimeout(()=>{if(!E)return;if(!E.hf&&!E.composing&&liftBlocks(E.main))snap();if(E.hf)fitHF();guides();words();posImgBox();cmRender();},250);}
 function hint(m){const h=q('weHint');h.textContent=m;clearTimeout(E.hintT);E.hintT=setTimeout(()=>{if(E)h.textContent='';},3000);}
 
 /* ---------- character formatting ---------- */
@@ -1267,14 +1277,27 @@ function setPage(ch){if(E.snapT)snap();Object.assign(E.page,ch);E.pageDirty=true
 function applyPage(){
   const pg=E.page,sh=q('weSheet');
   Object.assign(sh.style,{width:px(pg.w)+'px',minHeight:px(pg.h)+'px',paddingTop:px(pg.top)+'px',paddingBottom:px(pg.bottom)+'px',paddingLeft:px(pg.left)+'px',paddingRight:px(pg.right)+'px'});
-  Object.assign(q('weHdr').style,{top:px(pg.header)+'px',left:px(pg.left)+'px',right:px(pg.right)+'px',maxHeight:Math.max(0,px(pg.top)-px(pg.header))+'px'});
-  Object.assign(q('weFtr').style,{bottom:px(pg.footer)+'px',left:px(pg.left)+'px',right:px(pg.right)+'px',maxHeight:Math.max(0,px(pg.bottom)-px(pg.footer))+'px'});
+  Object.assign(q('weHdr').style,{top:px(pg.header)+'px',left:px(pg.left)+'px',right:px(pg.right)+'px',maxHeight:'none'});
+  Object.assign(q('weFtr').style,{bottom:px(pg.footer)+'px',left:px(pg.left)+'px',right:px(pg.right)+'px',maxHeight:'none'});
+  fitHF();
+}
+// like Word: a header (or footer) taller than the room the margin leaves pushes the text down (or up),
+// instead of being cut to a thin strip over the first lines of the document
+function fitHF(){
+  if(!E||!E.page)return;const pg=E.page,sh=q('weSheet'),h=q('weHdr'),f=q('weFtr');
+  const hc=h.firstElementChild,fc=f.firstElementChild;
+  const hh=hc&&(hc.textContent.replace(ZW,'').trim()||hc.querySelector('img,table,svg'))?h.scrollHeight:0;
+  const fh=fc&&(fc.textContent.replace(ZW,'').trim()||fc.querySelector('img,table,svg'))?f.scrollHeight:0;
+  const top=Math.max(px(pg.top),hh?px(pg.header)+hh+6:0),bot=Math.max(px(pg.bottom),fh?px(pg.footer)+fh+6:0);
+  E.padT=top;E.padB=bot;
+  if(sh.style.paddingTop!==top+'px')sh.style.paddingTop=top+'px';
+  if(sh.style.paddingBottom!==bot+'px')sh.style.paddingBottom=bot+'px';
 }
 
 /* ---------- where each page ends ---------- */
 function guides(){
   const g=q('weGuides'),b=E.main,pg=E.page;g.innerHTML='';
-  const H=px(pg.h)-px(pg.top)-px(pg.bottom);if(H<50)return;
+  const H=px(pg.h)-(E.padT||px(pg.top))-(E.padB||px(pg.bottom));if(H<50)return;
   let start=0,pages=1;const marks=[];
   for(const el of b.children){
     const t=el.offsetTop,h=el.offsetHeight;
@@ -1736,9 +1759,11 @@ async function imgBytes(img){
     const png=await new Promise(r=>c.toBlob(r,'image/png'));return{bytes:new Uint8Array(await png.arrayBuffer()),ext:'png',w:bm.width,h:bm.height};
   }catch(_){return null;}
 }
+// how a block looked when it was opened: the number shown in a page-number field follows the page count, not an edit
+const outerSig=el=>htmlSig(el.outerHTML);
 function paraXml(el,ctx,opts={}){
   const key=el.dataset.src,ent=key?E.map.get(key):null;
-  if(ent&&ent.kind==='p'&&!opts.list&&!ctx.used.has(key)&&el.outerHTML===ent.html){
+  if(ent&&ent.kind==='p'&&!opts.list&&!ctx.used.has(key)&&outerSig(el)===ent.html){
     ctx.used.add(key);let xe=ent.xml;const sp=kid(kid(xe,'pPr'),'sectPr');
     if(sp&&ctx.last.get(key)!==el){xe=xe.cloneNode(true);const pp=kid(xe,'pPr');pp.removeChild(kid(pp,'sectPr'));}
     return ctx.clean(ser(xe));
@@ -1852,7 +1877,7 @@ function cellXml(td,ctx,tcPr){
 const isCont=tc=>{const vm=kid(kid(tc,'tcPr'),'vMerge');return !!vm&&wAttr(vm,'val')!=='restart';};
 function tableXml(el,ctx){
   const key=el.dataset.src,ent=key?E.map.get(key):null;
-  if(ent&&ent.kind==='tbl'&&!ctx.used.has(key)&&el.outerHTML===ent.html){ctx.used.add(key);return ctx.clean(ser(ent.xml));}
+  if(ent&&ent.kind==='tbl'&&!ctx.used.has(key)&&outerSig(el)===ent.html){ctx.used.add(key);return ctx.clean(ser(ent.xml));}
   const rows=[...el.rows].filter(r=>r.closest('table')===el);
   if(ent&&ent.kind==='tbl'&&ent.ok&&!ctx.used.has(key)&&rows.length===ent.rows.length&&rows.every((r,i)=>r.cells.length===ent.rows[i].shown.length)){
     ctx.used.add(key);let x='<w:tbl>';
@@ -1946,7 +1971,11 @@ async function buildDocx(){
 
 /* ---------- headers and footers: double-click to edit, like in Word ---------- */
 const hfBox=k=>q(k==='header'?'weHdr':'weFtr');
-const hfHtml=k=>{const el=hfBox(k).firstElementChild;return el?el.innerHTML:'';};
+// what is not an edit: the number a page-number field shows (it follows the page count), an emptied style,
+// and the size the viewer gives a drawn picture once it has loaded
+const htmlSig=h=>h.replace(/(<span class="we-fld"[^>]*>)[^<]*(<\/span>)/g,'$1$2').replace(/ style=""/g,'').replace(/(<svg\b[^>]*?) width="[^"]*" height="[^"]*"/g,'$1');
+// the number shown in a page-number field changes with the page count: it is not a change in the header
+const hfHtml=k=>{const el=hfBox(k).firstElementChild;return el?htmlSig(el.innerHTML):'';};
 const hfChanged=()=>['header','footer'].some(k=>hfHtml(k)!==(E.hfClean||{})[k]);
 function hfEl(k){
   const box=hfBox(k);let el=box.firstElementChild;
@@ -1973,7 +2002,7 @@ function exitHF(noFocus){
   h.el.contentEditable='false';hfBox(h.kind).classList.remove('ed');E.root.classList.remove('we-hfmode');
   E.body=E.main;E.hist=h.saved.hist;E.hi=h.saved.hi;E.lastRange=h.saved.lastRange;E.lastSel=h.saved.lastSel;E.hf=null;
   const tab=E.root.querySelector('.we-tabs [data-tab=hf]');tab.hidden=true;if(tab.getAttribute('aria-selected')==='true')showTab('home');
-  markDirty();updateUI();
+  fitHF();markDirty();updateUI();
   if(!noFocus){E.main.focus({preventScroll:true});if(E.lastRange){const s=getSelection();s.removeAllRanges();s.addRange(E.lastRange);}}
 }
 const fld=(f,style)=>`<span class="we-fld" data-f="${f}" contenteditable="false"${style?` style="${style}"`:''}>${f==='PAGE'?'1':(E.pageCount||1)}</span>`;
@@ -2000,11 +2029,16 @@ async function hfXml(k,files,docPart,st){
   const el=hfBox(k).firstElementChild;const tag=k==='header'?'w:hdr':'w:ftr';let path=st.hf[k].path,ref=null;
   if(!path){let n=1;do path=`word/${k}${n++}.xml`;while(files.has(path));
     ctEnsureOverride(files,path,OX+`wordprocessingml.${k}+xml`);ref={kind:k,type:st.hf[k].type,rid:addRel(files,docPart,RT_HF(k),path.replace(/^word\//,''))};}
-  const hctx={files,used:new Set(),last:new Map(),imgs:new Map(),props:new Map(),atomUsed:new Set(),lost:0,clean:x=>x,numMax:0,extra:[],decUsed:false,
+  // the header's own opening tag, with all its namespaces, is kept, so the original parts can be written back as they were
+  let root=st.hf[k].root&&new RegExp(`^<${tag}\\b`).test(st.hf[k].root)?st.hf[k].root:`<${tag} xmlns:w="${W}">`;
+  for(const [p2,u] of [['w',W],['r',NS.r],['wp',NS.wp],['a',NS.a],['pic',NS.pic]])if(!new RegExp(`xmlns:${p2}=`).test(root))root=root.replace(/\/?>$/,` xmlns:${p2}="${u}">`);
+  const decl=new Map();for(const m of root.matchAll(/xmlns:(\w+)="([^"]+)"/g))decl.set(m[1],m[2]);
+  const clean=x=>x.replace(/ xmlns:(\w+)="([^"]+)"/g,(m,p2,u)=>decl.get(p2)===u?'':m);
+  const hctx={files,used:new Set(),last:new Map(),imgs:new Map(),props:new Map(),atomUsed:new Set(),lost:0,clean,numMax:0,extra:[],decUsed:false,
     nextDocPr:5000+(k==='footer'?500:0),rel:(type,target,mode)=>addRel(files,path,type,target,mode),newDec(){return E.st.num.decimal;}};
   if(el)for(const img of el.querySelectorAll('img'))if(!img.closest('[data-atom]'))hctx.imgs.set(img,await imgBytes(img));
   const inner=(el&&exportContainer(el,hctx))||`<w:p><w:pPr>${st.heb?'<w:bidi/>':''}</w:pPr></w:p>`;
-  put(files,path,XML_HEAD+`<${tag} xmlns:w="${W}" xmlns:r="${NS.r}" xmlns:wp="${NS.wp}" xmlns:a="${NS.a}" xmlns:pic="${NS.pic}">${inner}</${tag}>`);
+  put(files,path,XML_HEAD+root+inner+`</${tag}>`);
   return ref;
 }
 
@@ -2277,15 +2311,28 @@ async function mount(){
   for(const s of body.querySelectorAll(`span.${P}_commentreference,span.${P}-commentreference`))if(!s.textContent.replace(ZW,''))s.remove();
   for(const box of [q('weHdr'),q('weFtr')])for(const a of box.querySelectorAll('a[href^="#__f"]')){const f=a.getAttribute('href').slice(4);const sp=document.createElement('span');sp.className='we-fld';sp.dataset.f=f;sp.contentEditable='false';
     const inner=a.querySelector('span');if(inner&&inner.getAttribute('style'))sp.setAttribute('style',inner.getAttribute('style'));sp.textContent=f==='PAGE'?'1':'#';a.replaceWith(sp);}
+  for(const box of [q('weHdr'),q('weFtr')])for(const a of box.querySelectorAll('a[href^="#__"]')){const m=/^#__([ap])(\d+)$/.exec(a.getAttribute('href'));if(!m)continue;
+    a.removeAttribute('href');a.contentEditable='false';a.dataset.atom=m[2];a.classList.add(m[1]==='p'?'we-pb':'we-atom');if(m[1]==='p')a.textContent='';a.querySelectorAll('img,svg').forEach(i=>i.draggable=false);}
   for(const box of [q('weHdr'),q('weFtr')])for(const a of box.querySelectorAll('a[href^="#__"]'))a.replaceWith(...a.childNodes);
+  // an old-style (VML) picture floating inside a header table cell, like a company logo: Word keeps it inside
+  // its cell and makes the row tall enough for it ("top and bottom" wrapping). Shown loose, it slid over the next row
+  for(const box of [q('weHdr'),q('weFtr')])for(const g of box.querySelectorAll('svg[style*="position:absolute"],img[style*="position:absolute"]')){
+    const st=g.getAttribute('style')||'';if(!/mso-position-/.test(st)||!g.closest('td'))continue;
+    const ml=(/margin-left:\s*([-\d.]+pt)/.exec(st)||[])[1]||'0pt',mt=(/margin-top:\s*([-\d.]+pt)/.exec(st)||[])[1]||'0pt';
+    g.style.position='static';g.style.display='block';g.style.marginTop=parseFloat(mt)>0?Math.min(parseFloat(mt),12)+'pt':'0';
+    g.style.marginLeft=ml;g.style.marginRight='auto';g.style.marginBottom='2pt';g.style.zIndex='auto';}
+  E.map=new Map();E.mapMiss=0;
+  for(const [k,pre] of [['header','h.'],['footer','f.']]){const el=hfBox(k).firstElementChild;if(el&&st.hf[k].norm)mapContainer(el,st.hf[k].norm,pre);}
+  for(const [k,ent] of E.map){const el=E.root.querySelector(`[data-src="${k}"]`);if(!el)continue;ent.html=outerSig(el);if(ent.kind==='p')ent.sig=sigOf(el);}
   E.hfOrig={header:hfHtml('header'),footer:hfHtml('footer')};E.hfClean={...E.hfOrig};
+  fitHF();for(const im of [...q('weHdr').querySelectorAll('img'),...q('weFtr').querySelectorAll('img')])if(!im.complete)im.addEventListener('load',()=>{fitHF();if(E)guides();},{once:true});
   E.cm=E.st.cm.list;E.cmDirty=false;for(const c of E.cm.values())if(!cmLive(c))c.keep=true;
   E.cmOrigLive=[...E.cm.values()].filter(c=>cmLive(c)).map(c=>c.id).sort().join(',');E.cmClean=cmSig();
   for(const p of body.querySelectorAll('p'))if(!p.childNodes.length)p.append(document.createElement('br'));
   for(const t of body.querySelectorAll(`span.${P}-tab-stop`))t.contentEditable='false';
-  E.map=new Map();E.mapMiss=0;mapContainer(body,st.body,'');
+  mapContainer(body,st.body,'');
   await nextFrame();
-  for(const [k,ent] of E.map){const el=body.querySelector(`[data-src="${k}"]`);if(!el)continue;ent.html=el.outerHTML;if(ent.kind==='p')ent.sig=sigOf(el);}
+  for(const [k,ent] of E.map){if(/^[hf]\./.test(k))continue;const el=body.querySelector(`[data-src="${k}"]`);if(!el)continue;ent.html=outerSig(el);if(ent.kind==='p')ent.sig=sigOf(el);}
   ensureBlocks();
   // the blank document starts as a paragraph the editor owns
   E.cleanHtml=body.innerHTML;
@@ -2562,6 +2609,26 @@ function aiSetText(b,text){
   if(!b.textContent&&!b.querySelector('img,[data-atom]'))b.append(document.createElement('br'));
   b.style.direction=aiDir(text);
 }
+// the columns of a table in a new order: mirrored (order=null), or as listed — header texts or numbers from 1 (the first column as read)
+function aiTableCols(t,order){
+  const rows=[...t.rows].filter(r=>r.closest('table')===t);if(!rows.length)return false;
+  const cg=[...t.querySelectorAll(':scope>colgroup>col')];
+  if(!order){
+    for(const r of rows){const cs=[...r.cells];if(cs.length<2)continue;for(let i=cs.length-1;i>=0;i--)r.append(cs[i]);}
+    if(cg.length>1){const g=cg[0].parentNode;for(let i=cg.length-1;i>=0;i--)g.append(cg[i]);}
+    return true;
+  }
+  // a listed order: only for tables without merged cells
+  if(rows.some(r=>[...r.cells].some(c=>c.colSpan>1||c.rowSpan>1)))return false;
+  const n=Math.max(...rows.map(r=>r.cells.length));const heads=[...rows[0].cells].map(c=>c.textContent.replace(/["'״׳\s]/g,''));
+  const seen=new Set(),perm=[];
+  for(const it of order){const x=String(it).trim();let i=/^\d+$/.test(x)?+x-1:heads.indexOf(x.replace(/["'״׳\s]/g,''));if(i>=0&&i<n&&!seen.has(i)){seen.add(i);perm.push(i);}}
+  for(let i=0;i<n;i++)if(!seen.has(i))perm.push(i);
+  if(perm.every((v,i)=>v===i))return false;
+  for(const r of rows){const cs=[...r.cells];for(const i of perm)if(cs[i])r.append(cs[i]);}
+  if(cg.length===n){const g=cg[0].parentNode;for(const i of perm)g.append(cg[i]);}
+  return true;
+}
 function aiTableStyle(t,a){
   const rows=[...t.rows].filter(r=>r.closest('table')===t);if(!rows.length)return;
   const kind=String(a.style||a.preset||'header').toLowerCase();
@@ -2602,6 +2669,10 @@ function aiApply(actions){
         const tw=document.createTreeWalker(E.main,NodeFilter.SHOW_TEXT);const ts=[];let t;while((t=tw.nextNode()))if(t.data.includes(f)&&!tokOf(t))ts.push(t);
         for(const x of ts){const parts=x.data.split(f);n+=parts.length-1;x.data=parts.join(String(a.with??a.replace??''));if(a.all===false&&n)break;}
         n?done.push(op):skipped.push(op);}
+      else if(op==='reversecols'||op==='reversecolumns'||op==='mirrorcols'||op==='flipcols'||op==='reordercols'||op==='movecols'){
+        const ts=aiTargets({...a,refs:a.refs??a.ref??'tables'}).filter(b=>b.tagName==='TABLE');let n=0;
+        for(const t of ts)if(aiTableCols(t,/^(reorder|move)/.test(op)?(a.order||a.columns):null))n++;
+        n?done.push(op):skipped.push(op);}
       else if(op==='table'||op==='tablestyle'){const ts=aiTargets({...a,refs:a.refs??a.ref??'tables'}).filter(b=>b.tagName==='TABLE');ts.forEach(t=>aiTableStyle(t,a));ts.length?done.push(op):skipped.push(op);}
       else if(op==='page'){const ch={};
         if(a.orientation){const land=/land|רוחב/.test(a.orientation);const w=Math.min(E.page.w,E.page.h),h=Math.max(E.page.w,E.page.h);Object.assign(ch,land?{w:h,h:w}:{w,h});}
@@ -2635,5 +2706,5 @@ async function shareFile(fmt){
 }
 window.WORD_EDITOR={open,close:forceClose,isOpen:()=>!!E,share:{file:shareFile,name:()=>E?fileName():''},
   assist:{context:aiContext,apply:aiApply,revert:aiRevert,ribbon:()=>E&&E.root.querySelector('.we-ribbon'),root:()=>E&&E.root},
-  _test:{get E(){return E;},enterHF,exitHF,pageNumber,removePageNumbers,cmNew,cmAction,cmRemove,tocInsert,tocRemove,wordCount,autoCorrect,countText,buildDocx:()=>buildDocx(),inline,fmt,setFont,setSize,setColor,setHilite,align,setDir,toggleList,indent,applyStyle,galItems,insertTable,tableOp,insertPageBreak,lineSpacing,setPage,undo,redo,getSel,setSel,snap,clearFmt,insertText,findAll,replaceAll:()=>replaceAll(),runFind}};
+  _test:{get E(){return E;},hfHtml:k=>hfHtml(k),enterHF,exitHF,pageNumber,removePageNumbers,cmNew,cmAction,cmRemove,tocInsert,tocRemove,wordCount,autoCorrect,countText,buildDocx:()=>buildDocx(),inline,fmt,setFont,setSize,setColor,setHilite,align,setDir,toggleList,indent,applyStyle,galItems,insertTable,tableOp,insertPageBreak,lineSpacing,setPage,undo,redo,getSel,setSel,snap,clearFmt,insertText,findAll,replaceAll:()=>replaceAll(),runFind}};
 })();
