@@ -1289,7 +1289,7 @@ body:has(#wed) .busy,body:has(#xed) .busy{z-index:1000}body:has(#wed) .toast,bod
 </dialog>
 
 <header class="bar">
-  <div class="brand"><b title="גרסה 5.3.0">סימן</b><span class="ver">5.3.0</span><span class="fname" id="fname"></span></div>
+  <div class="brand"><b title="גרסה 5.3.2">סימן</b><span class="ver">5.3.2</span><span class="fname" id="fname"></span></div>
 
   <nav class="tools" id="tools" aria-label="כלים">
     <button class="tool" data-tool="select" aria-pressed="true" title="בחירה וגלילה (V)">
@@ -1860,6 +1860,8 @@ async function renderLayers(P,z){
     await pdfjs.renderTextLayer({textContentSource:P.page.streamTextContent(),container:div,viewport:vp,textDivs:[]}).promise;
     if(S.zoom!==z)return;P.txl.replaceWith(div);P.txl=div;
   }catch(e){console.warn('text layer',e);}
+  // links, videos, apps and attached files inside the PDF (siman-media.js)
+  try{if(window.SimanMedia)SimanMedia.render(P,z);}catch(e){console.warn('media layer',e);}
   try{
     if(!P.annots)P.annots=(await P.page.getAnnotations({intent:'display'})).filter(a=>a.annotationType===20);
     if(!P.annots.length||S.zoom!==z)return;
@@ -3869,6 +3871,7 @@ async function openOffice(file,handle,opt){
         busy(true,'מכין את המצגת לסימון…');await loadEditLibs('pptx');
         const pdf=await PPTX_EDITOR.toPdf(src,m=>busy(true,m));const base=file.name.replace(/\.pptx$/i,'');
         busy(false);setDirty(false);showOfficeView(false);
+        window.SM_SRC={bytes:src,kind:'pptx',name:base+'.pdf'}; // links and videos of the original presentation
         await openFile(new File([pdf],base+'.pdf',{type:'application/pdf'}));
         toast('המצגת נפתחה לסימון וחתימה. היא נשמרת כקובץ PDF');
         return;
@@ -4008,6 +4011,7 @@ async function openWordEditor(bytes,name,isNew,handle){
       toPdf:async b=>{const r=await OFFICE_EDIT.toPdf('docx',b,m=>busy(true,m));return r.pdf instanceof Uint8Array?r.pdf:new Uint8Array(r.pdf);},
       toDesk:async f=>{await openOffice(f,null,{desk:true});},
       onClose:()=>{}});
+    if(bytes&&window.SimanMedia)SimanMedia.office(bytes,'docx'); // links, videos and files inside the document
   }catch(e){console.error(e);toast('לא הצלחתי לפתוח את המסמך לעריכה: '+(e.message||e));}
   finally{busy(false);}
 }
@@ -4024,6 +4028,7 @@ async function openExcelEditor(bytes,name,isNew,handle){
       toPdf:async b=>{const r=await OFFICE_EDIT.toPdf('xlsx',b,m=>busy(true,m));return r.pdf instanceof Uint8Array?r.pdf:new Uint8Array(r.pdf);},
       toDesk:async f=>{await openOffice(f,null,{desk:true});},
       onClose:()=>{}});
+    if(bytes&&window.SimanMedia)SimanMedia.office(bytes,'xlsx');
   }catch(e){console.error(e);toast('לא הצלחתי לפתוח את הגיליון לעריכה: '+(e.message||e));}
   finally{busy(false);}
 }
@@ -4039,6 +4044,7 @@ async function openPptEditor(bytes,name,isNew,handle){
       save:(n,b,k)=>saveEditorFile(ctx,n,b,k),toast,busy:(on,m)=>busy(on,m),
       toDesk:async f=>{await openFile(f);},
       onClose:()=>{}});
+    if(bytes&&window.SimanMedia)SimanMedia.office(bytes,'pptx');
   }catch(e){console.error(e);toast('לא הצלחתי לפתוח את המצגת לעריכה: '+(e.message||e));}
   finally{busy(false);}
 }
@@ -5243,5 +5249,6 @@ if(localStorage.getItem('siman.beta')==='1'){var l=document.createElement('link'
 </script>
 <link rel="stylesheet" href="siman-v7.css?v=5.3.0">
 <script src="siman-v7.js?v=5.3.0" defer></script>
+<script src="siman-media.js?v=5.3.2" defer></script>
 </body>
 </html>
