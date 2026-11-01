@@ -110,10 +110,10 @@
       cards: { translate: ['Translate a document', 'From any language, same exact layout'], transcribe: ['Transcribe a recording', 'A lesson, call or voice note into text'], word: ['Edit Word files', 'Like on a computer, even on your phone'], scan: ['Page to document', 'Snap a page, get a clean document'], slides: ['Design and fix slides', 'Even a deck that won’t open'], ask: ['Ask the document', 'Instant answers, no need to read it all'], excel: ['Work in Excel', 'Full editing in a few taps'], conv: ['Convert to Word', 'A PDF opened for normal editing'], send: ['Send for signature', 'To one person or several'], merge: ['Merge and split', 'Many files into one, or the reverse'], sign: ['Fill and sign', 'A form done in two minutes'] } }
   };
   var T2 = {
-    he: { appear: 'מראה וצבע', modeLabel: 'מראה', colorLabel: 'צבע', modes: ['בהיר', 'כהה', 'אוטומטי'], modeNote: 'במצב אוטומטי הצבעים מתחלפים לפי ההגדרה של המכשיר.', colors: ['שמיים', 'ים', 'לבנדר', 'שקיעה', 'פטל', 'יער'], fresh: 'חדש', types: 'PDF, Word, Excel ומצגות' },
-    ar: { appear: 'المظهر واللون', modeLabel: 'المظهر', colorLabel: 'اللون', modes: ['فاتح', 'داكن', 'تلقائي'], modeNote: 'في الوضع التلقائي تتبع الألوان إعداد الجهاز.', colors: ['سماوي', 'بحر', 'لافندر', 'غروب', 'توت', 'غابة'], fresh: 'جديد', types: 'PDF وWord وExcel والعروض' },
-    ru: { appear: 'Оформление и цвет', modeLabel: 'Оформление', colorLabel: 'Цвет', modes: ['Светлое', 'Тёмное', 'Авто'], modeNote: 'В режиме «Авто» цвета следуют настройке устройства.', colors: ['Небесный', 'Море', 'Лаванда', 'Закат', 'Малина', 'Лес'], fresh: 'Новое', types: 'PDF, Word, Excel и презентации' },
-    en: { appear: 'Appearance and color', modeLabel: 'Appearance', colorLabel: 'Color', modes: ['Light', 'Dark', 'Auto'], modeNote: 'In Auto, colors follow your device setting.', colors: ['Sky', 'Sea', 'Lavender', 'Sunset', 'Raspberry', 'Forest'], fresh: 'New', types: 'PDF, Word, Excel and slides' }
+    he: { appear: 'מראה וצבע', modeLabel: 'מראה', colorLabel: 'צבע', modes: ['בהיר', 'כהה', 'אוטומטי'], modeNote: 'במצב אוטומטי הצבעים מתחלפים לפי ההגדרה של המכשיר.', colors: ['שמיים', 'ים', 'לבנדר', 'שקיעה', 'פטל', 'יער'], fresh: 'חדש', searchShort: 'מה תרצו לעשות?', types: 'PDF, Word, Excel ומצגות' },
+    ar: { appear: 'المظهر واللون', modeLabel: 'المظهر', colorLabel: 'اللون', modes: ['فاتح', 'داكن', 'تلقائي'], modeNote: 'في الوضع التلقائي تتبع الألوان إعداد الجهاز.', colors: ['سماوي', 'بحر', 'لافندر', 'غروب', 'توت', 'غابة'], fresh: 'جديد', searchShort: 'ماذا تريد أن تفعل؟', types: 'PDF وWord وExcel والعروض' },
+    ru: { appear: 'Оформление и цвет', modeLabel: 'Оформление', colorLabel: 'Цвет', modes: ['Светлое', 'Тёмное', 'Авто'], modeNote: 'В режиме «Авто» цвета следуют настройке устройства.', colors: ['Небесный', 'Море', 'Лаванда', 'Закат', 'Малина', 'Лес'], fresh: 'Новое', searchShort: 'Что нужно сделать?', types: 'PDF, Word, Excel и презентации' },
+    en: { appear: 'Appearance and color', modeLabel: 'Appearance', colorLabel: 'Color', modes: ['Light', 'Dark', 'Auto'], modeNote: 'In Auto, colors follow your device setting.', colors: ['Sky', 'Sea', 'Lavender', 'Sunset', 'Raspberry', 'Forest'], fresh: 'New', searchShort: 'What do you want to do?', types: 'PDF, Word, Excel and slides' }
   };
   var LANGS = ['he', 'ar', 'ru', 'en'];
   var lang = LS.get('siman.v7.lang');
@@ -280,6 +280,13 @@
   var home = null;
   var WAVE = '<span class="v7-wave" aria-hidden="true">' + [10, 22, 14, 26, 16, 8, 20].map(function (x) { return '<i style="height:' + x + 'px"></i>'; }).join('') + '</span>';
   var SIGN = '<svg class="v7-sig" viewBox="0 0 110 34" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 26c8-16 14-20 17-10s6 11 11 1 8-9 11-1 6 6 11-1 9-7 14-3 10 4 16-2 10-6 14-5"/></svg>';
+  // בטלפון ההסבר המלא בשורת החיפוש לא נכנס ונחתך: מציגים גרסה קצרה
+  var narrowMq = window.matchMedia ? matchMedia('(max-width:720px)') : null;
+  function narrow() { return !!(narrowMq && narrowMq.matches); }
+  if (narrowMq) {
+    var onNarrow = function () { var s = $('v7Search'); if (s) s.placeholder = narrow() ? T2[lang].searchShort : T[lang].search; };
+    if (narrowMq.addEventListener) narrowMq.addEventListener('change', onNarrow); else if (narrowMq.addListener) narrowMq.addListener(onNarrow);
+  }
   function lbl(k) { var c = T[lang].cards[k]; return c ? c[0] + '. ' + c[1] : ''; }
   function buildHome() {
     var empty = $('empty');
@@ -287,7 +294,7 @@
     var L = T[lang], L2 = T2[lang], C = L.cards;
     var html = '<section class="v7-home" dir="' + L.dir + '" lang="' + lang + '">' +
       '<h1>' + esc(L.title) + '</h1><p class="v7-sub">' + esc(L.sub) + '</p>' +
-      '<label class="v7-search">' + svg(I.search, 20) + '<span class="v7-sr">' + esc(L.searchLabel) + '</span><input type="search" id="v7Search" autocomplete="off" enterkeyhint="search" placeholder="' + esc(L.search) + '"></label>' +
+      '<label class="v7-search">' + svg(I.search, 20) + '<span class="v7-sr">' + esc(L.searchLabel) + '</span><input type="search" id="v7Search" autocomplete="off" enterkeyhint="search" placeholder="' + esc(narrow() ? L2.searchShort : L.search) + '"></label>' +
       '<div class="v7-bento">' +
         '<button type="button" class="v7-t v7-open" data-v7="open"><span class="v7-plus">' + svg(I.plus, 26) + '</span><span class="v7-tt"><b>' + esc(L.openFile) + '</b>' +
           '<small class="v7-only-wide">' + esc(L.drop) + '</small><small class="v7-only-narrow">' + esc(L2.types) + '</small></span></button>' +
