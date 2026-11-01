@@ -119,6 +119,7 @@ document.head.append(h(`<style id="simanCamCss">
 .scn-grid .row button{width:30px;height:30px;border-radius:8px;border:0;background:rgba(255,255,255,.08);display:grid;place-items:center;padding:0}
 .scn-grid .row button svg{width:17px;height:17px}
 .scn-grid .row button:disabled{opacity:.3}
+.scn-grid .blur{display:inline-block;margin-inline-start:4px;padding:1px 6px;border-radius:6px;background:#E5484D;color:#fff;font-size:11px;font-weight:700}
 .scn-grid li.add{border:2px dashed rgba(255,255,255,.25);background:none;align-items:center;justify-content:center;min-height:200px;cursor:pointer;color:#B8C4D8;font-size:14px;text-align:center}
 .scn-sec{margin:18px 0 0}
 .scn-sec h3{margin:0 0 8px;font-size:14px;color:#9FB0C9;font-weight:600}
@@ -700,7 +701,7 @@ const CAM = {
     if (!this.auto) { this.setHint('הדף זוהה. לוחצים על הכפתור לצילום'); return; }
     if (same && Date.now() - this.lastShot < 6000) { this.setHint('צולם ✓ החליפו דף או הפכו עמוד'); return; }
     this.setHint(this.stable >= 3 ? 'החזיקו יציב…' : 'הדף זוהה');
-    if (this.stable >= 8 && Date.now() - this.lastShot > 1500) this.shoot();
+    if (this.stable >= 8 && Date.now() - this.lastShot > 1500) this.shoot(true);
   },
   // צילום אמיתי במצלמה, ברזולוציה המלאה שלה. המסגרת שזוהתה בווידאו מועברת לתמונה:
   // הווידאו הוא בדרך כלל חיתוך מהמרכז של אותה תמונה (16:9 מתוך 4:3)
@@ -842,13 +843,13 @@ const CAM = {
       }
       const q = sheetIn(out), blob = await toBlob(out, 0.92); free(out);
       this.megaCancel();
-      const p = newPage({ src: blob, quad: q || FULL.map(p => [...p]), auto: !!q, filter: this.defFilter });
+      const p = newPage({ src: blob, quad: q || FULL.map(p => [...p]), auto: !!q, filter: this.defFilter, mega: true });
       this.pages.push(p); await refreshThumb(p); this.updateStack();
       this.busy(null); this.cur = this.pages.length - 1; this.show('review');
       say(q ? 'הדף הגדול חובר. אפשר ליישר את המסגרת בעריכת העמוד' : 'הדף הגדול חובר. אפשר לחתוך אותו בעריכת העמוד');
     } catch (e) { console.error(e); this.busy(null); this.megaCancel(); say('החיבור נכשל: ' + (e.message || e)); }
   },
-  async shoot() {
+  async shoot(auto) {
     if (this.mode === 'mega') { if (!this.stream) return; return this.mega && this.mega.on ? this.megaStop() : this.megaStart(); }
     if (this.shooting || !this.stream) return;
     const v = this.video; if (!v.videoWidth) return;
@@ -866,6 +867,8 @@ const CAM = {
       let c = await this.photo(W, H, q);
       if (c && c.q !== undefined) { q = c.q; c = c.c; }
       if (!c) { const k = Math.min(1, 4000 / Math.max(W, H)); c = canvasOf(W * k, H * k); c.getContext('2d').drawImage(v, 0, 0, c.width, c.height); }
+      // צילום אוטומטי שיצא מטושטש (יד זזה, המצלמה עוד ממקדת) לא נשמר — מחכים לתמונה חדה
+      if (auto) { const sm = scaledCanvas(c, 800), sh = sharpness(sm); free(sm); if (sh < 25) { free(c); this.lastShot = Date.now() - 800; this.lastShotQuad = null; this.setHint('התמונה לא חדה, מחזיקים יציב…'); return; } }
       // בתעודה: אם לא זוהתה, המסגרת המסומנת על המסך
       if (!q && this.mode === 'id') q = [[0.08, 0.22], [0.92, 0.22], [0.92, 0.78], [0.08, 0.78]];
       this.lastShot = Date.now(); this.lastShotQuad = q; this.stable = 0;
@@ -881,7 +884,7 @@ const CAM = {
       const img = await decodeImg(blob), c = warp(img, q || FULL, 3600); if (img.close) img.close();
       const half = Math.round(c.width * Math.max(0.3, Math.min(0.7, splitT))), mk = async (x0, w) => { const o = canvasOf(w, c.height); o.getContext('2d').drawImage(c, x0, 0, w, c.height, 0, 0, w, c.height); const b = await toBlob(o, 0.92); free(o); return b; };
       const right = await mk(half, c.width - half), left = await mk(0, half); free(c);
-      for (const b of this.rtlBook ? [right, left] : [left, right]) { const p = newPage({ src: b }); this.pages.push(p); await refreshThumb(p); }
+      for (const b of this.rtlBook ? [right, left] : [left, right]) { const p = newPage({ src: b, split: true }); this.pages.push(p); await refreshThumb(p); }
     } else if (m === 'id') {
       const img = await decodeImg(blob), c = warp(img, q || FULL, 1400); if (img.close) img.close();
       // כרטיס לרוחב
@@ -905,11 +908,13 @@ const CAM = {
     x.drawImage(front, left, top1, cw, ch); if (back) x.drawImage(back, left, top2, cw, ch);
     x.strokeStyle = '#D0D6E0'; x.lineWidth = 2; x.strokeRect(left, top1, cw, ch); if (back) x.strokeRect(left, top2, cw, ch);
     free(front); free(back);
-    const p = newPage({ src: await toBlob(pg, 0.93), filter: 'orig' }); free(pg);
+    const p = newPage({ src: await toBlob(pg, 0.93), filter: 'orig', fixed: true }); free(pg);
     this.pages.push(p); await refreshThumb(p);
     this.updateStack(); this.setHint(`התעודה נוספה ✓ עמוד ${this.pages.length}`);
   },
   updateStack() {
+    // כל עמוד חדש עובר בדיקה ברקע: חדות, מסגרת הדף (אם לא זוהתה) וכיוון
+    for (const p of this.pages) if (!p.doc) p.doc = (this.docQ = (this.docQ || Promise.resolve()).then(() => this.doctor(p)).catch(e => console.warn('doctor', e)));
     const s = $r('[data-a=review]'), last = this.pages[this.pages.length - 1];
     s.hidden = !last; if (last) { s.querySelector('img').src = last.thumb || ''; s.querySelector('b').textContent = this.pages.length; s.setAttribute('aria-label', `מעבר לעמודים שנסרקו (${this.pages.length})`); }
   },
@@ -986,7 +991,7 @@ const CAM = {
     const nm = $r('[data-r=name]'); nm.value = this.name; nm.oninput = () => { this.name = nm.value; };
     const g = $r('[data-r=grid]');
     g.innerHTML = this.pages.map((p, i) => `<li><button class="pv" type="button" data-ed="${i}" aria-label="עריכת עמוד ${i + 1}"><img alt="" src="${p.thumb}"></button>
-      <div class="row"><button type="button" data-mv="${i}:-1" aria-label="להקדים את עמוד ${i + 1}" ${i ? '' : 'disabled'}>${I.prev}</button><span>עמוד ${i + 1}</span>
+      <div class="row"><button type="button" data-mv="${i}:-1" aria-label="להקדים את עמוד ${i + 1}" ${i ? '' : 'disabled'}>${I.prev}</button><span>עמוד ${i + 1}${p.blurry ? ' <b class="blur">מטושטש</b>' : ''}</span>
       <button type="button" data-mv="${i}:1" aria-label="לדחות את עמוד ${i + 1}" ${i < n - 1 ? '' : 'disabled'}>${I.next}</button><button type="button" data-del="${i}" aria-label="מחיקת עמוד ${i + 1}">${I.trash}</button></div></li>`).join('')
       + `<li class="add" role="button" tabindex="0" data-add="1">${I.plus}<span>הוספת עמודים</span></li>`;
     g.querySelectorAll('[data-ed]').forEach(b => b.onclick = () => { this.cur = +b.dataset.ed; this.show('edit'); });
@@ -1067,7 +1072,7 @@ const CAM = {
       if (f) { q = f; draw(); b.textContent = 'זוהה ✓'; } else b.textContent = 'לא זוהה, גררו את הפינות'; };
     stg.querySelector('[data-c=ok]').onclick = async () => {
       if (quadArea(q) < 0.02) { say('המסגרת קטנה מדי'); return; }
-      p.quad = q; this.cropping = false; this.busy('מיישר את הדף…'); await refreshThumb(p); this.busy(null); this.updateStack(); this.renderEdit();
+      p.quad = q; p.cropEdited = true; this.cropping = false; this.busy('מיישר את הדף…'); await refreshThumb(p); this.busy(null); this.updateStack(); this.renderEdit();
     };
   },
   async tool(t) {
@@ -1144,6 +1149,38 @@ const CAM = {
     if (ocr) { if (typeof runOCR === 'function' && typeof S !== 'undefined' && S.pages) await runOCR(S.pages.map((_, i) => i)); }
     else say('הסריקה פתוחה: אפשר לחתום, לסמן ולמלא. לשמירה, כפתור השמירה למעלה');
   },
+  /* בדיקת עמוד חדש, ברקע, בלי לעכב את הצילום הבא:
+     1. חדות — צילום מטושטש מסומן, כי ממנו אי אפשר לקרוא טוב
+     2. מסגרת הדף — כשהזיהוי במכשיר לא מצא את הדף (רקע בהיר, תאורה חלשה), הקורא מוצא את ארבע הפינות
+     3. כיוון — דף שצולם לרוחב או הפוך מסובב */
+  async doctor(p) {
+    if (!this.pages.includes(p)) return;
+    try {
+      const c = await render(Object.assign({}, p, { filter: 'orig', ink: false }), 800);
+      p.blurry = sharpness(c) < 25; free(c);
+      if (p.blurry) say(`עמוד ${this.pages.indexOf(p) + 1} יצא מטושטש. כדאי לצלם אותו שוב`);
+    } catch (_) {}
+    const AI = window.SIMAN_AI;
+    if (AI && navigator.onLine !== false && !p.auto && !p.mega && !p.split && !p.fixed && !p.cropEdited) {
+      try {
+        const img = await decodeImg(p.src), c = scaledCanvas(img, 900); if (img.close) img.close();
+        const u = c.toDataURL('image/jpeg', 0.82); free(c);
+        const j = JSON.parse(String(await AI({ mode: 'corners', image: u.split(',')[1] }, { timeout: 40000 })).replace(/^\s*```(?:json)?|```\s*$/g, ''));
+        if (j && j.found && Array.isArray(j.corners) && j.corners.length === 4 && !p.cropEdited) {
+          const pts = j.corners.map(q => [Math.max(0, Math.min(1, (+q[1] || 0) / 1000)), Math.max(0, Math.min(1, (+q[0] || 0) / 1000))]);
+          // סדר: למעלה-שמאל, למעלה-ימין, למטה-ימין, למטה-שמאל
+          const cx = pts.reduce((a, q) => a + q[0], 0) / 4, cy = pts.reduce((a, q) => a + q[1], 0) / 4;
+          pts.sort((a, b) => Math.atan2(a[1] - cy, a[0] - cx) - Math.atan2(b[1] - cy, b[0] - cx));
+          let k = 0, best = 9; pts.forEach((q, i) => { const d = q[0] + q[1]; if (d < best) { best = d; k = i; } });
+          const q = [...pts.slice(k), ...pts.slice(0, k)];
+          const a = quadArea(q);
+          if (a > 0.12 && a < 0.985) { p.quad = q; p.auto = true; await refreshThumb(p); this.updateStack(); if (this.view === 'review') this.renderReview(); }
+        }
+      } catch (e) { console.warn('corners', e); }
+    }
+    if (AI && navigator.onLine !== false && !p.fixed) await this.orient(p);
+    if (this.view === 'review') this.renderReview();
+  },
   /* דף שצולם לרוחב או הפוך (טבלה רחבה, מחברת שסובבה): קודם בודקים במכשיר אם השורות אופקיות.
      רק כשלא ברור — שואלים את הקורא איך לסובב (בקשה קטנה ומהירה). הסיבוב נשמר בעמוד, ורואים אותו גם בתמונה הקטנה */
   async orient(p) {
@@ -1160,52 +1197,43 @@ const CAM = {
       if ([90, 180, 270].includes(r)) { p.rot = (p.rot + r) % 360; await refreshThumb(p); this.updateStack(); }
     } catch (e) { console.warn('orient', e); }
   },
-  // טבלה בדף → גיליון Excel: כל טבלה בגיליון משלה, תאים לא ודאיים ברשימה נפרדת לבדיקה, ופתיחה בעורך הגיליונות של סימן
+  // טבלה בדף → גיליון Excel: קריאה, מבט שני על כל תא מול התמונה, ובניית גיליון מעוצב
+  // (גבולות, כותרת מודגשת, מימין לשמאל, תאים לא ודאיים בצהוב) שנפתח בעורך הגיליונות של סימן
   async toExcel() {
     const AI = window.SIMAN_AI;
     if (!AI) throw new Error('קריאת הטקסט לא נטענה');
-    const tables = [], t0 = Date.now(), strip = t => String(t).replace(/^\s*```(?:json)?|```\s*$/g, '');
+    const sheets = [], t0 = Date.now(), strip = t => String(t).replace(/^\s*```(?:json)?|```\s*$/g, '');
+    const okTables = j => j && Array.isArray(j.tables) && j.tables.some(t => Array.isArray(t.rows) && t.rows.some(r => Array.isArray(r) && r.some(c => String(c || '').trim())));
     for (const [i, p] of this.pages.entries()) {
       const label = this.pages.length > 1 ? `עמוד ${i + 1} מתוך ${this.pages.length}: ` : '';
       this.busy(label + 'בודק שהדף ישר…');
+      if (p.doc) await p.doc;
       await this.orient(p);
       this.busy(label + 'מכין את התמונה…');
       const pic = await tablePic(p);
-      const clock = setInterval(() => this.busy(`${label}קורא את הטבלה… ${Math.round((Date.now() - t0) / 1000)} שנ׳`), 1000);
-      let j;
-      try { j = JSON.parse(strip(await AI({ mode: 'table', image: pic.b64, strips: pic.strips, mime: 'image/jpeg' }, { timeout: 150000, onWait: s => this.busy(`השירות עמוס, ממשיך בעוד ${s} שניות…`) }))); }
-      finally { clearInterval(clock); }
-      for (const t of (j && j.tables) || []) if (Array.isArray(t.rows) && t.rows.some(r => Array.isArray(r) && r.some(c => String(c || '').trim()))) tables.push({ title: t.title || '', rows: t.rows, page: i + 1 });
+      let stage = 'קורא את הטבלה';
+      const clock = setInterval(() => this.busy(`${label}${stage}… ${Math.round((Date.now() - t0) / 1000)} שנ׳`), 1000);
+      let j = null;
+      try {
+        const wait = { timeout: 150000, onWait: s => this.busy(`השירות עמוס, ממשיך בעוד ${s} שניות…`) };
+        j = JSON.parse(strip(await AI({ mode: 'table', image: pic.b64, strips: pic.strips, mime: 'image/jpeg' }, wait)));
+        if (okTables(j)) {
+          stage = 'בודק כל תא מול התמונה';
+          try { const k = JSON.parse(strip(await AI({ mode: 'tableCheck', image: pic.b64, strips: pic.strips, draft: j }, wait))); if (okTables(k)) j = Object.assign({}, j, k, { notes: k.notes || j.notes }); }
+          catch (e) { console.warn('table check', e); }   // the first reading stays
+        }
+      } finally { clearInterval(clock); }
+      if (!okTables(j)) continue;
+      j.tables.forEach((t, ti) => sheets.push({ title: t.title || '', notes: ti === 0 ? (j.notes || []) : [], rows: t.rows, page: i + 1 }));
     }
-    if (!tables.length) throw new Error('לא נמצאה טבלה בדף');
+    if (!sheets.length) throw new Error('לא נמצאה טבלה בדף');
     this.busy('בונה את הגיליון…');
-    if (!window.XLSX || !XLSX.utils) await loadJs('xlsx.mini.min.js');
-    const wb = XLSX.utils.book_new(), unsure = [['גיליון', 'תא', 'מה נקרא']];
-    let he = 0, lat = 0;
-    tables.forEach((t, ti) => {
-      const width = Math.max(...t.rows.map(r => (r || []).length));
-      const rows = t.rows.map(r => { const a = (r || []).map(c => String(c ?? '')); while (a.length < width) a.push(''); return a; });
-      const top = t.title ? [[t.title], []] : [], aoa = [...top], name = (tables.length > 1 ? `טבלה ${ti + 1}` : 'טבלה').slice(0, 31);
-      rows.forEach((r, ri) => aoa.push(r.map((c, ci) => {
-        if (/[\u0590-\u05FF]/.test(c)) he++; else if (/[A-Za-z]/.test(c)) lat++;
-        // טקסט שנשבר לשתי שורות בתוך התא מחובר לשורה אחת, כמו שהוא נכתב
-        c = c.replace(/\s*\n\s*/g, (m, off, str) => /[,.;:\/\-]$/.test(str.slice(0, off)) || /^[,.;:\/\-]/.test(str.slice(off + m.length)) ? '' : ' ');
-        if (/\[\[/.test(c)) { c = c.replace(/\[\[|\]\]/g, ''); unsure.push([name, XLSX.utils.encode_cell({ r: top.length + ri, c: ci }), c]); }
-        return cellValue(c);
-      })));
-      const ws = XLSX.utils.aoa_to_sheet(aoa);
-      ws['!cols'] = [...Array(width).keys()].map(ci => ({ wch: Math.min(48, Math.max(8, ...rows.map(r => String(r[ci]).length + 2))) }));
-      XLSX.utils.book_append_sheet(wb, ws, name);
-    });
-    if (unsure.length > 1) { const ws = XLSX.utils.aoa_to_sheet(unsure); ws['!cols'] = [{ wch: 12 }, { wch: 8 }, { wch: 40 }]; XLSX.utils.book_append_sheet(wb, ws, 'לבדיקה'); }
-    // טבלה בעברית (יותר תאים עם עברית מאשר עם אנגלית; מספרים לא נספרים) → גיליון מימין לשמאל,
-    // כך שהעמודה הימנית בדף (למשל מק״ט) היא גם העמודה הימנית בקובץ
-    if (he && he >= lat) { wb.Workbook = { Views: [{ RTL: true }] }; wb.SheetNames.forEach(n => { wb.Sheets[n]['!views'] = [{ RTL: true }]; }); }
-    const bytes = new Uint8Array(XLSX.write(wb, { bookType: 'xlsx', type: 'array' })), name = this.fileBase() + '.xlsx';
+    const bytes = await buildXlsx(sheets), name = this.fileBase() + '.xlsx';
+    const unsure = sheets.reduce((n, sh) => n + sh.unsure, 0);
     this.busy(null); this.close(true);
     if (typeof openExcelEditor === 'function') await openExcelEditor(bytes, name, false);
     else download(new File([bytes], name, { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
-    say(unsure.length > 1 ? `הטבלה מוכנה. ${unsure.length - 1} תאים לבדיקה ברשימה ״לבדיקה״` : 'הטבלה מוכנה לעריכה');
+    say(unsure ? `הטבלה מוכנה. ${unsure} תאים מסומנים בצהוב לבדיקה` : 'הטבלה מוכנה לעריכה');
   },
   async toWord() {
     const SC = window.SIMAN_SCAN;
@@ -1213,6 +1241,7 @@ const CAM = {
     const pics = [];
     for (const [i, p] of this.pages.entries()) {
       this.busy(`בודק שעמוד ${i + 1} ישר…`);
+      if (p.doc) await p.doc;
       await this.orient(p);
       this.busy(`מכין עמוד ${i + 1} מתוך ${this.pages.length} לקריאה…`);
       pics.push(await readingPic(p, SC.quality === 'fast'));
@@ -1223,6 +1252,96 @@ const CAM = {
   },
 };
 
+/* ---- גיליון Excel מעוצב, נכתב ישירות (גבולות, כותרת מודגשת, עטיפת טקסט, רוחב עמודות, מימין לשמאל, צהוב לבדיקה) ---- */
+async function buildXlsx(sheets) {
+  if (!window.JSZip) await loadJs('jszip.min.js');
+  const X = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '');
+  const col = n => { let s = ''; n++; while (n) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = (n - m - 1) / 26; } return s; };
+  // טקסט שנשבר לשתי שורות בתוך התא → שורה אחת, כמו שהוא נכתב
+  const join = c => String(c ?? '').replace(/\s*\n\s*/g, (m, off, str) => /[,.;:\/\-]$/.test(str.slice(0, off)) || /^[,.;:\/\-]/.test(str.slice(off + m.length)) ? '' : ' ').trim();
+  const zip = new JSZip(), names = [];
+  let he = 0, lat = 0;
+  sheets.forEach(sh => sh.rows.forEach(r => (r || []).forEach(c => { c = String(c || ''); if (/[\u0590-\u05FF]/.test(c)) he++; else if (/[A-Za-z]/.test(c)) lat++; })));
+  const rtl = he > 0 && he >= lat;
+  sheets.forEach((sh, si) => {
+    const width = Math.max(1, ...sh.rows.map(r => (r || []).length));
+    const rows = sh.rows.map(r => { const a = (r || []).map(join); while (a.length < width) a.push(''); return a; });
+    const out = [], merges = []; let r = 1;
+    sh.unsure = 0;
+    const cellXml = (ref, v, style) => {
+      if (v === '') return `<c r="${ref}" s="${style}"/>`;
+      const num = cellValue(v);
+      if (typeof num === 'number') return `<c r="${ref}" s="${style}"><v>${num}</v></c>`;
+      return `<c r="${ref}" s="${style}" t="inlineStr"><is><t xml:space="preserve">${X(v)}</t></is></c>`;
+    };
+    // כותרת והערות מעל הטבלה, כל אחת בשורה משלה (בלי מיזוג תאים: כך הגיליון נוח לעריכה גם בטלפון)
+    if (sh.title) { out.push(`<row r="${r}" ht="24" customHeight="1">${cellXml('A' + r, join(sh.title), 4)}</row>`); r++; }
+    for (const n of sh.notes || []) { const t = join(n); if (!t) continue; out.push(`<row r="${r}">${cellXml('A' + r, t, 5)}</row>`); r++; }
+    if (r > 1) r++;
+    rows.forEach((row, ri) => {
+      out.push(`<row r="${r}">` + row.map((c, ci) => {
+        let st = ri === 0 ? 2 : 1;
+        if (/\[\[/.test(c)) { c = c.replace(/\[\[|\]\]/g, '').replace(/^\?$/, ''); st = ri === 0 ? 6 : 3; sh.unsure++; }
+        return cellXml(col(ci) + r, c, st);
+      }).join('') + '</row>');
+      r++;
+    });
+    const widths = [...Array(width).keys()].map(ci => Math.min(45, Math.max(9, ...rows.map(x => String(x[ci]).replace(/\[\[|\]\]/g, '').length * 1.15 + 3))));
+    const xml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+<sheetViews><sheetView workbookViewId="0"${rtl ? ' rightToLeft="1"' : ''}${si === 0 ? ' tabSelected="1"' : ''}/></sheetViews>
+<sheetFormatPr defaultRowHeight="18"/>
+<cols>${widths.map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w.toFixed(1)}" customWidth="1"/>`).join('')}</cols>
+<sheetData>${out.join('')}</sheetData>
+${merges.length ? `<mergeCells count="${merges.length}">${merges.map(m => `<mergeCell ref="${m}"/>`).join('')}</mergeCells>` : ''}
+<pageMargins left="0.5" right="0.5" top="0.6" bottom="0.6" header="0.3" footer="0.3"/>
+<pageSetup orientation="${widths.reduce((a, b) => a + b, 0) > 95 ? 'landscape' : 'portrait'}" fitToWidth="1" fitToHeight="0"/>
+</worksheet>`;
+    names.push((sheets.length > 1 ? `טבלה ${si + 1}` : 'טבלה') + (sh.page && sheets.length > 1 ? ` (עמ׳ ${sh.page})` : ''));
+    zip.file(`xl/worksheets/sheet${si + 1}.xml`, xml);
+  });
+  const n = sheets.length;
+  zip.file('[Content_Types].xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>${[...Array(n).keys()].map(i => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('')}</Types>`);
+  zip.file('_rels/.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`);
+  zip.file('xl/workbook.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><bookViews><workbookView/></bookViews><sheets>${names.map((nm, i) => `<sheet name="${X(nm.slice(0, 31))}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('')}</sheets></workbook>`);
+  zip.file('xl/_rels/workbook.xml.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${[...Array(n).keys()].map(i => `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join('')}<Relationship Id="rId${n + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`);
+  // סגנונות: 0 רגיל · 1 תא בטבלה · 2 כותרת עמודה · 3 תא לבדיקה (צהוב) · 4 כותרת הטבלה · 5 הערה · 6 כותרת עמודה לבדיקה
+  zip.file('xl/styles.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+<fonts count="3"><font><sz val="11"/><name val="Arial"/></font><font><b/><sz val="11"/><name val="Arial"/></font><font><b/><sz val="14"/><name val="Arial"/></font></fonts>
+<fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFDCE6F2"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFEB84"/><bgColor indexed="64"/></patternFill></fill></fills>
+<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FF7F7F7F"/></left><right style="thin"><color rgb="FF7F7F7F"/></right><top style="thin"><color rgb="FF7F7F7F"/></top><bottom style="thin"><color rgb="FF7F7F7F"/></bottom><diagonal/></border></borders>
+<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
+<cellXfs count="7">
+<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
+<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf>
+<xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>
+<xf numFmtId="0" fontId="0" fillId="3" borderId="1" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf>
+<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment vertical="center"/></xf>
+<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
+<xf numFmtId="0" fontId="1" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>
+</cellXfs>
+<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
+</styleSheet>`);
+  return new Uint8Array(await zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE' }));
+}
+
+/* ---- חדות: הקצוות החדים ביותר בתמונה (אחוזון עליון של הנגזרת השנייה) — בצילום מטושטש גם הם רכים ---- */
+function sharpness(c) {
+  const W = c.width, H = c.height, d = c.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, W, H).data;
+  const g = new Float32Array(W * H); for (let i = 0, k = 0; k < g.length; i += 4, k++) g[k] = d[i] * 0.3 + d[i + 1] * 0.59 + d[i + 2] * 0.11;
+  const hist = new Uint32Array(1021); let n = 0;
+  for (let y = Math.round(H * 0.15); y < H * 0.85; y++) for (let x = Math.round(W * 0.15); x < W * 0.85; x++) {
+    const k = y * W + x, v = Math.abs(4 * g[k] - g[k - 1] - g[k + 1] - g[k - W] - g[k + W]); hist[Math.min(1020, v | 0)]++; n++;
+  }
+  let a = 0; for (let v = 1020; v >= 0; v--) { a += hist[v]; if (a >= n * 0.005) return v; }
+  return 0;
+}
+
 /* ---- כיוון השורות בדף: 'h' (אופקיות, הדף ישר או הפוך), 'v' (אנכיות: הדף צולם לרוחב), '?' ----
    שורות כתב יוצרות פרופיל "מפוספס" לאורך הכיוון שלהן: הרבה דיו בשורה, רווח, שוב שורה */
 function textDirection(c) {
@@ -1232,11 +1351,14 @@ function textDirection(c) {
   const bg = Float32Array.from(g); boxBlur(bg, W, H, 10);
   const rows = new Float64Array(H), cols = new Float64Array(W);
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const k = y * W + x; if (bg[k] - g[k] > Math.max(25, bg[k] * 0.15)) { rows[y]++; cols[x]++; } }
-  const stripe = p => { const n = p.length; let m = 0; for (const v of p) m += v; m /= n; if (!m) return 0; let e = 0;
+  // קו בודד לכל האורך (ספירלה, קו שוליים, קצה הדף) לא יקבע את הכיוון: הקצוות נחתכים והשיאים מוגבלים
+  const stripe = p0 => { const cut = Math.round(p0.length * 0.07), p = Array.from(p0.slice(cut, p0.length - cut)), srt = [...p].sort((a, b) => a - b), cap = srt[Math.floor(srt.length * 0.9)] || 0;
+    for (let i = 0; i < p.length; i++) if (p[i] > cap) p[i] = cap;
+    const n = p.length; let m = 0; for (const v of p) m += v; m /= n; if (!m) return 0; let e = 0;
     for (let i = 0; i < n; i++) { let s = 0, c2 = 0; for (let k = i - 15; k <= i + 15; k++) if (k >= 0 && k < n) { s += p[k]; c2++; } e += (p[i] - s / c2) ** 2; }
     return e / n / (m * m); };
   const vr = stripe(rows), vc = stripe(cols);
-  return vr > vc * 1.8 ? 'h' : vc > vr * 1.8 ? 'v' : '?';
+  return vr > vc * 1.5 ? "h" : vc > vr * 1.5 ? "v" : "?";
 }
 
 /* ---- תמונה לקריאת טבלה: הדף בצבע נקי (קווי הטבלה נשמרים!), ועוד שלוש רצועות חדות מלמעלה למטה ---- */

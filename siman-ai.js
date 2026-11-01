@@ -19,15 +19,15 @@ const MAX_IMAGE = 7 * 1024 * 1024;  // base64 characters of one page picture
 // Cloudflare cuts a request that sends nothing back for 100 seconds (error 524). Reading a page of
 // handwriting can take longer, so "scan" and "ask" answer at once and keep the line open with spaces
 // until Gemini is done. The app reads the JSON at the end (JSON allows spaces before it).
-const STREAM_MODES = ['scan', 'scanAccurate', 'ask', 'lines', 'linesFast', 'linesCheck', 'table'];
+const STREAM_MODES = ['scan', 'scanAccurate', 'ask', 'lines', 'linesFast', 'linesCheck', 'table', 'tableCheck'];
 // the whole request has one time budget (the app gives up after 150 s): each model gets what is left
-const BUDGET = { orient: 30000, table: 120000, linesCheck: 80000, lines: 110000, linesFast: 60000, scan: 70000, scanAccurate: 125000, ask: 85000, translate: 85000, corners: 30000 };
-const MODEL_TIMEOUT = { orient: 20000, table: 90000, linesCheck: 70000, lines: 75000, linesFast: 45000, scan: 60000, scanAccurate: 90000, scanCheck: 45000, ask: 80000, translate: 80000, corners: 30000 }; // ms per model before trying the next one
+const BUDGET = { tableCheck: 100000, orient: 30000, table: 120000, linesCheck: 80000, lines: 110000, linesFast: 60000, scan: 70000, scanAccurate: 125000, ask: 85000, translate: 85000, corners: 30000 };
+const MODEL_TIMEOUT = { tableCheck: 80000, orient: 20000, table: 90000, linesCheck: 70000, lines: 75000, linesFast: 45000, scan: 60000, scanAccurate: 90000, scanCheck: 45000, ask: 80000, translate: 80000, corners: 30000 }; // ms per model before trying the next one
 // reading a page: "accurate" = the main model, thinking a little (best for handwriting, ~20–90 s);
 // "fast" = the light model, no thinking (a few seconds, guesses more)
 // lines: on the ivrit.ai Hebrew handwriting benchmark the main model reads single lines best of all models
 // (median 12% of letters wrong), far ahead of the light one — and far ahead of itself on a whole page
-const MODELS_FOR = { orient: ['gemini-flash-lite-latest', 'gemini-flash-latest'], table: ['gemini-flash-latest', 'gemini-flash-lite-latest'], linesCheck: ['gemini-flash-latest'], lines: ['gemini-flash-latest', 'gemini-flash-lite-latest'], linesFast: ['gemini-flash-lite-latest', 'gemini-flash-latest'], scan: ['gemini-flash-lite-latest', 'gemini-flash-latest'], scanAccurate: ['gemini-flash-latest', 'gemini-flash-lite-latest'], scanCheck: ['gemini-flash-latest'], corners: ['gemini-flash-latest', 'gemini-flash-lite-latest'] };
+const MODELS_FOR = { tableCheck: ['gemini-flash-latest'], orient: ['gemini-flash-lite-latest', 'gemini-flash-latest'], table: ['gemini-flash-latest', 'gemini-flash-lite-latest'], linesCheck: ['gemini-flash-latest'], lines: ['gemini-flash-latest', 'gemini-flash-lite-latest'], linesFast: ['gemini-flash-lite-latest', 'gemini-flash-latest'], scan: ['gemini-flash-lite-latest', 'gemini-flash-latest'], scanAccurate: ['gemini-flash-latest', 'gemini-flash-lite-latest'], scanCheck: ['gemini-flash-latest'], corners: ['gemini-flash-latest', 'gemini-flash-lite-latest'] };
 // no "thinking" for reading and translating = a much faster answer; a little for questions
 // Models differ in which setting they take (older: thinkingBudget, newer: thinkingLevel), and one that does
 // not take a setting answers "invalid argument" — so each is tried in turn, and at the end none at all.
@@ -38,6 +38,7 @@ const THINKING = {
   // lines: the model's own default thinking, as on the benchmark; then less if the request is refused
   lines: [null],
   orient: [{ thinkingBudget: 0 }, { thinkingLevel: 'minimal' }, null],
+  tableCheck: [{ thinkingLevel: 'low' }, { thinkingBudget: 2048 }, null],
   table: [{ thinkingLevel: 'low' }, { thinkingBudget: 2048 }, null],
   linesCheck: [{ thinkingLevel: 'low' }, { thinkingBudget: 2048 }, null],
   linesFast: [{ thinkingBudget: 0 }, { thinkingLevel: 'minimal' }, null],
@@ -125,6 +126,7 @@ You get the page picture, and sometimes sharper strips of the same page from top
 - Copy every cell exactly as written: numbers, decimal points, minus signs, %, currency signs, dates and units as written. Do not calculate, total, round, translate or correct anything. Do not invent rows.
 - A cell you cannot read with confidence: your best reading inside [[ ]].
 - title: the table's caption or the heading written right above it, if any.
+- notes: other short lines written on the page outside the tables (a date line, a name, a signature line), each as written, in reading order. A blank to fill (____) stays as written.
 - Use only header text that is actually written on the page. Never invent column names or rows. Text that wraps onto a second line inside one cell is ONE cell (join the parts in order, without adding characters).
 - Keep the table's real structure: the number of columns and rows the ruled lines show. A column that is empty on the page stays as an empty column.
 - If the page has no table but has lines of items with values (a list with amounts, a form), make a table of it with sensible columns.${hint ? `\nThe page is probably in: ${hint}.` : ''}`;
@@ -132,10 +134,18 @@ const TABLE_SCHEMA = {
   type: 'OBJECT',
   properties: {
     lang: { type: 'STRING', nullable: true },
+    notes: { type: 'ARRAY', items: { type: 'STRING' } },
     tables: { type: 'ARRAY', items: { type: 'OBJECT', properties: { title: { type: 'STRING', nullable: true }, rows: { type: 'ARRAY', items: { type: 'ARRAY', items: { type: 'STRING' } } } }, required: ['rows'] } },
   },
   required: ['tables'],
 };
+
+const TABLE_CHECK_PROMPT = `You proofread spreadsheet data that was read from a photographed table, against the picture.
+You get the page picture (and sometimes sharper strips of it) and the first reading as JSON.
+Check cell by cell: the number of rows and columns must match the ruled lines on the page; every cell's text must match what is written in that cell, character by character (digits, commas, decimal points, signs). Fix what does not match. A cell that is empty on the page is "". Header text only as written — never invented.
+In a Hebrew (right-to-left) table the rightmost column is the FIRST cell of every row.
+Mark with [[ ]] every cell you are not fairly sure of — the person checks every marked cell.
+Return the full corrected data in the same JSON format, and nothing else.`;
 
 const CORNERS_PROMPT = `You find the document in a photo taken to scan it: the sheet of paper, page, notebook page, form or receipt the person is photographing.
 Ignore everything around it: the table, hands, other papers, bags, plastic sleeves, shadows.
@@ -232,6 +242,20 @@ function build(body) {
       systemInstruction: { parts: [{ text: LINES_PROMPT(hint) }] },
       contents: [{ role: 'user', parts }],
       generationConfig: { temperature: 0, maxOutputTokens: 8192, responseMimeType: 'application/json', responseSchema: LINES_SCHEMA },
+    };
+  }
+  if (mode === 'tableCheck') {
+    const img = String(body.image || '');
+    if (!img || img.length > MAX_IMAGE || !/^[A-Za-z0-9+/=]+$/.test(img.slice(0, 200))) return { err: 'image missing' };
+    const strips = (Array.isArray(body.strips) ? body.strips : []).slice(0, 4).map(String).filter(x => x && x.length <= MAX_IMAGE);
+    const draft = JSON.stringify(body.draft || {}).slice(0, 60000);
+    const parts = [{ text: 'The page:' }, { inlineData: { mimeType: 'image/jpeg', data: img } }];
+    strips.forEach((x, i) => parts.push({ text: `Strip ${i + 1} of ${strips.length}:` }, { inlineData: { mimeType: 'image/jpeg', data: x } }));
+    parts.push({ text: 'First reading:\n' + draft + '\nCheck it against the page and return the corrected data.' });
+    return {
+      systemInstruction: { parts: [{ text: TABLE_CHECK_PROMPT }] },
+      contents: [{ role: 'user', parts }],
+      generationConfig: { temperature: 0, maxOutputTokens: 16384, responseMimeType: 'application/json', responseSchema: TABLE_SCHEMA },
     };
   }
   if (mode === 'orient') {
