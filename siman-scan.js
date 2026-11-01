@@ -1071,9 +1071,122 @@ async function readingPic(p, fast) {
     }
   }
   free(gray);
-  return { url: page.u, b64: page.u.split(',')[1], w: page.w, h: page.h, strips };
+  const lines = splitLines(g, W, H, x0, y0, cw, ch);
+  return { url: page.u, b64: page.u.split(',')[1], w: page.w, h: page.h, strips, lines };
 }
 window.SIMAN_CAM = CAM;
+
+/* ---- חלוקת הדף לשורות ----
+   מודלי הקריאה קוראים כתב רהוט עברי טוב בהרבה כשמקבלים שורה אחת בכל תמונה, ולא דף שלם
+   (במדד כתב היד העברי של ivrit.ai: טעות של כ-12% מהאותיות בשורות, לעומת יותר מפי שלושה בדף שלם).
+   לכן הדף מיושר (תיקון הטיה קלה), נחתך לשורות לפי פיזור הדיו, וכל שורה נשלחת כתמונה נפרדת. */
+function splitLines(g, W, H, X0, Y0, cw, ch) {
+  const INK = 110;
+  // הטיה: הזווית (עד 6 מעלות) שבה שורות הדיו הכי "חדות" בהטלה האופקית
+  const sk = Math.min(1, 700 / cw), pts = [];
+  const sx = Math.max(1, Math.round(1 / sk));
+  for (let y = 0; y < ch; y += sx) for (let x = 0; x < cw; x += sx) if (g[(y + Y0) * W + x + X0] < INK) pts.push(x, y);
+  if (pts.length < 40) return [];
+  let bestA = 0, bestV = -1;
+  for (let a = -6; a <= 6.001; a += 0.5) {
+    const t = Math.tan(a * Math.PI / 180), bins = new Float32Array(Math.ceil(ch / sx) + Math.ceil(cw * 0.12 / sx) * 2 + 4), off = Math.ceil(cw * 0.12 / sx) + 2;
+    for (let i = 0; i < pts.length; i += 2) { const b = Math.round((pts[i + 1] - (pts[i] - cw / 2) * t) / sx) + off; if (b >= 0 && b < bins.length) bins[b]++; }
+    let v = 0; for (const c of bins) v += c * c;
+    if (v > bestV) { bestV = v; bestA = a; }
+  }
+  // הדף המיושר (אפור), בגודל מלא
+  const src = canvasOf(cw, ch), sxc = src.getContext('2d'), si = sxc.createImageData(cw, ch), sd = si.data;
+  for (let y = 0; y < ch; y++) for (let x = 0; x < cw; x++) { const v = g[(y + Y0) * W + x + X0], o = (y * cw + x) * 4; sd[o] = sd[o + 1] = sd[o + 2] = v; sd[o + 3] = 255; }
+  sxc.putImageData(si, 0, 0);
+  let pg = src;
+  if (Math.abs(bestA) >= 0.5) {
+    pg = canvasOf(cw, ch); const px = pg.getContext('2d'); px.fillStyle = '#fff'; px.fillRect(0, 0, cw, ch);
+    px.translate(cw / 2, ch / 2); px.rotate(-bestA * Math.PI / 180); px.drawImage(src, -cw / 2, -ch / 2); free(src);
+  }
+  const pctx = pg.getContext('2d', { willReadFrequently: true }), pim = pctx.getImageData(0, 0, cw, ch), d = pim.data;
+  // קו ארוך ודק (קו תחתון, קצה שולחן, צל בשוליים) אינו כתב: כל רכיב דיו מחובר כזה נמחק,
+  // כדי שלא ייחשב שורה ולא יחבר שורות
+  {
+    const n = cw * ch, lab = new Int32Array(n).fill(-1), stack = new Int32Array(n);
+    for (let s0 = 0; s0 < n; s0++) {
+      if (lab[s0] !== -1 || d[s0 * 4] >= INK) continue;
+      let sp = 0, x0 = cw, x1 = -1, y0 = ch, y1 = -1; const pix = [];
+      stack[sp++] = s0; lab[s0] = s0;
+      while (sp) {
+        const p = stack[--sp], x = p % cw, y = (p / cw) | 0; pix.push(p);
+        if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+        for (const q of [x > 0 ? p - 1 : -1, x < cw - 1 ? p + 1 : -1, y > 0 ? p - cw : -1, y < ch - 1 ? p + cw : -1])
+          if (q >= 0 && lab[q] === -1 && d[q * 4] < INK) { lab[q] = s0; stack[sp++] = q; }
+      }
+      const bw = x1 - x0 + 1, bh = y1 - y0 + 1;
+      const rule = (bw > cw * 0.2 && bh < bw * 0.15) || ((y0 === 0 || y1 === ch - 1) && bw > cw * 0.12) || (bh > ch * 0.5 && bw < bh * 0.1);
+      if (rule) for (const p of pix) { const o = p * 4; d[o] = d[o + 1] = d[o + 2] = 255; }
+    }
+  }
+  pctx.putImageData(pim, 0, 0);
+  const ink = (x, y) => d[(y * cw + x) * 4] < INK;
+  // קווים אנכיים לכל אורך הדף (שוליים, ספירלה) לא נספרים
+  const colN = new Uint32Array(cw);
+  for (let y = 0; y < ch; y++) for (let x = 0; x < cw; x++) if (ink(x, y)) colN[x]++;
+  const skip = new Uint8Array(cw); for (let x = 0; x < cw; x++) if (colN[x] > ch * 0.35) { skip[x] = 1; if (x) skip[x - 1] = 1; if (x < cw - 1) skip[x + 1] = 1; }
+  const rows = new Float32Array(ch);
+  const sideX = Math.round(cw * 0.05);
+  for (let y = 0; y < ch; y++) { let n = 0; for (let x = sideX; x < cw - sideX; x++) if (!skip[x] && ink(x, y)) n++; rows[y] = n; }
+  // פס כהה לרוחב כל הדף (קצה השולחן, צל) אינו שורת כתב
+  for (let y = 0; y < ch; y++) if (rows[y] > cw * 0.3) { rows[y] = 0; for (let x = 0; x < cw; x++) if (ink(x, y)) d[(y * cw + x) * 4] = 255; }
+  // גובה גוף האות: הרצועות הרציפות של דיו בפרופיל
+  const sm0 = new Float32Array(ch), w0 = Math.max(1, Math.round(ch * 0.003));
+  for (let y = 0; y < ch; y++) { let a = 0, n = 0; for (let k = y - w0; k <= y + w0; k++) if (k >= 0 && k < ch) { a += rows[k]; n++; } sm0[y] = a / n; }
+  const pos = [...sm0].filter(v => v > 0).sort((a, b) => a - b);
+  if (!pos.length) { free(pg); return []; }
+  const top95 = pos[Math.floor(pos.length * 0.95)], hs = [];
+  for (let y = 0, st = -1; y <= ch; y++) { const on = y < ch && sm0[y] > top95 * 0.15; if (on && st < 0) st = y; if (!on && st >= 0) { hs.push(y - st); st = -1; } }
+  hs.sort((a, b) => a - b);
+  const med = Math.max(10, hs.length ? hs[hs.length >> 1] : 20);
+  // שורות = פסגות בפרופיל המוחלק; הגבול בין שתי שורות = הנקודה הכי ריקה ביניהן.
+  // כך גם אותיות שיורדות מהשורה (ק ף ן) או עולות ממנה (ל) לא מחברות שתי שורות לאחת
+  const r = Math.max(2, Math.round(med * 0.35)), sm = new Float32Array(ch);
+  for (let y = 0; y < ch; y++) { let a = 0, n = 0; for (let k = y - r; k <= y + r; k++) if (k >= 0 && k < ch) { a += rows[k]; n++; } sm[y] = a / n; }
+  let mx = 0; for (const v of sm) if (v > mx) mx = v;
+  let peaks = [];
+  for (let y = 1; y < ch - 1; y++) if (sm[y] >= sm[y - 1] && sm[y] > sm[y + 1] && sm[y] > mx * 0.12) peaks.push(y);
+  // שתי פסגות קרובות מדי הן שורה אחת
+  const pk = [];
+  for (const y of peaks) { const l = pk[pk.length - 1]; if (l != null && y - l < med * 0.9) { if (sm[y] > sm[l]) pk[pk.length - 1] = y; } else pk.push(y); }
+  peaks = pk;
+  if (!peaks.length) { free(pg); return []; }
+  if (peaks.length > 45) { free(pg); return []; }   // דף מודפס צפוף: נקרא כדף שלם
+  const cuts = [];
+  for (let i = 0; i < peaks.length - 1; i++) { let by = peaks[i], bv = 1e9; for (let y = peaks[i]; y <= peaks[i + 1]; y++) if (sm[y] < bv) { bv = sm[y]; by = y; } cuts.push(by); }
+  let first = 0; while (first < ch && rows[first] === 0) first++;
+  let last = ch - 1; while (last > 0 && rows[last] === 0) last--;
+  let segs = peaks.map((p, i) => [i ? cuts[i - 1] : Math.max(0, first - Math.round(med * 0.3)), i < cuts.length ? cuts[i] : Math.min(ch - 1, last + Math.round(med * 0.3))]);
+  // קטע עם מעט מאוד דיו (קו תחתון, זנב, נקודה) מצטרף לשכן הקרוב
+  const mass = sg => { let m = 0; for (let y = sg[0]; y <= sg[1]; y++) m += rows[y]; return m; };
+  const ms = segs.map(mass), mm = [...ms].sort((a, b) => a - b)[ms.length >> 1] || 1;
+  for (let i = segs.length - 1; i >= 0 && segs.length > 1; i--) {
+    if (mass(segs[i]) >= mm * 0.18) continue;
+    const j = i === 0 ? 1 : i === segs.length - 1 ? i - 1 : (segs[i][0] - segs[i - 1][1] <= segs[i + 1][0] - segs[i][1] ? i - 1 : i + 1);
+    segs[j] = [Math.min(segs[j][0], segs[i][0]), Math.max(segs[j][1], segs[i][1])]; segs.splice(i, 1);
+  }
+  // רוחב: רק העמודות שיש בהן דיו (בלי הספירלה וקווי השוליים)
+  const side = Math.round(cw * 0.05), out = [];
+  segs.forEach(sg => {
+    const t0 = Math.max(0, sg[0] - Math.round(med * 0.12)), b0 = Math.min(ch - 1, sg[1] + Math.round(med * 0.12));
+    let lx = cw, rx = -1;
+    for (let y = sg[0]; y <= sg[1]; y++) for (let x = side; x < cw - side; x++) if (!skip[x] && ink(x, y)) { if (x < lx) lx = x; if (x > rx) rx = x; }
+    if (rx < 0) return;
+    const padX = Math.round(med * 0.8); lx = Math.max(0, lx - padX); rx = Math.min(cw - 1, rx + padX);
+    const w = rx - lx + 1, hh = b0 - t0 + 1;
+    // גובה שורה כ-160 נקודות: חד מספיק לכל אות, בלי תמונה ענקית
+    const k = Math.max(0.5, Math.min(2.5, 160 / hh, 2200 / w));
+    const o = canvasOf(w * k, hh * k), ox = o.getContext('2d'); ox.fillStyle = '#fff'; ox.fillRect(0, 0, o.width, o.height);
+    ox.imageSmoothingQuality = 'high'; ox.drawImage(pg, lx, t0, w, hh, 0, 0, o.width, o.height);
+    out.push(o.toDataURL('image/jpeg', 0.9).split(',')[1]); free(o);
+  });
+  free(pg);
+  return out;
+}
 CAM._readingPic = readingPic; CAM._find = findSheet; CAM._spread = spreadOf;
 if (FILTERS.some(f => f[0] === LS.get('siman.scan.filter'))) CAM.defFilter = LS.get('siman.scan.filter');
 try { const o = JSON.parse(LS.get('siman.scan.opts') || 'null'); if (o) Object.assign(CAM.opts, { size: o.size || 'auto', q: o.q || 'high', wm: '' }); } catch (_) {}

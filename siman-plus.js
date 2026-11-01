@@ -1171,7 +1171,7 @@ const SC = {
       st.textContent = line + '…';
       const clock = setInterval(() => { const sec = Math.round((Date.now() - t0) / 1000); li.querySelector('span').textContent = `קורא… ${sec} שנ׳`; st.textContent = `${line} · ${sec} שניות${sec > 45 ? ' (דף צפוף לוקח לפעמים עד שתי דקות)' : ''}`; }, 1000);
       try {
-        const raw = await ai({ mode: 'scan', image: p.b64, strips: p.strips || [], mime: 'image/jpeg', hint: this.hint, quality: this.quality }, { timeout: 150000, onWait: s => { st.textContent = `השירות עמוס, ממשיך בעוד ${s} שניות…`; } }).finally(() => clearInterval(clock));
+        const raw = await readPage(p, this.hint, this.quality, { onWait: s => { st.textContent = `השירות עמוס, ממשיך בעוד ${s} שניות…`; }, onLines: (d, n) => { li.querySelector('span').textContent = `שורה ${d} מתוך ${n}`; } }).finally(() => clearInterval(clock));
         p.blocks = parseBlocks(raw); p.lang = p.blocks.lang;
         li.className = 'ok'; li.querySelector('span').textContent = p.blocks.length ? `${p.blocks.length} קטעים` : 'עמוד ריק';
       } catch (e) {
@@ -1238,7 +1238,7 @@ const SC = {
     this.running = true; btn.disabled = true;
     const t0 = Date.now(), clock = setInterval(() => { btn.textContent = `קורא שוב… ${Math.round((Date.now() - t0) / 1000)} שנ׳`; }, 1000);
     try {
-      const raw = await ai({ mode: 'scan', image: p.b64, strips: p.strips || [], mime: 'image/jpeg', hint: this.hint, quality: 'accurate' });
+      const raw = await readPage(p, this.hint, 'accurate', {});
       const bl = parseBlocks(raw);
       if (bl.length) { p.blocks = bl; p.html = null; ed.innerHTML = blocksHtml(bl); ed.dir = blocksRtl(bl) ? 'rtl' : 'ltr'; this.count(); btn.textContent = 'נקרא שוב ✓'; }
       else btn.textContent = 'לא זוהה טקסט';
@@ -1299,6 +1299,45 @@ camIn.onchange = e => { const f = [...e.target.files]; e.target.value = ''; SC.f
 imgIn.onchange = e => { const f = [...e.target.files]; e.target.value = ''; SC.fromImages(f); };
 pdfIn.onchange = e => { const f = e.target.files[0]; e.target.value = ''; SC.fromPdf(f); };
 window.SIMAN_SCAN = SC;
+
+/* Reading one page.
+   Pages prepared by the scanner (siman-scan.js) come cut into lines: each line is read as its own picture,
+   in a few requests of up to 6 lines, two at a time. On the ivrit.ai Hebrew handwriting benchmark this is
+   where the reading models are by far the most accurate. Other pages (a PDF, an old reader photo) are read
+   as one page, as before. The answer has the same shape either way: {"lang","blocks"}. */
+async function readPage(p, hint, quality, { onWait, onLines } = {}) {
+  if (!p.lines || !p.lines.length) return ai({ mode: 'scan', image: p.b64, strips: p.strips || [], mime: 'image/jpeg', hint, quality }, { timeout: 150000, onWait });
+  const L = p.lines, B = 6, got = new Array(L.length).fill(null), starts = [];
+  for (let i = 0; i < L.length; i += B) starts.push(i);
+  let next = 0, done = 0, firstErr = null, lang = null;
+  const strip = t => String(t).replace(/^\s*```(?:json)?|```\s*$/g, '');
+  const worker = async () => {
+    while (next < starts.length) {
+      const s0 = starts[next++], part = L.slice(s0, s0 + B);
+      try {
+        const raw = await ai({ mode: 'lines', lines: part, hint, quality }, { timeout: 130000, onWait });
+        const j = JSON.parse(strip(raw));
+        if (j.lang && !lang) lang = j.lang;
+        (j.lines || []).forEach((r, k) => { const n = Number.isInteger(r.n) && r.n >= 1 && r.n <= part.length ? r.n - 1 : k; if (n < part.length && !got[s0 + n]) got[s0 + n] = r; });
+      } catch (e) { firstErr = firstErr || e; }
+      done += part.length; onLines && onLines(Math.min(done, L.length), L.length);
+    }
+  };
+  await Promise.all([worker(), worker()]);
+  if (!got.some(Boolean)) throw firstErr || new Error('לא זוהה טקסט');
+  // שורות → קטעים. שורה שהיא רק חץ מחברת את השורה שלפניה לזו שאחריה (רצף של שלבים)
+  const blocks = []; let joinNext = false;
+  got.forEach((r, i) => {
+    if (!r) { blocks.push({ t: 'p', text: '[[?]]' }); joinNext = false; return; }
+    const text = String(r.text || '').replace(/\s+/g, ' ').trim();
+    if (r.kind === 'empty' || !text || /^[-–—_.·\s]+$/.test(text)) return;
+    if (r.kind === 'arrow' || /^[↓↙↘⬇←→⇣⟵⟶\s]+$/.test(text)) { if (blocks.length) joinNext = true; return; }
+    if (joinNext && blocks.length) { blocks[blocks.length - 1].text += ' ← ' + text; joinNext = false; return; }
+    joinNext = false;
+    blocks.push({ t: r.kind === 'list' ? 'li' : r.kind === 'title' && blocks.length < 2 ? 'h2' : 'p', text });
+  });
+  return JSON.stringify({ lang: lang || hint || 'he', blocks });
+}
 
 // pictures for the service: long side ~2000px, JPEG
 function canvasJpeg(draw, w, hgt) {
