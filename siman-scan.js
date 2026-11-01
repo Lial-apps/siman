@@ -1,3 +1,4 @@
+/* 5.8.3: on a computer "מדף למסמך" opens with pictures from the computer (drag, choose, paste); the computer's camera stays as a choice. Phones and tablets: unchanged. */
 /* 5.8.2: finding the page steadily — candidates checked against real straight edges (no frame rather than a wrong one), no "two pages" without a real spiral, a frame only after two matching finds, a faster blur (same result, ~10x faster), check picture 240, an empty area is not "blurry". 5.8.1: color, faster loop, 5 steady frames */
 /* =====================================================================
    סימן 5.4 — siman-scan.js
@@ -90,6 +91,19 @@ document.head.append(h(`<style id="simanCamCss">
 .scn-nocam h3{margin:0 0 6px;font-size:18px}
 .scn-nocam p{margin:0 0 16px;color:#B8C4D8;font-size:14.5px}
 .scn-nocam .row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+/* 5.8.3 — computer: pictures from the computer instead of the camera */
+.scn-desk{width:min(560px,92%);display:flex;flex-direction:column;gap:14px;text-align:center}
+.scn-drop{display:flex;flex-direction:column;align-items:center;gap:10px;padding:34px 22px;border:2px dashed rgba(255,255,255,.35);border-radius:22px;background:rgba(255,255,255,.04);cursor:pointer;color:inherit;font:inherit}
+.scn-drop:hover,.scn.drag .scn-drop{border-color:#FFD43B;background:rgba(255,212,59,.08)}
+.scn-drop:focus-visible{outline:3px solid #FFD43B;outline-offset:3px}
+.scn-drop svg{width:44px;height:44px;opacity:.9}
+.scn-drop b{font-size:19px}
+.scn-drop span{font-size:14.5px;color:#B8C4D8;line-height:1.5}
+.scn-desk .alt{display:flex;flex-direction:column;gap:8px;align-items:center;font-size:14px;color:#B8C4D8}
+.scn-desk kbd{direction:ltr;display:inline-block;padding:1px 7px;border:1px solid rgba(255,255,255,.3);border-radius:6px;font:inherit;font-size:13px}
+.scn-desk .link{border:0;background:none;color:#FFD43B;font:inherit;font-size:14.5px;text-decoration:underline;text-underline-offset:3px;cursor:pointer;min-height:44px;padding:0 8px}
+.scn.desk-pick .scn-shutter,.scn.desk-pick [data-a=auto],.scn.desk-pick [data-a=torch],.scn.desk-pick [data-m=mega],.scn.desk-pick [data-m=qr]{visibility:hidden}
+.scn.desk-pick [data-m=mega],.scn.desk-pick [data-m=qr]{display:none}
 .scn-modes{flex:none;display:flex;gap:4px;padding:10px 8px 2px;overflow-x:auto;scrollbar-width:none}
 .scn-modes button{border:0;background:none;padding:7px 13px;border-radius:999px;font-size:14.5px;color:#9FB0C9;white-space:nowrap}
 .scn-modes button[aria-pressed="true"]{color:#0A1222;background:#FFD43B;font-weight:700}
@@ -255,6 +269,12 @@ const root = h(`<div class="scn" hidden role="dialog" aria-modal="true" aria-lab
 </div>`);
 document.body.append(root);
 const galIn = h('<input type="file" accept="image/*" multiple hidden>');
+// 5.8.3: a computer (a mouse, not a phone or tablet): its camera faces the person, so pictures come from the computer.
+// iPhone, iPad and Android keep opening the camera, as before
+const DESK = (() => { try {
+  const ua = navigator.userAgent || '', tab = /iPhone|iPad|iPod|Android/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  return !tab && matchMedia('(pointer:fine)').matches;
+} catch (_) { return false; } })();
 const camIn = h('<input type="file" accept="image/*" capture="environment" hidden>');
 root.append(galIn, camIn);
 const $r = s => root.querySelector(s);
@@ -764,7 +784,7 @@ const CAM = {
   },
   close(force) {
     if (!force && this.pages.length && !confirm('לסגור את הסורק? העמודים שסרקתם לא יישמרו')) return;
-    this.stopCam(); root.hidden = true; document.documentElement.style.overflow = '';
+    this.stopCam(); root.hidden = true; document.documentElement.style.overflow = ''; this.deskCam = false; root.classList.remove('desk-pick', 'drag');
     this.pages = []; this.idFront = null; this.cropping = false; this.updateStack();
     try { this.prevFocus && this.prevFocus.focus(); } catch (_) {}
   },
@@ -779,6 +799,8 @@ const CAM = {
 
   /* ---- מצלמה ---- */
   async startCam() {
+    if (DESK && !this.deskCam) return this.deskPick();
+    root.classList.remove('desk-pick');
     if (this.stream) { this.loop(); return; }
     const nc = $r('.scn-nocam');
     nc.hidden = true;
@@ -808,6 +830,19 @@ const CAM = {
     if (this.mega) this.megaCancel();
     if (this.stream) { this.stream.getTracks().forEach(t => t.stop()); this.stream = null; this.track = null; this.torch = false; $r('[data-a=torch]').setAttribute('aria-pressed', 'false'); }
     this.video.srcObject = null; this.quad = null; this.stable = 0; this.ic = null; this.spread = null; this.pick = 'auto'; this.drawQuad();
+  },
+  // computer: pictures of pages from the computer (drag, choose or paste); the computer's camera is still there
+  deskPick() {
+    this.vf.hidden = true; this.setHint(''); root.classList.add('desk-pick');
+    const nc = $r('.scn-nocam'); nc.hidden = false;
+    nc.innerHTML = `<div class="scn-desk">
+      <button class="scn-drop" type="button" data-n="gal">${I.gallery}<b>גוררים לכאן תמונות של דפים</b>
+        <span>או לוחצים כדי לבחור מהמחשב. אפשר כמה תמונות יחד: צילומים מהטלפון, מוואטסאפ או מסורק</span></button>
+      <div class="alt"><span>תמונה שהעתקתם? <kbd>${/Mac/.test(navigator.platform) ? '⌘' : 'Ctrl'}+V</kbd> מדביק אותה כאן</span>
+        <button class="link" type="button" data-n="cam">צילום במצלמה של המחשב</button></div></div>`;
+    nc.querySelector('[data-n=gal]').onclick = () => galIn.click();
+    nc.querySelector('[data-n=cam]').onclick = () => { this.deskCam = true; nc.hidden = true; this.startCam(); };
+    setTimeout(() => { const d = nc.querySelector('.scn-drop'); if (d && !root.hidden) d.focus(); }, 60);
   },
   noCam(msg) {
     this.vf.hidden = true; this.setHint('');
@@ -1194,7 +1229,7 @@ const CAM = {
         const img = await decodeImg(f), c = scaledCanvas(img, 4000); if (img.close) img.close();
         let q = sheetIn(c), sp = null;
         // מחברת פתוחה בתמונה: העמוד שיש בו יותר כתב
-        if (q && this.mode === 'doc') { const sm = scaledCanvas(c, 900); sp = spreadOf(sm, q); free(sm); if (sp) q = sp.ink.left > sp.ink.right ? sp.left : sp.right; }
+        if (q && this.mode === 'doc') { const sm = scaledCanvas(c, 900); sp = spreadOf(sm, q); free(sm); if (sp && sp.spiral) q = sp.ink.left > sp.ink.right ? sp.left : sp.right; }
         const b = await toBlob(c, 0.93); free(c);
         await this.addShot(b, q, true);
       } catch (e) { console.warn(e); bad.push(f.name + (/heic|heif/i.test(f.type + f.name) ? ' (HEIC: שמרו כ-JPG)' : '')); }
@@ -1862,6 +1897,18 @@ $r('.scn-vf').addEventListener('pointerup', e => { if (e.pointerType === 'mouse'
 galIn.onchange = e => { const f = [...e.target.files]; e.target.value = ''; CAM.fromFiles(f); };
 camIn.onchange = e => { const f = [...e.target.files]; e.target.value = ''; CAM.fromFiles(f); };
 addEventListener('resize', () => { if (!root.hidden && CAM.view === 'cam') CAM.fit(); });
+// 5.8.3: pictures dragged onto the scanner, or pasted (Ctrl+V / ⌘V), become pages — on any device
+const hasFiles = e => e.dataTransfer && [...(e.dataTransfer.types || [])].includes('Files');
+root.addEventListener('dragover', e => { if (!hasFiles(e)) return; e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; root.classList.add('drag'); });
+root.addEventListener('dragleave', e => { if (e.target === root || !root.contains(e.relatedTarget)) root.classList.remove('drag'); });
+root.addEventListener('drop', e => { if (!hasFiles(e)) return; e.preventDefault(); e.stopPropagation(); root.classList.remove('drag'); CAM.fromFiles([...e.dataTransfer.files]); });
+document.addEventListener('paste', e => {
+  if (root.hidden || CAM.view === 'edit' || !e.clipboardData) return;
+  const t = e.target; if (t && t.closest && t.closest('input,textarea,[contenteditable="true"]')) return;
+  const files = [...e.clipboardData.items].filter(i => i.kind === 'file' && /^image\//.test(i.type)).map(i => i.getAsFile()).filter(Boolean);
+  if (!files.length) return;
+  e.preventDefault(); CAM.fromFiles(files);
+});
 document.addEventListener('visibilitychange', () => {
   if (root.hidden || CAM.view !== 'cam') return;
   if (document.hidden) CAM.stopCam(); else CAM.startCam();
