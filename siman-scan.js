@@ -1181,13 +1181,15 @@ const CAM = {
     this.busy('בונה את הגיליון…');
     if (!window.XLSX || !XLSX.utils) await loadJs('xlsx.mini.min.js');
     const wb = XLSX.utils.book_new(), unsure = [['גיליון', 'תא', 'מה נקרא']];
-    let he = 0, all = 0;
+    let he = 0, lat = 0;
     tables.forEach((t, ti) => {
       const width = Math.max(...t.rows.map(r => (r || []).length));
       const rows = t.rows.map(r => { const a = (r || []).map(c => String(c ?? '')); while (a.length < width) a.push(''); return a; });
       const top = t.title ? [[t.title], []] : [], aoa = [...top], name = (tables.length > 1 ? `טבלה ${ti + 1}` : 'טבלה').slice(0, 31);
       rows.forEach((r, ri) => aoa.push(r.map((c, ci) => {
-        all++; if (/[\u0590-\u05FF]/.test(c)) he++;
+        if (/[\u0590-\u05FF]/.test(c)) he++; else if (/[A-Za-z]/.test(c)) lat++;
+        // טקסט שנשבר לשתי שורות בתוך התא מחובר לשורה אחת, כמו שהוא נכתב
+        c = c.replace(/\s*\n\s*/g, (m, off, str) => /[,.;:\/\-]$/.test(str.slice(0, off)) || /^[,.;:\/\-]/.test(str.slice(off + m.length)) ? '' : ' ');
         if (/\[\[/.test(c)) { c = c.replace(/\[\[|\]\]/g, ''); unsure.push([name, XLSX.utils.encode_cell({ r: top.length + ri, c: ci }), c]); }
         return cellValue(c);
       })));
@@ -1196,8 +1198,9 @@ const CAM = {
       XLSX.utils.book_append_sheet(wb, ws, name);
     });
     if (unsure.length > 1) { const ws = XLSX.utils.aoa_to_sheet(unsure); ws['!cols'] = [{ wch: 12 }, { wch: 8 }, { wch: 40 }]; XLSX.utils.book_append_sheet(wb, ws, 'לבדיקה'); }
-    // גיליון מימין לשמאל כשרוב התאים בעברית
-    if (he > all * 0.3) wb.Workbook = { Views: [{ RTL: true }] };
+    // טבלה בעברית (יותר תאים עם עברית מאשר עם אנגלית; מספרים לא נספרים) → גיליון מימין לשמאל,
+    // כך שהעמודה הימנית בדף (למשל מק״ט) היא גם העמודה הימנית בקובץ
+    if (he && he >= lat) { wb.Workbook = { Views: [{ RTL: true }] }; wb.SheetNames.forEach(n => { wb.Sheets[n]['!views'] = [{ RTL: true }]; }); }
     const bytes = new Uint8Array(XLSX.write(wb, { bookType: 'xlsx', type: 'array' })), name = this.fileBase() + '.xlsx';
     this.busy(null); this.close(true);
     if (typeof openExcelEditor === 'function') await openExcelEditor(bytes, name, false);
