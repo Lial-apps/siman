@@ -1025,9 +1025,13 @@ async function readingPic(p, fast) {
   if (hi < lo + 28) hi = Math.min(250, lo + 28);
   const lut = new Uint8ClampedArray(256);
   for (let v = 0; v < 256; v++) { const t = Math.max(0, Math.min(1, (v - lo) / (hi - lo))); lut[v] = 255 * Math.pow(t, 1.6); }
-  for (let k = 0; k < g.length; k++) g[k] = lut[g[k]];
+  // מבט שני ורך של אותה שורה: מתיחה ישרה בלי הכהיה, כך שקווים דקים ופרטים קטנים של האותיות נשמרים
+  const softLut = new Uint8ClampedArray(256);
+  for (let v = 0; v < 256; v++) softLut[v] = 255 * Math.max(0, Math.min(1, (v - lo * 0.6) / (250 - lo * 0.6)));
+  const gs = new Uint8ClampedArray(g.length);
+  for (let k = 0; k < g.length; k++) { gs[k] = softLut[g[k]]; g[k] = lut[g[k]]; }
   // אם המחיקה של העט הופעלה, העמוד נקרא כמו שהוא מוצג
-  if (p.ink) { applyFilter(c, 'clean', true); const dd = x.getImageData(0, 0, W, H).data; for (let i = 0, k = 0; k < g.length; i += 4, k++) if (dd[i] === 255 && dd[i + 1] === 255 && dd[i + 2] === 255) g[k] = 255; }
+  if (p.ink) { applyFilter(c, 'clean', true); const dd = x.getImageData(0, 0, W, H).data; for (let i = 0, k = 0; k < g.length; i += 4, k++) if (dd[i] === 255 && dd[i + 1] === 255 && dd[i + 2] === 255) g[k] = gs[k] = 255; }
   // האזור שיש בו כתב: שורות ועמודות עם מספיק נקודות כהות
   // כתב = כמעט שחור אחרי ההכנה. נקודות המשבצות נשארות אפורות בהירות ולא נספרות
   const INK = 100, rows = new Uint32Array(H), cols = new Uint32Array(W);
@@ -1071,8 +1075,8 @@ async function readingPic(p, fast) {
     }
   }
   free(gray);
-  const lines = splitLines(g, W, H, x0, y0, cw, ch);
-  return { url: page.u, b64: page.u.split(',')[1], w: page.w, h: page.h, strips, lines };
+  const sp = splitLines(g, gs, W, H, x0, y0, cw, ch);
+  return { url: page.u, b64: page.u.split(',')[1], w: page.w, h: page.h, strips, lines: sp.map(l => l.a), lines2: sp.map(l => l.b) };
 }
 window.SIMAN_CAM = CAM;
 
@@ -1080,7 +1084,7 @@ window.SIMAN_CAM = CAM;
    מודלי הקריאה קוראים כתב רהוט עברי טוב בהרבה כשמקבלים שורה אחת בכל תמונה, ולא דף שלם
    (במדד כתב היד העברי של ivrit.ai: טעות של כ-12% מהאותיות בשורות, לעומת יותר מפי שלושה בדף שלם).
    לכן הדף מיושר (תיקון הטיה קלה), נחתך לשורות לפי פיזור הדיו, וכל שורה נשלחת כתמונה נפרדת. */
-function splitLines(g, W, H, X0, Y0, cw, ch) {
+function splitLines(g, gs, W, H, X0, Y0, cw, ch) {
   const INK = 110;
   // הטיה: הזווית (עד 6 מעלות) שבה שורות הדיו הכי "חדות" בהטלה האופקית
   const sk = Math.min(1, 700 / cw), pts = [];
@@ -1095,14 +1099,17 @@ function splitLines(g, W, H, X0, Y0, cw, ch) {
     if (v > bestV) { bestV = v; bestA = a; }
   }
   // הדף המיושר (אפור), בגודל מלא
-  const src = canvasOf(cw, ch), sxc = src.getContext('2d'), si = sxc.createImageData(cw, ch), sd = si.data;
-  for (let y = 0; y < ch; y++) for (let x = 0; x < cw; x++) { const v = g[(y + Y0) * W + x + X0], o = (y * cw + x) * 4; sd[o] = sd[o + 1] = sd[o + 2] = v; sd[o + 3] = 255; }
-  sxc.putImageData(si, 0, 0);
-  let pg = src;
-  if (Math.abs(bestA) >= 0.5) {
-    pg = canvasOf(cw, ch); const px = pg.getContext('2d'); px.fillStyle = '#fff'; px.fillRect(0, 0, cw, ch);
+  const straight = arr => {
+    const src = canvasOf(cw, ch), sxc = src.getContext('2d'), si = sxc.createImageData(cw, ch), sd = si.data;
+    for (let y = 0; y < ch; y++) for (let x = 0; x < cw; x++) { const v = arr[(y + Y0) * W + x + X0], o = (y * cw + x) * 4; sd[o] = sd[o + 1] = sd[o + 2] = v; sd[o + 3] = 255; }
+    sxc.putImageData(si, 0, 0);
+    if (Math.abs(bestA) < 0.5) return src;
+    const o = canvasOf(cw, ch), px = o.getContext('2d'); px.fillStyle = '#fff'; px.fillRect(0, 0, cw, ch);
     px.translate(cw / 2, ch / 2); px.rotate(-bestA * Math.PI / 180); px.drawImage(src, -cw / 2, -ch / 2); free(src);
-  }
+    return o;
+  };
+  const pg = straight(g), pg2 = straight(gs);
+  const p2ctx = pg2.getContext('2d', { willReadFrequently: true }), p2im = p2ctx.getImageData(0, 0, cw, ch), d2 = p2im.data;
   const pctx = pg.getContext('2d', { willReadFrequently: true }), pim = pctx.getImageData(0, 0, cw, ch), d = pim.data;
   // קו ארוך ודק (קו תחתון, קצה שולחן, צל בשוליים) אינו כתב: כל רכיב דיו מחובר כזה נמחק,
   // כדי שלא ייחשב שורה ולא יחבר שורות
@@ -1120,10 +1127,10 @@ function splitLines(g, W, H, X0, Y0, cw, ch) {
       }
       const bw = x1 - x0 + 1, bh = y1 - y0 + 1;
       const rule = (bw > cw * 0.2 && bh < bw * 0.15) || ((y0 === 0 || y1 === ch - 1) && bw > cw * 0.12) || (bh > ch * 0.5 && bw < bh * 0.1);
-      if (rule) for (const p of pix) { const o = p * 4; d[o] = d[o + 1] = d[o + 2] = 255; }
+      if (rule) for (const p of pix) { const o = p * 4; d[o] = d[o + 1] = d[o + 2] = 255; d2[o] = d2[o + 1] = d2[o + 2] = 255; }
     }
   }
-  pctx.putImageData(pim, 0, 0);
+  pctx.putImageData(pim, 0, 0); p2ctx.putImageData(p2im, 0, 0);
   const ink = (x, y) => d[(y * cw + x) * 4] < INK;
   // קווים אנכיים לכל אורך הדף (שוליים, ספירלה) לא נספרים
   const colN = new Uint32Array(cw);
@@ -1138,7 +1145,7 @@ function splitLines(g, W, H, X0, Y0, cw, ch) {
   const sm0 = new Float32Array(ch), w0 = Math.max(1, Math.round(ch * 0.003));
   for (let y = 0; y < ch; y++) { let a = 0, n = 0; for (let k = y - w0; k <= y + w0; k++) if (k >= 0 && k < ch) { a += rows[k]; n++; } sm0[y] = a / n; }
   const pos = [...sm0].filter(v => v > 0).sort((a, b) => a - b);
-  if (!pos.length) { free(pg); return []; }
+  if (!pos.length) { free(pg); free(pg2); return []; }
   const top95 = pos[Math.floor(pos.length * 0.95)], hs = [];
   for (let y = 0, st = -1; y <= ch; y++) { const on = y < ch && sm0[y] > top95 * 0.15; if (on && st < 0) st = y; if (!on && st >= 0) { hs.push(y - st); st = -1; } }
   hs.sort((a, b) => a - b);
@@ -1154,13 +1161,13 @@ function splitLines(g, W, H, X0, Y0, cw, ch) {
   const pk = [];
   for (const y of peaks) { const l = pk[pk.length - 1]; if (l != null && y - l < med * 0.9) { if (sm[y] > sm[l]) pk[pk.length - 1] = y; } else pk.push(y); }
   peaks = pk;
-  if (!peaks.length) { free(pg); return []; }
-  if (peaks.length > 45) { free(pg); return []; }   // דף מודפס צפוף: נקרא כדף שלם
+  if (!peaks.length) { free(pg); free(pg2); return []; }
+  if (peaks.length > 45) { free(pg); free(pg2); return []; }   // דף מודפס צפוף: נקרא כדף שלם
   const cuts = [];
   for (let i = 0; i < peaks.length - 1; i++) { let by = peaks[i], bv = 1e9; for (let y = peaks[i]; y <= peaks[i + 1]; y++) if (sm[y] < bv) { bv = sm[y]; by = y; } cuts.push(by); }
-  let first = 0; while (first < ch && rows[first] === 0) first++;
-  let last = ch - 1; while (last > 0 && rows[last] === 0) last--;
-  let segs = peaks.map((p, i) => [i ? cuts[i - 1] : Math.max(0, first - Math.round(med * 0.3)), i < cuts.length ? cuts[i] : Math.min(ch - 1, last + Math.round(med * 0.3))]);
+  // כל שורה: עד הגבול עם השכנה, אבל לא יותר משורה וחצי סביב מרכזה (כדי שלא תימשך על כל החלק הריק של הדף)
+  const reach = Math.round(med * 1.25);
+  let segs = peaks.map((p, i) => [Math.max(i ? cuts[i - 1] : 0, p - reach), Math.min(i < cuts.length ? cuts[i] : ch - 1, p + reach)]);
   // קטע עם מעט מאוד דיו (קו תחתון, זנב, נקודה) מצטרף לשכן הקרוב
   const mass = sg => { let m = 0; for (let y = sg[0]; y <= sg[1]; y++) m += rows[y]; return m; };
   const ms = segs.map(mass), mm = [...ms].sort((a, b) => a - b)[ms.length >> 1] || 1;
@@ -1182,9 +1189,11 @@ function splitLines(g, W, H, X0, Y0, cw, ch) {
     const k = Math.max(0.5, Math.min(2.5, 160 / hh, 2200 / w));
     const o = canvasOf(w * k, hh * k), ox = o.getContext('2d'); ox.fillStyle = '#fff'; ox.fillRect(0, 0, o.width, o.height);
     ox.imageSmoothingQuality = 'high'; ox.drawImage(pg, lx, t0, w, hh, 0, 0, o.width, o.height);
-    out.push(o.toDataURL('image/jpeg', 0.9).split(',')[1]); free(o);
+    const a = o.toDataURL('image/jpeg', 0.9).split(',')[1];
+    ox.drawImage(pg2, lx, t0, w, hh, 0, 0, o.width, o.height);
+    out.push({ a, b: o.toDataURL('image/jpeg', 0.88).split(',')[1] }); free(o);
   });
-  free(pg);
+  free(pg); free(pg2);
   return out;
 }
 CAM._readingPic = readingPic; CAM._find = findSheet; CAM._spread = spreadOf;

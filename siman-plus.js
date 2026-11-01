@@ -1171,7 +1171,7 @@ const SC = {
       st.textContent = line + '…';
       const clock = setInterval(() => { const sec = Math.round((Date.now() - t0) / 1000); li.querySelector('span').textContent = `קורא… ${sec} שנ׳`; st.textContent = `${line} · ${sec} שניות${sec > 45 ? ' (דף צפוף לוקח לפעמים עד שתי דקות)' : ''}`; }, 1000);
       try {
-        const raw = await readPage(p, this.hint, this.quality, { onWait: s => { st.textContent = `השירות עמוס, ממשיך בעוד ${s} שניות…`; }, onLines: (d, n) => { li.querySelector('span').textContent = `שורה ${d} מתוך ${n}`; } }).finally(() => clearInterval(clock));
+        const raw = await readPage(p, this.hint, this.quality, { onWait: s => { st.textContent = `השירות עמוס, ממשיך בעוד ${s} שניות…`; }, onLines: (d, n) => { li.querySelector('span').textContent = `שורה ${d} מתוך ${n}`; }, onCheck: () => { li.querySelector('span').textContent = 'בודק את כל הדף שוב…'; } }).finally(() => clearInterval(clock));
         p.blocks = parseBlocks(raw); p.lang = p.blocks.lang;
         li.className = 'ok'; li.querySelector('span').textContent = p.blocks.length ? `${p.blocks.length} קטעים` : 'עמוד ריק';
       } catch (e) {
@@ -1275,6 +1275,8 @@ const SC = {
   collect() { return this.pages.filter(p => p.ed).map(p => domBlocks(p.ed)).filter(pg => pg.length); },
   async save(kind) {
     const pages = this.collect();
+    // מילים שהמשתמש תיקן נלמדות לקריאות הבאות
+    try { this.pages.forEach(p => { if (p.ed && p.blocks && p.blocks.length) VOCAB.learn(p.blocks.map(blockText).join(' '), domBlocks(p.ed).map(blockText).join(' ')); }); } catch (_) {}
     if (!pages.length) { toast('אין טקסט לשמירה'); return; }
     // a new name each time when the name is the default one: an old broken file of the same name is never opened by mistake
     let base = cleanBase(this.name) || 'סריקה';
@@ -1300,12 +1302,30 @@ imgIn.onchange = e => { const f = [...e.target.files]; e.target.value = ''; SC.f
 pdfIn.onchange = e => { const f = e.target.files[0]; e.target.value = ''; SC.fromPdf(f); };
 window.SIMAN_SCAN = SC;
 
+/* The writer's own words: names, places and work terms the person typed when fixing a reading.
+   Kept on this device only, and sent with the next readings as a hint (used only when the letters fit). */
+const VOCAB = {
+  key: 'siman.scan.vocab',
+  load() { try { return JSON.parse(localStorage.getItem(this.key) || '{}') || {}; } catch (_) { return {}; } },
+  top(n = 150) { const v = this.load(); return Object.keys(v).sort((a, b) => v[b] - v[a]).slice(0, n); },
+  words: t => String(t || '').replace(/\[\[|\]\]/g, ' ').split(/[\s,.;:!?()"״׳'\/\\\-–—]+/).map(w => w.trim()).filter(w => w.length >= 2 && /[\u0590-\u05FFA-Za-z]/.test(w) && w !== '?'),
+  learn(before, after) {
+    const had = new Set(this.words(before)), v = this.load(); let n = 0;
+    for (const w of new Set(this.words(after))) if (!had.has(w)) { v[w] = (v[w] || 0) + 1; n++; }
+    if (!n) return;
+    const keep = Object.keys(v).sort((a, b) => v[b] - v[a]).slice(0, 400), out = {};
+    for (const k of keep) out[k] = v[k];
+    try { localStorage.setItem(this.key, JSON.stringify(out)); } catch (_) {}
+  },
+};
+window.SIMAN_VOCAB = VOCAB;
+
 /* Reading one page.
    Pages prepared by the scanner (siman-scan.js) come cut into lines: each line is read as its own picture,
    in a few requests of up to 6 lines, two at a time. On the ivrit.ai Hebrew handwriting benchmark this is
    where the reading models are by far the most accurate. Other pages (a PDF, an old reader photo) are read
    as one page, as before. The answer has the same shape either way: {"lang","blocks"}. */
-async function readPage(p, hint, quality, { onWait, onLines } = {}) {
+async function readPage(p, hint, quality, { onWait, onLines, onCheck } = {}) {
   if (!p.lines || !p.lines.length) return ai({ mode: 'scan', image: p.b64, strips: p.strips || [], mime: 'image/jpeg', hint, quality }, { timeout: 150000, onWait });
   const L = p.lines, B = 6, got = new Array(L.length).fill(null), starts = [];
   for (let i = 0; i < L.length; i += B) starts.push(i);
@@ -1315,7 +1335,7 @@ async function readPage(p, hint, quality, { onWait, onLines } = {}) {
     while (next < starts.length) {
       const s0 = starts[next++], part = L.slice(s0, s0 + B);
       try {
-        const raw = await ai({ mode: 'lines', lines: part, hint, quality }, { timeout: 130000, onWait });
+        const raw = await ai({ mode: 'lines', lines: part, lines2: (p.lines2 || []).slice(s0, s0 + B), vocab: VOCAB.top(), hint, quality }, { timeout: 130000, onWait });
         const j = JSON.parse(strip(raw));
         if (j.lang && !lang) lang = j.lang;
         (j.lines || []).forEach((r, k) => { const n = Number.isInteger(r.n) && r.n >= 1 && r.n <= part.length ? r.n - 1 : k; if (n < part.length && !got[s0 + n]) got[s0 + n] = r; });
@@ -1325,6 +1345,21 @@ async function readPage(p, hint, quality, { onWait, onLines } = {}) {
   };
   await Promise.all([worker(), worker()]);
   if (!got.some(Boolean)) throw firstErr || new Error('לא זוהה טקסט');
+  // מבט שני על כל הדף יחד: כל השורות והקריאה הראשונה. מתקן מילים לפי נושא הדף ומסמן בצהוב כל מילה לא בטוחה
+  if (quality !== 'fast') {
+    onCheck && onCheck();
+    const views = p.lines2 && p.lines2.length === L.length ? p.lines2 : L;
+    for (let s0 = 0; s0 < L.length; s0 += 15) {
+      const idx = [...Array(Math.min(15, L.length - s0)).keys()].map(k => s0 + k);
+      if (!idx.some(i => got[i])) continue;
+      try {
+        const raw = await ai({ mode: 'linesCheck', lines: idx.map(i => views[i]), draft: idx.map(i => got[i] || { kind: 'text', text: '[[?]]' }), vocab: VOCAB.top(), hint }, { timeout: 100000, onWait });
+        const j = JSON.parse(strip(raw));
+        const fixed = j.lines || [];
+        if (fixed.length === idx.length) fixed.forEach((r, k) => { if (r && typeof r.text === 'string') got[idx[k]] = r; });
+      } catch (e) { console.warn('second look', e); }   // the first reading stays
+    }
+  }
   // שורות → קטעים. שורה שהיא רק חץ מחברת את השורה שלפניה לזו שאחריה (רצף של שלבים)
   const blocks = []; let joinNext = false;
   got.forEach((r, i) => {
