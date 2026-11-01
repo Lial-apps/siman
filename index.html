@@ -4946,7 +4946,9 @@ function shareHints(){
   const btn=k=>document.querySelector(`.sh[data-share="${k}"]`);
   set('shMeHint',USER.mail?USER.mail:'קודם מגדירים את המייל שלך');
   set('shWaTitle','וואטסאפ');
-  set('shWaHint',IS_TOUCH?'הקובץ עצמו, בוחרים שיחה ושולחים':waLinkReady()?'נפתח ישר בוואטסאפ, עם קישור לקובץ':'דרך תפריט השיתוף של המחשב, בלי הורדה');
+  const asPdf=!!(SH.file&&SH.pdfAlt&&!canShareFile(SH.file));
+  set('shWaHint',IS_TOUCH?(asPdf?'יישלח כ-PDF, בוחרים שיחה ושולחים':'הקובץ עצמו, בוחרים שיחה ושולחים'):waLinkReady()?'נפתח ישר בוואטסאפ, עם קישור לקובץ':'דרך תפריט השיתוף של המחשב, בלי הורדה');
+  set('shMailHint',asPdf?'כקובץ PDF מצורף':'שליחת הקובץ כקובץ מצורף');
   document.querySelector('.sh[data-share="wadesk"]').classList.add('hidden'); // one WhatsApp button on every device (5.8.1)
   const ad=IS_APPLE&&native;btn('airdrop').disabled=!ad;
   set('shAdHint',ad?'לאייפון, אייפד ומק שליד':'זמין רק באייפון, אייפד ומק');
@@ -4999,8 +5001,19 @@ function prepShare(focusKey){
     SH.file=f;renameShareFile();
     d.classList.remove('wait');shStatus(SH.msgs.join('. '));
     if(focusKey){const b=document.querySelector(`.sh[data-share="${focusKey}"]`);b&&b.focus();}
+    // 5.8.1: phones share only PDF through their share menu (a Word / Excel / PowerPoint file is refused).
+    // The PDF version is prepared now, in the background, so a tap on WhatsApp, mail or Quick Share sends it at once
+    SH.pdfAlt=null;SH.altUsed=false;
+    if(IS_TOUCH&&navigator.share&&SH.fmt==='office'&&!canShareFile(f)){
+      const altJob=SH.altJob=(SH.ext?SH.ext.api.share.file('pdf').then(async b=>new Uint8Array(await b.arrayBuffer())):buildPdf())
+        .then(bytes=>{if(SH.altJob!==altJob||SH.job!==job)return;const n=fileName().replace(/\.[a-z0-9]{2,5}$/i,'')+'.pdf';SH.pdfAlt=new File([bytes],n,{type:'application/pdf'});shareHints();})
+        .catch(e=>console.warn('pdf alt',e));
+    }
+    shareHints();
   }).catch(e=>{console.error(e);shStatus('הכנת הקובץ נכשלה: '+(e.message||e));});
 }
+// the file the device's share menu will take: the file itself, or its PDF version on a phone that refuses Word / Excel / PowerPoint
+function shareableFile(){const f=SH.file;if(!f)return null;if(canShareFile(f)||!SH.pdfAlt)return f;SH.altUsed=true;return SH.pdfAlt;}
 $('shareBtn').onclick=()=>openShare();
 /* SEND FOR SIGNING / SHARE BY LINK — see send.js */
 const loadSend=()=>window.SIMAN_SEND?Promise.resolve():loadScript('send.js');
@@ -5172,12 +5185,18 @@ function refused(f){
   shStatus(`תפריט השיתוף של המכשיר לא מקבל קובץ ${f.name.split('.').pop().toUpperCase()}. <a href="#" id="shDl">הורדת הקובץ</a> ושליחה מהאפליקציה${(S.office||SH.ext)&&SH.fmt==='office'?', או בחירה ב-"PDF" למעלה':''}.`,true);
   const a=document.getElementById('shDl');if(a)a.onclick=e=>{e.preventDefault();downloadFile(f);done('הקובץ ירד לתיקיית ההורדות');};
 }
-function done(msg){$('shareDlg').close();if(msg)toast(msg);}
+function done(msg){$('shareDlg').close();if(SH.altUsed){msg=(msg?msg+'. ':'')+'נשלחה גרסת PDF של הקובץ, כי הטלפון משתף רק PDF';SH.altUsed=false;}if(msg)toast(msg);}
 document.querySelectorAll('.sh[data-share]').forEach(b=>b.addEventListener('click',async()=>{
   const k=b.dataset.share;
   if(!SH.file){shStatus('עוד רגע, הקובץ בהכנה…');return;}
-  if(['airdrop','quick','more'].includes(k)&&!canShareFile(SH.file)){shStatus(`הדפדפן הזה משתף ככה רק PDF. בחרו "PDF חתום" למעלה, או שמרו את קובץ ה-${SH.ext?OF_LABEL[SH.ext.kind]:S.office?OF_LABEL[S.office.kind]:''} ושלחו אותו מהאפליקציה.`.replace('קובץ ה- ','הקובץ '));return;}
-  try{await ACTIONS[k](SH.file);}
+  SH.altUsed=false;
+  const viaMenu=['whatsapp','mail','me','airdrop','quick','more'].includes(k);
+  const f=viaMenu?shareableFile():SH.file;
+  if(viaMenu&&!canShareFile(f)&&navigator.share){
+    if(SH.altJob&&!SH.pdfAlt){shStatus('עוד רגע, מכין גרסת PDF לשליחה…');try{await SH.altJob;}catch(_){}const f2=shareableFile();if(f2&&canShareFile(f2)){try{await ACTIONS[k](f2);}catch(e){console.error(e);$('shareDlg').classList.remove('wait');shStatus(e&&e.name==='AbortError'?'':'השיתוף נכשל: '+(e.message||e));}return;}}
+    if(['airdrop','quick','more'].includes(k)){shStatus(`הדפדפן הזה משתף ככה רק PDF. בחרו "PDF" למעלה, או שמרו את קובץ ה-${SH.ext?OF_LABEL[SH.ext.kind]:S.office?OF_LABEL[S.office.kind]:''} ושלחו אותו מהאפליקציה.`.replace('קובץ ה- ','הקובץ '));return;}
+  }
+  try{await ACTIONS[k](f);}
   catch(e){console.error(e);$('shareDlg').classList.remove('wait');
     shStatus(e&&e.name==='AbortError'?'':(k==='drive'?'השמירה ב-Drive נכשלה: ':'השיתוף נכשל: ')+(e.message||e));}
 }));
@@ -5350,7 +5369,7 @@ if('launchQueue' in window){
 <script src="siman-phone.js?v=5.8.1" defer></script>
 <script src="a11y.js?v=5.8.1" defer></script>
 <script src="siman-voice.js" defer></script>
-<script src="siman-back.js?v=5.2.9" defer></script>
+<script src="siman-back.js?v=5.8.1" defer></script>
 <!-- 5.8.1: one design for everyone (the ?beta=1 shell and the classic design were removed) -->
 <link rel="stylesheet" href="siman-v7.css?v=5.8.1">
 <script src="siman-v7.js?v=5.8.1" defer></script>

@@ -279,3 +279,36 @@ html.v7[data-theme="dark"] .v7-new-tag{color:var(--v7-accent)}
 @media (max-width:360px){.v7-small b{font-size:11.5px}}
 @media (max-width:720px){.v7-home .v7-only-wide{display:none}}
 @media (min-width:721px){.v7-home .v7-only-narrow{display:none}}
+
+
+/* ================================================================ 5.8.1: the Word / Excel / PowerPoint editors in dark mode
+   Their ribbons, menus and status bars were painted light while the text took the dark theme's light colour.
+   The document itself (the white page, the sheet's cells, the slide) stays light, as in Word. */
+html.v7[data-theme="dark"] #wed,html.v7[data-theme="dark"] #ped,html.v7[data-theme="dark"] #ped .pe-stage,
+html.v7[data-theme="dark"] .we-load,html.v7[data-theme="dark"] .pe-load{background:var(--v7-bg)!important}
+html.v7[data-theme="dark"] #ped .pe-slides{background:var(--v7-deep2)!important;border-color:var(--v7-line)!important}
+html.v7[data-theme="dark"] .we-ribbon,html.v7[data-theme="dark"] #xed .xe-ribbon,html.v7[data-theme="dark"] .pe-ribbon,
+html.v7[data-theme="dark"] .we-status,html.v7[data-theme="dark"] #xed .xe-bottom,html.v7[data-theme="dark"] .pe-status,
+html.v7[data-theme="dark"] #xed .xe-fbar,
+html.v7[data-theme="dark"] #wed .we-tabs button[aria-selected=true],html.v7[data-theme="dark"] #xed .xe-tabs button[aria-selected=true],html.v7[data-theme="dark"] #ped .pe-tabs button[aria-selected=true]{background:var(--v7-surface)!important;color:var(--v7-ink)!important;border-color:var(--v7-line)!important}
+html.v7[data-theme="dark"] #wed .wg,html.v7[data-theme="dark"] #xed .xg,html.v7[data-theme="dark"] #ped .wg,html.v7[data-theme="dark"] #ped .pg{border-color:var(--v7-line)!important}
+html.v7[data-theme="dark"] #wed .wb,html.v7[data-theme="dark"] #xed .xb,html.v7[data-theme="dark"] #ped .wb,
+html.v7[data-theme="dark"] #wed .wg-l,html.v7[data-theme="dark"] #xed .xg-l,html.v7[data-theme="dark"] #ped .wg-l{color:var(--v7-ink)!important}
+html.v7[data-theme="dark"] #wed .wb:hover,html.v7[data-theme="dark"] #xed .xb:hover,html.v7[data-theme="dark"] #ped .wb:hover{background:var(--v7-soft)!important}
+html.v7[data-theme="dark"] #wed .wb[aria-pressed=true],html.v7[data-theme="dark"] #wed .wb.on,html.v7[data-theme="dark"] #xed .xb[aria-pressed=true],html.v7[data-theme="dark"] #ped .wb[aria-pressed=true],html.v7[data-theme="dark"] #ped .wb.on{background:var(--v7-soft)!important;border-color:var(--v7-accent)!important}
+html.v7[data-theme="dark"] #wed .wsel,html.v7[data-theme="dark"] #xed .xsel,html.v7[data-theme="dark"] #ped .wsel,
+html.v7[data-theme="dark"] #wed .num input,html.v7[data-theme="dark"] #xed .num input,html.v7[data-theme="dark"] #ped .num input,
+html.v7[data-theme="dark"] #xed .xe-fxin,html.v7[data-theme="dark"] #xed .xe-ref,html.v7[data-theme="dark"] #xed .xdd{background:var(--v7-surface)!important;color:var(--v7-ink)!important;border-color:var(--v7-line)!important}
+html.v7[data-theme="dark"] #xed .xdd:hover,html.v7[data-theme="dark"] #xed .xfb:hover,html.v7[data-theme="dark"] #xed .xfb.on{background:var(--v7-soft)!important}
+html.v7[data-theme="dark"] .we-pop,html.v7[data-theme="dark"] #xed .xe-pop,html.v7[data-theme="dark"] .pe-pop,
+html.v7[data-theme="dark"] .oa-menu,html.v7[data-theme="dark"] .oa-drop,html.v7[data-theme="dark"] #wed .cmc,
+html.v7[data-theme="dark"] .otr-box,html.v7[data-theme="dark"] #xed .xe-tip{background:var(--v7-surface)!important;color:var(--v7-ink)!important;border-color:var(--v7-line)!important}
+html.v7[data-theme="dark"] .we-pop .mi:hover,html.v7[data-theme="dark"] .we-pop .mi.on,html.v7[data-theme="dark"] #xed .xe-pop .mi:hover,html.v7[data-theme="dark"] .pe-pop .mi:hover,html.v7[data-theme="dark"] .pe-pop .mi.on,
+html.v7[data-theme="dark"] .oa-menu button:hover,html.v7[data-theme="dark"] .oa-menu button.on,html.v7[data-theme="dark"] .oa-drop button.on,html.v7[data-theme="dark"] .oa-drop button:hover,html.v7[data-theme="dark"] .oa-drop button .ico,
+html.v7[data-theme="dark"] .ai-res .done,html.v7[data-theme="dark"] .ai-res button:hover,html.v7[data-theme="dark"] #wed .we-toc:hover,html.v7[data-theme="dark"] #wed .we-wc:hover,html.v7[data-theme="dark"] #ped .pe-toc:hover,html.v7[data-theme="dark"] #ped .pe-wc:hover{background:var(--v7-soft)!important}
+html.v7[data-theme="dark"] .oa-menu button,html.v7[data-theme="dark"] .oa-drop button,html.v7[data-theme="dark"] .ai-res{color:var(--v7-ink)!important}
+html.v7[data-theme="dark"] .oa-menu .sep{background:var(--v7-line)!important}
+html.v7[data-theme="dark"] .otr-langs button{background:var(--v7-bg)!important;color:var(--v7-ink)!important;border-color:var(--v7-line)!important}
+html.v7[data-theme="dark"] .otr-langs button:hover,html.v7[data-theme="dark"] .otr-langs button:focus-visible{background:var(--v7-soft)!important}
+/* the document stays a light page: its own text colours are kept */
+html.v7[data-theme="dark"] .we-sheet,html.v7[data-theme="dark"] #xed .xe-wrap,html.v7[data-theme="dark"] #xed .xe-grid td{color-scheme:light}

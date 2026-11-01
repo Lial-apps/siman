@@ -1,4 +1,4 @@
-/* סימן — כפתור "חזרה" (5.2.9)
+/* סימן — כפתור "חזרה" (5.8.1: בצבעי המראה שנבחר, מרווח לנוץ' בתצוגה לרוחב)
    בטלפון יש עכשיו גם כפתור חזרה עגול על המסך (בפינה הימנית התחתונה). הוא מופיע רק כשיש לאן לחזור,
    ועובד בדיוק כמו כפתור / החלקת "חזרה" של המכשיר — גם באייפון, שאין לו כפתור חזרה בכלל.
    לחיצה על "חזרה" (או החלקת חזרה באנדרואיד) לוקחת צעד אחד אחורה בתוך סימן ולא סוגרת את האפליקציה:
@@ -172,12 +172,12 @@
   /* ---------- the round back button on the screen (phones only) ---------- */
   const css = document.createElement('style');
   css.textContent = `
-.sb-back{position:fixed;z-index:2147482998;right:16px;bottom:calc(76px + env(safe-area-inset-bottom,0px));width:52px;height:52px;border-radius:50%;
-  border:0;padding:0;display:none;align-items:center;justify-content:center;cursor:pointer;background:#1B1C1F;color:#E8F55A;
-  box-shadow:0 8px 22px -6px rgba(0,0,0,.45),0 0 0 2px rgba(232,245,90,.55);-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+.sb-back{position:fixed;z-index:2147482998;right:calc(16px + env(safe-area-inset-right,0px));bottom:calc(76px + env(safe-area-inset-bottom,0px));width:52px;height:52px;border-radius:50%;
+  border:0;padding:0;display:none;align-items:center;justify-content:center;cursor:pointer;background:var(--v7-accent,#1B1C1F);color:var(--v7-on,#E8F55A);
+  box-shadow:0 8px 22px -6px rgba(0,0,0,.45),0 0 0 2px var(--v7-surface,rgba(232,245,90,.55));-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;user-select:none;touch-action:manipulation}
 .sb-back svg{width:26px;height:26px}
 .sb-back:active{transform:scale(.92)}
-.sb-back:focus-visible{outline:3px solid #2E58CC;outline-offset:3px}
+.sb-back:focus-visible{outline:3px solid var(--v7-ink,#2E58CC);outline-offset:3px}
 @media (max-width:720px){.sb-back.on{display:flex}}
 @media print{.sb-back{display:none!important}}`;
   document.head.append(css);
