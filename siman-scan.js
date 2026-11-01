@@ -1144,6 +1144,22 @@ const CAM = {
     if (ocr) { if (typeof runOCR === 'function' && typeof S !== 'undefined' && S.pages) await runOCR(S.pages.map((_, i) => i)); }
     else say('הסריקה פתוחה: אפשר לחתום, לסמן ולמלא. לשמירה, כפתור השמירה למעלה');
   },
+  /* דף שצולם לרוחב או הפוך (טבלה רחבה, מחברת שסובבה): קודם בודקים במכשיר אם השורות אופקיות.
+     רק כשלא ברור — שואלים את הקורא איך לסובב (בקשה קטנה ומהירה). הסיבוב נשמר בעמוד, ורואים אותו גם בתמונה הקטנה */
+  async orient(p) {
+    if (p.orientDone) return;
+    p.orientDone = true;
+    try {
+      const c = await render(Object.assign({}, p, { filter: 'orig', ink: false }), 700);
+      const dir = textDirection(c);
+      if (dir === 'h') { free(c); return; }
+      const u = c.toDataURL('image/jpeg', 0.8); free(c);
+      const AI = window.SIMAN_AI; if (!AI) return;
+      const raw = await AI({ mode: 'orient', image: u.split(',')[1], mime: 'image/jpeg' }, { timeout: 40000 });
+      const r = parseInt(JSON.parse(String(raw).replace(/^\s*```(?:json)?|```\s*$/g, '')).rotate, 10);
+      if ([90, 180, 270].includes(r)) { p.rot = (p.rot + r) % 360; await refreshThumb(p); this.updateStack(); }
+    } catch (e) { console.warn('orient', e); }
+  },
   // טבלה בדף → גיליון Excel: כל טבלה בגיליון משלה, תאים לא ודאיים ברשימה נפרדת לבדיקה, ופתיחה בעורך הגיליונות של סימן
   async toExcel() {
     const AI = window.SIMAN_AI;
@@ -1151,6 +1167,8 @@ const CAM = {
     const tables = [], t0 = Date.now(), strip = t => String(t).replace(/^\s*```(?:json)?|```\s*$/g, '');
     for (const [i, p] of this.pages.entries()) {
       const label = this.pages.length > 1 ? `עמוד ${i + 1} מתוך ${this.pages.length}: ` : '';
+      this.busy(label + 'בודק שהדף ישר…');
+      await this.orient(p);
       this.busy(label + 'מכין את התמונה…');
       const pic = await tablePic(p);
       const clock = setInterval(() => this.busy(`${label}קורא את הטבלה… ${Math.round((Date.now() - t0) / 1000)} שנ׳`), 1000);
@@ -1191,6 +1209,8 @@ const CAM = {
     if (!SC || !SC.openReader) throw new Error('קריאת הטקסט לא נטענה');
     const pics = [];
     for (const [i, p] of this.pages.entries()) {
+      this.busy(`בודק שעמוד ${i + 1} ישר…`);
+      await this.orient(p);
       this.busy(`מכין עמוד ${i + 1} מתוך ${this.pages.length} לקריאה…`);
       pics.push(await readingPic(p, SC.quality === 'fast'));
     }
@@ -1199,6 +1219,22 @@ const CAM = {
     SC.openReader(); SC.name = name; SC.run(pics);
   },
 };
+
+/* ---- כיוון השורות בדף: 'h' (אופקיות, הדף ישר או הפוך), 'v' (אנכיות: הדף צולם לרוחב), '?' ----
+   שורות כתב יוצרות פרופיל "מפוספס" לאורך הכיוון שלהן: הרבה דיו בשורה, רווח, שוב שורה */
+function textDirection(c) {
+  const W = c.width, H = c.height, d = c.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, W, H).data;
+  const g = new Float32Array(W * H);
+  for (let i = 0, k = 0; k < g.length; i += 4, k++) g[k] = Math.min(d[i], d[i + 1], d[i + 2]);
+  const bg = Float32Array.from(g); boxBlur(bg, W, H, 10);
+  const rows = new Float64Array(H), cols = new Float64Array(W);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const k = y * W + x; if (bg[k] - g[k] > Math.max(25, bg[k] * 0.15)) { rows[y]++; cols[x]++; } }
+  const stripe = p => { const n = p.length; let m = 0; for (const v of p) m += v; m /= n; if (!m) return 0; let e = 0;
+    for (let i = 0; i < n; i++) { let s = 0, c2 = 0; for (let k = i - 15; k <= i + 15; k++) if (k >= 0 && k < n) { s += p[k]; c2++; } e += (p[i] - s / c2) ** 2; }
+    return e / n / (m * m); };
+  const vr = stripe(rows), vc = stripe(cols);
+  return vr > vc * 1.8 ? 'h' : vc > vr * 1.8 ? 'v' : '?';
+}
 
 /* ---- תמונה לקריאת טבלה: הדף בצבע נקי (קווי הטבלה נשמרים!), ועוד שלוש רצועות חדות מלמעלה למטה ---- */
 async function tablePic(p) {
