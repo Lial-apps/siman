@@ -1,3 +1,4 @@
+/* 5.8.1: finding the page — by its edges and its color (a light tablecloth no longer joins the page), and faster (the large check picture only for a page lying sideways, automatic photo after 5 steady frames, the pause counts the check time) */
 /* =====================================================================
    סימן 5.4 — siman-scan.js
    מדף למסמך: סורק מצלמה מלא, בסגנון אפליקציות הסריקה המובילות
@@ -17,6 +18,7 @@ const h = html => { const t = document.createElement('template'); t.innerHTML = 
 const esc = t => String(t ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const FULL = [[0, 0], [1, 0], [1, 1], [0, 1]];
+const AUTO_NEED = 5;   // steady frames before the automatic photo (5.8.1: was 8)
 const isFull = q => !q || q.every((p, i) => Math.abs(p[0] - FULL[i][0]) < 0.004 && Math.abs(p[1] - FULL[i][1]) < 0.004);
 const quadArea = q => Math.abs(q.reduce((a, p, i) => { const n = q[(i + 1) % 4]; return a + p[0] * n[1] - n[0] * p[1]; }, 0)) / 2;
 const LS = { get: k => { try { return localStorage.getItem(k); } catch (_) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (_) {} } };
@@ -285,7 +287,7 @@ function boxBlur(a, w, hh, r) {
     for (let y = -r; y <= r; y++) s += t[Math.min(hh - 1, Math.max(0, y)) * w + x];
     for (let y = 0; y < hh; y++) { a[y * w + x] = s / (2 * r + 1); s += t[Math.min(hh - 1, y + r + 1) * w + x] - t[Math.max(0, y - r) * w + x]; } }
 }
-function findSheet(data, w, hh) {
+function findSheetBright(data, w, hh) {
   const n = w * hh, g = new Float32Array(n);
   for (let i = 0; i < n; i++) g[i] = data[i * 4] * 0.3 + data[i * 4 + 1] * 0.59 + data[i * 4 + 2] * 0.11;
   boxBlur(g, w, hh, 2);
@@ -333,6 +335,79 @@ function findSheet(data, w, hh) {
   const cx = q.reduce((a, p) => a + p[0], 0) / 4, cy = q.reduce((a, p) => a + p[1], 0) / 4;
   return q.map(([x, y]) => [Math.max(0, Math.min(1, cx + (x - cx) * 0.996)), Math.max(0, Math.min(1, cy + (y - cy) * 0.996))]);
 }
+/* 5.8.1: the page is the bright area that is closed off by its own edges.
+   A light tablecloth or a shadow can be as bright as the page; the line where the page ends still has
+   an edge, so bright pixels that sit on a strong edge don't connect areas. Of the closed areas, the page is
+   the large, bright, nearly rectangular one. */
+function findSheetEdges(data, w, hh) {
+  const n = w * hh, g = new Float32Array(n);
+  for (let i = 0; i < n; i++) g[i] = data[i * 4] * 0.3 + data[i * 4 + 1] * 0.59 + data[i * 4 + 2] * 0.11;
+  boxBlur(g, w, hh, 1);
+  const mag = new Float32Array(n), mh = new Uint32Array(256);
+  for (let y = 1; y < hh - 1; y++) for (let x = 1; x < w - 1; x++) {
+    const i = y * w + x;
+    const gx = (g[i - w + 1] + 2 * g[i + 1] + g[i + w + 1]) - (g[i - w - 1] + 2 * g[i - 1] + g[i + w - 1]);
+    const gy = (g[i + w - 1] + 2 * g[i + w] + g[i + w + 1]) - (g[i - w - 1] + 2 * g[i - w] + g[i - w + 1]);
+    const m = Math.sqrt(gx * gx + gy * gy) / 4; mag[i] = m; mh[Math.min(255, m | 0)]++;
+  }
+  let acc = 0, E = 255; for (let t = 255; t >= 0; t--) { acc += mh[t]; if (acc > n * 0.1) { E = t; break; } }
+  E = Math.max(7, E);
+  const hist = new Float64Array(256); for (let i = 0; i < n; i++) hist[g[i] | 0]++;
+  let sum = 0; for (let t = 0; t < 256; t++) sum += t * hist[t];
+  let wB = 0, sB = 0, best = -1, th = 128, m0 = 0, m1 = 0;
+  for (let t = 0; t < 256; t++) { wB += hist[t]; if (!wB) continue; const wF = n - wB; if (!wF) break;
+    sB += t * hist[t]; const mB = sB / wB, mF = (sum - sB) / wF, v = wB * wF * (mB - mF) * (mB - mF); if (v > best) { best = v; th = t; m0 = mB; m1 = mF; } }
+  // a light page on a light table: the two brightness groups are close; the page is then the bright part of the bright group
+  if (m1 - m0 < 32) { let c = 0, s2 = 0; for (let t = th + 1; t < 256; t++) { c += hist[t]; s2 += t * hist[t]; } th = Math.max(th, (th + s2 / Math.max(1, c)) / 2 | 0); }
+  // the page's color: the brightest tenth of the picture. A beige or golden cloth is as bright, but colored
+  const rg = [], gb = [];
+  { let c2 = 0, lim = 0; for (let t = 255; t >= 0; t--) { c2 += hist[t]; if (c2 > n * 0.1) { lim = t; break; } }
+    for (let i = 0; i < n; i += 3) if (g[i] >= lim) { rg.push(data[i * 4] - data[i * 4 + 1]); gb.push(data[i * 4 + 1] - data[i * 4 + 2]); } }
+  const med = a => { a.sort((x, y) => x - y); return a.length ? a[a.length >> 1] : 0; };
+  const RG = med(rg), GB = med(gb), CT = 16;
+  const mask = new Uint8Array(n);
+  for (let i = 0; i < n; i++) { const o = i * 4, dr = data[o] - data[o + 1] - RG, dg = data[o + 1] - data[o + 2] - GB;
+    mask[i] = g[i] > th && mag[i] < E && dr * dr + dg * dg < CT * CT ? 1 : 0; }
+  const lab = new Int32Array(n).fill(-1), stack = new Int32Array(n), comps = [];
+  for (let s = 0; s < n; s++) {
+    if (!mask[s] || lab[s] >= 0) continue;
+    const id = comps.length; let sp = 0, area = 0, bright = 0, mnS = 1e9, mxS = -1e9, mnD = 1e9, mxD = -1e9, pS = 0, PS = 0, pD = 0, PD = 0, edge = 0;
+    stack[sp++] = s; lab[s] = id;
+    while (sp) {
+      const p = stack[--sp], x = p % w, y = (p / w) | 0; area++; bright += g[p];
+      if (x === 0 || y === 0 || x === w - 1 || y === hh - 1) edge++;
+      const su = x + y, di = x - y;
+      if (su < mnS) { mnS = su; pS = p; } if (su > mxS) { mxS = su; PS = p; }
+      if (di < mnD) { mnD = di; pD = p; } if (di > mxD) { mxD = di; PD = p; }
+      if (x > 0 && mask[p - 1] && lab[p - 1] < 0) { lab[p - 1] = id; stack[sp++] = p - 1; }
+      if (x < w - 1 && mask[p + 1] && lab[p + 1] < 0) { lab[p + 1] = id; stack[sp++] = p + 1; }
+      if (y > 0 && mask[p - w] && lab[p - w] < 0) { lab[p - w] = id; stack[sp++] = p - w; }
+      if (y < hh - 1 && mask[p + w] && lab[p + w] < 0) { lab[p + w] = id; stack[sp++] = p + w; }
+    }
+    comps.push({ id, area, bright: bright / area, edge, tl: pS, br: PS, bl: pD, tr: PD });
+  }
+  const pt = p => [((p % w) + 0.5) / w, (((p / w) | 0) + 0.5) / hh];
+  let pick = null;
+  for (const c of comps) {
+    if (c.area < n * 0.06) continue;
+    const q = [pt(c.tl), pt(c.tr), pt(c.br), pt(c.bl)], qa = quadArea(q);
+    if (qa < 0.1 || qa > 0.97) continue;
+    const onEdge = q.filter(([x, y]) => x < 0.02 || x > 0.98 || y < 0.02 || y > 0.98).length;
+    if (onEdge >= 4) continue;
+    // how rectangular: the area inside the corners vs the area (text holes count as page)
+    const fill = c.area / (qa * n);
+    if (fill < 0.55 || fill > 1.15) continue;
+    const sc = c.bright * (0.6 + 0.4 * Math.min(1, fill / 0.85)) * Math.sqrt(qa) * (c.edge > (w + hh) * 0.6 ? 0.6 : 1);
+    if (!pick || sc > pick.sc) pick = { sc, q };
+  }
+  if (!pick) return null;
+  // the edge itself was left out of the area: move each corner out by about one pixel and a half
+  const q = pick.q, cx = q.reduce((a, p) => a + p[0], 0) / 4, cy = q.reduce((a, p) => a + p[1], 0) / 4;
+  return q.map(([x, y]) => { const dx = x - cx, dy = y - cy, L = Math.hypot(dx * w, dy * hh) || 1, k = 1 + 1.6 / L;
+    return [Math.max(0, Math.min(1, cx + dx * k)), Math.max(0, Math.min(1, cy + dy * k))]; });
+}
+// first by the page's edges and color; if that finds nothing clear, the bright area as before
+function findSheet(data, w, hh) { return findSheetEdges(data, w, hh) || findSheetBright(data, w, hh); }
 function sheetIn(img) {
   const c = scaledCanvas(img, 320), x = c.getContext('2d', { willReadFrequently: true });
   const q = findSheet(x.getImageData(0, 0, c.width, c.height).data, c.width, c.height); free(c); return q;
@@ -654,13 +729,13 @@ const CAM = {
     this.poly2.setAttribute('points', o ? o.map(([x, y]) => `${x * 100},${y * 100}`).join(' ') : '');
     const pb = $r('[data-a=pages]'); pb.hidden = !this.spread; $r('[data-a=swap]').hidden = !this.spread || this.pick === 'both'; if (this.spread) pb.querySelector('span').textContent = this.pick === 'both' ? (this.spread.spiral ? 'שני העמודים' : 'כל הדף') : 'עמוד אחד';
     this.poly.classList.toggle('ok', this.stable >= 3);
-    const need = 8, p = this.auto && this.mode !== 'id' && q ? Math.min(1, this.stable / need) : 0;
+    const need = AUTO_NEED, p = this.auto && this.mode !== 'id' && q ? Math.min(1, this.stable / need) : 0;
     this.ring.style.strokeDashoffset = String(264 * (1 - p));
   },
   loop() {
     clearTimeout(this.timer);
     if (!this.stream || this.view !== 'cam' || root.hidden) return;
-    const v = this.video;
+    const v = this.video, t0 = performance.now();
     if (v.videoWidth && !this.shooting && !$r('.scn-sheet:not([hidden])')) {
       try {
         if (this.mode === 'qr') this.scanQr().catch(() => {});
@@ -670,7 +745,11 @@ const CAM = {
           c.width = Math.round(v.videoWidth * k); c.height = Math.round(v.videoHeight * k);
           const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(v, 0, 0, c.width, c.height);
           let q = findSheet(x.getImageData(0, 0, c.width, c.height).data, c.width, c.height);
-          if (q && (this.mode === 'doc' || this.mode === 'board')) {
+          // 5.8.1: the larger picture (for an open notebook: which page has writing) is read only when the page lies
+          // sideways. A portrait page is always one page, and reading 900 pixels every tenth of a second slowed finding it
+          const wide = q && (Math.hypot((q[1][0] - q[0][0]) * c.width, (q[1][1] - q[0][1]) * c.height) + Math.hypot((q[2][0] - q[3][0]) * c.width, (q[2][1] - q[3][1]) * c.height))
+            >= 0.95 * (Math.hypot((q[3][0] - q[0][0]) * c.width, (q[3][1] - q[0][1]) * c.height) + Math.hypot((q[2][0] - q[1][0]) * c.width, (q[2][1] - q[1][1]) * c.height));
+          if (q && wide && (this.mode === 'doc' || this.mode === 'board')) {
             // לבדיקת הכתב בכל עמוד: תמונה גדולה יותר מזו של זיהוי הדף, כי כתב קטן נעלם בהקטנה
             const k2 = 900 / Math.max(v.videoWidth, v.videoHeight), m = this.mid || (this.mid = document.createElement('canvas'));
             m.width = Math.round(v.videoWidth * k2); m.height = Math.round(v.videoHeight * k2);
@@ -681,7 +760,9 @@ const CAM = {
         }
       } catch (e) { console.warn(e); }
     }
-    this.timer = setTimeout(() => this.loop(), this.mode === 'qr' ? 220 : this.mode === 'mega' ? 160 : 110);
+    // 5.8.1: the pause between checks counts the time the check itself took, so a slow phone isn't slowed twice
+    const spent = performance.now() - t0;
+    this.timer = setTimeout(() => this.loop(), Math.max(30, (this.mode === 'qr' ? 220 : this.mode === 'mega' ? 160 : 110) - spent));
   },
   // מעקב אחרי הדף בין תמונות: החלקה, יציבות, וצילום אוטומטי
   track2(q) {
@@ -691,7 +772,7 @@ const CAM = {
     const prev = this.quad;
     const move = prev ? Math.max(...q.map((p, i) => Math.hypot(p[0] - prev[i][0], p[1] - prev[i][1]))) : 1;
     this.quad = prev && move < 0.08 ? q.map((p, i) => [prev[i][0] * 0.45 + p[0] * 0.55, prev[i][1] * 0.45 + p[1] * 0.55]) : q;
-    this.stable = move < 0.014 ? this.stable + 1 : 0;
+    this.stable = move < 0.018 ? this.stable + 1 : 0;
     this.drawQuad();
     const same = this.lastShotQuad && Math.max(...q.map((p, i) => Math.hypot(p[0] - this.lastShotQuad[i][0], p[1] - this.lastShotQuad[i][1]))) < 0.03;
     if (this.mode === 'id') { this.setHint(this.modeHint()); return; }
@@ -701,7 +782,7 @@ const CAM = {
     if (!this.auto) { this.setHint('הדף זוהה. לוחצים על הכפתור לצילום'); return; }
     if (same && Date.now() - this.lastShot < 6000) { this.setHint('צולם ✓ החליפו דף או הפכו עמוד'); return; }
     this.setHint(this.stable >= 3 ? 'החזיקו יציב…' : 'הדף זוהה');
-    if (this.stable >= 8 && Date.now() - this.lastShot > 1500) this.shoot(true);
+    if (this.stable >= AUTO_NEED && Date.now() - this.lastShot > 1500) this.shoot(true);
   },
   // צילום אמיתי במצלמה, ברזולוציה המלאה שלה. המסגרת שזוהתה בווידאו מועברת לתמונה:
   // הווידאו הוא בדרך כלל חיתוך מהמרכז של אותה תמונה (16:9 מתוך 4:3)
