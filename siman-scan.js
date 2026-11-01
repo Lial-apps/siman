@@ -20,7 +20,12 @@ const FULL = [[0, 0], [1, 0], [1, 1], [0, 1]];
 const isFull = q => !q || q.every((p, i) => Math.abs(p[0] - FULL[i][0]) < 0.004 && Math.abs(p[1] - FULL[i][1]) < 0.004);
 const quadArea = q => Math.abs(q.reduce((a, p, i) => { const n = q[(i + 1) % 4]; return a + p[0] * n[1] - n[0] * p[1]; }, 0)) / 2;
 const LS = { get: k => { try { return localStorage.getItem(k); } catch (_) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (_) {} } };
-const say = m => { if (typeof toast === 'function') toast(m); };
+let toastT = 0;
+const say = m => {
+  const r = document.querySelector('.scn');
+  if (r && !r.hidden) { const t = r.querySelector('.scn-toast'); t.textContent = m; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => { t.hidden = true; }, 3800); return; }
+  if (typeof toast === 'function') toast(m);
+};
 
 const SVG = (p, w = 1.9) => `<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
 const I = {
@@ -46,7 +51,7 @@ const I = {
 
 /* ---------------------------------------------------------------- עיצוב */
 document.head.append(h(`<style id="simanCamCss">
-.scn{position:fixed;inset:0;z-index:2147482000;display:flex;flex-direction:column;background:#0A1222;color:#EEF3FB;font-family:inherit;direction:rtl;text-align:right;-webkit-user-select:none;user-select:none;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+.scn{position:fixed;inset:0;z-index:2147483100;display:flex;flex-direction:column;background:#0A1222;color:#EEF3FB;font-family:inherit;direction:rtl;text-align:right;-webkit-user-select:none;user-select:none;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 .scn[hidden]{display:none}
 .scn *{box-sizing:border-box}
 .scn [hidden]:not(.scn-stack){display:none!important}
@@ -154,6 +159,9 @@ document.head.append(h(`<style id="simanCamCss">
 .scn-sheet button.main{background:#0A1222;color:#fff;border-color:#0A1222}
 .scn-btn{height:42px;padding:0 16px;border-radius:12px;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.06);display:inline-flex;align-items:center;gap:8px;font-size:14.5px}
 .scn-btn.main{background:#FFD43B;border-color:#FFD43B;color:#0A1222;font-weight:700}
+.scn-toast{position:absolute;left:50%;bottom:24px;transform:translateX(-50%);z-index:6;max-width:90%;padding:10px 16px;border-radius:12px;background:#fff;color:#0A1222;font-size:14.5px;box-shadow:0 6px 24px rgba(0,0,0,.4);text-align:center}
+.scn-toast[hidden]{display:none}
+.scn-vf .ov polygon.other{fill:rgba(0,0,0,.35);stroke:rgba(255,255,255,.6);stroke-dasharray:6 5}
 .scn-note{margin:10px 0 0;font-size:12.5px;color:#8FA1BC;line-height:1.5}
 @media (max-width:560px){.scn-grid{grid-template-columns:repeat(2,1fr)}.scn-acts{grid-template-columns:1fr 1fr}.scn-act span{display:none}.scn-act{min-height:48px}}
 @media (prefers-reduced-motion:reduce){.scn-flash.go{animation:none}.scn-vf .ov polygon{transition:none}}
@@ -167,12 +175,13 @@ const root = h(`<div class="scn" hidden role="dialog" aria-modal="true" aria-lab
     <div class="scn-top">
       <button class="scn-ib" type="button" data-a="close" aria-label="סגירת הסורק">${I.x}</button>
       <h2>מדף למסמך</h2>
+      <button class="scn-pill" type="button" data-a="pages" hidden>${I.crop}<span>עמוד אחד</span></button>
       <button class="scn-pill" type="button" data-a="auto" aria-pressed="true">${I.auto}<span>אוטומטי</span></button>
       <button class="scn-ib" type="button" data-a="torch" aria-pressed="false" aria-label="פנס" hidden>${I.torch}</button>
     </div>
     <div class="scn-stage">
       <div class="scn-vf" hidden><video playsinline muted autoplay></video><div class="grid"></div><div class="guide"></div>
-        <svg class="ov" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><polygon points=""/></svg><div class="scn-flash"></div></div>
+        <svg class="ov" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><polygon class="other" points=""/><polygon class="main" points=""/></svg><div class="scn-flash"></div></div>
       <div class="scn-nocam" hidden></div>
       <p class="scn-hint" role="status" aria-live="polite"></p>
       <div class="scn-sheet" hidden></div>
@@ -231,6 +240,7 @@ const root = h(`<div class="scn" hidden role="dialog" aria-modal="true" aria-lab
     </div>
   </section>
   <div class="scn-busy" hidden><div><i></i><span></span></div></div>
+  <p class="scn-toast" role="status" hidden></p>
 </div>`);
 document.body.append(root);
 const galIn = h('<input type="file" accept="image/*" multiple hidden>');
@@ -317,6 +327,38 @@ function findSheet(data, w, hh) {
 function sheetIn(img) {
   const c = scaledCanvas(img, 320), x = c.getContext('2d', { willReadFrequently: true });
   const q = findSheet(x.getImageData(0, 0, c.width, c.height).data, c.width, c.height); free(c); return q;
+}
+
+/* ---- שני עמודים בדף שזוהה (מחברת או ספר פתוחים)? ----
+   הספירלה או התפר: עמודה צרה באמצע עם הרבה נקודות כהות. בלי ספירלה: דף רחב בהרבה מגובהו */
+function spreadOf(c, q) {
+  const [W0, H0] = dimsOf(c), P = q.map(([x, y]) => [x * W0, y * H0]), dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+  const aspect = (dist(P[0], P[1]) + dist(P[3], P[2])) / Math.max(1, dist(P[0], P[3]) + dist(P[1], P[2]));
+  if (aspect < 0.95) return null;                       // דף לאורך: עמוד אחד
+  const w = warp(c, q, 260), W = w.width, H = w.height, d = w.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, W, H).data; free(w);
+  const g = new Float32Array(W * H); let sum = 0;
+  for (let i = 0, k = 0; k < g.length; i += 4, k++) { g[k] = Math.min(d[i], d[i + 1], d[i + 2]); sum += g[k]; }
+  const thr = (sum / g.length) * 0.62, col = new Float32Array(W);
+  for (let y = Math.round(H * 0.04); y < H * 0.96; y++) for (let x = 0; x < W; x++) if (g[y * W + x] < thr) col[x]++;
+  for (let x = 0; x < W; x++) col[x] /= H;
+  const sm = x => (col[Math.max(0, x - 1)] + col[x] + col[Math.min(W - 1, x + 1)]) / 3;
+  const sorted = [...col].sort((a, b) => a - b), med = sorted[W >> 1];
+  let best = -1, bx = 0;
+  for (let x = Math.round(W * 0.3); x <= W * 0.7; x++) { const v = sm(x); if (v > best) { best = v; bx = x; } }
+  let t = null;
+  if (best > 0.16 && best > med * 4 + 0.06) t = bx / W;   // ספירלה או תפר כהה
+  else if (aspect > 1.25) t = 0.5;                       // רחב: כנראה שני עמודים
+  if (t == null) return null;
+  const gap = 0.035, ink = { left: 0, right: 0 };
+  for (let y = Math.round(H * 0.05); y < H * 0.95; y++) for (let x = Math.round(W * 0.04); x < W * 0.96; x++) {
+    const u = x / W; if (Math.abs(u - t) < gap + 0.02) continue;
+    if (g[y * W + x] < thr) ink[u > t ? 'right' : 'left']++;
+  }
+  const lerp = (a, b, k) => [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k];
+  const [TL, TR, BR, BL] = q;
+  return { t, ink, spiral: best > 0.16 && best > med * 4 + 0.06,
+    left: [TL, lerp(TL, TR, t - gap), lerp(BL, BR, t - gap), BL],
+    right: [lerp(TL, TR, t + gap), TR, BR, lerp(BL, BR, t + gap)] };
 }
 
 /* ---- יישור: מסגרת של ארבע פינות → דף ישר (מיפוי ריבוע→מרובע של Heckbert) ---- */
@@ -449,7 +491,7 @@ const CAM = {
   pages: [], mode: 'doc', auto: true, defFilter: 'magic', stream: null, track: null, torch: false,
   quad: null, stable: 0, lastShot: 0, lastShotQuad: null, timer: 0, shooting: false, idFront: null, view: 'cam', cur: 0, cropping: false,
   qrOn: false, qrDet: null, name: '', opts: { size: 'auto', q: 'high', wm: '' },
-  video: $r('video'), vf: $r('.scn-vf'), poly: $r('.ov polygon'), hint: $r('.scn-hint'), ring: $r('.ring circle'),
+  video: $r('video'), vf: $r('.scn-vf'), poly: $r('.ov polygon.main'), poly2: $r('.ov polygon.other'), pick: 'auto', spread: null, hint: $r('.scn-hint'), ring: $r('.ring circle'),
 
   open() {
     if (typeof needReg === 'function' && needReg()) { if (typeof showReg === 'function') showReg(); return; }
@@ -504,7 +546,7 @@ const CAM = {
   stopCam() {
     clearTimeout(this.timer); this.timer = 0;
     if (this.stream) { this.stream.getTracks().forEach(t => t.stop()); this.stream = null; this.track = null; this.torch = false; $r('[data-a=torch]').setAttribute('aria-pressed', 'false'); }
-    this.video.srcObject = null; this.quad = null; this.stable = 0; this.drawQuad();
+    this.video.srcObject = null; this.quad = null; this.stable = 0; this.ic = null; this.spread = null; this.pick = 'auto'; this.drawQuad();
   },
   noCam(msg) {
     this.vf.hidden = true; this.setHint('');
@@ -546,6 +588,9 @@ const CAM = {
   drawQuad() {
     const q = this.quad;
     this.poly.setAttribute('points', q && this.mode !== 'qr' ? q.map(([x, y]) => `${x * 100},${y * 100}`).join(' ') : '');
+    const o = this.spread && q && this.mode !== 'qr' && this.pick !== 'both' ? this.spread.other : null;
+    this.poly2.setAttribute('points', o ? o.map(([x, y]) => `${x * 100},${y * 100}`).join(' ') : '');
+    const pb = $r('[data-a=pages]'); pb.hidden = !this.spread; if (this.spread) pb.querySelector('span').textContent = this.pick === 'both' ? (this.spread.spiral ? 'שני העמודים' : 'כל הדף') : 'עמוד אחד';
     this.poly.classList.toggle('ok', this.stable >= 3);
     const need = 8, p = this.auto && this.mode !== 'id' && q ? Math.min(1, this.stable / need) : 0;
     this.ring.style.strokeDashoffset = String(264 * (1 - p));
@@ -561,7 +606,8 @@ const CAM = {
           const k = 320 / Math.max(v.videoWidth, v.videoHeight), c = this.small || (this.small = document.createElement('canvas'));
           c.width = Math.round(v.videoWidth * k); c.height = Math.round(v.videoHeight * k);
           const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(v, 0, 0, c.width, c.height);
-          const q = findSheet(x.getImageData(0, 0, c.width, c.height).data, c.width, c.height);
+          let q = findSheet(x.getImageData(0, 0, c.width, c.height).data, c.width, c.height);
+          q = this.choosePage(c, q);
           this.track2(q);
         }
       } catch (e) { console.warn(e); }
@@ -580,35 +626,82 @@ const CAM = {
     this.drawQuad();
     const same = this.lastShotQuad && Math.max(...q.map((p, i) => Math.hypot(p[0] - this.lastShotQuad[i][0], p[1] - this.lastShotQuad[i][1]))) < 0.03;
     if (this.mode === 'id') { this.setHint(this.modeHint()); return; }
+    if (quadArea(q) < 0.07) { this.stable = 0; this.drawQuad(); this.setHint('קרבו את המצלמה לדף, כדי שהכתב ייקרא'); return; }
+    if (this.spread && this.pick !== 'both' && !this.spreadTold) { this.setHint('נסרק העמוד המסומן · נגיעה בשני מחליפה'); this.spreadTold = Date.now(); return; }
+    if (this.spreadTold && Date.now() - this.spreadTold < 2200) return;
     if (!this.auto) { this.setHint('הדף זוהה. לוחצים על הכפתור לצילום'); return; }
     if (same && Date.now() - this.lastShot < 6000) { this.setHint('צולם ✓ החליפו דף או הפכו עמוד'); return; }
     this.setHint(this.stable >= 3 ? 'החזיקו יציב…' : 'הדף זוהה');
     if (this.stable >= 8 && Date.now() - this.lastShot > 1500) this.shoot();
+  },
+  // צילום אמיתי במצלמה, ברזולוציה המלאה שלה. המסגרת שזוהתה בווידאו מועברת לתמונה:
+  // הווידאו הוא בדרך כלל חיתוך מהמרכז של אותה תמונה (16:9 מתוך 4:3)
+  async photo(W, H, q) {
+    if (!this.track || !('ImageCapture' in window) || this.noPhoto) return null;
+    try {
+      const ic = this.ic || (this.ic = new ImageCapture(this.track));
+      const pb = await Promise.race([ic.takePhoto(), sleep(5000).then(() => null)]);
+      if (!pb) { this.noPhoto = true; return null; }
+      const bmp = await decodeImg(pb), [pw, ph] = dimsOf(bmp);
+      if ((pw > ph) !== (W > H)) { if (bmp.close) bmp.close(); this.noPhoto = true; return null; }   // מסובבת אחרת מהווידאו: לא בטוח
+      const av = W / H, ap = pw / ph;
+      const map = ([x, y]) => av > ap ? [x, 0.5 + (y - 0.5) * ap / av] : [0.5 + (x - 0.5) * av / ap, y];
+      const c = scaledCanvas(bmp, 4000); if (bmp.close) bmp.close();
+      return { c, q: q ? q.map(map) : null };
+    } catch (e) { console.warn('takePhoto', e); this.noPhoto = true; return null; }
+  },
+  // מחברת או ספר פתוחים: הדף שזוהה הוא שני עמודים. מוצאים את הספירלה או את האמצע,
+  // ובוחרים את העמוד שיש בו כתב (או את מה שהמשתמש בחר בנגיעה)
+  choosePage(c, q) {
+    this.spread = null;
+    if (!q || (this.mode !== 'doc' && this.mode !== 'board')) return q;
+    const s = spreadOf(c, q);
+    if (!s) return q;
+    let side = this.pick === 'left' || this.pick === 'right' ? this.pick : (this.autoSide && s.ink[this.autoSide] * 1.6 > s.ink[this.autoSide === 'right' ? 'left' : 'right'] ? this.autoSide : (s.ink.left > s.ink.right * 1.15 ? 'left' : 'right'));
+    if (this.pick === 'auto') this.autoSide = side;
+    const qq = side === 'right' ? s.right : s.left;
+    this.spread = { t: s.t, full: q, other: side === 'right' ? s.left : s.right, side };
+    return this.pick === 'both' ? q : qq;
+  },
+  tapPick(e) {
+    if (!this.spread || this.mode === 'book') return;
+    const r = this.vf.getBoundingClientRect(), x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
+    const f = this.spread.full, t = this.spread.t, top = f[0][0] + (f[1][0] - f[0][0]) * t, bot = f[3][0] + (f[2][0] - f[3][0]) * t;
+    const mid = top + (bot - top) * Math.max(0, Math.min(1, (y - Math.min(f[0][1], f[1][1])) / Math.max(0.01, Math.max(f[2][1], f[3][1]) - Math.min(f[0][1], f[1][1]))));
+    this.pick = x > mid ? 'right' : 'left'; this.quad = null; this.stable = 0; this.spreadTold = 0;
+    this.setHint(this.pick === 'right' ? 'נבחר העמוד הימני' : 'נבחר העמוד השמאלי');
   },
   async shoot() {
     if (this.shooting || !this.stream) return;
     const v = this.video; if (!v.videoWidth) return;
     this.shooting = true;
     try {
-      const W = v.videoWidth, H = v.videoHeight, k = Math.min(1, 3200 / Math.max(W, H)), c = canvasOf(W * k, H * k);
-      c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+      const W = v.videoWidth, H = v.videoHeight;
       const fl = $r('.scn-flash'); fl.classList.remove('go'); void fl.offsetWidth; fl.classList.add('go');
       try { navigator.vibrate && navigator.vibrate(25); } catch (_) {}
       let q = this.quad ? this.quad.map(p => [...p]) : null;
+      const sp = this.spread && this.pick === 'both' && this.mode !== 'book' ? this.spread : null;
+      // ״שני העמודים״: במחברת עם ספירלה — שני עמודים נפרדים. בדף רחב בלי ספירלה — הדף כולו
+      if (sp) q = sp.full.map(p => [...p]);
+      const both = sp && sp.spiral ? sp : null;
+      // תמונה אמיתית של המצלמה (חדה פי כמה מהווידאו), ואם אין — התמונה מהווידאו
+      let c = await this.photo(W, H, q);
+      if (c && c.q !== undefined) { q = c.q; c = c.c; }
+      if (!c) { const k = Math.min(1, 4000 / Math.max(W, H)); c = canvasOf(W * k, H * k); c.getContext('2d').drawImage(v, 0, 0, c.width, c.height); }
       // בתעודה: אם לא זוהתה, המסגרת המסומנת על המסך
       if (!q && this.mode === 'id') q = [[0.08, 0.22], [0.92, 0.22], [0.92, 0.78], [0.08, 0.78]];
       this.lastShot = Date.now(); this.lastShotQuad = q; this.stable = 0;
-      const blob = await toBlob(c, 0.92); free(c);
-      await this.addShot(blob, q);
+      const blob = await toBlob(c, 0.93); free(c);
+      await this.addShot(blob, q, false, both ? 'book' : null, both ? both.t : 0.5);
     } catch (e) { console.error(e); this.setHint('הצילום נכשל, נסו שוב'); }
     finally { this.shooting = false; }
   },
-  async addShot(blob, q, fromGallery) {
-    const m = this.mode === 'qr' ? 'doc' : this.mode;
+  async addShot(blob, q, fromGallery, forceMode, splitT = 0.5) {
+    const m = forceMode || (this.mode === 'qr' ? 'doc' : this.mode);
     if (m === 'book') {
       // ספר: הדף כולו מיושר, ונחתך לשני עמודים. בספר בעברית העמוד הימני קודם
       const img = await decodeImg(blob), c = warp(img, q || FULL, 3600); if (img.close) img.close();
-      const half = Math.round(c.width / 2), mk = async (x0, w) => { const o = canvasOf(w, c.height); o.getContext('2d').drawImage(c, x0, 0, w, c.height, 0, 0, w, c.height); const b = await toBlob(o, 0.92); free(o); return b; };
+      const half = Math.round(c.width * Math.max(0.3, Math.min(0.7, splitT))), mk = async (x0, w) => { const o = canvasOf(w, c.height); o.getContext('2d').drawImage(c, x0, 0, w, c.height, 0, 0, w, c.height); const b = await toBlob(o, 0.92); free(o); return b; };
       const right = await mk(half, c.width - half), left = await mk(0, half); free(c);
       for (const b of this.rtlBook ? [right, left] : [left, right]) { const p = newPage({ src: b }); this.pages.push(p); await refreshThumb(p); }
     } else if (m === 'id') {
@@ -695,8 +788,11 @@ const CAM = {
     for (const [i, f] of files.entries()) {
       this.busy(files.length > 1 ? `מכין את התמונות… ${i + 1} מתוך ${files.length}` : 'מכין את התמונה…');
       try {
-        const img = await decodeImg(f), c = scaledCanvas(img, 3200); if (img.close) img.close();
-        const q = sheetIn(c), b = await toBlob(c, 0.92); free(c);
+        const img = await decodeImg(f), c = scaledCanvas(img, 4000); if (img.close) img.close();
+        let q = sheetIn(c), sp = null;
+        // מחברת פתוחה בתמונה: העמוד שיש בו יותר כתב
+        if (q && this.mode === 'doc') { const sm = scaledCanvas(c, 320); sp = spreadOf(sm, q); free(sm); if (sp) q = sp.ink.left > sp.ink.right * 1.15 ? sp.left : sp.right; }
+        const b = await toBlob(c, 0.93); free(c);
         await this.addShot(b, q, true);
       } catch (e) { console.warn(e); bad.push(f.name + (/heic|heif/i.test(f.type + f.name) ? ' (HEIC: שמרו כ-JPG)' : '')); }
     }
@@ -898,26 +994,48 @@ async function readingPic(p, fast) {
   c = rotated(c, p.rot);
   const W = c.width, H = c.height, x = c.getContext('2d', { willReadFrequently: true }), im = x.getImageData(0, 0, W, H), d = im.data;
   const bg = paperMap(c);
-  const g = new Uint8ClampedArray(W * H);
+  const g = new Uint8ClampedArray(W * H), hist = new Uint32Array(256);
+  const ix0 = W * 0.08, ix1 = W * 0.92, iy0 = H * 0.06, iy1 = H * 0.94;
+  let inner = 0;
   for (let i = 0, k = 0; i < d.length; i += 4, k++) {
     const r = d[i] * 255 / Math.max(40, bg[i]), gg = d[i + 1] * 255 / Math.max(40, bg[i + 1]), b = d[i + 2] * 255 / Math.max(40, bg[i + 2]);
-    const v = Math.min(r, gg, b);
-    // מתחת ל-95: דיו מלא. מעל 205: נייר וקווים בהירים
-    g[k] = v >= 205 ? 255 : v <= 95 ? 0 : (v - 95) * 255 / 110;
+    g[k] = Math.min(255, r, gg, b);
+    const xx = k % W, yy = (k / W) | 0;
+    if (xx > ix0 && xx < ix1 && yy > iy0 && yy < iy1) { hist[g[k]]++; inner++; }
   }
+  // הגבולות נקבעים לפי פנים הדף (בלי קצה השולחן והספירלה):
+  // lo = הדיו הכהה ביותר → שחור. hi = הקווים או המשבצות המודפסים (או הנייר) → לבן.
+  // כך גם כתב דק או רחוק נשאר כהה וקריא, והמשבצות נעלמות
+  const pct = f => { let a = 0; for (let v = 0; v < 256; v++) { a += hist[v]; if (a >= inner * f) return v; } return 255; };
+  let lo = Math.min(pct(0.003), 170), hi = Math.min(242, pct(0.1) - 6);
+  if (hi < lo + 28) hi = Math.min(250, lo + 28);
+  const lut = new Uint8ClampedArray(256);
+  for (let v = 0; v < 256; v++) { const t = Math.max(0, Math.min(1, (v - lo) / (hi - lo))); lut[v] = 255 * Math.pow(t, 1.6); }
+  for (let k = 0; k < g.length; k++) g[k] = lut[g[k]];
   // אם המחיקה של העט הופעלה, העמוד נקרא כמו שהוא מוצג
   if (p.ink) { applyFilter(c, 'clean', true); const dd = x.getImageData(0, 0, W, H).data; for (let i = 0, k = 0; k < g.length; i += 4, k++) if (dd[i] === 255 && dd[i + 1] === 255 && dd[i + 2] === 255) g[k] = 255; }
   // האזור שיש בו כתב: שורות ועמודות עם מספיק נקודות כהות
-  const rows = new Uint32Array(H), cols = new Uint32Array(W);
-  for (let y = 0; y < H; y++) for (let xx = 0; xx < W; xx++) if (g[y * W + xx] < 110) { rows[y]++; cols[xx]++; }
+  // כתב = כמעט שחור אחרי ההכנה. נקודות המשבצות נשארות אפורות בהירות ולא נספרות
+  const INK = 100, rows = new Uint32Array(H), cols = new Uint32Array(W);
+  for (let y = 0; y < H; y++) for (let xx = 0; xx < W; xx++) if (g[y * W + xx] < INK) { rows[y]++; cols[xx]++; }
   const edge = (arr, len, min) => { let a = 0, b = len - 1; while (a < len && arr[a] < min) a++; while (b > a && arr[b] < min) b--; return [a, b]; };
   // שוליים של 2% מכל צד לא נבדקים: שם יושבים צל, ספירלה וקצה הדף
   // הספירלה של המחברת והצל בקצה לא נחשבים כתב: השורות נספרות בלי 6% מכל צד
   const mx = Math.round(W * 0.02), my = Math.round(H * 0.02), side = Math.round(W * 0.06);
+  // קו שוליים לאורך כל הדף (עמודה כהה ברוב הגובה) או קו לרוחב כל הדף אינם כתב
+  const vRule = new Uint8Array(W); for (let xx = 0; xx < W; xx++) vRule[xx] = cols[xx] > H * 0.4 ? 1 : 0;
+  for (let xx = 1; xx < W - 1; xx++) if ((vRule[xx - 1] & 1) || (vRule[xx + 1] & 1)) vRule[xx] |= 2;
   rows.fill(0);
-  for (let y = my; y < H - my; y++) for (let xx = side; xx < W - side; xx++) if (g[y * W + xx] < 110) rows[y]++;
+  for (let y = my; y < H - my; y++) for (let xx = side; xx < W - side; xx++) if (!vRule[xx] && g[y * W + xx] < INK) rows[y]++;
+  const hRule = new Uint8Array(H); for (let y = 0; y < H; y++) hRule[y] = rows[y] > W * 0.35 ? 1 : 0;
+  for (let y = 0; y < H; y++) if (hRule[y]) rows[y] = 0;
+  // ממוצע על כמה שורות: נקודה בודדת או לכלוך לא נחשבים שורת כתב
+  { const win = Math.max(3, Math.round(H * 0.008)), t = Float32Array.from(rows);
+    for (let y = 0; y < H; y++) { let a = 0, n = 0; for (let k = y - win; k <= y + win; k++) if (k >= 0 && k < H) { a += t[k]; n++; } rows[y] = a / n; } }
+  cols.fill(0);
+  for (let y = my; y < H - my; y++) if (!hRule[y]) for (let xx = 0; xx < W; xx++) if (!(vRule[xx] & 1) && g[y * W + xx] < INK) cols[xx]++;
   for (let xx = 0; xx < mx; xx++) cols[xx] = cols[W - 1 - xx] = 0;
-  let [y0, y1] = edge(rows, H, Math.max(3, W * 0.004)), [x0, x1] = edge(cols, W, Math.max(3, H * 0.003));
+  let [y0, y1] = edge(rows, H, Math.max(3, W * 0.008)), [x0, x1] = edge(cols, W, Math.max(4, H * 0.004));
   if (y1 - y0 < H * 0.05 || x1 - x0 < W * 0.1) { y0 = 0; y1 = H - 1; x0 = 0; x1 = W - 1; }
   const pad = Math.round(Math.max(W, H) * 0.025);
   x0 = Math.max(0, x0 - pad); y0 = Math.max(0, y0 - pad); x1 = Math.min(W - 1, x1 + pad); y1 = Math.min(H - 1, y1 + pad);
@@ -925,7 +1043,8 @@ async function readingPic(p, fast) {
   const gray = canvasOf(cw, ch), gx = gray.getContext('2d'), gi = gx.createImageData(cw, ch), gd = gi.data;
   for (let y = 0; y < ch; y++) for (let xx = 0; xx < cw; xx++) { const v = g[(y + y0) * W + xx + x0], o = (y * cw + xx) * 4; gd[o] = gd[o + 1] = gd[o + 2] = v; gd[o + 3] = 255; }
   gx.putImageData(gi, 0, 0); free(c);
-  const jpeg = (src, sx, sy, sw, sh, max) => { const k = Math.min(1, max / Math.max(sw, sh)), o = canvasOf(sw * k, sh * k), ox = o.getContext('2d');
+  // אזור כתב קטן (צולם מרחוק) מוגדל, כדי שהקורא יראה כל אות בגודל מספיק
+  const jpeg = (src, sx, sy, sw, sh, max) => { const k = Math.min(2.5, max / Math.max(sw, sh)), o = canvasOf(sw * k, sh * k), ox = o.getContext('2d');
     ox.imageSmoothingQuality = 'high'; ox.drawImage(src, sx, sy, sw, sh, 0, 0, o.width, o.height); const u = o.toDataURL('image/jpeg', 0.9); const r = { u, w: o.width, h: o.height }; free(o); return r; };
   const page = jpeg(gray, 0, 0, cw, ch, fast ? 1800 : 2600), strips = [];
   if (!fast) {
@@ -977,6 +1096,7 @@ root.addEventListener('click', e => {
     case 'close': return CAM.close();
     case 'auto': CAM.auto = !CAM.auto; b.setAttribute('aria-pressed', String(CAM.auto)); b.querySelector('span').textContent = CAM.auto ? 'אוטומטי' : 'ידני'; CAM.stable = 0; return CAM.drawQuad();
     case 'torch': return CAM.toggleTorch();
+    case 'pages': CAM.pick = CAM.pick === 'both' ? 'auto' : 'both'; CAM.quad = null; CAM.stable = 0; CAM.spreadTold = 0; return CAM.drawQuad();
     case 'shoot': return CAM.shoot();
     case 'gallery': return galIn.click();
     case 'review': return CAM.show('review');
@@ -987,6 +1107,7 @@ root.addEventListener('click', e => {
     case 'pnext': if (CAM.cur < CAM.pages.length - 1) { CAM.cur++; CAM.cropping = false; CAM.renderEdit(); } return;
   }
 });
+$r('.scn-vf').addEventListener('pointerup', e => { if (e.pointerType === 'mouse' && e.button !== 0) return; CAM.tapPick(e); });
 galIn.onchange = e => { const f = [...e.target.files]; e.target.value = ''; CAM.fromFiles(f); };
 camIn.onchange = e => { const f = [...e.target.files]; e.target.value = ''; CAM.fromFiles(f); };
 addEventListener('resize', () => { if (!root.hidden && CAM.view === 'cam') CAM.fit(); });
