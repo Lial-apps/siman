@@ -1,17 +1,28 @@
 <!doctype html>
 <html lang="he" dir="rtl">
 <head>
-<script>/* עיצוב 7: מונע הבהוב של העיצוב הקודם אצל מי שכבר בחר בעיצוב החדש */try{var _d=new URLSearchParams(location.search).get("design")||localStorage.getItem("siman.design");if(_d==="new")document.documentElement.classList.add("v7");}catch(e){}</script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>סימן</title>
-<meta name="theme-color" content="#202125">
+<meta name="theme-color" content="#FFFFFF">
 <meta name="description" content="סימן: לסמן, לחתום, לתרגם ולשלוח מסמכים — PDF, Word ו-Excel, ישר מהמחשב או מהטלפון">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
-<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="apple-touch-icon" sizes="180x180" href="icon-180.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="סימן">
+<script>/* 5.8.1 — כולם בעיצוב החדש. הצבע והמצב (בהיר / כהה / אוטומטי) נצבעים מיד, לפני שהדף מופיע, בלי הבהוב.
+   הערכים נשמרים ב-siman.v7.boot על ידי siman-v7.js, שם נמצאת רשימת הצבעים המלאה. */
+(function(){var d=document.documentElement;d.classList.add('v7');
+try{localStorage.removeItem('siman.design');localStorage.removeItem('siman.beta');}catch(e){}
+var b=null;try{b=JSON.parse(localStorage.getItem('siman.v7.boot')||'null');}catch(e){}
+if(!b||!b.l||!b.d){b={mode:'auto',
+ l:{bg:'#EEF3FB',surface:'#FFFFFF',ink:'#0F213F',muted:'#4B5B77',line:'#D6E0F0',accent:'#1D4ED8',on:'#FFFFFF',dash:'#8FAEEB',soft:'#DCE6FA',art:'#1D4ED8',deep:'#0F213F',deep2:'#1B2F55',tile2:'#0F213F'},
+ d:{bg:'#14161C',surface:'#1E2129',ink:'#F1F2F5',muted:'#A9AFBC',line:'#2E323C',accent:'#8FB0FF',on:'#0B1530',dash:'#4A5F8F',soft:'#1F2B47',art:'#1D4ED8',deep:'#0E1015',deep2:'#1A1D24',tile2:'#1D4ED8'}};}
+var dark=b.mode==='dark'||(b.mode!=='light'&&!!(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches));
+var v=dark?b.d:b.l;for(var k in v)d.style.setProperty('--v7-'+k,v[k]);
+d.setAttribute('data-theme',dark?'dark':'light');
+var m=document.querySelector('meta[name="theme-color"]');if(m&&v.surface)m.setAttribute('content',v.surface);})();</script>
 <style>
 @font-face{font-family:"SF-heebo";font-weight:400;font-display:swap;src:url(font-heebo-400.ttf) format("truetype");}
 @font-face{font-family:"SF-heebo";font-weight:700;font-display:swap;src:url(font-heebo-700.ttf) format("truetype");}
@@ -1275,6 +1286,54 @@ dialog.cmd-dlg[open]{animation:cmdIn .16s ease-out}
 body:has(#wed) .busy,body:has(#xed) .busy{z-index:1000}body:has(#wed) .toast,body:has(#xed) .toast{z-index:1001}
 .of-ico.sign{background:#16213A;font-size:20px;padding-bottom:12px;letter-spacing:0}
 .btn.wedit{border-color:#2B579A;color:#2B579A;font-weight:600}
+
+/* =====================================================================
+   5.8.1 — iPhone / iPad (Apple HIG). Every rule says who it reaches:
+   @supports (-webkit-touch-callout:none) = iPhone and iPad only;
+   @media (pointer:coarse) = touch screens (phones and tablets, Android too), never a mouse.
+   ===================================================================== */
+/* landscape: nothing under the notch or the rounded corners (zero on every other screen) */
+:root{padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
+.a11y-fab{left:calc(14px + env(safe-area-inset-left,0px))!important}
+@media (max-width:720px){
+  .pgpanel,.tpanel{box-sizing:border-box;padding-bottom:env(safe-area-inset-bottom,0px);padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
+}
+/* screen readers / keyboards */
+.kb-esc{direction:ltr}
+@media (pointer:coarse){.kb-esc{display:none}}
+@media (hover:none){.qa:hover{transform:none}}
+
+/* touch: every control is at least 44 points */
+@media (pointer:coarse){
+  .icon-btn{min-width:44px;min-height:44px}
+  .btn,.segb{min-height:44px}
+  .linkbtn{min-height:44px;padding:0 8px}
+  .swatches{gap:14px}
+  .sw{position:relative;width:30px;height:30px}
+  .sw::after{content:"";position:absolute;inset:-9px;border-radius:50%}
+  .thumb .ta button{min-width:44px;min-height:44px}
+  .thumb .tsel{min-height:44px}
+  .thumb .tsel input{width:22px;height:22px}
+  .sig-saved .x{width:30px;height:30px;top:-13px;inset-inline-end:-13px;font-size:15px}
+  .sig-saved .x::after{content:"";position:absolute;inset:-7px}
+  .iw .rs{width:24px;height:24px;inset-inline-start:-12px;bottom:-12px}
+  .iw .rs::after{content:"";position:absolute;inset:-10px}
+  .ew .ers{width:14px;inset-inline-end:-9px}
+  .ew .ers::after{content:"";position:absolute;inset:0 -15px}
+  .grip{height:30px;line-height:30px;top:-32px;font-size:13px;padding:0 10px}
+}
+
+/* iPhone and iPad only: an app, not a web page */
+@supports (-webkit-touch-callout:none){
+  /* typing in a field never zooms the whole screen */
+  input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]):not([type=file]),select,textarea{font-size:16px!important}
+  #cmdIn{font-size:17px!important}
+  /* no double-tap zoom, no grey flash on tap, no bounce of the whole screen */
+  html{-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%;touch-action:manipulation;overscroll-behavior:none}
+  body{overscroll-behavior:none}
+  /* a long press on a button doesn't select its text or open the copy menu */
+  .bar,.tools,.opts,.v7-dock,.menu,.toast,.sh,.qa,.v7-t,.v7-b,.v7-pop,button,.btn,.icon-btn,.tool,.thumb,.a11y-fab,.grip{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+}
 </style>
 </head>
 <body data-tool="select">
@@ -1282,41 +1341,41 @@ body:has(#wed) .busy,body:has(#xed) .busy{z-index:1000}body:has(#wed) .toast,bod
 <dialog class="cmd-dlg" id="cmdDlg" aria-label="מה לעשות">
   <div class="cmd-in">
     <div class="cmd-box"><span class="cmd-dot" aria-hidden="true"></span>
-      <input id="cmdIn" type="text" dir="auto" autocomplete="off" spellcheck="false" role="combobox" aria-expanded="true" aria-controls="cmdList" aria-label="מה לעשות" placeholder="מה לעשות? למשל: לתרגם לאנגלית, לחתום, לפצל עמודים">
-      <kbd>Esc</kbd></div>
+      <input id="cmdIn" type="text" dir="auto" autocomplete="off" spellcheck="false" role="combobox" aria-expanded="true" aria-controls="cmdList" enterkeyhint="go" aria-label="מה לעשות" placeholder="מה לעשות? למשל: לתרגם לאנגלית, לחתום, לפצל עמודים">
+      <kbd class="kb-esc" aria-hidden="true">Esc</kbd></div>
     <ul class="cmd-list" id="cmdList" role="listbox" aria-label="פעולות"></ul>
   </div>
 </dialog>
 
 <header class="bar">
-  <div class="brand"><b title="גרסה 5.8.0">סימן</b><span class="ver">5.8.0</span><span class="fname" id="fname"></span></div>
+  <div class="brand"><b title="גרסה 5.8.1">סימן</b><span class="ver">5.8.1</span><span class="fname" id="fname"></span></div>
 
   <nav class="tools" id="tools" aria-label="כלים">
     <button class="tool" data-tool="select" aria-pressed="true" title="בחירה וגלילה (V)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M6 3l12 9-5.5 1.2L15.5 20l-2.6 1.1-3-6.8L6 18z" stroke-linejoin="round"/></svg><span>בחירה</span></button>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M6 3l12 9-5.5 1.2L15.5 20l-2.6 1.1-3-6.8L6 18z" stroke-linejoin="round"/></svg><span>בחירה</span></button>
     <button class="tool" data-tool="text" aria-pressed="false" title="הוספת טקסט (T)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M5 6V4h14v2M12 4v16M9 20h6" stroke-linecap="round"/></svg><span>טקסט</span></button>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M5 6V4h14v2M12 4v16M9 20h6" stroke-linecap="round"/></svg><span>טקסט</span></button>
     <button class="tool" data-tool="edit" aria-pressed="false" title="עריכת טקסט קיים בקובץ (R)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 7V5h10v2M9 5v12M7 17h4" stroke-linecap="round"/><path d="M14 19l1-3 5-5 2 2-5 5z" stroke-linejoin="round"/></svg><span>עריכה</span></button>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 7V5h10v2M9 5v12M7 17h4" stroke-linecap="round"/><path d="M14 19l1-3 5-5 2 2-5 5z" stroke-linejoin="round"/></svg><span>עריכה</span></button>
     <button class="tool" data-tool="highlight" aria-pressed="false" title="מרקר (H)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M14 4l6 6-8 8H6v-6z" stroke-linejoin="round"/><path d="M4 21h9" stroke-linecap="round"/></svg><span>מרקר</span></button>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M14 4l6 6-8 8H6v-6z" stroke-linejoin="round"/><path d="M4 21h9" stroke-linecap="round"/></svg><span>מרקר</span></button>
     <button class="tool" data-tool="pen" aria-pressed="false" title="עט (P)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 20c3-1 4-4 7-4s3 3 6 2 3-5 3-5" stroke-linecap="round"/><path d="M16 4l4 4-7 7-4 1 1-4z" stroke-linejoin="round"/></svg><span>עט</span></button>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 20c3-1 4-4 7-4s3 3 6 2 3-5 3-5" stroke-linecap="round"/><path d="M16 4l4 4-7 7-4 1 1-4z" stroke-linejoin="round"/></svg><span>עט</span></button>
     <button class="tool" data-tool="eraser" aria-pressed="false" title="מחק (E)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M8 20h12M5 15l9-9 5 5-8 8H8z" stroke-linejoin="round" stroke-linecap="round"/></svg><span>מחק</span></button>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M8 20h12M5 15l9-9 5 5-8 8H8z" stroke-linejoin="round" stroke-linecap="round"/></svg><span>מחק</span></button>
     <button class="tool" data-tool="redact" aria-pressed="false" title="השחרה: מחיקה אמיתית של מידע רגיש (D)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="8" width="18" height="8" rx="1" fill="currentColor"/><path d="M5 4h8M5 20h12" stroke-linecap="round"/></svg><span>השחרה</span></button>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="3" y="8" width="18" height="8" rx="1" fill="currentColor"/><path d="M5 4h8M5 20h12" stroke-linecap="round"/></svg><span>השחרה</span></button>
     <button class="tool" data-tool="snip" aria-pressed="false" title="העתקת אזור כתמונה (C)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4" stroke-linecap="round" stroke-linejoin="round"/><rect x="8" y="8" width="8" height="8" rx="1"/></svg><span>העתקה</span></button>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4" stroke-linecap="round" stroke-linejoin="round"/><rect x="8" y="8" width="8" height="8" rx="1"/></svg><span>העתקה</span></button>
     <button class="tool" data-action="sign" title="הוספת חתימה">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 17c2-4 4-9 6-9s-1 9 1 9 3-5 5-5-1 5 1 5 3-2 4-3" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 21h18" stroke-linecap="round"/></svg><span>חתימה</span></button>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M3 17c2-4 4-9 6-9s-1 9 1 9 3-5 5-5-1 5 1 5 3-2 4-3" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 21h18" stroke-linecap="round"/></svg><span>חתימה</span></button>
     <button class="tool" data-action="image" title="הוספת תמונה">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M21 16l-5-5-8 8" stroke-linejoin="round"/></svg><span>תמונה</span></button>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M21 16l-5-5-8 8" stroke-linejoin="round"/></svg><span>תמונה</span></button>
   </nav>
 
   <div class="group zoom">
     <button class="icon-btn" id="zoomOut" title="הקטנה" aria-label="הקטנה">−</button>
-    <span class="zoomval" id="zoomVal">100%</span>
+    <span class="zoomval" id="zoomVal" aria-live="polite">100%</span>
     <button class="icon-btn" id="zoomIn" title="הגדלה" aria-label="הגדלה">+</button>
     <button class="btn" id="fitW" title="התאמה לרוחב">רוחב</button>
   </div>
@@ -1330,9 +1389,9 @@ body:has(#wed) .busy,body:has(#xed) .busy{z-index:1000}body:has(#wed) .toast,bod
     <button class="btn wedit hidden" id="wordEditBtn" title="עריכת המסמך כמו ב-Word: גופנים, הדגשה, קו תחתי, רשימות וטבלאות">עריכת Word</button>
     <div class="split-btn">
       <button class="btn primary" id="saveBtn" disabled title="שמירה (Ctrl+S)">שמירה</button><button class="btn primary caret" id="saveMenuBtn" disabled aria-haspopup="menu" aria-expanded="false" aria-label="עוד אפשרויות שמירה" title="עוד אפשרויות שמירה">▾</button>
-      <div class="menu hidden" id="saveMenu" role="menu"><button role="menuitem" id="saveAsBtn" disabled>שמירה בשם… <kbd>Ctrl+Shift+S</kbd></button><button role="menuitem" id="driveMenuBtn" disabled>שמירה ב-Google Drive</button><button role="menuitem" id="icloudMenuBtn" disabled>שמירה ב-iCloud Drive</button></div>
+      <div class="menu hidden" id="saveMenu" role="menu"><button role="menuitem" id="saveAsBtn" disabled>שמירה בשם… <kbd aria-hidden="true">Ctrl+Shift+S</kbd></button><button role="menuitem" id="driveMenuBtn" disabled>שמירה ב-Google Drive</button><button role="menuitem" id="icloudMenuBtn" disabled>שמירה ב-iCloud Drive</button></div>
     </div>
-    <button class="btn cmd" id="cmdBtn" title="מה לעשות? (Ctrl+K)" aria-haspopup="dialog"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg><span class="lbl">מה לעשות?</span><kbd dir="ltr">Ctrl K</kbd></button>
+    <button class="btn cmd" id="cmdBtn" title="מה לעשות? (Ctrl+K)" aria-haspopup="dialog"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg><span class="lbl">מה לעשות?</span><kbd dir="ltr" aria-hidden="true">Ctrl K</kbd></button>
     <button class="btn share" id="shareBtn" disabled title="שליחה במייל, בוואטסאפ, ב-AirDrop או בשיתוף מהיר"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.3 10.8l7.4-4.4M8.3 13.2l7.4 4.4"/></svg><span class="lbl">שיתוף</span></button>
     <button class="icon-btn" id="setBtn" title="הגדרות: השם והמייל שלך" aria-label="הגדרות"><svg viewBox="0 0 24 24" aria-hidden="true" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="8.5" r="3.6"/><path d="M4.5 20c1.2-3.6 4-5.4 7.5-5.4s6.3 1.8 7.5 5.4"/></svg></button>
     <button class="btn install hidden" id="installBtn" title="התקנת האפליקציה במכשיר">התקנה</button>
@@ -1395,7 +1454,7 @@ body:has(#wed) .busy,body:has(#xed) .busy{z-index:1000}body:has(#wed) .toast,bod
           <button class="qa" data-qa="newdoc"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M12.5 11v6M9.5 14h6"/></svg>מסמך Word חדש</button>
           <button class="qa" data-qa="newxl"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="1.5"/><path d="M4 9.5h16M4 15h16M10 4v16"/></svg>גיליון Excel חדש</button>
           <button class="qa" data-qa="newppt"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="11" rx="1.5"/><path d="M12 16v3.5M9 19.5h6M9.5 8.5v4.5M9.5 8.5h2.2a1.6 1.6 0 010 3.2H9.5"/></svg>מצגת PowerPoint חדשה</button>
-          <button class="qa ghost" data-qa="cmd"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>משהו אחר?<kbd dir="ltr">Ctrl K</kbd></button>
+          <button class="qa ghost" data-qa="cmd"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>משהו אחר?<kbd dir="ltr" aria-hidden="true">Ctrl K</kbd></button>
         </div>
         <ul class="wl-list">
           <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4l6 6-8 8H6v-6z"/><path d="M4 21h9"/></svg>מרקר, עט והערות</li>
@@ -1409,7 +1468,7 @@ body:has(#wed) .busy,body:has(#xed) .busy{z-index:1000}body:has(#wed) .toast,bod
         <p class="ios-hint hidden" id="iosHint">להתקנה באייפון: לוחצים על "שיתוף" ב-Safari ואז "הוסף למסך הבית".</p>
       </div>
       <div class="drop wl-art" aria-hidden="true">
-        <svg viewBox="0 0 300 390">
+        <svg viewBox="0 0 300 390" aria-hidden="true">
           <rect class="ln" x="34" y="44" width="150" height="12" rx="3"/>
           <rect class="hlb" x="28" y="76" width="236" height="20" rx="3"/>
           <rect class="ln" x="34" y="80" width="224" height="9" rx="3"/>
@@ -1519,9 +1578,9 @@ body:has(#wed) .busy,body:has(#xed) .busy{z-index:1000}body:has(#wed) .toast,bod
 </aside>
 </div>
 
-<dialog class="sig" id="sigDlg">
+<dialog class="sig" id="sigDlg" aria-labelledby="sigTitle">
   <div class="sig-in">
-    <h2>חתימה</h2>
+    <h2 id="sigTitle">חתימה</h2>
     <div class="sig-saved" id="sigSaved"></div>
     <canvas class="sig-pad" id="sigPad" width="1000" height="400" aria-label="משטח חתימה"></canvas>
     <div class="sig-row">
@@ -1532,9 +1591,9 @@ body:has(#wed) .busy,body:has(#xed) .busy{z-index:1000}body:has(#wed) .toast,bod
     </div>
   </div>
 </dialog>
-<dialog class="sig split" id="splitDlg">
+<dialog class="sig split" id="splitDlg" aria-labelledby="splitTitle">
   <div class="sig-in">
-    <h2>שמירת עמודים כקבצים נפרדים</h2>
+    <h2 id="splitTitle">שמירת עמודים כקבצים נפרדים</h2>
     <p class="fmt-note" id="splitInfo"></p>
     <div class="sig-row">
       <button class="btn" id="autoNames" title="מוצא בכל עמוד מספר מזהה, כמו מספר תסקיר או חשבונית, ונותן לפיו שם לקובץ">שמות לפי המספר שבעמוד</button>
@@ -1548,9 +1607,9 @@ body:has(#wed) .busy,body:has(#xed) .busy{z-index:1000}body:has(#wed) .toast,bod
     </div>
   </div>
 </dialog>
-<dialog class="sig conv" id="convDlg">
+<dialog class="sig conv" id="convDlg" aria-labelledby="convTitle">
   <div class="sig-in">
-    <h2>המרה לקובץ לעריכה</h2>
+    <h2 id="convTitle">המרה לקובץ לעריכה</h2>
     <div class="conv-scope">
       <label class="field">אילו עמודים להמיר
         <select id="convScope"><option value="all">כל המסמך</option><option value="cur">העמוד הנוכחי</option><option value="sel">העמודים המסומנים בחלונית "עמודים"</option><option value="range">עמודים לבחירה…</option></select></label>
@@ -1573,9 +1632,9 @@ body:has(#wed) .busy,body:has(#xed) .busy{z-index:1000}body:has(#wed) .toast,bod
     <div class="sig-row"><span class="grow" id="convStatus"></span><button class="btn" id="convCancel">ביטול</button></div>
   </div>
 </dialog>
-<dialog class="sig ready" id="readyDlg">
+<dialog class="sig ready" id="readyDlg" aria-labelledby="readyTitle">
   <div class="sig-in">
-    <h2>הקובץ מוכן</h2>
+    <h2 id="readyTitle">הקובץ מוכן</h2>
     <p class="fmt-note" id="readyName"></p>
     <div class="sig-row"><span class="grow"></span><button class="btn" id="readyCancel">ביטול</button><button class="btn primary" id="readySave">שמירה</button></div>
   </div>
@@ -1586,28 +1645,28 @@ body:has(#wed) .busy,body:has(#xed) .busy{z-index:1000}body:has(#wed) .toast,bod
   <div class="sig-in">
     <div class="sh-head"><h2 id="shareTitle">שיתוף ושמירה</h2><button class="icon-btn" id="shareClose" aria-label="סגירה">×</button></div>
     <label class="sh-name" for="shareName"><span class="sh-name-lbl">שם הקובץ</span>
-      <span class="sh-name-box"><input id="shareName" type="text" dir="auto" maxlength="120" spellcheck="false" autocomplete="off" aria-describedby="shNameHint"><span class="sh-ext" id="shareExt" dir="ltr">.pdf</span></span></label>
+      <span class="sh-name-box"><input id="shareName" type="text" enterkeyhint="done" dir="auto" maxlength="120" spellcheck="false" autocomplete="off" aria-describedby="shNameHint"><span class="sh-ext" id="shareExt" dir="ltr">.pdf</span></span></label>
     <small class="sh-name-hint" id="shNameHint"></small>
     <div class="seg sh-fmt hidden" id="shFmt" role="group" aria-label="לשלוח בתור"><button class="segb" data-fmt="pdf" aria-pressed="true">PDF חתום</button><button class="segb" data-fmt="office" aria-pressed="false" id="shFmtOf">Word לעריכה</button></div>
     <h3 class="sh-grp">קישור</h3>
     <div class="sh-grid two">
-      <button class="sh" data-link="sign"><span class="sh-ic sg"><svg viewBox="0 0 24 24"><path d="M3 17c3-6 5-6 6-2s3 4 5-1 4-5 7 0"/><path d="M3 21h18"/></svg></span><b>שליחה לחתימה בקישור</b><small>מסמנים איפה חותמים, והם חותמים מהטלפון</small></button>
-      <button class="sh" data-link="view"><span class="sh-ic lk"><svg viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg></span><b>קישור לצפייה</b><small>מי שמקבל רואה ומוריד, בלי להירשם</small></button>
+      <button class="sh" data-link="sign"><span class="sh-ic sg"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17c3-6 5-6 6-2s3 4 5-1 4-5 7 0"/><path d="M3 21h18"/></svg></span><b>שליחה לחתימה בקישור</b><small>מסמנים איפה חותמים, והם חותמים מהטלפון</small></button>
+      <button class="sh" data-link="view"><span class="sh-ic lk"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg></span><b>קישור לצפייה</b><small>מי שמקבל רואה ומוריד, בלי להירשם</small></button>
     </div>
     <h3 class="sh-grp">שליחה</h3>
     <div class="sh-grid">
-      <button class="sh" data-share="mail"><span class="sh-ic mail"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M4 7l8 6 8-6"/></svg></span><b>מייל</b><small id="shMailHint">שליחת הקובץ כקובץ מצורף</small></button>
-      <button class="sh" data-share="me"><span class="sh-ic me"><svg viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.6"/><path d="M4.5 20c1.2-3.6 4-5.4 7.5-5.4s6.3 1.8 7.5 5.4"/></svg></span><b>שליחה אליי</b><small id="shMeHint">למייל שהגדרת</small></button>
-      <button class="sh" data-share="whatsapp"><span class="sh-ic wa"><svg viewBox="0 0 24 24"><path d="M4 20l1.3-4A8 8 0 1 1 8.4 19z"/><path d="M9 8.6c0 3.5 2.9 6.4 6.4 6.4l1.2-1.6-2-1-1 .8a4.4 4.4 0 0 1-2.8-2.8l.8-1-1-2z"/></svg></span><b id="shWaTitle">וואטסאפ</b><small id="shWaHint">בוחרים שיחה ושולחים</small></button>
-      <button class="sh desk-only" data-share="wadesk"><span class="sh-ic wa"><svg viewBox="0 0 24 24"><path d="M4 20l1.3-4A8 8 0 1 1 8.4 19z"/><path d="M9 8.6c0 3.5 2.9 6.4 6.4 6.4l1.2-1.6-2-1-1 .8a4.4 4.4 0 0 1-2.8-2.8l.8-1-1-2z"/></svg></span><b>וואטסאפ למחשב</b><small id="shWdHint">האפליקציה המותקנת</small></button>
-      <button class="sh" data-share="airdrop"><span class="sh-ic ad"><svg viewBox="0 0 24 24"><path d="M6.3 16.5a8 8 0 1 1 11.4 0M8.8 14a4.6 4.6 0 1 1 6.4 0"/><path d="M12 13l-3.5 8h7z"/></svg></span><b>AirDrop</b><small id="shAdHint">לאייפון, אייפד ומק שליד</small></button>
-      <button class="sh" data-share="quick"><span class="sh-ic qs"><svg viewBox="0 0 24 24"><path d="M13 3L5 13h6l-1 8 8-10h-6z"/></svg></span><b>שיתוף מהיר</b><small id="shQsHint">Quick Share לאנדרואיד שליד</small></button>
-      <button class="sh" data-share="more"><span class="sh-ic more"><svg viewBox="0 0 24 24"><circle cx="6" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="18" cy="12" r="1.6"/></svg></span><b>עוד אפליקציות</b><small id="shMoreHint">כל מה שמותקן במכשיר</small></button>
+      <button class="sh" data-share="mail"><span class="sh-ic mail"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M4 7l8 6 8-6"/></svg></span><b>מייל</b><small id="shMailHint">שליחת הקובץ כקובץ מצורף</small></button>
+      <button class="sh" data-share="me"><span class="sh-ic me"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.5" r="3.6"/><path d="M4.5 20c1.2-3.6 4-5.4 7.5-5.4s6.3 1.8 7.5 5.4"/></svg></span><b>שליחה אליי</b><small id="shMeHint">למייל שהגדרת</small></button>
+      <button class="sh" data-share="whatsapp"><span class="sh-ic wa"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l1.3-4A8 8 0 1 1 8.4 19z"/><path d="M9 8.6c0 3.5 2.9 6.4 6.4 6.4l1.2-1.6-2-1-1 .8a4.4 4.4 0 0 1-2.8-2.8l.8-1-1-2z"/></svg></span><b id="shWaTitle">וואטסאפ</b><small id="shWaHint">בוחרים שיחה ושולחים</small></button>
+      <button class="sh desk-only" data-share="wadesk"><span class="sh-ic wa"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l1.3-4A8 8 0 1 1 8.4 19z"/><path d="M9 8.6c0 3.5 2.9 6.4 6.4 6.4l1.2-1.6-2-1-1 .8a4.4 4.4 0 0 1-2.8-2.8l.8-1-1-2z"/></svg></span><b>וואטסאפ למחשב</b><small id="shWdHint">האפליקציה המותקנת</small></button>
+      <button class="sh" data-share="airdrop"><span class="sh-ic ad"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.3 16.5a8 8 0 1 1 11.4 0M8.8 14a4.6 4.6 0 1 1 6.4 0"/><path d="M12 13l-3.5 8h7z"/></svg></span><b>AirDrop</b><small id="shAdHint">לאייפון, אייפד ומק שליד</small></button>
+      <button class="sh" data-share="quick"><span class="sh-ic qs"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 3L5 13h6l-1 8 8-10h-6z"/></svg></span><b>שיתוף מהיר</b><small id="shQsHint">Quick Share לאנדרואיד שליד</small></button>
+      <button class="sh" data-share="more"><span class="sh-ic more"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="18" cy="12" r="1.6"/></svg></span><b>עוד אפליקציות</b><small id="shMoreHint">כל מה שמותקן במכשיר</small></button>
     </div>
     <h3 class="sh-grp">שמירה בענן</h3>
     <div class="sh-grid two">
-      <button class="sh" data-share="drive"><span class="sh-ic dr"><svg viewBox="0 0 24 24"><path d="M8.5 3.5h7l6 10.5-3.5 6h-12L2.5 14z"/><path d="M8.5 3.5L15 14.5h6.5M2.5 14l6.3-0M12 9l-5.7 11"/></svg></span><b>Google Drive</b><small id="shDrHint">לתיקייה "סימן" שלך</small></button>
-      <button class="sh" data-share="icloud"><span class="sh-ic ic"><svg viewBox="0 0 24 24"><path d="M7 18.5h10.5a4 4 0 0 0 .5-8 6 6 0 0 0-11.4 1.6A3.3 3.3 0 0 0 7 18.5z"/></svg></span><b>iCloud Drive</b><small id="shIcHint">דרך "שמירה בקבצים"</small></button>
+      <button class="sh" data-share="drive"><span class="sh-ic dr"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 3.5h7l6 10.5-3.5 6h-12L2.5 14z"/><path d="M8.5 3.5L15 14.5h6.5M2.5 14l6.3-0M12 9l-5.7 11"/></svg></span><b>Google Drive</b><small id="shDrHint">לתיקייה "סימן" שלך</small></button>
+      <button class="sh" data-share="icloud"><span class="sh-ic ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 18.5h10.5a4 4 0 0 0 .5-8 6 6 0 0 0-11.4 1.6A3.3 3.3 0 0 0 7 18.5z"/></svg></span><b>iCloud Drive</b><small id="shIcHint">דרך "שמירה בקבצים"</small></button>
     </div>
     <p class="sh-status" id="shareStatus" role="status"></p>
   </div>
@@ -1617,10 +1676,10 @@ body:has(#wed) .busy,body:has(#xed) .busy{z-index:1000}body:has(#wed) .toast,bod
     <h2 id="regTitle">ברוכים הבאים לסימן</h2>
     <p class="reg-sub">לפני שמתחילים, נרשמים עם מייל. זה לוקח עשר שניות.</p>
     <label class="field">המייל שלך
-      <input id="regMail" type="email" dir="ltr" autocomplete="email" placeholder="name@example.com" required></label>
+      <input id="regMail" type="email" enterkeyhint="next" dir="ltr" autocomplete="email" placeholder="name@example.com" required></label>
     <label class="field">השם שלך (לא חובה)
-      <input id="regName" autocomplete="name" maxlength="40"></label>
-    <label class="chk"><input type="checkbox" id="regNews" checked> אפשר לשלוח לי עדכונים על סימן</label>
+      <input id="regName" autocomplete="name" enterkeyhint="go" maxlength="40"></label>
+    <label class="chk"><input type="checkbox" id="regNews"> אפשר לשלוח לי עדכונים על סימן</label>
     <p class="sh-status" id="regStatus" role="status"></p>
     <button type="submit" class="btn primary big" id="regGo">כניסה לסימן</button>
     <button type="button" class="btn big reg-later hidden" id="regLater">אולי אחר כך</button>
@@ -1666,7 +1725,7 @@ body:has(#wed) .busy,body:has(#xed) .busy{z-index:1000}body:has(#wed) .toast,bod
 </dialog>
 <div id="printArea" aria-hidden="true"></div>
 <div class="toast" id="toast" role="status"></div>
-<div class="busy hidden" id="busy"><div id="busyMsg">רגע…</div></div>
+<div class="busy hidden" id="busy" role="status" aria-live="polite"><div id="busyMsg">רגע…</div></div>
 
 <script src="pdf.min.js"></script>
 <script src="pdf-lib.min.js"></script>
@@ -1725,6 +1784,8 @@ function runForPdf(run){
 const pdfjs=window.pdfjsLib||window['pdfjs-dist/build/pdf'];
 pdfjs.GlobalWorkerOptions.workerSrc="pdf.worker.min.js";
 
+const SW_NAMES={'#1C2333':'כהה','#C2362B':'אדום','#2B59C3':'כחול','#1F8A4C':'ירוק','#7A3EB1':'סגול','#FFD83D':'צהוב','#7CE38B':'ירוק בהיר','#6CC7FF':'תכלת','#FF8FB8':'ורוד','#FFA94D':'כתום','#E07A00':'כתום'};
+const SW_NAME=c=>SW_NAMES[String(c).toUpperCase()]||c;
 const PALETTE={
   text:['#1C2333','#C2362B','#2B59C3','#1F8A4C','#7A3EB1'],
   highlight:['#FFD83D','#7CE38B','#6CC7FF','#FF8FB8','#FFA94D'],
@@ -3425,7 +3486,7 @@ function setTool(t){
   const labels={edit:'לחצו על שורה כדי לערוך אותה. Esc לסיום',redact:'גררו מלבן על מידע רגיש. הטקסט שמתחת יימחק מהקובץ לגמרי ויוחלף בפס שחור',snip:'גררו מלבן סביב האזור שרוצים להעתיק. אחר כך מדביקים ב-Word, בוואטסאפ או בתוך המסמך',place:'לחצו על הדף במקום שבו לשים את '+(S.pending&&S.pending.sig?'החתימה':'התמונה'),select:'',text:'לחצו על הדף כדי לכתוב',highlight:'גררו מלבן על מה שרוצים לסמן',pen:'כתבו או ציירו חופשי',eraser:'לוחצים על סימון כדי למחוק אותו. גוררים מלבן על הדף כדי למחוק מה שכתוב שם'};
   lbl.textContent=labels[t];
   sw.classList.toggle('hidden',!PALETTE[t]);sz.classList.toggle('hidden',!SIZES[t]);
-  if(PALETTE[t]){sw.innerHTML='';PALETTE[t].forEach(c=>{const b=document.createElement('button');b.className='sw';b.style.background=c;b.title=c;b.setAttribute('aria-label','צבע '+c);
+  if(PALETTE[t]){sw.innerHTML='';PALETTE[t].forEach(c=>{const b=document.createElement('button');b.className='sw';b.style.background=c;b.title=SW_NAME(c);b.setAttribute('aria-label','צבע: '+SW_NAME(c));
     b.setAttribute('aria-pressed',S.color[t]===c);b.onclick=()=>{S.color[t]=c;setTool(t);};sw.append(b);});}
   $('fontWrap').classList.toggle('hidden',!(t==='text'||t==='edit'));$('boldWrap').classList.toggle('hidden',!(t==='text'||t==='edit'));
   $('ocrBtn').classList.toggle('hidden',t!=='edit');$('paraWrap').classList.toggle('hidden',t!=='edit');
@@ -4819,14 +4880,14 @@ function cmdMatch(q){
 }
 function cmdRender(){
   const ul=$('cmdList');ul.innerHTML='';const q=$('cmdIn').value;
-  CMD.list=cmdMatch(q);CMD.at=Math.min(CMD.at,Math.max(0,CMD.list.length-1));
+  CMD.list=cmdMatch(q);CMD.at=Math.min(CMD.at,Math.max(0,CMD.list.length-1));$('cmdIn').setAttribute('aria-expanded',CMD.list.length?'true':'false');
   if(!CMD.list.length){const li=document.createElement('li');li.className='cmd-empty';li.textContent='לא מצאתי פעולה כזו. נסו מילה אחרת, למשל "חתימה" או "תרגום".';ul.append(li);return;}
   CMD.list.forEach((c,i)=>{
     const li=document.createElement('li');const b=document.createElement('button');b.type='button';b.setAttribute('role','option');
     b.setAttribute('aria-selected',i===CMD.at);
     const t=document.createElement('span');t.textContent=c.l;b.append(t);
     const k=document.createElement('span');k.className='k';
-    if(c.doc&&!S.doc)k.textContent='פותחים קובץ ואז…';else if(c.key){k.textContent=c.key;k.dir='ltr';}
+    if(c.doc&&!S.doc)k.textContent='פותחים קובץ ואז…';else if(c.key){k.textContent=IS_APPLE?c.key.replace(/Ctrl\+Shift\+/g,'⌘⇧').replace(/Ctrl\+/g,'⌘'):c.key;k.dir='ltr';}
     b.append(k);
     b.onclick=()=>cmdRun(c);b.onmousemove=()=>{if(CMD.at!==i){CMD.at=i;ul.querySelectorAll('[role=option]').forEach((x,j)=>x.setAttribute('aria-selected',j===i));}};
     li.append(b);ul.append(li);
@@ -4884,9 +4945,9 @@ function shareHints(){
   const set=(id,txt)=>{$(id).textContent=txt;};
   const btn=k=>document.querySelector(`.sh[data-share="${k}"]`);
   set('shMeHint',USER.mail?USER.mail:'קודם מגדירים את המייל שלך');
-  set('shWaTitle',IS_TOUCH?'וואטסאפ':'וואטסאפ ווב');
-  set('shWaHint',IS_TOUCH?'בוחרים שיחה ושולחים':'בדפדפן, הקובץ יורד ונגרר לשיחה');
-  document.querySelector('.sh[data-share="wadesk"]').classList.toggle('hidden',IS_TOUCH);
+  set('shWaTitle','וואטסאפ');
+  set('shWaHint',IS_TOUCH?'הקובץ עצמו, בוחרים שיחה ושולחים':waLinkReady()?'נפתח ישר בוואטסאפ, עם קישור לקובץ':'דרך תפריט השיתוף של המחשב, בלי הורדה');
+  document.querySelector('.sh[data-share="wadesk"]').classList.add('hidden'); // one WhatsApp button on every device (5.8.1)
   const ad=IS_APPLE&&native;btn('airdrop').disabled=!ad;
   set('shAdHint',ad?'לאייפון, אייפד ומק שליד':'זמין רק באייפון, אייפד ומק');
   const qs=(IS_ANDROID||/Windows/i.test(UA))&&native;btn('quick').disabled=!qs;
@@ -4895,8 +4956,13 @@ function shareHints(){
   set('shDrHint',GDRIVE_CLIENT_ID?'לתיקייה "סימן" ב-Drive שלך':IS_TOUCH?'דרך תפריט השיתוף':'לתיקיית Drive במחשב');
   set('shIcHint',IS_APPLE_TOUCH?'דרך "שמירה בקבצים"':IS_MAC?'לתיקיית iCloud Drive':'לתיקיית iCloud במחשב');
 }
+// computer: WhatsApp gets a link to the file (send.js makes it). Loaded when the share window opens,
+// so the click itself can open WhatsApp without the browser blocking the new window.
+const waLinkReady=()=>!!(window.SIMAN_SEND&&typeof window.SIMAN_SEND.makeViewLink==='function');
+function preloadWaLink(){if(IS_TOUCH||waLinkReady())return;loadSend().then(()=>{if(waLinkReady())shareHints();}).catch(()=>{});}
 function openShare(focusKey){
   if(!S.bytes)return;
+  preloadWaLink();
   SH.ext=null;$('shFmt').querySelector('[data-fmt="pdf"]').textContent='PDF חתום';
   closeSaveMenu&&closeSaveMenu();
   document.activeElement&&document.activeElement.blur&&document.activeElement.blur();
@@ -4912,7 +4978,7 @@ function openShare(focusKey){
 window.SIMAN_SHARE_EDITOR=function(kind,focusKey){
   const api={docx:window.WORD_EDITOR,xlsx:window.XLSX_EDITOR,pptx:window.PPTX_EDITOR}[kind];
   if(!api||!api.share||!api.isOpen())return;
-  SH.ext={kind,api};SH.fmt='office';SH.base=null;SH.forBytes=null;
+  SH.ext={kind,api};SH.fmt='office';SH.base=null;SH.forBytes=null;preloadWaLink();
   const f=$('shFmt');f.classList.remove('hidden');
   f.querySelector('[data-fmt="pdf"]').textContent='PDF';$('shFmtOf').textContent=`${OF_LABEL[kind]} לעריכה`;
   f.querySelectorAll('.segb').forEach(b=>b.setAttribute('aria-pressed',b.dataset.fmt===SH.fmt));
@@ -5030,10 +5096,22 @@ const ACTIONS={
     const fbTouch=()=>{downloadFile(f);done('הקובץ ירד למכשיר. בוואטסאפ לוחצים על אטב ← מסמך, ובוחרים אותו מההורדות');};
     if(IS_TOUCH&&canShareFile(f)){if(await shareOr(f,null,fbTouch))done('בוחרים וואטסאפ ואת השיחה');return;}
     if(IS_TOUCH){downloadFile(f);done('הקובץ ירד למכשיר. בוואטסאפ לוחצים על אטב ← מסמך, ובוחרים אותו מההורדות');return;}
-    const w=window.open('https://web.whatsapp.com/','siman_wa');
-    downloadFile(f);
-    if(w){shStatus(`וואטסאפ ווב נפתח בלשונית חדשה. פותחים את השיחה, לוחצים על <b>+</b> ← <b>מסמך</b> ובוחרים מתיקיית <b>הורדות</b> את <bdi>${esc(f.name)}</bdi>, או גוררים אותו לשיחה.`,true);return;}
-    done(w?'':'הקובץ ירד. פתחו את web.whatsapp.com וגררו אותו לשיחה (הדפדפן חסם חלון חדש)');
+    // computer, 1: a link to the file, and WhatsApp opens with the message ready
+    if(waLinkReady()){
+      const w=window.open('about:blank','siman_wa'); // opened on the click itself, so it isn't blocked
+      $('shareDlg').classList.add('wait');shStatus('מכין קישור לקובץ…');
+      try{
+        // the link always opens a PDF (the server keeps PDF only): a Word / Excel / PowerPoint file is sent as its PDF
+        const bytes=f.type==='application/pdf'?new Uint8Array(await f.arrayBuffer())
+          :SH.ext?new Uint8Array(await (await SH.ext.api.share.file('pdf')).arrayBuffer()):await buildPdf();
+        const r=await window.SIMAN_SEND.makeViewLink({bytes,name:f.name,sender:{name:USER.name||'',mail:USER.mail||''}});
+        const wa='https://wa.me/?text='+encodeURIComponent(r.text||(f.name+'\n'+r.url));
+        if(w&&!w.closed)w.location.href=wa;else{S.noWarn=true;location.href=wa;setTimeout(()=>{S.noWarn=false;},2000);}
+        $('shareDlg').classList.remove('wait');done('בוחרים שיחה בוואטסאפ ושולחים');return;
+      }catch(e){console.warn('wa link',e);if(w&&!w.closed)w.close();$('shareDlg').classList.remove('wait');shStatus('');}
+    }
+    // computer, 2: the computer's share menu (WhatsApp for Windows / Mac is listed there), no download
+    return ACTIONS.wadesk(f);
   },
   async wadesk(f){
     // Windows / Mac share menu lists the installed WhatsApp app, and the file goes in attached.
@@ -5088,7 +5166,7 @@ function waDeskOpen(f){
   shStatus('הקובץ ירד. פותח את וואטסאפ למחשב…');
   setTimeout(()=>{removeEventListener('blur',onBlur);
     if(left||!document.hasFocus())shStatus(`<b>עכשיו בוואטסאפ:</b> פותחים את השיחה, לוחצים על <b>+</b> (צירוף) ← <b>מסמך</b>, ובוחרים מתיקיית <b>הורדות</b> את <bdi>${esc(f.name)}</bdi>. אפשר גם לגרור את הקובץ מחלונית ההורדות של הדפדפן ישר לשיחה.`,true);
-    else shStatus('הקובץ ירד, אבל וואטסאפ למחשב לא נפתח. אם הוא לא מותקן אפשר <a href="https://www.whatsapp.com/download" target="_blank" rel="noopener">להוריד אותו</a>, או לבחור "וואטסאפ ווב".',true);},1800);
+    else shStatus('הקובץ ירד, אבל וואטסאפ למחשב לא נפתח. אם הוא לא מותקן אפשר <a href="https://www.whatsapp.com/download" target="_blank" rel="noopener">להוריד אותו</a>, או לפתוח את <a href="https://web.whatsapp.com/" target="_blank" rel="noopener">וואטסאפ ווב</a> ולגרור אליו את הקובץ מההורדות.',true);},1800);
 }
 function refused(f){
   shStatus(`תפריט השיתוף של המכשיר לא מקבל קובץ ${f.name.split('.').pop().toUpperCase()}. <a href="#" id="shDl">הורדת הקובץ</a> ושליחה מהאפליקציה${(S.office||SH.ext)&&SH.fmt==='office'?', או בחירה ב-"PDF" למעלה':''}.`,true);
@@ -5153,7 +5231,15 @@ document.addEventListener('copy',()=>{
    PWA — offline cache, install button, open PDFs from the OS
    ===================================================================== */
 if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost')){
-  navigator.serviceWorker.register('sw.js').catch(e=>console.warn('SW',e));
+  navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(r=>{try{const u=r&&r.update&&r.update();if(u&&u.catch)u.catch(()=>{});}catch(_){}}).catch(e=>console.warn('SW',e));
+  // a new version took over: reload once, but only on the opening screen, so no open document is lost
+  let swHad=!!navigator.serviceWorker.controller,swReloaded=false;
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{
+    if(!swHad){swHad=true;return;}
+    if(swReloaded)return;
+    if(!S.bytes&&!S.office&&!document.body.classList.contains('ed-live')&&!document.querySelector('dialog[open]')){swReloaded=true;S.noWarn=true;location.reload();}
+    else toast('גרסה חדשה של סימן מוכנה. היא תיפתח בכניסה הבאה');
+  });
 }
 let installEvt=null;
 addEventListener('beforeinstallprompt',e=>{e.preventDefault();installEvt=e;$('installBtn').classList.remove('hidden');});
@@ -5175,7 +5261,7 @@ if('launchQueue' in window){
    ===================================================================== */
 (function(){
   const STATUS_URL=(typeof REGISTER_URL!=='undefined'&&REGISTER_URL)?REGISTER_URL.replace(/\/register$/,'/status'):'';
-  const U_KEY='siman.usage', T_KEY='siman.trial', APP_VER='5.2.9';
+  const U_KEY='siman.usage', T_KEY='siman.trial', APP_VER='5.8.1';
   const today=()=>new Date().toISOString().slice(0,10);
   const rd=k=>{try{return JSON.parse(localStorage.getItem(k)||'null');}catch(_){return null;}};
   const wr=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch(_){}};
@@ -5236,19 +5322,38 @@ if('launchQueue' in window){
 })();
 </script>
 
+<script>
+/* 5.8.1 — iPhone / iPad (Apple HIG): keyboard labels, zoom, on-screen keyboard. Android and computers are not touched here. */
+(function(){
+  if(typeof IS_APPLE==='undefined')return;
+  // Mac, iPhone and iPad keyboards: show ⌘ instead of Ctrl (the shortcuts accept both)
+  if(IS_APPLE){
+    const fix=el=>{const v=el.textContent;const n=v.replace(/Ctrl\+Shift\+/g,'⌘⇧').replace(/Ctrl\+/g,'⌘').replace(/Ctrl /g,'⌘');if(n!==v)el.textContent=n;};
+    document.querySelectorAll('kbd').forEach(fix);
+    new MutationObserver(l=>l.forEach(m=>m.addedNodes.forEach(n=>{if(n.nodeType!==1)return;if(n.tagName==='KBD')fix(n);else n.querySelectorAll&&n.querySelectorAll('kbd').forEach(fix);}))).observe(document.body,{childList:true,subtree:true});
+  }
+  if(!IS_APPLE_TOUCH)return;
+  // pinching zooms the document (siman-v7.js), never the whole interface with its toolbar
+  // (the Word / Excel / PowerPoint editors keep the system zoom, as before)
+  ['gesturestart','gesturechange','gestureend'].forEach(ev=>document.addEventListener(ev,e=>{if(e.target&&e.target.closest&&e.target.closest('#wed,#xed,#ped'))return;e.preventDefault();},{passive:false}));
+  // a field in a panel at the bottom of the screen stays visible above the on-screen keyboard
+  document.addEventListener('focusin',e=>{
+    const el=e.target;
+    if(!el||!el.matches||!el.matches('input,textarea,select,[contenteditable="true"],[contenteditable=""]'))return;
+    if(!el.closest('.tpanel,.pgpanel,dialog,.sp-save,.a11y-panel'))return;
+    setTimeout(()=>{try{el.scrollIntoView({block:'center',behavior:'smooth'});}catch(_){}},350);
+  });
+})();
+</script>
 <script src="admin-panel.js"></script>
-<link rel="stylesheet" href="siman-phone.css">
-<script src="siman-phone.js" defer></script>
-<script src="a11y.js" defer></script>
+<link rel="stylesheet" href="siman-phone.css?v=5.8.1">
+<script src="siman-phone.js?v=5.8.1" defer></script>
+<script src="a11y.js?v=5.8.1" defer></script>
 <script src="siman-voice.js" defer></script>
 <script src="siman-back.js?v=5.2.9" defer></script>
-<script>
-/* the new design is off for everyone; open the app with ?beta=1 to try it on this device, ?beta=0 to go back */
-(function(){try{var q=new URLSearchParams(location.search).get('beta');if(q==='1')localStorage.setItem('siman.beta','1');if(q==='0')localStorage.removeItem('siman.beta');
-if(localStorage.getItem('siman.beta')==='1'){var l=document.createElement('link');l.rel='stylesheet';l.href='siman-shell.css';document.body.appendChild(l);var s=document.createElement('script');s.src='siman-shell.js';s.defer=true;document.body.appendChild(s);}}catch(e){}})();
-</script>
-<link rel="stylesheet" href="siman-v7.css?v=5.3.0">
-<script src="siman-v7.js?v=5.3.0" defer></script>
+<!-- 5.8.1: one design for everyone (the ?beta=1 shell and the classic design were removed) -->
+<link rel="stylesheet" href="siman-v7.css?v=5.8.1">
+<script src="siman-v7.js?v=5.8.1" defer></script>
 <script src="siman-media.js?v=5.3.2" defer></script>
 <script src="siman-scan.js?v=5.8.0" defer></script>
 </body>

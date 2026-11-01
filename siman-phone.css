@@ -1,4 +1,4 @@
-/* סימן — Word / Excel / PowerPoint editors on a phone (5.0.5)
+/* סימן — Word / Excel / PowerPoint editors on a phone (5.8.1: theme colors, 44-point targets)
    Only the top of the editors, only on narrow screens. Nothing else in the app is touched.
    Row 1: name + close.  Row 2: the action buttons, sharing the width.  The tabs scroll sideways. */
 @media (max-width:720px){
@@ -9,7 +9,7 @@
   #wed .we-namebox,#xed .xe-namebox,#ped .pe-namebox{order:2!important;flex:1 1 0!important;min-width:0!important;width:auto!important;max-width:none!important}
   #wed .we-name,#xed .xe-name,#ped .pe-name{min-width:0!important;width:100%!important}
   #wed .we-state,#xed .xe-state,#ped .pe-state{order:3!important;flex:none}
-  #wed .we-x,#xed .xe-x,#ped .pe-x{order:4!important;flex:none;min-width:40px;min-height:40px}
+  #wed .we-x,#xed .xe-x,#ped .pe-x{order:4!important;flex:none;min-width:44px;min-height:44px}
   #wed .we-top > .grow,#xed .xe-top > .grow,#ped .pe-top > .grow{order:5!important;flex:0 0 100%!important;height:0!important;margin:0!important;padding:0!important}
   #wed .we-top > button:not(.we-x),#xed .xe-top > button:not(.xe-x),#ped .pe-top > button:not(.pe-x){flex:1 1 auto;min-width:0;padding-inline:6px!important;font-size:13.5px!important;white-space:nowrap;justify-content:center;overflow:hidden;text-overflow:ellipsis}
   /* "sign" and "PDF" leave the top row: saving asks Word / PDF (siman-phone.js) */
@@ -21,21 +21,23 @@
 }
 
 /* the save choice that opens under "שמירה" on a phone */
-.sp-save{position:fixed;z-index:2147482000;min-width:230px;background:#fff;color:#1B2232;border-radius:18px;padding:6px;
-  box-shadow:0 14px 40px rgba(22,33,58,.28),0 0 0 1px rgba(22,33,58,.08);direction:rtl;font-family:Rubik,Heebo,Arial,sans-serif}
+.sp-save{position:fixed;z-index:2147482000;min-width:230px;background:var(--v7-surface,#fff);color:var(--v7-ink,#1B2232);border-radius:18px;padding:6px;
+  box-shadow:0 14px 40px rgba(22,33,58,.28),0 0 0 1px var(--v7-line,rgba(22,33,58,.08));direction:rtl;font-family:Rubik,Heebo,Arial,sans-serif}
 .sp-save[hidden]{display:none}
 .sp-save button{display:flex;align-items:center;gap:12px;width:100%;min-height:50px;padding:0 12px;border:0;border-radius:12px;background:none;color:inherit;font:inherit;font-size:15.5px;text-align:start;cursor:pointer}
-.sp-save button:active,.sp-save button:hover{background:#F1F3F7}
+.sp-save button:active{background:var(--v7-soft,#F1F3F7)}
+@media (hover:hover){.sp-save button:hover{background:var(--v7-soft,#F1F3F7)}}
+.sp-save button:focus-visible{outline:3px solid var(--v7-accent,#2E58CC);outline-offset:-3px}
 .sp-save .ic{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;font-size:11px;font-weight:700;color:#fff;flex:none;direction:ltr}
-.sp-save small{display:block;font-size:12px;color:#6A7488;margin-top:1px}
-.sp-save hr{border:0;border-top:1px solid #E6E9EF;margin:4px 8px}
-.sp-save .sec{min-height:44px;font-size:14px;color:#4A5468}
+.sp-save small{display:block;font-size:12px;color:var(--v7-muted,#6A7488);margin-top:1px}
+.sp-save hr{border:0;border-top:1px solid var(--v7-line,#E6E9EF);margin:4px 8px}
+.sp-save .sec{min-height:44px;font-size:14px;color:var(--v7-muted,#4A5468)}
 
 /* the notice after a translation into the document (phone) */
-.sp-note{position:fixed;z-index:2147482000;left:12px;right:12px;bottom:calc(84px + env(safe-area-inset-bottom,0px));display:flex;align-items:flex-start;gap:10px;
-  background:#16213A;color:#fff;border-radius:16px;padding:14px 14px 14px 10px;box-shadow:0 12px 32px rgba(0,0,0,.3);direction:rtl;font-family:Rubik,Heebo,Arial,sans-serif}
+.sp-note{position:fixed;z-index:2147482000;left:calc(12px + env(safe-area-inset-left,0px));right:calc(12px + env(safe-area-inset-right,0px));bottom:calc(84px + env(safe-area-inset-bottom,0px));display:flex;align-items:flex-start;gap:10px;
+  background:var(--v7-ink,#16213A);color:var(--v7-surface,#fff);border-radius:16px;padding:14px 14px 14px 10px;box-shadow:0 12px 32px rgba(0,0,0,.3);direction:rtl;font-family:Rubik,Heebo,Arial,sans-serif}
 .sp-note[hidden]{display:none}
 .sp-note-t{flex:1;margin:0;font-size:15.5px;line-height:1.5}
-.sp-note-x{flex:none;width:44px;height:44px;margin:-6px 0;border:0;border-radius:12px;background:rgba(255,255,255,.12);color:#fff;font-size:22px;line-height:1;cursor:pointer}
-.sp-note-x:focus-visible{outline:3px solid #FFD43B;outline-offset:2px}
+.sp-note-x{flex:none;width:44px;height:44px;margin:-6px 0;border:0;border-radius:12px;background:rgba(127,127,127,.22);color:inherit;font-size:22px;line-height:1;cursor:pointer}
+.sp-note-x:focus-visible{outline:3px solid var(--v7-accent,#FFD43B);outline-offset:2px}
 @media (min-width:721px){.sp-note{left:auto;right:20px;max-width:420px}}

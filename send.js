@@ -1,4 +1,4 @@
-/* סימן — שליחה לחתימה ושיתוף בקישור.
+/* סימן — שליחה לחתימה ושיתוף בקישור (5.8.1: makeViewLink לוואטסאפ במחשב).
    השולח מסמן איפה כל אחד חותם, מקבל קישור לכל חותם ושולח אותו בוואטסאפ או במייל.
    החותם פותח את הקישור בטלפון או במחשב, בלי הרשמה ובלי התקנה, וחותם.
    המסמך החתום נבנה בדפדפן: המקור + החתימות + עמוד תיעוד (מי חתם, מתי, מאיזה מכשיר).
@@ -551,5 +551,19 @@ async function openView(opts){
   await upload(u,{mode:'view',title:String(opts.name||'מסמך').replace(/\.pdf$/i,''),signers:[],fields:[],pages:1});
 }
 
-window.SIMAN_SEND={open,openView,list,links,close,buildSigned,getMeta,getPdf,api,signLink,viewLink,groupLink,ownerLink,findTargets,scanTargets,findBlanks,labelKind,hook:HOOK,HOST,devName,COLORS,TYPES,isOpen:()=>!!U};
+/* ---------- 5.8.1: a view link made without any window, for "WhatsApp" on a computer.
+   Same upload as "קישור לצפייה" (kept 30 days on the server, listed in "המסמכים ששלחתי").
+   Returns the link and the ready message. */
+async function makeViewLink(o){
+  o=o||{};const title=String(o.name||'מסמך').replace(/\.[a-z0-9]{2,5}$/i,'');
+  const meta={mode:'view',title,signers:[],fields:[],pages:1,from:{name:o.sender&&o.sender.name||'',mail:o.sender&&o.sender.mail||''}};
+  const fd=new FormData();fd.append('meta',JSON.stringify(meta));
+  fd.append('pdf',new Blob([o.bytes],{type:'application/pdf'}),'doc.pdf');
+  const r=await api('',{method:'POST',body:fd});
+  const rec={id:r.id,k:r.owner,v:r.view,title,mode:'view',created:new Date().toISOString(),expires:r.expires,signers:[],note:'',ask:''};
+  listSet([rec,...listGet()]);
+  return {url:viewLink(rec.id,rec.v),text:msgFor(rec,null,o)};
+}
+
+window.SIMAN_SEND={open,openView,makeViewLink,list,links,close,buildSigned,getMeta,getPdf,api,signLink,viewLink,groupLink,ownerLink,findTargets,scanTargets,findBlanks,labelKind,hook:HOOK,HOST,devName,COLORS,TYPES,isOpen:()=>!!U};
 })();

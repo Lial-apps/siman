@@ -1,27 +1,15 @@
-/* סימן — עיצוב 7: מסך "לפני ← אחרי", כחול שמיים, בחירת צבע ושפת ממשק.
-
-   איך מחליפים בין העיצובים
-   - DEFAULT_DESIGN למטה קובע מה כולם רואים: 'classic' = העיצוב הקודם, 'new' = העיצוב החדש.
-   - כל אחד יכול לנסות במכשיר שלו: פותחים את האפליקציה עם ?design=new או ?design=classic בסוף הכתובת.
-   - בעיצוב החדש יש בחלון הצבעים קישור "חזרה לעיצוב הקודם".
-   כשהעיצוב הקודם פעיל, הקובץ הזה לא נוגע בשום דבר.
-
-   הקובץ לא מזיז אף כפתור קיים: הוא מוסיף מסך פתיחה, שני כפתורים בסרגל וסרגל קבוצות בטלפון,
+/* סימן — עיצוב 7 (5.8.1): מסך פתיחה של אריחים ("בנטו"), מראה בהיר / כהה / אוטומטי, שישה צבעים, שפת ממשק.
+   כל המשתמשים מקבלים את העיצוב הזה. אין יותר מעבר לעיצוב הקודם (גם לא בכתובת ?design=classic).
+   הקובץ לא מזיז אף כפתור קיים: הוא מוסיף מסך פתיחה, כפתורים בסרגל וסרגל קבוצות בטלפון,
    וכל פעולה שלו לוחצת על הכפתור המקורי של האפליקציה. */
 (function () {
   'use strict';
-  var DEFAULT_DESIGN = 'new';
-
   var LS = {
     get: function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
-    set: function (k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+    set: function (k, v) { try { localStorage.setItem(k, v); } catch (e) {} },
+    del: function (k) { try { localStorage.removeItem(k); } catch (e) {} }
   };
-  try {
-    var q = new URLSearchParams(location.search).get('design');
-    if (q === 'new' || q === 'classic') LS.set('siman.design', q);
-  } catch (e) {}
-  var design = LS.get('siman.design') || DEFAULT_DESIGN;
-  if (design !== 'new') return;
+  LS.del('siman.design'); // הבחירה הישנה בין העיצובים כבר לא קיימת
 
   var root = document.documentElement;
   root.classList.add('v7');
@@ -44,31 +32,66 @@
     select: '<path d="M6 3l13 7-5.5 1.8L11.5 18z"/>',
     mark: '<path d="M9.5 14.5l7-8.5 3 3-8.5 7z"/><path d="M9.5 14.5L7 18h3.5l.5-1.5"/><path d="M4 21h16"/>',
     text: '<path d="M5 5h14"/><path d="M12 5v14"/><path d="M9 19h6"/>',
-    sign: '<path d="M3 16c3-6 5-7 6-3s2 4 4 0 3-3 4 0 2 2 4 0"/><path d="M3 20.5h18"/>'
+    sign: '<path d="M3 16c3-6 5-7 6-3s2 4 4 0 3-3 4 0 2 2 4 0"/><path d="M3 20.5h18"/>',
+    plus: '<path d="M12 5v14"/><path d="M5 12h14"/>',
+    word: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6"/><path d="M9 17h4"/>',
+    excel: '<rect x="4" y="5" width="16" height="14" rx="2"/><path d="M4 10h16"/><path d="M4 15h16"/><path d="M10 5v14"/>',
+    slides: '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M12 16v4"/><path d="M8 20h8"/>',
+    conv: '<path d="M7 7h11l-3-3"/><path d="M17 17H6l3 3"/>',
+    ask: '<path d="M4 5h16v11H9l-5 4z"/><path d="M9 9.5h6"/><path d="M9 12.5h4"/>',
+    send: '<path d="M21 3L3 10.5l7 2.5 2.5 7z"/><path d="M10 13L21 3"/>',
+    merge: '<path d="M8 3h6l4 4v10H8z"/><path d="M5 7v14h10"/>',
+    sun: '<circle cx="12" cy="12" r="4.5"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/>',
+    moon: '<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>',
+    auto: '<rect x="4" y="5" width="16" height="11" rx="2"/><path d="M9 20h6"/><path d="M12 16v4"/>'
   };
 
-  /* ================================================================ צבעים */
+  /* ================================================================ צבעים: שישה צבעים, כל אחד בהיר וכהה */
+  var DARK = { deep: '#0E1015', deep2: '#1A1D24', bg: '#14161C', surface: '#1E2129', ink: '#F1F2F5', muted: '#A9AFBC', line: '#2E323C' };
   var PAL = [
-    { id: 'sky', deep: '#0F213F', deep2: '#1B2F55', bg: '#EEF3FB', surface: '#FFFFFF', ink: '#0F213F', muted: '#4B5B77', line: '#D6E0F0', accent: '#1D4ED8', on: '#FFFFFF', dash: '#8FAEEB', soft: '#DCE6FA', art: '#1D4ED8', dark: false },
-    { id: 'sea', deep: '#12302C', deep2: '#1D4440', bg: '#EEF6F4', surface: '#FFFFFF', ink: '#12302C', muted: '#4E6B66', line: '#D3E6E1', accent: '#0F766E', on: '#FFFFFF', dash: '#7FB8AF', soft: '#D6F0EB', art: '#0F766E', dark: false },
-    { id: 'lavender', deep: '#221E3D', deep2: '#332D57', bg: '#F5F3FA', surface: '#FFFFFF', ink: '#221E3D', muted: '#5E5878', line: '#E2DDF0', accent: '#5A48D6', on: '#FFFFFF', dash: '#B1A6EC', soft: '#E6E1FA', art: '#5A48D6', dark: false },
-    { id: 'sunset', deep: '#3A1E14', deep2: '#52301F', bg: '#FFF5EF', surface: '#FFFFFF', ink: '#3A1E14', muted: '#7A5446', line: '#F3DDD0', accent: '#C2410C', on: '#FFFFFF', dash: '#EBA27E', soft: '#FBE1D3', art: '#C2410C', dark: false },
-    { id: 'raspberry', deep: '#3B1028', deep2: '#561A3B', bg: '#FCF2F6', surface: '#FFFFFF', ink: '#3B1028', muted: '#7A4A62', line: '#F1D9E4', accent: '#BE185D', on: '#FFFFFF', dash: '#E79BBE', soft: '#F8DCE8', art: '#BE185D', dark: false },
-    { id: 'forest', deep: '#1C2B16', deep2: '#2B3F22', bg: '#F2F6EE', surface: '#FFFFFF', ink: '#1C2B16', muted: '#55654B', line: '#DCE6D2', accent: '#3F6212', on: '#FFFFFF', dash: '#A3BE84', soft: '#E1EBD5', art: '#3F6212', dark: false },
-    { id: 'night', deep: '#0E1015', deep2: '#1A1D24', bg: '#14161C', surface: '#1E2129', ink: '#F1F2F5', muted: '#A9AFBC', line: '#2E323C', accent: '#7DD3C0', on: '#0B1F1B', dash: '#4C7F75', soft: '#253A37', art: '#2C8C79', dark: true }
+    { id: 'sky', l: { deep: '#0F213F', deep2: '#1B2F55', bg: '#EEF3FB', surface: '#FFFFFF', ink: '#0F213F', muted: '#4B5B77', line: '#D6E0F0', accent: '#1D4ED8', on: '#FFFFFF', dash: '#8FAEEB', soft: '#DCE6FA', art: '#1D4ED8' },
+      d: { accent: '#8FB0FF', on: '#0B1530', dash: '#4A5F8F', soft: '#1F2B47' } },
+    { id: 'sea', l: { deep: '#12302C', deep2: '#1D4440', bg: '#EEF6F4', surface: '#FFFFFF', ink: '#12302C', muted: '#4E6B66', line: '#D3E6E1', accent: '#0F766E', on: '#FFFFFF', dash: '#7FB8AF', soft: '#D6F0EB', art: '#0F766E' },
+      d: { accent: '#7DD3C0', on: '#0B1F1B', dash: '#4C7F75', soft: '#253A37' } },
+    { id: 'lavender', l: { deep: '#221E3D', deep2: '#332D57', bg: '#F5F3FA', surface: '#FFFFFF', ink: '#221E3D', muted: '#5E5878', line: '#E2DDF0', accent: '#5A48D6', on: '#FFFFFF', dash: '#B1A6EC', soft: '#E6E1FA', art: '#5A48D6' },
+      d: { accent: '#B3A6FF', on: '#1A1440', dash: '#6A5FA8', soft: '#2D2846' } },
+    { id: 'sunset', l: { deep: '#3A1E14', deep2: '#52301F', bg: '#FFF5EF', surface: '#FFFFFF', ink: '#3A1E14', muted: '#7A5446', line: '#F3DDD0', accent: '#C2410C', on: '#FFFFFF', dash: '#EBA27E', soft: '#FBE1D3', art: '#C2410C' },
+      d: { accent: '#FFA176', on: '#2B1206', dash: '#9A5A3E', soft: '#3A2A24' } },
+    { id: 'raspberry', l: { deep: '#3B1028', deep2: '#561A3B', bg: '#FCF2F6', surface: '#FFFFFF', ink: '#3B1028', muted: '#7A4A62', line: '#F1D9E4', accent: '#BE185D', on: '#FFFFFF', dash: '#E79BBE', soft: '#F8DCE8', art: '#BE185D' },
+      d: { accent: '#FF8DBE', on: '#2E0A1C', dash: '#9A4D6E', soft: '#3C2532' } },
+    { id: 'forest', l: { deep: '#1C2B16', deep2: '#2B3F22', bg: '#F2F6EE', surface: '#FFFFFF', ink: '#1C2B16', muted: '#55654B', line: '#DCE6D2', accent: '#3F6212', on: '#FFFFFF', dash: '#A3BE84', soft: '#E1EBD5', art: '#3F6212' },
+      d: { accent: '#A9D17A', on: '#14200A', dash: '#647A47', soft: '#2A3423' } }
   ];
+  var KEYS = ['bg', 'surface', 'ink', 'muted', 'line', 'accent', 'on', 'dash', 'soft', 'art', 'deep', 'deep2', 'tile2'];
+  var MODES = ['light', 'dark', 'auto'];
   var colorId = LS.get('siman.v7.color');
-  if (!PAL.some(function (p) { return p.id === colorId; })) {
-    colorId = (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches) ? 'night' : 'sky';
+  var mode = LS.get('siman.v7.mode');
+  if (colorId === 'night') { colorId = 'sea'; if (MODES.indexOf(mode) < 0) mode = 'dark'; LS.set('siman.v7.color', 'sea'); LS.set('siman.v7.mode', 'dark'); } // "לילה" הוא עכשיו המצב הכהה של "ים"
+  if (!PAL.some(function (p) { return p.id === colorId; })) colorId = 'sky';
+  if (MODES.indexOf(mode) < 0) mode = 'auto';
+  var mql = window.matchMedia ? matchMedia('(prefers-color-scheme: dark)') : null;
+  function palOf(id) { return PAL.filter(function (x) { return x.id === id; })[0] || PAL[0]; }
+  function isDark() { return mode === 'dark' || (mode === 'auto' && !!(mql && mql.matches)); }
+  function varsFor(p, dark) {
+    var v = {}, k;
+    for (k in p.l) v[k] = p.l[k];
+    if (dark) { for (k in DARK) v[k] = DARK[k]; for (k in p.d) v[k] = p.d[k]; v.art = p.l.art; v.tile2 = p.l.art; }
+    else v.tile2 = p.l.deep;
+    return v;
   }
-  function applyColor(id) {
-    var p = PAL.filter(function (x) { return x.id === id; })[0] || PAL[0];
-    colorId = p.id;
-    ['bg', 'surface', 'ink', 'muted', 'line', 'accent', 'on', 'dash', 'soft', 'art', 'deep', 'deep2'].forEach(function (k) { root.style.setProperty('--v7-' + k, p[k]); });
-    root.setAttribute('data-theme', p.dark ? 'dark' : 'light');
+  function applyTheme() {
+    var p = palOf(colorId), dark = isDark(), v = varsFor(p, dark);
+    KEYS.forEach(function (k) { root.style.setProperty('--v7-' + k, v[k]); });
+    root.setAttribute('data-theme', dark ? 'dark' : 'light');
     var m = document.querySelector('meta[name="theme-color"]');
-    if (m) m.setAttribute('content', p.surface);
+    if (m) m.setAttribute('content', v.surface);
+    // נשמר כדי שבפתיחה הבאה הצבעים יופיעו מיד, עוד לפני שהקובץ הזה נטען (index.html)
+    LS.set('siman.v7.boot', JSON.stringify({ mode: mode, l: varsFor(p, false), d: varsFor(p, true) }));
     renderPops();
+  }
+  if (mql) {
+    var onScheme = function () { if (mode === 'auto') applyTheme(); };
+    if (mql.addEventListener) mql.addEventListener('change', onScheme); else if (mql.addListener) mql.addListener(onScheme);
   }
 
   /* ================================================================ שפות */
@@ -85,6 +108,12 @@
     en: { dir: 'ltr', native: 'English', title: 'Any document. Everything you need to do with it.', sub: 'Edit, translate, transcribe, scan, design and share. All in one app.', search: 'What do you want to do? Translate, transcribe, edit slides', searchLabel: 'Search actions', drop: 'Drop a file here', dropSub: 'PDF, Word, Excel, PowerPoint, a photo or a recording. Your file stays on your device.', choose: 'Choose file', openFile: 'Open file', scan: 'Scan a page', record: 'Record', fav: 'Most loved', more: 'And much more', newLbl: 'Create new:', newDoc: 'Word document', newXl: 'Excel sheet', newPpt: 'PowerPoint deck', priv: 'Your files stay on your device', colorBtn: 'Choose color', langBtn: 'Interface language', yourColor: 'Your color', colorNote: 'Your choice is saved on this device, and you can change it anytime.', classic: 'Back to the previous design', langTitle: 'Interface language', langNote: 'Some windows are still in Hebrew.',
       pal: ['Sky', 'Sea', 'Lavender', 'Sunset', 'Raspberry', 'Forest', 'Night'], dock: ['Select', 'Mark', 'Text', 'Document', 'Sign'], dockLabel: 'Tool groups',
       cards: { translate: ['Translate a document', 'From any language, same exact layout'], transcribe: ['Transcribe a recording', 'A lesson, call or voice note into text'], word: ['Edit Word files', 'Like on a computer, even on your phone'], scan: ['Page to document', 'Snap a page, get a clean document'], slides: ['Design and fix slides', 'Even a deck that won’t open'], ask: ['Ask the document', 'Instant answers, no need to read it all'], excel: ['Work in Excel', 'Full editing in a few taps'], conv: ['Convert to Word', 'A PDF opened for normal editing'], send: ['Send for signature', 'To one person or several'], merge: ['Merge and split', 'Many files into one, or the reverse'], sign: ['Fill and sign', 'A form done in two minutes'] } }
+  };
+  var T2 = {
+    he: { appear: 'מראה וצבע', modeLabel: 'מראה', colorLabel: 'צבע', modes: ['בהיר', 'כהה', 'אוטומטי'], modeNote: 'במצב אוטומטי הצבעים מתחלפים לפי ההגדרה של המכשיר.', colors: ['שמיים', 'ים', 'לבנדר', 'שקיעה', 'פטל', 'יער'], fresh: 'חדש', types: 'PDF, Word, Excel ומצגות' },
+    ar: { appear: 'المظهر واللون', modeLabel: 'المظهر', colorLabel: 'اللون', modes: ['فاتح', 'داكن', 'تلقائي'], modeNote: 'في الوضع التلقائي تتبع الألوان إعداد الجهاز.', colors: ['سماوي', 'بحر', 'لافندر', 'غروب', 'توت', 'غابة'], fresh: 'جديد', types: 'PDF وWord وExcel والعروض' },
+    ru: { appear: 'Оформление и цвет', modeLabel: 'Оформление', colorLabel: 'Цвет', modes: ['Светлое', 'Тёмное', 'Авто'], modeNote: 'В режиме «Авто» цвета следуют настройке устройства.', colors: ['Небесный', 'Море', 'Лаванда', 'Закат', 'Малина', 'Лес'], fresh: 'Новое', types: 'PDF, Word, Excel и презентации' },
+    en: { appear: 'Appearance and color', modeLabel: 'Appearance', colorLabel: 'Color', modes: ['Light', 'Dark', 'Auto'], modeNote: 'In Auto, colors follow your device setting.', colors: ['Sky', 'Sea', 'Lavender', 'Sunset', 'Raspberry', 'Forest'], fresh: 'New', types: 'PDF, Word, Excel and slides' }
   };
   var LANGS = ['he', 'ar', 'ru', 'en'];
   var lang = LS.get('siman.v7.lang');
@@ -136,6 +165,11 @@
     ['לחצו על הדף במקום שבו לשים את החתימה', 'انقر على الصفحة حيث تريد وضع التوقيع', 'Нажмите на страницу там, где поставить подпись', 'Click the page where the signature should go'],
     ['לחצו על הדף במקום שבו לשים את התמונה', 'انقر على الصفحة حيث تريد وضع الصورة', 'Нажмите на страницу там, где разместить изображение', 'Click the page where the image should go']
   ];
+  // שמות הצבעים של המרקר, העט והטקסט (תווית לקורא מסך)
+  [['כהה', 'داكن', 'тёмный', 'dark'], ['אדום', 'أحمر', 'красный', 'red'], ['כחול', 'أزرق', 'синий', 'blue'], ['ירוק', 'أخضر', 'зелёный', 'green'],
+   ['סגול', 'بنفسجي', 'фиолетовый', 'purple'], ['צהוב', 'أصفر', 'жёлтый', 'yellow'], ['ירוק בהיר', 'أخضر فاتح', 'светло-зелёный', 'light green'],
+   ['תכלת', 'سماوي', 'голубой', 'light blue'], ['ורוד', 'وردي', 'розовый', 'pink'], ['כתום', 'برتقالي', 'оранжевый', 'orange']
+  ].forEach(function (c) { DICT_ROWS.push(['צבע: ' + c[0], 'اللون: ' + c[1], 'Цвет: ' + c[2], 'Color: ' + c[3]]); });
   var DICT = {};
   DICT_ROWS.forEach(function (r) { DICT[r[0]] = { ar: r[1], ru: r[2], en: r[3] }; });
 
@@ -143,15 +177,19 @@
   var origText = new WeakMap(), setText = new WeakMap(), origAttr = new WeakMap();
   var ATTRS = ['title', 'aria-label', 'placeholder'];
   function trFor(he) { var d = DICT[he]; return d && lang !== 'he' ? d[lang] : null; }
+  // במק, באייפון ובאייפד מקש הקיצור הוא ⌘ ולא Ctrl (הקיצורים עצמם עובדים עם שניהם)
+  var APPLE = /Mac|iPhone|iPad|iPod/.test(navigator.platform || '') || /Macintosh|iPhone|iPad/.test(navigator.userAgent || '');
+  function keys(s) { return APPLE ? s.replace(/Ctrl\+Shift\+/g, '⌘⇧').replace(/Ctrl\+/g, '⌘') : s; }
+  function unkeys(s) { return s.replace(/⌘⇧/g, 'Ctrl+Shift+').replace(/⌘/g, 'Ctrl+'); }
   function doText(n, force) {
     var v = n.nodeValue;
     if (!force && setText.get(n) === v) return;
     var key = v.trim();
     if (!key) return;
     if (!/[\u0590-\u05FF]/.test(key) && !origText.has(n)) return;
-    var he = /[\u0590-\u05FF]/.test(key) ? key : origText.get(n);
-    if (/[\u0590-\u05FF]/.test(key)) origText.set(n, key);
-    var out = lang === 'he' ? he : (trFor(he) || he);
+    var he = /[\u0590-\u05FF]/.test(key) ? unkeys(key) : origText.get(n);
+    if (/[\u0590-\u05FF]/.test(key)) origText.set(n, he);
+    var out = keys(lang === 'he' ? he : (trFor(he) || he));
     if (out === key) return;
     var nv = v.replace(key, out);
     setText.set(n, nv);
@@ -163,9 +201,9 @@
       if (!el.hasAttribute(a)) return;
       var v = el.getAttribute(a);
       if (!force && rec[a] && rec[a].set === v) return;
-      var he = /[\u0590-\u05FF]/.test(v) ? v : (rec[a] && rec[a].he);
+      var he = /[\u0590-\u05FF]/.test(v) ? unkeys(v) : (rec[a] && rec[a].he);
       if (!he) return;
-      var out = lang === 'he' ? he : (trFor(he) || he);
+      var out = keys(lang === 'he' ? he : (trFor(he) || he));
       rec[a] = { he: he, set: out };
       if (out !== v) el.setAttribute(a, out);
     });
@@ -225,7 +263,7 @@
   var ARROW = '<svg class="v7-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + I.arrow + '</svg>';
   var ART = {
     translate: [PG('<b dir="auto" style="font-size:8px;line-height:1" data-art="from">Договор</b>' + LN() + LN() + LN(60)), PG('<b dir="auto" style="font-size:10px;line-height:1" data-art="to">חוזה</b>' + LN() + LN() + LN(60), 1)],
-    transcribe: ['<svg width="50" height="40" viewBox="0 0 50 40" fill="none" stroke="#0F213F" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M4 16v8M11 10v20M18 4v32M25 12v16M32 7v26M39 14v12M46 18v4"/></svg>', PG(LN() + LN() + LN(80) + LN() + LN(45), 1)],
+    transcribe: ['<svg width="50" height="40" viewBox="0 0 50 40" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M4 16v8M11 10v20M18 4v32M25 12v16M32 7v26M39 14v12M46 18v4"/></svg>', PG(LN() + LN() + LN(80) + LN() + LN(45), 1)],
     word: [PG(LN() + LN() + LN() + LN(50)), PG('<i style="display:flex;gap:2px"><i style="width:7px;height:6px;border-radius:1px;background:#CBD5EA"></i><i style="width:7px;height:6px;border-radius:1px;background:var(--v7-art)"></i><i style="width:7px;height:6px;border-radius:1px;background:#CBD5EA"></i></i><i style="height:5px;width:75%;border-radius:2px;background:#0F213F"></i>' + LN() + LN(65), 1)],
     scan: ['<span style="width:46px;height:60px;background:#F4EEDC;border-radius:4px;border:1px solid #D8CDAE;transform:rotate(-9deg);display:flex;align-items:center;justify-content:center"><svg width="34" height="40" viewBox="0 0 34 40" fill="none" stroke="#8C7F5E" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 8c4-3 7 3 11 0s7 3 11 0 5 2 6 1"/><path d="M3 18c4-3 7 3 11 0s7 3 11 0"/><path d="M3 28c4-3 7 3 11 0s5 2 8 0"/></svg></span>', PG('<i style="height:4px;width:70%;border-radius:2px;background:#0F213F"></i>' + LN() + LN() + LN() + LN(60), 1)],
     slides: ['<span style="width:60px;height:40px;border-radius:5px;border:1.5px dashed #8B97AD;display:flex;align-items:center;justify-content:center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8B97AD" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></span>', '<span style="width:60px;height:40px;border-radius:5px;background:#fff;border:1.5px solid var(--v7-art);padding:5px;box-sizing:border-box;display:flex;gap:4px"><span style="flex:1;display:flex;flex-direction:column;gap:3px"><i style="height:4px;border-radius:2px;background:#0F213F"></i>' + LN() + LN(70) + '</span><i style="width:18px;border-radius:3px;background:#FFD7C2"></i></span>'],
@@ -236,35 +274,38 @@
     merge: ['<span style="display:flex;gap:3px"><i style="width:18px;height:26px;background:#fff;border-radius:3px;border:1px solid #D9DEEA"></i><i style="width:18px;height:26px;background:#fff;border-radius:3px;border:1px solid #D9DEEA"></i><i style="width:18px;height:26px;background:#fff;border-radius:3px;border:1px solid #D9DEEA"></i></span>', PG(LN() + LN() + LN() + LN() + LN(50), 1)],
     sign: [PG(LN() + '<i style="height:12px;border-bottom:1.5px solid #8B97AD"></i>', 0, 'style="justify-content:flex-end"'), PG(LN() + '<svg width="32" height="14" viewBox="0 0 32 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true" style="color:var(--v7-art)"><path d="M2 10c3-8 5-8 6-2s3 5 5-1 4-3 5 1 5 1 12-3"/></svg>', 1, 'style="justify-content:flex-end;gap:2px"')]
   };
-  var TINT = { translate: '#D9ECFF', ask: '#D9ECFF', transcribe: '#D6F5E8', scan: '#D6F5E8', word: '#EDE6FF', slides: '#EDE6FF', excel: '#EDE6FF', conv: '#EDE6FF', send: '#FFE1D6', sign: '#FFE1D6', merge: '#FFF1C2' };
-  var FAV = ['translate', 'transcribe'];
-  var REST = ['word', 'scan', 'slides', 'ask', 'excel', 'conv', 'send', 'merge', 'sign'];
-
-  /* ================================================================ מסך הפתיחה */
+  /* ================================================================ מסך הפתיחה: אריחים */
+  var SMALL = ['word', 'excel', 'slides', 'conv', 'ask', 'send', 'merge', 'record'];
+  var SMALL_IC = { word: I.word, excel: I.excel, slides: I.slides, conv: I.conv, ask: I.ask, send: I.send, merge: I.merge, record: I.mic };
   var home = null;
-  function card(k) {
-    var L = T[lang].cards[k];
-    return '<button type="button" class="v7-card" data-v7="' + k + '"><span class="v7-art" style="background:' + TINT[k] + '"><span>' + ART[k][0] + ARROW + ART[k][1] + '</span></span><b>' + esc(L[0]) + '</b><small>' + esc(L[1]) + '</small></button>';
-  }
+  var WAVE = '<span class="v7-wave" aria-hidden="true">' + [10, 22, 14, 26, 16, 8, 20].map(function (x) { return '<i style="height:' + x + 'px"></i>'; }).join('') + '</span>';
+  var SIGN = '<svg class="v7-sig" viewBox="0 0 110 34" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 26c8-16 14-20 17-10s6 11 11 1 8-9 11-1 6 6 11-1 9-7 14-3 10 4 16-2 10-6 14-5"/></svg>';
+  function lbl(k) { var c = T[lang].cards[k]; return c ? c[0] + '. ' + c[1] : ''; }
   function buildHome() {
     var empty = $('empty');
     if (!empty) return;
-    var L = T[lang];
+    var L = T[lang], L2 = T2[lang], C = L.cards;
     var html = '<section class="v7-home" dir="' + L.dir + '" lang="' + lang + '">' +
       '<h1>' + esc(L.title) + '</h1><p class="v7-sub">' + esc(L.sub) + '</p>' +
-      '<label class="v7-search">' + svg(I.search, 20) + '<span class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">' + esc(L.searchLabel) + '</span><input type="search" id="v7Search" autocomplete="off" placeholder="' + esc(L.search) + '"></label>' +
-      '<div class="v7-drop"><span class="v7-ic">' + svg(I.up, 28) + '</span><span class="v7-dt"><b>' + esc(L.drop) + '</b><span>' + esc(L.dropSub) + '</span></span>' +
-      '<span class="v7-acts"><button type="button" class="v7-b pri" data-v7="open">' + '<span class="v7-only-narrow">' + svg(I.file, 24) + '</span>' + '<span class="v7-only-narrow">' + esc(L.openFile) + '</span><span class="v7-only-wide">' + esc(L.choose) + '</span></button>' +
-      '<button type="button" class="v7-b" data-v7="scan">' + svg(I.cam, 22) + '<span>' + esc(L.scan) + '</span></button>' +
-      '<button type="button" class="v7-b" data-v7="record">' + svg(I.mic, 22) + '<span>' + esc(L.record) + '</span></button></span></div>' +
-      '<h2 class="v7-h2">' + esc(L.fav) + '</h2><div class="v7-grid fav">' + FAV.map(card).join('') + '</div>' +
-      '<h2 class="v7-h2">' + esc(L.more) + '</h2><div class="v7-grid">' + REST.map(card).join('') + '</div>' +
+      '<label class="v7-search">' + svg(I.search, 20) + '<span class="v7-sr">' + esc(L.searchLabel) + '</span><input type="search" id="v7Search" autocomplete="off" enterkeyhint="search" placeholder="' + esc(L.search) + '"></label>' +
+      '<div class="v7-bento">' +
+        '<button type="button" class="v7-t v7-open" data-v7="open"><span class="v7-plus">' + svg(I.plus, 26) + '</span><span class="v7-tt"><b>' + esc(L.openFile) + '</b>' +
+          '<small class="v7-only-wide">' + esc(L.drop) + '</small><small class="v7-only-narrow">' + esc(L2.types) + '</small></span></button>' +
+        '<button type="button" class="v7-t v7-tr" data-v7="translate" aria-label="' + esc(lbl('translate')) + '"><span class="v7-words" aria-hidden="true"><span dir="rtl">שלום</span><span dir="ltr">Hello</span><span dir="ltr">Привет</span></span>' +
+          '<span class="v7-tt"><b>' + esc(C.translate[0]) + '</b><small>' + esc(C.translate[1]) + '</small></span></button>' +
+        '<button type="button" class="v7-t v7-feat" data-v7="scan" aria-label="' + esc(lbl('scan')) + '"><span class="v7-art" aria-hidden="true"><span>' + ART.scan[0] + ARROW + ART.scan[1] + '</span></span>' +
+          '<span class="v7-tt"><span class="v7-new-tag">' + esc(L2.fresh) + '</span><b>' + esc(C.scan[0]) + '</b><small>' + esc(C.scan[1]) + '</small></span></button>' +
+        '<button type="button" class="v7-t v7-wide" data-v7="transcribe" aria-label="' + esc(lbl('transcribe')) + '"><span class="v7-tt"><b>' + esc(C.transcribe[0]) + '</b><small>' + esc(C.transcribe[1]) + '</small></span>' + WAVE + '</button>' +
+        '<button type="button" class="v7-t v7-wide" data-v7="sign" aria-label="' + esc(lbl('sign')) + '"><span class="v7-tt"><b>' + esc(C.sign[0]) + '</b><small>' + esc(C.sign[1]) + '</small></span>' + SIGN + '</button>' +
+        SMALL.map(function (k) {
+          var name = k === 'record' ? L.record : C[k][0];
+          var full = k === 'record' ? L.record : lbl(k);
+          return '<button type="button" class="v7-t v7-small" data-v7="' + k + '" aria-label="' + esc(full) + '"><span class="v7-ic2">' + svg(SMALL_IC[k], 22) + '</span><b>' + esc(name) + '</b></button>';
+        }).join('') +
+      '</div>' +
       '<div class="v7-new"><span>' + esc(L.newLbl) + '</span><button type="button" class="v7-b" data-v7="newdoc">' + esc(L.newDoc) + '</button><button type="button" class="v7-b" data-v7="newxl">' + esc(L.newXl) + '</button><button type="button" class="v7-b" data-v7="newppt">' + esc(L.newPpt) + '</button></div>' +
       '<p class="v7-private">' + svg(I.lock, 18) + esc(L.priv) + '</p></section>';
     var n = h(html);
-    var AW = { he: ['Договор', 'חוזה'], ar: ['Договор', 'عقد'], ru: ['Contract', 'Договор'], en: ['Договор', 'Contract'] }[lang];
-    n.querySelectorAll('[data-art="from"]').forEach(function (x) { x.textContent = AW[0]; });
-    n.querySelectorAll('[data-art="to"]').forEach(function (x) { x.textContent = AW[1]; });
     if (home && home.parentNode) home.parentNode.replaceChild(n, home); else empty.appendChild(n);
     home = n;
     home.addEventListener('click', function (e) {
@@ -308,11 +349,13 @@
     document.body.appendChild(popColor); document.body.appendChild(popLang);
     [popColor, popLang].forEach(function (p) { p.addEventListener('click', function (e) { e.stopPropagation(); }); });
     document.addEventListener('click', closePops);
-    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closePops(); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closePops(true); });
     window.addEventListener('resize', closePops);
   }
-  function closePops() {
-    [[popColor, btnColor], [popLang, btnLang]].forEach(function (x) { if (x[0] && !x[0].hidden) { x[0].hidden = true; x[1].setAttribute('aria-expanded', 'false'); } });
+  function closePops(refocus) {
+    [[popColor, btnColor], [popLang, btnLang]].forEach(function (x) {
+      if (x[0] && !x[0].hidden) { x[0].hidden = true; x[1].setAttribute('aria-expanded', 'false'); if (refocus === true) x[1].focus(); }
+    });
   }
   function toggle(pop, btn, other, otherBtn) {
     if (other) { other.hidden = true; otherBtn.setAttribute('aria-expanded', 'false'); }
@@ -326,22 +369,29 @@
   }
   function renderPops() {
     if (!popColor) return;
-    var L = T[lang];
-    btnColor.setAttribute('aria-label', L.colorBtn); btnColor.title = L.colorBtn;
+    var L = T[lang], L2 = T2[lang];
+    btnColor.setAttribute('aria-label', L2.appear); btnColor.title = L2.appear;
     btnLang.setAttribute('aria-label', L.langBtn); btnLang.title = L.langBtn;
-    popColor.setAttribute('aria-label', L.yourColor); popLang.setAttribute('aria-label', L.langTitle);
+    popColor.setAttribute('aria-label', L2.appear); popLang.setAttribute('aria-label', L.langTitle);
     popColor.dir = L.dir; popLang.dir = L.dir;
-    popColor.innerHTML = '<h3>' + esc(L.yourColor) + '</h3><div class="v7-sw">' + PAL.map(function (p, i) {
-      return '<button type="button" data-c="' + p.id + '" aria-pressed="' + (p.id === colorId) + '"><i style="background:' + p.accent + ';color:' + p.on + '">' + svg(I.check, 20) + '</i><span>' + esc(L.pal[i]) + '</span></button>';
-    }).join('') + '</div><p class="v7-note">' + esc(L.colorNote) + '</p><button type="button" class="v7-link" data-classic="1">' + esc(L.classic) + '</button>';
+    var MI = [I.sun, I.moon, I.auto];
+    popColor.innerHTML = '<h3>' + esc(L2.appear) + '</h3>' +
+      '<div class="v7-seg" role="group" aria-label="' + esc(L2.modeLabel) + '">' + MODES.map(function (m, i) {
+        return '<button type="button" data-m="' + m + '" aria-pressed="' + (m === mode) + '">' + svg(MI[i], 18) + '<span>' + esc(L2.modes[i]) + '</span></button>';
+      }).join('') + '</div>' +
+      '<div class="v7-sw" role="group" aria-label="' + esc(L2.colorLabel) + '">' + PAL.map(function (p, i) {
+        return '<button type="button" data-c="' + p.id + '" aria-pressed="' + (p.id === colorId) + '"><i style="background:linear-gradient(135deg,' + p.l.accent + ' 0 50%,' + p.d.accent + ' 50% 100%)"></i><span>' + esc(L2.colors[i]) + '</span></button>';
+      }).join('') + '</div>' +
+      '<p class="v7-note">' + esc(L.colorNote) + (mode === 'auto' ? ' ' + esc(L2.modeNote) : '') + '</p>';
     popLang.innerHTML = '<h3>' + esc(L.langTitle) + '</h3><div class="v7-langs">' + LANGS.map(function (c) {
       return '<button type="button" data-l="' + c + '" lang="' + c + '" dir="' + T[c].dir + '" aria-pressed="' + (c === lang) + '"><span>' + esc(T[c].native) + '</span>' + svg(I.check, 20) + '</button>';
     }).join('') + '</div>' + (lang !== 'he' ? '<p class="v7-note">' + esc(L.langNote) + '</p>' : '');
     popColor.onclick = function (e) {
       e.stopPropagation();
-      var c = e.target.closest('[data-c]');
-      if (c) { LS.set('siman.v7.color', c.getAttribute('data-c')); applyColor(c.getAttribute('data-c')); popColor.hidden = false; return; }
-      if (e.target.closest('[data-classic]')) { LS.set('siman.design', 'classic'); location.reload(); }
+      var c = e.target.closest('[data-c]'), m = e.target.closest('[data-m]'), f;
+      if (c) { colorId = c.getAttribute('data-c'); LS.set('siman.v7.color', colorId); applyTheme(); f = popColor.querySelector('[data-c="' + colorId + '"]'); }
+      else if (m) { mode = m.getAttribute('data-m'); LS.set('siman.v7.mode', mode); applyTheme(); f = popColor.querySelector('[data-m="' + mode + '"]'); }
+      if (f) f.focus(); // החלון נבנה מחדש: הפוקוס חוזר לכפתור שנלחץ
     };
     popLang.onclick = function (e) {
       e.stopPropagation();
@@ -432,7 +482,7 @@
     if (!document.querySelector('header.bar') || !$('empty')) { root.classList.remove('v7'); return; }
     addHeaderButtons();
     try { setupZoom(); } catch (e) {}
-    applyColor(colorId);
+    applyTheme();
     applyLang(lang);
     // האם פתוח מסמך? (מסך הפתיחה מוסתר)
     var empty = $('empty');

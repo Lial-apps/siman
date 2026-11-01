@@ -16,9 +16,10 @@
 
   // ---------- styles ----------
   const css = `
-.a11y-panel{--a-bg:#FFFFFF;--a-ink:#16213A;--a-mute:#5D6982;--a-line:#D4DBE5;--a-tile:#F2F4F8;--a-on:#16213A;--a-on-ink:#FFD43B;--a-acc:#2E58CC}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .a11y-panel{--a-bg:#1B2436;--a-ink:#E4EAF4;--a-mute:#9AA6BB;--a-line:#2D3950;--a-tile:#232E44;--a-on:#FFD43B;--a-on-ink:#16213A;--a-acc:#86A6FF}}
-:root[data-theme="dark"] .a11y-panel{--a-bg:#1B2436;--a-ink:#E4EAF4;--a-mute:#9AA6BB;--a-line:#2D3950;--a-tile:#232E44;--a-on:#FFD43B;--a-on-ink:#16213A;--a-acc:#86A6FF}
+/* in the app the panel takes the colors the person chose (--v7-*); other pages keep their own */
+.a11y-panel{--a-bg:var(--v7-surface,#FFFFFF);--a-ink:var(--v7-ink,#16213A);--a-mute:var(--v7-muted,#5D6982);--a-line:var(--v7-line,#D4DBE5);--a-tile:var(--v7-bg,#F2F4F8);--a-on:var(--v7-accent,#16213A);--a-on-ink:var(--v7-on,#FFD43B);--a-acc:var(--v7-accent,#2E58CC)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .a11y-panel{--a-bg:var(--v7-surface,#1B2436);--a-ink:var(--v7-ink,#E4EAF4);--a-mute:var(--v7-muted,#9AA6BB);--a-line:var(--v7-line,#2D3950);--a-tile:var(--v7-bg,#232E44);--a-on:var(--v7-accent,#FFD43B);--a-on-ink:var(--v7-on,#16213A);--a-acc:var(--v7-accent,#86A6FF)}}
+:root[data-theme="dark"] .a11y-panel{--a-bg:var(--v7-surface,#1B2436);--a-ink:var(--v7-ink,#E4EAF4);--a-mute:var(--v7-muted,#9AA6BB);--a-line:var(--v7-line,#2D3950);--a-tile:var(--v7-bg,#232E44);--a-on:var(--v7-accent,#FFD43B);--a-on-ink:var(--v7-on,#16213A);--a-acc:var(--v7-accent,#86A6FF)}
 .a11y-panel{position:fixed;z-index:2147483000;width:min(340px,calc(100vw - 20px));max-height:calc(100vh - 90px);overflow:auto;direction:rtl;text-align:right;
   background:var(--a-bg);color:var(--a-ink);border:1px solid var(--a-line);border-radius:16px;box-shadow:0 18px 48px -12px rgba(10,16,30,.45);
   padding:16px;font:15px/1.45 "Segoe UI",Arial,sans-serif;box-sizing:border-box}
@@ -26,12 +27,12 @@
 .a11y-panel *{box-sizing:border-box;font-family:inherit}
 .a11y-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 12px}
 .a11y-head h2{margin:0;font-size:18px;font-weight:700;color:var(--a-ink)}
-.a11y-x{border:0;background:transparent;color:var(--a-ink);width:34px;height:34px;border-radius:9px;cursor:pointer;font-size:20px;line-height:1}
+.a11y-x{border:0;background:transparent;color:var(--a-ink);width:44px;height:44px;border-radius:12px;cursor:pointer;font-size:20px;line-height:1}
 .a11y-x:hover{background:var(--a-tile)}
 .a11y-size{display:flex;align-items:center;gap:8px;background:var(--a-tile);border-radius:12px;padding:8px 10px;margin:0 0 10px}
 .a11y-size span{flex:1;font-weight:600}
 .a11y-size output{min-width:44px;text-align:center;font-weight:700}
-.a11y-size button{width:38px;height:38px;border-radius:10px;border:1px solid var(--a-line);background:var(--a-bg);color:var(--a-ink);font-size:20px;font-weight:700;cursor:pointer}
+.a11y-size button{width:44px;height:44px;border-radius:12px;border:1px solid var(--a-line);background:var(--a-bg);color:var(--a-ink);font-size:20px;font-weight:700;cursor:pointer}
 .a11y-size button:disabled{opacity:.4;cursor:default}
 .a11y-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .a11y-t{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-height:78px;padding:10px 6px;border-radius:12px;
@@ -40,22 +41,25 @@
 .a11y-t[aria-pressed="true"]{background:var(--a-on);color:var(--a-on-ink);border-color:var(--a-on)}
 .a11y-t:hover{border-color:var(--a-acc)}
 .a11y-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px;padding-top:12px;border-top:1px solid var(--a-line)}
-.a11y-reset{border:1px solid var(--a-line);background:transparent;color:var(--a-ink);border-radius:10px;padding:8px 12px;font-weight:600;cursor:pointer}
-.a11y-foot a{color:var(--a-acc);font-weight:600}
+.a11y-reset{border:1px solid var(--a-line);background:transparent;color:var(--a-ink);border-radius:12px;min-height:44px;padding:8px 14px;font-weight:600;cursor:pointer}
+.a11y-foot a{color:var(--a-acc);font-weight:600;padding:12px 4px}
 .a11y-panel button:focus-visible,.a11y-panel a:focus-visible,.a11y-fab:focus-visible{outline:3px solid var(--a-acc);outline-offset:2px}
 .a11y-fab{position:fixed;z-index:2147482999;left:16px;bottom:16px;width:52px;height:52px;border-radius:50%;border:0;cursor:pointer;
-  background:#16213A;color:#FFD43B;box-shadow:0 8px 22px -6px rgba(10,16,30,.5);display:flex;align-items:center;justify-content:center;
+  background:var(--v7-accent,#16213A);color:var(--v7-on,#FFD43B);box-shadow:0 8px 22px -6px rgba(10,16,30,.5);display:flex;align-items:center;justify-content:center;
   margin-bottom:env(safe-area-inset-bottom,0px)}
 .a11y-fab svg{width:28px;height:28px}
 @media print{.a11y-panel,.a11y-fab{display:none!important}}
 
 /* ---- the modes ---- */
-html.a11y-contrast.a11y-contrast:root{--navy:#000;--navy-2:#000;--ink:#000;--muted:#1d1d1d;--line:#000;--bar:#fff;--desk:#fff;--chrome-text:#fff;--chrome-mute:#fff;--blue:#0033B3}
+/* stronger than the app's color layer (siman-v7.css) and than the colors it sets on <html> */
+html.a11y-contrast.a11y-contrast:root:not(#_):not(#__){--navy:#000;--navy-2:#000;--ink:#000;--muted:#1d1d1d;--line:#000;--bar:#fff;--desk:#fff;--chrome-text:#fff;--chrome-mute:#fff;--blue:#0033B3;--danger:#B00020;
+  --v7-bg:#fff!important;--v7-surface:#fff!important;--v7-ink:#000!important;--v7-muted:#1d1d1d!important;--v7-line:#000!important;--v7-accent:#0033B3!important;--v7-on:#fff!important;
+  --v7-soft:#E6ECFF!important;--v7-dash:#000!important;--v7-deep:#000!important;--v7-deep2:#000!important;--v7-tile2:#000!important;--v7-art:#0033B3!important;color-scheme:light!important}
 html.a11y-contrast body :is(button,input,select,textarea,.btn,.icon-btn):not(.a11y-t):not(.a11y-fab){border:2px solid currentColor!important}
 html.a11y-gray{filter:grayscale(1)}
 html.a11y-links a:not(.a11y-panel a){text-decoration:underline!important;text-underline-offset:3px;outline:2px dashed currentColor;outline-offset:2px}
-html.a11y-font body :not(#pages):not(#pages *):not(#wed *):not(#xed *):not([contenteditable] *):not(svg):not(svg *){font-family:Arial,"Segoe UI",sans-serif!important;letter-spacing:0!important}
-html.a11y-spacing body :is(p,li,label,summary,td,th,dd,dt,h1,h2,h3,button):not(#pages *):not(#wed *):not(#xed *){line-height:1.8!important;letter-spacing:.04em!important;word-spacing:.12em!important}
+html.a11y-font body :not(#pages):not(#pages *):not(#wed *):not(#xed *):not(#ped *):not([contenteditable] *):not(svg):not(svg *){font-family:Arial,"Segoe UI",sans-serif!important;letter-spacing:0!important}
+html.a11y-spacing body :is(p,li,label,summary,td,th,dd,dt,h1,h2,h3,button):not(#pages *):not(#wed *):not(#xed *):not(#ped *){line-height:1.8!important;letter-spacing:.04em!important;word-spacing:.12em!important}
 html.a11y-motion *,html.a11y-motion *::before,html.a11y-motion *::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
 html.a11y-cursor,html.a11y-cursor *{cursor:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 24 24'%3E%3Cpath d='M5 2l14 10.5-6.4 1.4L16 21.5l-3 1.3-3.4-7.7L5 19z' fill='%23000' stroke='%23fff' stroke-width='1.4' stroke-linejoin='round'/%3E%3C/svg%3E") 6 3,auto!important}
 html.a11y-focus *:focus{outline:4px solid #FFB000!important;outline-offset:2px!important;box-shadow:0 0 0 7px #16213A!important}
@@ -64,12 +68,27 @@ html.a11y-focus *:focus{outline:4px solid #FFB000!important;outline-offset:2px!i
   (document.head || document.documentElement).appendChild(styleEl);
 
   // ---------- text size (UI only, documents untouched) ----------
-  const SKIP = '#pages,#wed,#xed,[contenteditable="true"],[contenteditable=""],canvas,svg,script,style,noscript,.a11y-panel,.a11y-fab,.a11y-skip';
+  const SKIP = '#pages,#wed,#xed,#ped,[contenteditable="true"],[contenteditable=""],canvas,svg,script,style,noscript,.a11y-panel,.a11y-fab,.a11y-skip';
+  // iPhone / iPad: the text size chosen in the device settings (Dynamic Type) enlarges the interface too,
+  // on top of this menu's size. Only enlarges; capped so the layout still fits. Other devices: always 1.
+  let DT = 1;
+  function readDT() {
+    try {
+      if (!(window.CSS && CSS.supports('-webkit-touch-callout', 'none') && CSS.supports('font', '-apple-system-body'))) return 1;
+      const pr = document.createElement('span');
+      pr.style.cssText = 'position:absolute;visibility:hidden;pointer-events:none;font:-apple-system-body';
+      pr.className = 'a11y-skip'; pr.textContent = 'א';
+      (document.body || document.documentElement).appendChild(pr);
+      const px = parseFloat(getComputedStyle(pr).fontSize) || 17; pr.remove();
+      return Math.max(1, Math.min(1.6, Math.round(px / 17 * 100) / 100));
+    } catch (_) { return 1; }
+  }
+  const factor = () => Math.min(1.75, (SIZES[st.size] || 1) * DT);
   const base = new WeakMap();
   function baseOf(el) {
     if (base.has(el)) return base.get(el);
     let b = parseFloat(getComputedStyle(el).fontSize) || 16;
-    const f = SIZES[st.size] || 1;
+    const f = factor();
     if (f !== 1 && !el.style.fontSize) {
       // added while the page is enlarged: an inherited size is already scaled, an own size is not
       const p = el.parentElement;
@@ -78,7 +97,7 @@ html.a11y-focus *:focus{outline:4px solid #FFB000!important;outline-offset:2px!i
     base.set(el, b); return b;
   }
   function scaleTree(root) {
-    const f = SIZES[st.size] || 1;
+    const f = factor();
     const els = root.nodeType === 1 ? [root, ...root.querySelectorAll('*')] : [];
     for (const el of els) {
       if (el.closest(SKIP)) continue;
@@ -91,7 +110,7 @@ html.a11y-focus *:focus{outline:4px solid #FFB000!important;outline-offset:2px!i
   let mo = null;
   function applySize() {
     if (!document.body) return;
-    if (st.size === 0) { if (mo) { mo.disconnect(); mo = null; } scaleTree(document.body); return; }
+    if (factor() === 1) { if (mo) { mo.disconnect(); mo = null; } scaleTree(document.body); return; }
     // measure every element at its own size first, then enlarge
     if (mo) mo.disconnect();
     const prev = [...document.body.querySelectorAll('[data-a11y-fs]')];
@@ -200,7 +219,13 @@ html.a11y-focus *:focus{outline:4px solid #FFB000!important;outline-offset:2px!i
     } else if (!btn.innerHTML.trim()) btn.innerHTML = ic.a11y;
     btn.setAttribute('aria-haspopup', 'dialog'); btn.setAttribute('aria-controls', 'a11yPanel'); btn.setAttribute('aria-expanded', 'false');
     btn.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); toggle(btn); });
+    DT = readDT();
     apply();
+    // the person may change the text size in the device settings while the app is open
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState !== 'visible') return;
+      const n = readDT(); if (n !== DT) { DT = n; applySize(); }
+    });
   }
   // apply the visual modes immediately (no flash), the rest once the page is ready
   MODES.forEach(m => document.documentElement.classList.toggle('a11y-' + m, !!st[m]));

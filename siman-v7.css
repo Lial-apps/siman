@@ -1,6 +1,5 @@
-/* סימן — עיצוב 7 ("לפני ← אחרי", כחול שמיים)
-   שכבת עיצוב בלבד: כל הכללים כאן פועלים רק כש-<html> מקבל את המחלקה v7.
-   בלי המחלקה (העיצוב הקודם) הקובץ הזה לא משנה שום דבר.
+/* סימן — עיצוב 7 (5.8.1): אריחים, מראה בהיר / כהה, שישה צבעים
+   שכבת עיצוב בלבד: כל הכללים כאן פועלים רק כש-<html> מקבל את המחלקה v7 (מ-5.8.1 כולם מקבלים אותה).
    שום כפתור קיים לא מוזז ב-DOM, כך שכל הפעולות של האפליקציה ממשיכות לעבוד. */
 
 /* ---------- צבעים: הטוקנים של האפליקציה נלקחים מהערכה שהמשתמש בחר ---------- */
@@ -12,6 +11,13 @@ html.v7:not(#_){
   --paper-shadow:0 1px 0 rgba(15,33,63,.04),0 18px 40px -18px rgba(15,33,63,.35);
   --shadow:0 1px 2px rgba(15,33,63,.08),0 8px 24px rgba(15,33,63,.08);
 }
+/* פקדים מובנים (רשימות, תיבות סימון, פסי גלילה) בצבעי המצב שנבחר */
+html.v7{color-scheme:light}
+html.v7[data-theme="dark"]{color-scheme:dark}
+/* מצב כהה: צבע הסכנה וכפתורים בצבע קבוע, בניגודיות קריאה */
+html.v7[data-theme="dark"]:not(#_){--danger:#FF8A80}
+html.v7[data-theme="dark"]:not(#_) .set-del .btn{color:#FF8A80;border-color:color-mix(in srgb,#FF8A80 45%,var(--v7-line))}
+html.v7[data-theme="dark"]:not(#_) .btn.wedit{border-color:#8FB0FF;color:#8FB0FF}
 html.v7:not(#_) body{font-family:"SF-rubik",Rubik,"Noto Sans Arabic","Segoe UI",Arial,sans-serif}
 html.v7 .intro{display:none!important}
 
@@ -38,7 +44,8 @@ html.v7:not(#_) .toast{background:var(--v7-ink);color:var(--v7-surface);border-i
 
 /* כפתורי צבע ושפה שנוספו לסרגל */
 .v7-hbtn{display:none}
-html.v7 .v7-hbtn{display:inline-grid;place-items:center;width:38px;height:38px;padding:0;border-radius:19px!important}
+html.v7 .v7-hbtn{display:inline-grid;place-items:center;flex:none;width:38px;height:38px;padding:0;border-radius:19px!important}
+@media (pointer:coarse){html.v7 .v7-hbtn{width:44px;height:44px;border-radius:22px!important}}
 html.v7 .v7-hbtn svg{width:20px;height:20px}
 
 /* ---------- סרגל הכלים: קבוצות ברורות בלי להזיז כפתורים (order בלבד) ---------- */
@@ -81,7 +88,7 @@ html.v7 .v7-home{display:flex;flex-direction:column;gap:22px;width:min(1180px,10
 .v7-drop .v7-dt span{font-size:15px;color:var(--v7-muted)}
 .v7-drop .v7-acts{display:flex;flex-wrap:wrap;gap:10px}
 .v7-b{min-height:50px;padding:0 22px;border-radius:16px;border:1px solid var(--v7-line);background:var(--v7-surface);color:var(--v7-ink);font:inherit;font-size:16px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px}
-.v7-b:hover{background:var(--v7-soft)}
+@media (hover:hover){.v7-b:hover{background:var(--v7-soft)}}
 .v7-b.pri{background:var(--v7-accent);border-color:var(--v7-accent);color:var(--v7-on);font-weight:600}
 .v7-b.pri:hover{filter:brightness(1.08)}
 .v7-b svg{width:20px;height:20px}
@@ -89,7 +96,7 @@ html.v7 .v7-home{display:flex;flex-direction:column;gap:22px;width:min(1180px,10
 .v7-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px}
 .v7-grid.fav{grid-template-columns:repeat(auto-fill,minmax(320px,1fr))}
 .v7-card{display:flex;flex-direction:column;gap:10px;text-align:start;background:var(--v7-surface);border:1px solid var(--v7-line);border-radius:22px;padding:10px 10px 14px;color:var(--v7-ink);font:inherit;cursor:pointer;transition:transform .15s,box-shadow .15s,border-color .15s}
-.v7-card:hover{transform:translateY(-2px);box-shadow:0 12px 28px -14px rgba(15,33,63,.35);border-color:var(--v7-dash)}
+@media (hover:hover){.v7-card:hover{transform:translateY(-2px);box-shadow:0 12px 28px -14px rgba(15,33,63,.35);border-color:var(--v7-dash)}}
 .v7-card:focus-visible{outline:3px solid var(--v7-accent);outline-offset:3px}
 .v7-art{height:104px;border-radius:16px;display:flex;align-items:center;justify-content:center;gap:10px;overflow:hidden}
 .v7-grid.fav .v7-art{height:170px}
@@ -113,8 +120,8 @@ html[dir="ltr"] .v7-arrow,.v7-home[dir="ltr"] .v7-arrow{transform:scaleX(-1)}
 .v7-pop{position:fixed;z-index:2147482500;width:min(330px,calc(100vw - 24px));box-sizing:border-box;background:var(--v7-surface);color:var(--v7-ink);border:1px solid var(--v7-line);border-radius:22px;padding:18px;box-shadow:0 14px 40px rgba(15,33,63,.22);display:flex;flex-direction:column;gap:14px;font-family:"SF-rubik",Rubik,"Noto Sans Arabic",Arial,sans-serif}
 .v7-pop[hidden]{display:none}
 .v7-pop h3{margin:0;font-size:17px}
-.v7-sw{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
-.v7-sw button{display:flex;flex-direction:column;align-items:center;gap:6px;border:0;background:transparent;padding:0;cursor:pointer;font:inherit;font-size:12px;color:var(--v7-ink)}
+.v7-sw{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.v7-sw button{display:flex;flex-direction:column;align-items:center;gap:6px;min-height:72px;border:0;background:transparent;padding:4px 0;cursor:pointer;font:inherit;font-size:13px;color:var(--v7-ink)}
 .v7-sw i{width:46px;height:46px;border-radius:23px;display:grid;place-items:center}
 .v7-sw button[aria-pressed="true"] i{outline:2px solid var(--v7-ink);outline-offset:3px}
 .v7-sw i svg{width:20px;height:20px;visibility:hidden}
@@ -147,12 +154,12 @@ html[dir="ltr"] .v7-arrow,.v7-home[dir="ltr"] .v7-arrow{transform:scaleX(-1)}
 /* ---------- טלפון: סרגל קבוצות בתחתית בזמן עבודה על מסמך ---------- */
 .v7-dock{display:none}
 @media (max-width:720px){
-  html.v7.v7-doc .v7-dock{display:flex;position:fixed;inset:auto 0 0 0;z-index:15;background:var(--v7-surface);border-top:1px solid var(--v7-line);padding:4px 6px calc(4px + env(safe-area-inset-bottom,0px));box-shadow:0 -8px 24px rgba(15,33,63,.08)}
+  html.v7.v7-doc .v7-dock{display:flex;position:fixed;inset:auto 0 0 0;z-index:15;background:var(--v7-surface);border-top:1px solid var(--v7-line);padding:4px calc(6px + env(safe-area-inset-right,0px)) calc(4px + env(safe-area-inset-bottom,0px)) calc(6px + env(safe-area-inset-left,0px));box-shadow:0 -8px 24px rgba(15,33,63,.08)}
   .v7-dock button{flex:1;min-height:58px;border:0;background:transparent;color:var(--v7-muted);font:inherit;font-size:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;position:relative;padding:0}
   .v7-dock button svg{width:22px;height:22px}
   .v7-dock button[aria-pressed="true"]{color:var(--v7-accent);font-weight:600}
   .v7-dock button[aria-pressed="true"]::before{content:"";position:absolute;top:0;width:28px;height:3px;border-radius:2px;background:var(--v7-accent)}
-  html.v7.v7-doc:not(#_) .tools{position:fixed;inset:auto 10px calc(70px + env(safe-area-inset-bottom,0px)) 10px;z-index:15;width:auto;margin:0;justify-content:center;gap:6px;border-radius:20px;padding:6px;box-shadow:0 -6px 22px rgba(15,33,63,.12)}
+  html.v7.v7-doc:not(#_) .tools{position:fixed;inset:auto calc(10px + env(safe-area-inset-right,0px)) calc(70px + env(safe-area-inset-bottom,0px)) calc(10px + env(safe-area-inset-left,0px));z-index:15;width:auto;margin:0;justify-content:center;gap:6px;border-radius:20px;padding:6px;box-shadow:0 -6px 22px rgba(15,33,63,.12)}
   html.v7.v7-doc[data-v7grp="select"]:not(#_) .tools,html.v7.v7-doc[data-v7grp="sign"]:not(#_) .tools{display:none}
   html.v7.v7-doc[data-v7grp="mark"] .tools .tool:not([data-tool="highlight"]):not([data-tool="pen"]):not([data-tool="eraser"]),
   html.v7.v7-doc[data-v7grp="text"] .tools .tool:not([data-tool="text"]):not([data-tool="edit"]),
@@ -185,6 +192,7 @@ html.v7 #admPanel .a-badge{color:var(--v7-on)}
 html.v7:not(.v7-doc) .bar .group.zoom{display:none}
 html.v7:not(#_) .bar .group.zoom .zoomval{display:inline-block;min-width:4.5ch;color:var(--v7-muted);font-size:13px}
 html.v7 #zoomIn,html.v7 #zoomOut{display:inline-grid;place-items:center;width:36px;height:36px;padding:0}
+@media (pointer:coarse){html.v7 #zoomIn,html.v7 #zoomOut{width:44px;height:44px}}
 html.v7 #zoomIn svg,html.v7 #zoomOut svg{width:19px;height:19px}
 @media (max-width:720px){html.v7 .bar .group.zoom{display:none!important}}
 html.v7 .v7-pinch{transition:none!important;will-change:transform}
@@ -194,3 +202,80 @@ html.v7:not(#_) .vx-tile.main{background:var(--v7-accent);border-color:var(--v7-
 html.v7:not(#_) .vx-tile.main span{color:color-mix(in srgb,var(--v7-on) 82%,transparent)}
 html.v7:not(#_) .vx-tile.main svg{color:var(--v7-on)}
 html.v7:not(#_) .vx-top{background:var(--v7-deep)}
+
+
+/* ================================================================ 5.8.1 */
+.v7-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.v7-sw button[aria-pressed="true"]{font-weight:600}
+
+/* מראה: בהיר / כהה / אוטומטי */
+.v7-seg{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;padding:4px;border:1px solid var(--v7-line);border-radius:16px;background:var(--v7-bg)}
+.v7-seg button{min-height:44px;border:0;border-radius:12px;background:transparent;color:var(--v7-ink);font:inherit;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;padding:0 4px}
+.v7-seg button svg{width:18px;height:18px;flex:none}
+.v7-seg button[aria-pressed="true"]{background:var(--v7-accent);color:var(--v7-on);font-weight:600}
+.v7-seg button:focus-visible,.v7-sw button:focus-visible,.v7-langs button:focus-visible{outline:3px solid var(--v7-accent);outline-offset:2px}
+
+/* מסך הפתיחה: אריחים */
+html.v7 .v7-home .v7-grid,html.v7 .v7-home .v7-drop{display:none}
+.v7-bento{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));grid-auto-rows:118px;grid-auto-flow:row dense;gap:14px}
+.v7-t{position:relative;min-width:0;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;align-items:stretch;gap:8px;padding:16px;border:1px solid var(--v7-line);border-radius:24px;background:var(--v7-surface);color:var(--v7-ink);font:inherit;text-align:start;cursor:pointer;overflow:hidden;-webkit-tap-highlight-color:transparent;transition:transform .15s,box-shadow .15s,border-color .15s}
+.v7-t:focus-visible{outline:3px solid var(--v7-accent);outline-offset:3px}
+@media (hover:hover){.v7-t:hover{border-color:var(--v7-dash);box-shadow:0 12px 28px -16px rgba(15,33,63,.45);transform:translateY(-2px)}}
+.v7-t:active{transform:scale(.985)}
+.v7-tt{display:flex;flex-direction:column;gap:3px;min-width:0}
+.v7-t b{font-size:17px;font-weight:700;line-height:1.25}
+.v7-t small{font-size:13px;line-height:1.4;color:var(--v7-muted)}
+/* פתיחת קובץ */
+.v7-open{grid-column:span 2;grid-row:span 2;background:var(--v7-accent);border-color:var(--v7-accent);color:var(--v7-on);box-shadow:0 18px 40px -24px var(--v7-accent)}
+.v7-open b{font-size:22px}
+.v7-open small{color:inherit;opacity:.88;font-weight:500}
+.v7-plus{width:54px;height:54px;border-radius:50%;background:var(--v7-on);color:var(--v7-accent);display:grid;place-items:center}
+.v7-plus svg{width:26px;height:26px}
+/* תרגום */
+.v7-tr{grid-column:span 2;grid-row:span 2;background:var(--v7-tile2);border-color:var(--v7-tile2);color:#FFFFFF}
+.v7-tr small{color:rgba(255,255,255,.86)}
+.v7-words{display:flex;flex-direction:column;gap:2px;font-size:26px;font-weight:700;line-height:1.15}
+.v7-words span:nth-child(2){opacity:.8;text-align:end}
+.v7-words span:nth-child(3){opacity:.6;font-size:21px;text-align:end}
+/* מדף למסמך */
+.v7-feat{grid-column:span 2;grid-row:span 2;padding:12px}
+.v7-feat .v7-art{flex:1;height:auto;min-height:0;border-radius:16px;background:var(--v7-soft);color:var(--v7-ink)}
+.v7-feat .v7-art .v7-arrow{color:var(--v7-accent)}
+.v7-feat .v7-tt{padding:2px 4px}
+.v7-new-tag{align-self:flex-start;padding:2px 10px;border-radius:999px;background:var(--v7-soft);color:var(--v7-accent);font-size:12px;font-weight:600}
+html.v7[data-theme="dark"] .v7-new-tag{color:var(--v7-accent)}
+/* אריחים רחבים */
+.v7-wide{grid-column:span 2;flex-direction:row;align-items:center}
+.v7-wave{display:flex;align-items:center;gap:3px;flex:none;color:var(--v7-accent)}
+.v7-wave i{width:4px;border-radius:2px;background:currentColor}
+.v7-sig{width:76px;height:30px;flex:none;color:var(--v7-accent)}
+/* אריחים קטנים */
+.v7-small{justify-content:space-between}
+.v7-ic2{width:42px;height:42px;border-radius:13px;background:var(--v7-soft);color:var(--v7-accent);display:grid;place-items:center}
+.v7-ic2 svg{width:22px;height:22px}
+.v7-small b{font-size:15px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.v7-home .v7-new .v7-b{min-height:44px}
+
+/* טלפון */
+@media (max-width:720px){
+  .v7-bento{grid-template-columns:repeat(4,minmax(0,1fr));grid-auto-rows:84px;gap:10px}
+  .v7-t{padding:12px;border-radius:22px}
+  .v7-open b{font-size:19px}
+  .v7-plus{width:46px;height:46px}
+  .v7-words{font-size:21px}
+  .v7-words span:nth-child(3){font-size:17px}
+  .v7-feat{grid-column:span 4;flex-direction:row;align-items:stretch;gap:12px}
+  .v7-feat .v7-art{flex:0 0 46%}
+  .v7-feat .v7-art > span{transform:scale(.9)}
+  .v7-feat .v7-tt{justify-content:space-between;padding:4px 0}
+  .v7-wide b{font-size:15.5px}
+  .v7-wide small{display:none}
+  .v7-small{padding:9px 6px 8px;align-items:center;text-align:center;gap:4px}
+  .v7-ic2{width:34px;height:34px;border-radius:11px}
+  .v7-ic2 svg{width:20px;height:20px}
+  .v7-small b{font-size:12.5px;font-weight:600;line-height:1.2}
+  .v7-home .v7-new{gap:8px}
+}
+@media (max-width:360px){.v7-small b{font-size:11.5px}}
+@media (max-width:720px){.v7-home .v7-only-wide{display:none}}
+@media (min-width:721px){.v7-home .v7-only-narrow{display:none}}
