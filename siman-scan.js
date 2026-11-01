@@ -175,6 +175,7 @@ const root = h(`<div class="scn" hidden role="dialog" aria-modal="true" aria-lab
     <div class="scn-top">
       <button class="scn-ib" type="button" data-a="close" aria-label="סגירת הסורק">${I.x}</button>
       <h2>מדף למסמך</h2>
+      <button class="scn-pill" type="button" data-a="swap" hidden><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h14l-4-4M20 16H6l4 4"/></svg><span>העמוד השני</span></button>
       <button class="scn-pill" type="button" data-a="pages" hidden>${I.crop}<span>עמוד אחד</span></button>
       <button class="scn-pill" type="button" data-a="auto" aria-pressed="true">${I.auto}<span>אוטומטי</span></button>
       <button class="scn-ib" type="button" data-a="torch" aria-pressed="false" aria-label="פנס" hidden>${I.torch}</button>
@@ -335,28 +336,33 @@ function spreadOf(c, q) {
   const [W0, H0] = dimsOf(c), P = q.map(([x, y]) => [x * W0, y * H0]), dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
   const aspect = (dist(P[0], P[1]) + dist(P[3], P[2])) / Math.max(1, dist(P[0], P[3]) + dist(P[1], P[2]));
   if (aspect < 0.95) return null;                       // דף לאורך: עמוד אחד
-  const w = warp(c, q, 260), W = w.width, H = w.height, d = w.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, W, H).data; free(w);
-  const g = new Float32Array(W * H); let sum = 0;
-  for (let i = 0, k = 0; k < g.length; i += 4, k++) { g[k] = Math.min(d[i], d[i + 1], d[i + 2]); sum += g[k]; }
-  const thr = (sum / g.length) * 0.62, col = new Float32Array(W);
-  for (let y = Math.round(H * 0.04); y < H * 0.96; y++) for (let x = 0; x < W; x++) if (g[y * W + x] < thr) col[x]++;
+  const w = warp(c, q, 520), W = w.width, H = w.height, d = w.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, W, H).data; free(w);
+  // כתב וספירלה = נקודות כהות בהרבה מהסביבה הקרובה שלהן. צל של יד או גוף כהה בהדרגה, ולכן לא נספר
+  const g = new Float32Array(W * H);
+  for (let i = 0, k = 0; k < g.length; i += 4, k++) g[k] = Math.min(d[i], d[i + 1], d[i + 2]);
+  const bg = Float32Array.from(g); boxBlur(bg, W, H, Math.max(4, Math.round(W / 40)));
+  const ink = new Uint8Array(W * H);
+  for (let k = 0; k < g.length; k++) if (bg[k] - g[k] > Math.max(18, bg[k] * 0.1)) ink[k] = 1;
+  const col = new Float32Array(W);
+  for (let y = Math.round(H * 0.04); y < H * 0.96; y++) for (let x = 0; x < W; x++) col[x] += ink[y * W + x];
   for (let x = 0; x < W; x++) col[x] /= H;
   const sm = x => (col[Math.max(0, x - 1)] + col[x] + col[Math.min(W - 1, x + 1)]) / 3;
   const sorted = [...col].sort((a, b) => a - b), med = sorted[W >> 1];
   let best = -1, bx = 0;
   for (let x = Math.round(W * 0.3); x <= W * 0.7; x++) { const v = sm(x); if (v > best) { best = v; bx = x; } }
+  const spiral = best > 0.12 && best > med * 4 + 0.05;
   let t = null;
-  if (best > 0.16 && best > med * 4 + 0.06) t = bx / W;   // ספירלה או תפר כהה
+  if (spiral) t = bx / W;                                // ספירלה או תפר
   else if (aspect > 1.25) t = 0.5;                       // רחב: כנראה שני עמודים
   if (t == null) return null;
-  const gap = 0.035, ink = { left: 0, right: 0 };
-  for (let y = Math.round(H * 0.05); y < H * 0.95; y++) for (let x = Math.round(W * 0.04); x < W * 0.96; x++) {
-    const u = x / W; if (Math.abs(u - t) < gap + 0.02) continue;
-    if (g[y * W + x] < thr) ink[u > t ? 'right' : 'left']++;
+  const gap = 0.035, cnt = { left: 0, right: 0 };
+  for (let y = Math.round(H * 0.05); y < H * 0.95; y++) for (let x = Math.round(W * 0.05); x < W * 0.95; x++) {
+    const u = x / W; if (Math.abs(u - t) < gap + 0.03) continue;
+    if (ink[y * W + x]) cnt[u > t ? 'right' : 'left']++;
   }
   const lerp = (a, b, k) => [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k];
   const [TL, TR, BR, BL] = q;
-  return { t, ink, spiral: best > 0.16 && best > med * 4 + 0.06,
+  return { t, ink: cnt, spiral,
     left: [TL, lerp(TL, TR, t - gap), lerp(BL, BR, t - gap), BL],
     right: [lerp(TL, TR, t + gap), TR, BR, lerp(BL, BR, t + gap)] };
 }
@@ -590,7 +596,7 @@ const CAM = {
     this.poly.setAttribute('points', q && this.mode !== 'qr' ? q.map(([x, y]) => `${x * 100},${y * 100}`).join(' ') : '');
     const o = this.spread && q && this.mode !== 'qr' && this.pick !== 'both' ? this.spread.other : null;
     this.poly2.setAttribute('points', o ? o.map(([x, y]) => `${x * 100},${y * 100}`).join(' ') : '');
-    const pb = $r('[data-a=pages]'); pb.hidden = !this.spread; if (this.spread) pb.querySelector('span').textContent = this.pick === 'both' ? (this.spread.spiral ? 'שני העמודים' : 'כל הדף') : 'עמוד אחד';
+    const pb = $r('[data-a=pages]'); pb.hidden = !this.spread; $r('[data-a=swap]').hidden = !this.spread || this.pick === 'both'; if (this.spread) pb.querySelector('span').textContent = this.pick === 'both' ? (this.spread.spiral ? 'שני העמודים' : 'כל הדף') : 'עמוד אחד';
     this.poly.classList.toggle('ok', this.stable >= 3);
     const need = 8, p = this.auto && this.mode !== 'id' && q ? Math.min(1, this.stable / need) : 0;
     this.ring.style.strokeDashoffset = String(264 * (1 - p));
@@ -607,7 +613,13 @@ const CAM = {
           c.width = Math.round(v.videoWidth * k); c.height = Math.round(v.videoHeight * k);
           const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(v, 0, 0, c.width, c.height);
           let q = findSheet(x.getImageData(0, 0, c.width, c.height).data, c.width, c.height);
-          q = this.choosePage(c, q);
+          if (q && (this.mode === 'doc' || this.mode === 'board')) {
+            // לבדיקת הכתב בכל עמוד: תמונה גדולה יותר מזו של זיהוי הדף, כי כתב קטן נעלם בהקטנה
+            const k2 = 900 / Math.max(v.videoWidth, v.videoHeight), m = this.mid || (this.mid = document.createElement('canvas'));
+            m.width = Math.round(v.videoWidth * k2); m.height = Math.round(v.videoHeight * k2);
+            m.getContext('2d', { willReadFrequently: true }).drawImage(v, 0, 0, m.width, m.height);
+            q = this.choosePage(m, q);
+          } else q = this.choosePage(c, q);
           this.track2(q);
         }
       } catch (e) { console.warn(e); }
@@ -657,7 +669,9 @@ const CAM = {
     if (!q || (this.mode !== 'doc' && this.mode !== 'board')) return q;
     const s = spreadOf(c, q);
     if (!s) return q;
-    let side = this.pick === 'left' || this.pick === 'right' ? this.pick : (this.autoSide && s.ink[this.autoSide] * 1.6 > s.ink[this.autoSide === 'right' ? 'left' : 'right'] ? this.autoSide : (s.ink.left > s.ink.right * 1.15 ? 'left' : 'right'));
+    // העמוד עם יותר כתב. כשההפרש קטן נשאר העמוד הקודם, כדי שהמסגרת לא תקפוץ
+    const L = s.ink.left, Rr = s.ink.right, clear = Math.max(L, Rr) > 60 && Math.max(L, Rr) > Math.min(L, Rr) * 1.3;
+    let side = this.pick === 'left' || this.pick === 'right' ? this.pick : clear ? (L > Rr ? 'left' : 'right') : (this.autoSide || (L > Rr ? 'left' : 'right'));
     if (this.pick === 'auto') this.autoSide = side;
     const qq = side === 'right' ? s.right : s.left;
     this.spread = { t: s.t, full: q, other: side === 'right' ? s.left : s.right, side };
@@ -791,7 +805,7 @@ const CAM = {
         const img = await decodeImg(f), c = scaledCanvas(img, 4000); if (img.close) img.close();
         let q = sheetIn(c), sp = null;
         // מחברת פתוחה בתמונה: העמוד שיש בו יותר כתב
-        if (q && this.mode === 'doc') { const sm = scaledCanvas(c, 320); sp = spreadOf(sm, q); free(sm); if (sp) q = sp.ink.left > sp.ink.right * 1.15 ? sp.left : sp.right; }
+        if (q && this.mode === 'doc') { const sm = scaledCanvas(c, 900); sp = spreadOf(sm, q); free(sm); if (sp) q = sp.ink.left > sp.ink.right ? sp.left : sp.right; }
         const b = await toBlob(c, 0.93); free(c);
         await this.addShot(b, q, true);
       } catch (e) { console.warn(e); bad.push(f.name + (/heic|heif/i.test(f.type + f.name) ? ' (HEIC: שמרו כ-JPG)' : '')); }
@@ -1059,7 +1073,7 @@ async function readingPic(p, fast) {
   return { url: page.u, b64: page.u.split(',')[1], w: page.w, h: page.h, strips };
 }
 window.SIMAN_CAM = CAM;
-CAM._readingPic = readingPic;
+CAM._readingPic = readingPic; CAM._find = findSheet; CAM._spread = spreadOf;
 if (FILTERS.some(f => f[0] === LS.get('siman.scan.filter'))) CAM.defFilter = LS.get('siman.scan.filter');
 try { const o = JSON.parse(LS.get('siman.scan.opts') || 'null'); if (o) Object.assign(CAM.opts, { size: o.size || 'auto', q: o.q || 'high', wm: '' }); } catch (_) {}
 
@@ -1096,6 +1110,7 @@ root.addEventListener('click', e => {
     case 'close': return CAM.close();
     case 'auto': CAM.auto = !CAM.auto; b.setAttribute('aria-pressed', String(CAM.auto)); b.querySelector('span').textContent = CAM.auto ? 'אוטומטי' : 'ידני'; CAM.stable = 0; return CAM.drawQuad();
     case 'torch': return CAM.toggleTorch();
+    case 'swap': if (CAM.spread) { CAM.pick = CAM.spread.side === 'right' ? 'left' : 'right'; CAM.quad = null; CAM.stable = 0; CAM.lastShot = Date.now(); CAM.setHint(CAM.pick === 'right' ? 'נבחר העמוד הימני' : 'נבחר העמוד השמאלי'); } return;
     case 'pages': CAM.pick = CAM.pick === 'both' ? 'auto' : 'both'; CAM.quad = null; CAM.stable = 0; CAM.spreadTold = 0; return CAM.drawQuad();
     case 'shoot': return CAM.shoot();
     case 'gallery': return galIn.click();
