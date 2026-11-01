@@ -1058,15 +1058,16 @@ async function readingPic(p, fast) {
   for (let y = 0; y < ch; y++) for (let xx = 0; xx < cw; xx++) { const v = g[(y + y0) * W + xx + x0], o = (y * cw + xx) * 4; gd[o] = gd[o + 1] = gd[o + 2] = v; gd[o + 3] = 255; }
   gx.putImageData(gi, 0, 0); free(c);
   // אזור כתב קטן (צולם מרחוק) מוגדל, כדי שהקורא יראה כל אות בגודל מספיק
-  const jpeg = (src, sx, sy, sw, sh, max) => { const k = Math.min(2.5, max / Math.max(sw, sh)), o = canvasOf(sw * k, sh * k), ox = o.getContext('2d');
+  const jpeg = (src, sx, sy, sw, sh, max) => { const k = Math.min(2, max / Math.max(sw, sh)), o = canvasOf(sw * k, sh * k), ox = o.getContext('2d');
     ox.imageSmoothingQuality = 'high'; ox.drawImage(src, sx, sy, sw, sh, 0, 0, o.width, o.height); const u = o.toDataURL('image/jpeg', 0.9); const r = { u, w: o.width, h: o.height }; free(o); return r; };
-  const page = jpeg(gray, 0, 0, cw, ch, fast ? 1800 : 2600), strips = [];
-  if (!fast) {
+  const page = jpeg(gray, 0, 0, cw, ch, fast ? 1600 : 2000), strips = [];
+  // רצועות רק כשיש הרבה שורות: בכמה שורות הדף עצמו כבר חד מספיק, ותמונות נוספות רק מאטות
+  if (!fast && ch > cw * 0.55) {
     // רצועות: בערך שש שורות כתב בכל אחת, עד ארבע
-    const n = Math.max(2, Math.min(4, Math.round(ch / cw * 4))), ov = 0.08;
+    const n = Math.max(2, Math.min(3, Math.round(ch / cw * 2.5))), ov = 0.08;
     for (let s = 0; s < n; s++) {
       const sy0 = Math.max(0, ch * (s / n - ov)), sy1 = Math.min(ch, ch * ((s + 1) / n + ov));
-      strips.push(jpeg(gray, 0, sy0, cw, sy1 - sy0, 2200).u.split(',')[1]);
+      strips.push(jpeg(gray, 0, sy0, cw, sy1 - sy0, 1600).u.split(',')[1]);
     }
   }
   free(gray);

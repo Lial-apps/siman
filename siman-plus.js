@@ -1169,9 +1169,9 @@ const SC = {
       li.className = 'now'; li.querySelector('span').textContent = 'קורא…';
       const t0 = Date.now(), line = `${i ? '' : pre}קורא את עמוד ${start + i + 1}${fresh.length > 1 ? ` (${i + 1} מתוך ${fresh.length})` : ''}`;
       st.textContent = line + '…';
-      const clock = setInterval(() => { const sec = Math.round((Date.now() - t0) / 1000); li.querySelector('span').textContent = `קורא… ${sec} שנ׳`; st.textContent = `${line} · ${sec} שניות${sec > 45 ? ' (כתב יד צפוף לוקח לפעמים עד שתי דקות)' : ''}`; }, 1000);
+      const clock = setInterval(() => { const sec = Math.round((Date.now() - t0) / 1000); li.querySelector('span').textContent = `קורא… ${sec} שנ׳`; st.textContent = `${line} · ${sec} שניות${sec > 45 ? ' (דף צפוף לוקח לפעמים עד שתי דקות)' : ''}`; }, 1000);
       try {
-        const raw = await ai({ mode: 'scan', image: p.b64, strips: p.strips || [], mime: 'image/jpeg', hint: this.hint, quality: this.quality }, { onWait: s => { st.textContent = `השירות עמוס, ממשיך בעוד ${s} שניות…`; } }).finally(() => clearInterval(clock));
+        const raw = await ai({ mode: 'scan', image: p.b64, strips: p.strips || [], mime: 'image/jpeg', hint: this.hint, quality: this.quality }, { timeout: 150000, onWait: s => { st.textContent = `השירות עמוס, ממשיך בעוד ${s} שניות…`; } }).finally(() => clearInterval(clock));
         p.blocks = parseBlocks(raw); p.lang = p.blocks.lang;
         li.className = 'ok'; li.querySelector('span').textContent = p.blocks.length ? `${p.blocks.length} קטעים` : 'עמוד ריק';
       } catch (e) {
