@@ -872,28 +872,75 @@ const CAM = {
   async toWord() {
     const SC = window.SIMAN_SCAN;
     if (!SC || !SC.openReader) throw new Error('קריאת הטקסט לא נטענה');
-    const pics = [], fast = SC.quality === 'fast';
+    const pics = [];
     for (const [i, p] of this.pages.entries()) {
       this.busy(`מכין עמוד ${i + 1} מתוך ${this.pages.length} לקריאה…`);
-      // לקריאה: בלי סימן מים, ומסנן נקי אם בחרו ״מקורי״
-      const c = await render(Object.assign({}, p, { filter: p.filter === 'orig' ? 'clean' : p.filter }), fast ? 1700 : 2400);
-      const url = c.toDataURL('image/jpeg', 0.86), strips = [];
-      if (!fast && Math.max(c.width, c.height) >= 1400) {
-        const n = c.height > c.width * 1.15 ? 3 : 2, ov = 0.07;
-        for (let s = 0; s < n; s++) {
-          const y0 = Math.max(0, c.height * (s / n - ov)), y1 = Math.min(c.height, c.height * ((s + 1) / n + ov)), k = Math.min(1, 2000 / Math.max(c.width, y1 - y0));
-          const st = canvasOf(c.width * k, (y1 - y0) * k), sx = st.getContext('2d'); sx.fillStyle = '#fff'; sx.fillRect(0, 0, st.width, st.height);
-          sx.drawImage(c, 0, y0, c.width, y1 - y0, 0, 0, st.width, st.height); const su = st.toDataURL('image/jpeg', 0.86); strips.push(su.slice(su.indexOf(',') + 1)); free(st);
-        }
-      }
-      pics.push({ url, b64: url.slice(url.indexOf(',') + 1), w: c.width, h: c.height, strips }); free(c);
+      pics.push(await readingPic(p, SC.quality === 'fast'));
     }
     const name = this.fileBase();
     this.busy(null); this.close(true);
     SC.openReader(); SC.name = name; SC.run(pics);
   },
 };
+
+/* ---- תמונה לקריאת הטקסט: לא מה שיפה לעין, אלא מה שהכי קל לקרוא ----
+   · הנייר לבן לגמרי, גם בצללים
+   · כל עט (כחול, שחור, אדום) נעשה כהה, והקווים והמשבצות המודפסים של המחברת (בהירים) נעלמים:
+     לוקחים מכל נקודה את הערוץ הכהה ביותר שלה — דיו כחול כהה בכל הערוצים חוץ מהכחול, משבצת תכלת בהירה ברובם
+   · רק האזור שיש בו כתב נשלח, בלי החלק הריק של הדף — כך כל אות גדולה וחדה יותר
+   · ועוד רצועות חדות של אותו אזור, מלמעלה למטה, כדי לקרוא כל מילה */
+async function readingPic(p, fast) {
+  const img = await decodeImg(p.src);
+  // מסגרת מעט רחבה יותר: עדיף פס של שולחן בשוליים (נחתך בהמשך) מאשר מילה שנחתכה
+  const cx = p.quad.reduce((a, q) => a + q[0], 0) / 4, cy = p.quad.reduce((a, q) => a + q[1], 0) / 4;
+  const wide = isFull(p.quad) ? p.quad : p.quad.map(([qx, qy]) => [Math.max(0, Math.min(1, cx + (qx - cx) * 1.05)), Math.max(0, Math.min(1, cy + (qy - cy) * 1.04))]);
+  let c = warp(img, wide, 3600); if (img.close) img.close();
+  c = rotated(c, p.rot);
+  const W = c.width, H = c.height, x = c.getContext('2d', { willReadFrequently: true }), im = x.getImageData(0, 0, W, H), d = im.data;
+  const bg = paperMap(c);
+  const g = new Uint8ClampedArray(W * H);
+  for (let i = 0, k = 0; i < d.length; i += 4, k++) {
+    const r = d[i] * 255 / Math.max(40, bg[i]), gg = d[i + 1] * 255 / Math.max(40, bg[i + 1]), b = d[i + 2] * 255 / Math.max(40, bg[i + 2]);
+    const v = Math.min(r, gg, b);
+    // מתחת ל-95: דיו מלא. מעל 205: נייר וקווים בהירים
+    g[k] = v >= 205 ? 255 : v <= 95 ? 0 : (v - 95) * 255 / 110;
+  }
+  // אם המחיקה של העט הופעלה, העמוד נקרא כמו שהוא מוצג
+  if (p.ink) { applyFilter(c, 'clean', true); const dd = x.getImageData(0, 0, W, H).data; for (let i = 0, k = 0; k < g.length; i += 4, k++) if (dd[i] === 255 && dd[i + 1] === 255 && dd[i + 2] === 255) g[k] = 255; }
+  // האזור שיש בו כתב: שורות ועמודות עם מספיק נקודות כהות
+  const rows = new Uint32Array(H), cols = new Uint32Array(W);
+  for (let y = 0; y < H; y++) for (let xx = 0; xx < W; xx++) if (g[y * W + xx] < 110) { rows[y]++; cols[xx]++; }
+  const edge = (arr, len, min) => { let a = 0, b = len - 1; while (a < len && arr[a] < min) a++; while (b > a && arr[b] < min) b--; return [a, b]; };
+  // שוליים של 2% מכל צד לא נבדקים: שם יושבים צל, ספירלה וקצה הדף
+  // הספירלה של המחברת והצל בקצה לא נחשבים כתב: השורות נספרות בלי 6% מכל צד
+  const mx = Math.round(W * 0.02), my = Math.round(H * 0.02), side = Math.round(W * 0.06);
+  rows.fill(0);
+  for (let y = my; y < H - my; y++) for (let xx = side; xx < W - side; xx++) if (g[y * W + xx] < 110) rows[y]++;
+  for (let xx = 0; xx < mx; xx++) cols[xx] = cols[W - 1 - xx] = 0;
+  let [y0, y1] = edge(rows, H, Math.max(3, W * 0.004)), [x0, x1] = edge(cols, W, Math.max(3, H * 0.003));
+  if (y1 - y0 < H * 0.05 || x1 - x0 < W * 0.1) { y0 = 0; y1 = H - 1; x0 = 0; x1 = W - 1; }
+  const pad = Math.round(Math.max(W, H) * 0.025);
+  x0 = Math.max(0, x0 - pad); y0 = Math.max(0, y0 - pad); x1 = Math.min(W - 1, x1 + pad); y1 = Math.min(H - 1, y1 + pad);
+  const cw = x1 - x0 + 1, ch = y1 - y0 + 1;
+  const gray = canvasOf(cw, ch), gx = gray.getContext('2d'), gi = gx.createImageData(cw, ch), gd = gi.data;
+  for (let y = 0; y < ch; y++) for (let xx = 0; xx < cw; xx++) { const v = g[(y + y0) * W + xx + x0], o = (y * cw + xx) * 4; gd[o] = gd[o + 1] = gd[o + 2] = v; gd[o + 3] = 255; }
+  gx.putImageData(gi, 0, 0); free(c);
+  const jpeg = (src, sx, sy, sw, sh, max) => { const k = Math.min(1, max / Math.max(sw, sh)), o = canvasOf(sw * k, sh * k), ox = o.getContext('2d');
+    ox.imageSmoothingQuality = 'high'; ox.drawImage(src, sx, sy, sw, sh, 0, 0, o.width, o.height); const u = o.toDataURL('image/jpeg', 0.9); const r = { u, w: o.width, h: o.height }; free(o); return r; };
+  const page = jpeg(gray, 0, 0, cw, ch, fast ? 1800 : 2600), strips = [];
+  if (!fast) {
+    // רצועות: בערך שש שורות כתב בכל אחת, עד ארבע
+    const n = Math.max(2, Math.min(4, Math.round(ch / cw * 4))), ov = 0.08;
+    for (let s = 0; s < n; s++) {
+      const sy0 = Math.max(0, ch * (s / n - ov)), sy1 = Math.min(ch, ch * ((s + 1) / n + ov));
+      strips.push(jpeg(gray, 0, sy0, cw, sy1 - sy0, 2200).u.split(',')[1]);
+    }
+  }
+  free(gray);
+  return { url: page.u, b64: page.u.split(',')[1], w: page.w, h: page.h, strips };
+}
 window.SIMAN_CAM = CAM;
+CAM._readingPic = readingPic;
 if (FILTERS.some(f => f[0] === LS.get('siman.scan.filter'))) CAM.defFilter = LS.get('siman.scan.filter');
 try { const o = JSON.parse(LS.get('siman.scan.opts') || 'null'); if (o) Object.assign(CAM.opts, { size: o.size || 'auto', q: o.q || 'high', wm: '' }); } catch (_) {}
 
