@@ -1,4 +1,4 @@
-/* 5.8.1: finding the page — by its edges and its color (a light tablecloth no longer joins the page), and faster (the large check picture only for a page lying sideways, automatic photo after 5 steady frames, the pause counts the check time) */
+/* 5.8.2: finding the page steadily — candidates checked against real straight edges (no frame rather than a wrong one), no "two pages" without a real spiral, a frame only after two matching finds, a faster blur (same result, ~10x faster), check picture 240, an empty area is not "blurry". 5.8.1: color, faster loop, 5 steady frames */
 /* =====================================================================
    סימן 5.4 — siman-scan.js
    מדף למסמך: סורק מצלמה מלא, בסגנון אפליקציות הסריקה המובילות
@@ -279,13 +279,16 @@ const free = c => { if (c) { c.width = c.height = 0; } };
 
 /* ---- זיהוי הדף בתמונה, במכשיר: הדף בהיר מהרקע. מוצאים את האזור הבהיר הגדול ואת ארבע פינותיו ---- */
 function boxBlur(a, w, hh, r) {
-  const t = new Float32Array(a.length);
-  for (let y = 0; y < hh; y++) { let s = 0; const o = y * w;
-    for (let x = -r; x <= r; x++) s += a[o + Math.min(w - 1, Math.max(0, x))];
-    for (let x = 0; x < w; x++) { t[o + x] = s / (2 * r + 1); s += a[o + Math.min(w - 1, x + r + 1)] - a[o + Math.max(0, x - r)]; } }
+  // same result as before (edges repeat the border pixel), without a min/max for every pixel
+  const t = new Float32Array(a.length), k = 1 / (2 * r + 1);
+  const ix = new Int32Array(w + 2 * r + 1); for (let i = 0; i < ix.length; i++) ix[i] = Math.min(w - 1, Math.max(0, i - r - 1));
+  for (let y = 0; y < hh; y++) { const o = y * w; let s = 0;
+    for (let x = -r; x <= r; x++) s += a[o + ix[x + r + 1]];
+    for (let x = 0; x < w; x++) { t[o + x] = s * k; s += a[o + ix[x + 2 * r + 2]] - a[o + ix[x + 1]]; } }
+  const iy = new Int32Array(hh + 2 * r + 1); for (let i = 0; i < iy.length; i++) iy[i] = Math.min(hh - 1, Math.max(0, i - r - 1)) * w;
   for (let x = 0; x < w; x++) { let s = 0;
-    for (let y = -r; y <= r; y++) s += t[Math.min(hh - 1, Math.max(0, y)) * w + x];
-    for (let y = 0; y < hh; y++) { a[y * w + x] = s / (2 * r + 1); s += t[Math.min(hh - 1, y + r + 1) * w + x] - t[Math.max(0, y - r) * w + x]; } }
+    for (let y = -r; y <= r; y++) s += t[iy[y + r + 1] + x];
+    for (let y = 0; y < hh; y++) { a[y * w + x] = s * k; s += t[iy[y + 2 * r + 2] + x] - t[iy[y + 1] + x]; } }
 }
 function findSheetBright(data, w, hh) {
   const n = w * hh, g = new Float32Array(n);
@@ -335,82 +338,204 @@ function findSheetBright(data, w, hh) {
   const cx = q.reduce((a, p) => a + p[0], 0) / 4, cy = q.reduce((a, p) => a + p[1], 0) / 4;
   return q.map(([x, y]) => [Math.max(0, Math.min(1, cx + (x - cx) * 0.996)), Math.max(0, Math.min(1, cy + (y - cy) * 0.996))]);
 }
-/* 5.8.1: the page is the bright area that is closed off by its own edges.
-   A light tablecloth or a shadow can be as bright as the page; the line where the page ends still has
-   an edge, so bright pixels that sit on a strong edge don't connect areas. Of the closed areas, the page is
-   the large, bright, nearly rectangular one. */
-function findSheetEdges(data, w, hh) {
+/* ---- 5.8.2: finding the page, steadily.
+   Several ways of cutting the picture into areas each suggest a page (bright area; bright area closed by its
+   edges; the same with the page's own color; the brightest part only, for a white page on a white table).
+   Each suggestion is then checked against the picture: are its four sides real straight edges, with the page
+   lighter inside than outside, a page's proportions, and not a table that crosses the whole picture?
+   The sides are re-fitted to the edges, so the corners are exact. The best suggestion that passes is the page;
+   if none passes, no frame is drawn (a wrong frame is worse than none). */
+function findSheetEdges(data, w, hh, prev) {
   const n = w * hh, g = new Float32Array(n);
   for (let i = 0; i < n; i++) g[i] = data[i * 4] * 0.3 + data[i * 4 + 1] * 0.59 + data[i * 4 + 2] * 0.11;
   boxBlur(g, w, hh, 1);
-  const mag = new Float32Array(n), mh = new Uint32Array(256);
+  const gxA = new Float32Array(n), gyA = new Float32Array(n), mag = new Float32Array(n), mh = new Uint32Array(256);
   for (let y = 1; y < hh - 1; y++) for (let x = 1; x < w - 1; x++) {
     const i = y * w + x;
-    const gx = (g[i - w + 1] + 2 * g[i + 1] + g[i + w + 1]) - (g[i - w - 1] + 2 * g[i - 1] + g[i + w - 1]);
-    const gy = (g[i + w - 1] + 2 * g[i + w] + g[i + w + 1]) - (g[i - w - 1] + 2 * g[i - w] + g[i - w + 1]);
-    const m = Math.sqrt(gx * gx + gy * gy) / 4; mag[i] = m; mh[Math.min(255, m | 0)]++;
+    const gx = ((g[i - w + 1] + 2 * g[i + 1] + g[i + w + 1]) - (g[i - w - 1] + 2 * g[i - 1] + g[i + w - 1])) / 4;
+    const gy = ((g[i + w - 1] + 2 * g[i + w] + g[i + w + 1]) - (g[i - w - 1] + 2 * g[i - w] + g[i - w + 1])) / 4;
+    gxA[i] = gx; gyA[i] = gy; const m = Math.sqrt(gx * gx + gy * gy); mag[i] = m; mh[Math.min(255, m | 0)]++;
   }
   let acc = 0, E = 255; for (let t = 255; t >= 0; t--) { acc += mh[t]; if (acc > n * 0.1) { E = t; break; } }
   E = Math.max(7, E);
   const hist = new Float64Array(256); for (let i = 0; i < n; i++) hist[g[i] | 0]++;
   let sum = 0; for (let t = 0; t < 256; t++) sum += t * hist[t];
-  let wB = 0, sB = 0, best = -1, th = 128, m0 = 0, m1 = 0;
+  let wB = 0, sB = 0, bv = -1, th = 128;
   for (let t = 0; t < 256; t++) { wB += hist[t]; if (!wB) continue; const wF = n - wB; if (!wF) break;
-    sB += t * hist[t]; const mB = sB / wB, mF = (sum - sB) / wF, v = wB * wF * (mB - mF) * (mB - mF); if (v > best) { best = v; th = t; m0 = mB; m1 = mF; } }
-  // a light page on a light table: the two brightness groups are close; the page is then the bright part of the bright group
-  if (m1 - m0 < 32) { let c = 0, s2 = 0; for (let t = th + 1; t < 256; t++) { c += hist[t]; s2 += t * hist[t]; } th = Math.max(th, (th + s2 / Math.max(1, c)) / 2 | 0); }
-  // the page's color: the brightest tenth of the picture. A beige or golden cloth is as bright, but colored
-  const rg = [], gb = [];
-  { let c2 = 0, lim = 0; for (let t = 255; t >= 0; t--) { c2 += hist[t]; if (c2 > n * 0.1) { lim = t; break; } }
+    sB += t * hist[t]; const mB = sB / wB, mF = (sum - sB) / wF, v = wB * wF * (mB - mF) * (mB - mF); if (v > bv) { bv = v; th = t; } }
+  let c2 = 0, s2 = 0; for (let t = th + 1; t < 256; t++) { c2 += hist[t]; s2 += t * hist[t]; }
+  const th2 = (th + s2 / Math.max(1, c2)) / 2;
+  // the page's colour: the brightest tenth
+  const rg = [], gb = []; { let c = 0, lim = 0; for (let t = 255; t >= 0; t--) { c += hist[t]; if (c > n * 0.1) { lim = t; break; } }
     for (let i = 0; i < n; i += 3) if (g[i] >= lim) { rg.push(data[i * 4] - data[i * 4 + 1]); gb.push(data[i * 4 + 1] - data[i * 4 + 2]); } }
   const med = a => { a.sort((x, y) => x - y); return a.length ? a[a.length >> 1] : 0; };
-  const RG = med(rg), GB = med(gb), CT = 16;
-  const mask = new Uint8Array(n);
-  for (let i = 0; i < n; i++) { const o = i * 4, dr = data[o] - data[o + 1] - RG, dg = data[o + 1] - data[o + 2] - GB;
-    mask[i] = g[i] > th && mag[i] < E && dr * dr + dg * dg < CT * CT ? 1 : 0; }
-  const lab = new Int32Array(n).fill(-1), stack = new Int32Array(n), comps = [];
-  for (let s = 0; s < n; s++) {
-    if (!mask[s] || lab[s] >= 0) continue;
-    const id = comps.length; let sp = 0, area = 0, bright = 0, mnS = 1e9, mxS = -1e9, mnD = 1e9, mxD = -1e9, pS = 0, PS = 0, pD = 0, PD = 0, edge = 0;
-    stack[sp++] = s; lab[s] = id;
-    while (sp) {
-      const p = stack[--sp], x = p % w, y = (p / w) | 0; area++; bright += g[p];
-      if (x === 0 || y === 0 || x === w - 1 || y === hh - 1) edge++;
-      const su = x + y, di = x - y;
-      if (su < mnS) { mnS = su; pS = p; } if (su > mxS) { mxS = su; PS = p; }
-      if (di < mnD) { mnD = di; pD = p; } if (di > mxD) { mxD = di; PD = p; }
-      if (x > 0 && mask[p - 1] && lab[p - 1] < 0) { lab[p - 1] = id; stack[sp++] = p - 1; }
-      if (x < w - 1 && mask[p + 1] && lab[p + 1] < 0) { lab[p + 1] = id; stack[sp++] = p + 1; }
-      if (y > 0 && mask[p - w] && lab[p - w] < 0) { lab[p - w] = id; stack[sp++] = p - w; }
-      if (y < hh - 1 && mask[p + w] && lab[p + w] < 0) { lab[p + w] = id; stack[sp++] = p + w; }
+  const RG = med(rg), GB = med(gb);
+  const colorOk = i => { const o = i * 4, dr = data[o] - data[o + 1] - RG, dg = data[o + 1] - data[o + 2] - GB; return dr * dr + dg * dg < 256; };
+  // the brightest levels: the top half a percent, and a tenth. A page a little whiter than its table sits between them
+  let pTop = 255, pTen = 255; { let c = 0; for (let t = 255; t >= 0; t--) { c += hist[t]; if (pTop === 255 && c > n * 0.005) pTop = t; if (c > n * 0.1) { pTen = t; break; } } }
+  const pB1 = (pTop + pTen) / 2, pB2 = pTop - Math.max(3, (pTop - pTen) / 4);
+  const masks = [
+    i => g[i] > th,
+    i => g[i] > th && mag[i] < E,
+    i => g[i] > th && mag[i] < E && colorOk(i),
+    i => g[i] > th2 && mag[i] < E,
+    // plain, even areas whatever their brightness: a white page on a white table is closed off by its thin edge
+    i => mag[i] < 5,
+    // only the very brightest: the margins of a white page that is a little whiter than the white table under it.
+    // The writing in the middle is left out, so the area is a ring: the side check below decides
+    i => g[i] > pB1, i => g[i] > pB2
+  ];
+  const minFill = [0.45, 0.45, 0.45, 0.45, 0.45, 0.12, 0.12];
+  const pt = p => [(p % w) + 0.5, ((p / w) | 0) + 0.5];
+  // fit each side to the strongest edge near it (brighter inside), and measure how much of the side is a real edge
+  const R = Math.max(4, Math.round(Math.min(w, hh) * 0.035)), K = 28;
+  const onB = ([x, y]) => x < 2.5 ? 'L' : x > w - 3.5 ? 'R' : y < 2.5 ? 'T' : y > hh - 3.5 ? 'B' : '';
+  // each side: the strongest edge near it. Most of the side must be one edge with one direction of contrast
+  // (the page lighter than the table, or, where the page is in shadow, darker); the line is fitted to those points
+  function fitSide(A, Bp, cx, cy, lo, hi, minEdge) {
+    const L = Math.hypot(Bp[0] - A[0], Bp[1] - A[1]); if (L < 10) return null;
+    let nx = -(Bp[1] - A[1]) / L, ny = (Bp[0] - A[0]) / L;
+    const mx = (A[0] + Bp[0]) / 2, my = (A[1] + Bp[1]) / 2; if ((cx - mx) * nx + (cy - my) * ny < 0) { nx = -nx; ny = -ny; } // inward
+    const found = []; let inFrame = 0;
+    const gi = (X, Y) => g[Math.max(0, Math.min(hh - 1, Math.round(Y))) * w + Math.max(0, Math.min(w - 1, Math.round(X)))];
+    for (let k = 1; k < K; k++) {
+      const x0 = A[0] + (Bp[0] - A[0]) * k / K, y0 = A[1] + (Bp[1] - A[1]) * k / K;
+      if (x0 < 1 || y0 < 1 || x0 > w - 2 || y0 > hh - 2) continue; inFrame++;
+      let best = 0, bo = 0, sg = 0;
+      for (let o = lo; o <= hi; o++) {
+        const xi = Math.round(x0 + nx * o), yi = Math.round(y0 + ny * o); if (xi < 1 || yi < 1 || xi > w - 2 || yi > hh - 2) continue;
+        const i = yi * w + xi, along = gxA[i] * nx + gyA[i] * ny, aa = Math.abs(along);
+        if (aa > best && aa > mag[i] * 0.8) { best = aa; bo = o; sg = along > 0 ? 1 : -1; }
+      }
+      if (best >= minEdge) found.push([x0 + nx * bo, y0 + ny * bo, sg, bo]);
     }
-    comps.push({ id, area, bright: bright / area, edge, tl: pS, br: PS, bl: pD, tr: PD });
+    if (inFrame < K * 0.4) return { edge: false, border: true, a: A, b: Bp, sup: 0.5, con: 0, sg: 1 };
+    // the contrast may change along a side (the page lighter than a dark cloth, darker than a light one in its shadow)
+    // (found in order along the side: one change of direction at most; scattered changes are writing, not an edge)
+    const pos = found.filter(p => p[2] > 0).length, sg = pos * 2 >= found.length ? 1 : -1;
+    let changes = 0; for (let i = 1; i < found.length; i++) if (found[i][2] !== found[i - 1][2]) changes++;
+    const pts = changes <= 1 ? found : found.filter(p => p[2] === sg), sup = pts.length / inFrame;
+    if (pts.length < 6) return { edge: false, a: A, b: Bp, sup, con: 0, sg };
+    let con = 0, off = 0;
+    for (const p of pts) { con += Math.abs(gi(p[0] + nx * 3, p[1] + ny * 3) - gi(p[0] - nx * 3, p[1] - ny * 3)); off += p[3]; }
+    // least squares line, then once more without the farthest quarter
+    let use = pts, line = null;
+    for (let it = 0; it < 2; it++) {
+      let sx = 0, sy = 0; for (const p of use) { sx += p[0]; sy += p[1]; } sx /= use.length; sy /= use.length;
+      let xx = 0, yy = 0, xy = 0; for (const p of use) { const dx = p[0] - sx, dy = p[1] - sy; xx += dx * dx; yy += dy * dy; xy += dx * dy; }
+      const ang = 0.5 * Math.atan2(2 * xy, xx - yy), dx = Math.cos(ang), dy = Math.sin(ang);
+      line = { px: sx, py: sy, dx, dy };
+      if (it === 0) { const dd = use.map(p => Math.abs((p[0] - sx) * dy - (p[1] - sy) * dx)); const lim = [...dd].sort((a, b) => a - b)[Math.floor(dd.length * 0.75)]; use = use.filter((p, i) => dd[i] <= lim + 0.5); }
+    }
+    return { edge: true, line, sup, con: con / pts.length, off: off / pts.length, sg };
   }
-  const pt = p => [((p % w) + 0.5) / w, (((p / w) | 0) + 0.5) / hh];
-  let pick = null;
-  for (const c of comps) {
-    if (c.area < n * 0.06) continue;
-    const q = [pt(c.tl), pt(c.tr), pt(c.br), pt(c.bl)], qa = quadArea(q);
-    if (qa < 0.1 || qa > 0.97) continue;
-    const onEdge = q.filter(([x, y]) => x < 0.02 || x > 0.98 || y < 0.02 || y > 0.98).length;
-    if (onEdge >= 4) continue;
-    // how rectangular: the area inside the corners vs the area (text holes count as page)
-    const fill = c.area / (qa * n);
-    if (fill < 0.55 || fill > 1.15) continue;
-    const sc = c.bright * (0.6 + 0.4 * Math.min(1, fill / 0.85)) * Math.sqrt(qa) * (c.edge > (w + hh) * 0.6 ? 0.6 : 1);
-    if (!pick || sc > pick.sc) pick = { sc, q };
+  const meet = (a, b) => { const d = a.dx * b.dy - a.dy * b.dx; if (Math.abs(d) < 1e-6) return null; const t = ((b.px - a.px) * b.dy - (b.py - a.py) * b.dx) / d; return [a.px + a.dx * t, a.py + a.dy * t]; };
+  const asLine = s => s.edge ? s.line : { px: s.a[0], py: s.a[1], dx: (s.b[0] - s.a[0]) / Math.hypot(s.b[0] - s.a[0], s.b[1] - s.a[1]), dy: (s.b[1] - s.a[1]) / Math.hypot(s.b[0] - s.a[0], s.b[1] - s.a[1]) };
+  let best = null;
+  function consider(P, lo, hi, seed) {
+    const cx = (P[0][0] + P[1][0] + P[2][0] + P[3][0]) / 4, cy = (P[0][1] + P[1][1] + P[2][1] + P[3][1]) / 4;
+   {
+    const S = [0, 1, 2, 3].map(i => fitSide(P[i], P[(i + 1) % 4], cx, cy, lo, hi, seed ? 3 : 5));
+    if (S.some(s => !s)) return;
+    // a side along the frame: the page goes on beyond the picture. Opposite sides both along the frame: a table, not a page
+    const bd = [0, 1, 2, 3].map(i => { const a = onB(P[i]), b = onB(P[(i + 1) % 4]); return a && a === b ? a : ''; });
+    if ((bd[0] && bd[2]) || (bd[1] && bd[3])) return;
+    const L = S.map(asLine);
+    const Q = [meet(L[3], L[0]), meet(L[0], L[1]), meet(L[1], L[2]), meet(L[2], L[3])];
+    if (Q.some(p => !p || p[0] < -w * 0.02 || p[0] > w * 1.02 || p[1] < -hh * 0.02 || p[1] > hh * 1.02)) return;
+    let cv = true; for (let z = 0; z < 4; z++) { const a = Q[z], b = Q[(z + 1) % 4], c = Q[(z + 2) % 4]; if ((b[0] - a[0]) * (c[1] - b[1]) - (b[1] - a[1]) * (c[0] - b[0]) <= 0) { cv = false; break; } }
+    if (!cv) return;
+    const q = Q.map(([x, y]) => [Math.max(0, Math.min(1, x / w)), Math.max(0, Math.min(1, y / hh))]);
+    const A = quadArea(q); if (A < 0.05 || A > 0.95) return;
+    const d = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+    const s1 = (d(Q[0], Q[1]) + d(Q[3], Q[2])) / 2, s2 = (d(Q[0], Q[3]) + d(Q[1], Q[2])) / 2, asp = Math.max(s1, s2) / Math.max(1, Math.min(s1, s2));
+    if (asp > 2.4) return;
+    const real = S.filter(s => !s.border);
+    if (real.length < 4) return;                 // all four sides seen: the whole page is in the picture
+    const sups = real.map(s => s.sup), mn = Math.min(...sups), avg = sups.reduce((a, b) => a + b, 0) / sups.length;
+    const con = real.reduce((a, s) => a + s.con, 0) / real.length;
+    // the page is lighter than what is around it on at least two sides (a shadow may darken the others)
+    if (mn < 0.35 || con < 3 || real.filter(s => s.sg > 0).length < 2) return;
+    // from the writing: every side must be a clear edge, outside the writing (a page has margins)
+    if (seed && (mn < 0.6 || real.some(s => !s.edge || s.off > -2))) return;
+    let sc = 0.5 * avg + 0.3 * mn + 0.1 * Math.min(1, con / 30) + 0.1 * Math.min(1, A / 0.3) - 0.04 * (4 - real.length);
+    if (prev) { const mv = Math.max(...q.map((p, i) => d(p, prev[i]))); if (mv < 0.06) sc += 0.08; }   // the page that was already found stays
+    if (!best || sc > best.sc) best = { sc, q };
+   }
   }
-  if (!pick) return null;
-  // the edge itself was left out of the area: move each corner out by about one pixel and a half
-  const q = pick.q, cx = q.reduce((a, p) => a + p[0], 0) / 4, cy = q.reduce((a, p) => a + p[1], 0) / 4;
-  return q.map(([x, y]) => { const dx = x - cx, dy = y - cy, L = Math.hypot(dx * w, dy * hh) || 1, k = 1 + 1.6 / L;
-    return [Math.max(0, Math.min(1, cx + dx * k)), Math.max(0, Math.min(1, cy + dy * k))]; });
+  const M = Math.round(Math.min(w, hh) * 0.22);
+  const lab = new Int32Array(n), stack = new Int32Array(n), mask = new Uint8Array(n), cands = [];
+  for (const mf of masks) {
+    if (best && best.sc >= 0.92) break;             // a sure page already: no need for more ways of looking
+    for (let i = 0; i < n; i++) mask[i] = mf(i) ? 1 : 0;
+    lab.fill(-1);
+    for (let s = 0; s < n; s++) {
+      if (!mask[s] || lab[s] >= 0) continue;
+      let sp = 0, area = 0, mnS = 1e9, mxS = -1e9, mnD = 1e9, mxD = -1e9, pS = 0, PS = 0, pD = 0, PD = 0;
+      stack[sp++] = s; lab[s] = s;
+      while (sp) {
+        const p = stack[--sp], x = p % w, y = (p / w) | 0; area++;
+        const su = x + y, di = x - y;
+        if (su < mnS) { mnS = su; pS = p; } if (su > mxS) { mxS = su; PS = p; }
+        if (di < mnD) { mnD = di; pD = p; } if (di > mxD) { mxD = di; PD = p; }
+        if (x > 0 && mask[p - 1] && lab[p - 1] < 0) { lab[p - 1] = s; stack[sp++] = p - 1; }
+        if (x < w - 1 && mask[p + 1] && lab[p + 1] < 0) { lab[p + 1] = s; stack[sp++] = p + 1; }
+        if (y > 0 && mask[p - w] && lab[p - w] < 0) { lab[p - w] = s; stack[sp++] = p - w; }
+        if (y < hh - 1 && mask[p + w] && lab[p + w] < 0) { lab[p + w] = s; stack[sp++] = p + w; }
+      }
+      if (area < n * 0.04) continue;
+      const P = [pt(pS), pt(PD), pt(PS), pt(pD)];   // TL, TR, BR, BL
+      const qa = quadArea(P.map(([x, y]) => [x / w, y / hh]));
+      if (qa < 0.05) continue;
+      const fill = area / (qa * n); if (fill < minFill[masks.indexOf(mf)] || fill > 1.2) continue;
+      cands.push(P); consider(P, -R, R, 0);
+    }
+  }
+  // the writing on the page: a block of dark marks. Its frame is inside the page, so the page's sides are
+  // looked for outward from it. This finds a white page on a white table, where no area separates them
+  const seeds = [];
+  {
+    const bg = Float32Array.from(g); boxBlur(bg, w, hh, Math.max(4, Math.round(Math.min(w, hh) / 30)));
+    const ink = new Uint8Array(n); let inkN = 0;
+    for (let i = 0; i < n; i++) if (bg[i] > th && bg[i] - g[i] > Math.max(10, bg[i] * 0.07)) { ink[i] = 1; inkN++; }   // marks on something light: writing, not a dark floor's grain
+    if (inkN > n * 0.004 && !(best && best.sc >= 0.92)) {
+      // join the marks into blocks: grow each mark by a few pixels (rows of writing become one block)
+      const r = Math.max(3, Math.round(Math.min(w, hh) / 45)), blk = new Float32Array(n);
+      for (let i = 0; i < n; i++) blk[i] = ink[i];
+      boxBlur(blk, w, hh, r);
+      for (let i = 0; i < n; i++) mask[i] = blk[i] > 0.04 ? 1 : 0;
+      lab.fill(-1);
+      for (let s = 0; s < n; s++) {
+        if (!mask[s] || lab[s] >= 0) continue;
+        let sp = 0, area = 0, mnS = 1e9, mxS = -1e9, mnD = 1e9, mxD = -1e9, pS = 0, PS = 0, pD = 0, PD = 0;
+        stack[sp++] = s; lab[s] = s;
+        while (sp) {
+          const p = stack[--sp], x = p % w, y = (p / w) | 0; area++;
+          const su = x + y, di = x - y;
+          if (su < mnS) { mnS = su; pS = p; } if (su > mxS) { mxS = su; PS = p; }
+          if (di < mnD) { mnD = di; pD = p; } if (di > mxD) { mxD = di; PD = p; }
+          if (x > 0 && mask[p - 1] && lab[p - 1] < 0) { lab[p - 1] = s; stack[sp++] = p - 1; }
+          if (x < w - 1 && mask[p + 1] && lab[p + 1] < 0) { lab[p + 1] = s; stack[sp++] = p + 1; }
+          if (y > 0 && mask[p - w] && lab[p - w] < 0) { lab[p - w] = s; stack[sp++] = p - w; }
+          if (y < hh - 1 && mask[p + w] && lab[p + w] < 0) { lab[p + w] = s; stack[sp++] = p + w; }
+        }
+        if (area < n * 0.03) continue;
+        consider([pt(pS), pt(PD), pt(PS), pt(pD)], -M, 1, 1);
+      }
+    }
+  }
+  // a new page must be sure (0.8); the page already in the frame is kept while it is still fairly sure (0.7), so it doesn't flicker
+  const near = prev && best && Math.max(...best.q.map((p, i) => Math.hypot(p[0] - prev[i][0], p[1] - prev[i][1]))) < 0.06;
+  return best && best.sc > (near ? 0.7 : 0.8) ? best.q : null;
 }
-// first by the page's edges and color; if that finds nothing clear, the bright area as before
-function findSheet(data, w, hh) { return findSheetEdges(data, w, hh) || findSheetBright(data, w, hh); }
+
+// the camera: only a page that passed the checks (a wrong frame is worse than none).
+// A photo from the gallery or the "זיהוי הדף" button: if nothing passed, the bright area as before, to adjust by hand
+function findSheet(data, w, hh, prev) { return findSheetEdges(data, w, hh, prev); }
+function findSheetLoose(data, w, hh) { return findSheetEdges(data, w, hh) || findSheetBright(data, w, hh); }
 function sheetIn(img) {
   const c = scaledCanvas(img, 320), x = c.getContext('2d', { willReadFrequently: true });
-  const q = findSheet(x.getImageData(0, 0, c.width, c.height).data, c.width, c.height); free(c); return q;
+  const q = findSheetLoose(x.getImageData(0, 0, c.width, c.height).data, c.width, c.height); free(c); return q;
 }
 
 /* ---- שני עמודים בדף שזוהה (מחברת או ספר פתוחים)? ----
@@ -741,10 +866,10 @@ const CAM = {
         if (this.mode === 'qr') this.scanQr().catch(() => {});
         else if (this.mode === 'mega') { if (this.mega && this.mega.on) this.megaStep(); }
         else {
-          const k = 320 / Math.max(v.videoWidth, v.videoHeight), c = this.small || (this.small = document.createElement('canvas'));
+          const k = 240 / Math.max(v.videoWidth, v.videoHeight), c = this.small || (this.small = document.createElement('canvas'));   // 5.8.2: 240 (was 320): faster, and as exact after the edge fitting
           c.width = Math.round(v.videoWidth * k); c.height = Math.round(v.videoHeight * k);
           const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(v, 0, 0, c.width, c.height);
-          let q = findSheet(x.getImageData(0, 0, c.width, c.height).data, c.width, c.height);
+          let q = findSheet(x.getImageData(0, 0, c.width, c.height).data, c.width, c.height, this.quad);
           // 5.8.1: the larger picture (for an open notebook: which page has writing) is read only when the page lies
           // sideways. A portrait page is always one page, and reading 900 pixels every tenth of a second slowed finding it
           const wide = q && (Math.hypot((q[1][0] - q[0][0]) * c.width, (q[1][1] - q[0][1]) * c.height) + Math.hypot((q[2][0] - q[3][0]) * c.width, (q[2][1] - q[3][1]) * c.height))
@@ -766,8 +891,20 @@ const CAM = {
   },
   // מעקב אחרי הדף בין תמונות: החלקה, יציבות, וצילום אוטומטי
   track2(q) {
-    if (!q) { this.miss = (this.miss || 0) + 1; if (this.miss > 4) { this.quad = null; this.stable = 0; } this.drawQuad();
-      if (!this.quad) this.setHint(this.modeHint()); return; }
+    // 5.8.2: no frame yet: a page must be found twice in a row in about the same place, so a frame doesn't flash on and off
+    if (q && !this.quad) {
+      const pend = this.pend; this.pend = q;
+      if (!pend || Math.max(...q.map((p, i) => Math.hypot(p[0] - pend[i][0], p[1] - pend[i][1]))) > 0.05) { this.drawQuad(); return; }
+    }
+    if (!q) { this.pend = null; this.miss = (this.miss || 0) + 1; if (this.miss > 4) { this.quad = null; this.stable = 0; } this.drawQuad();
+      if (!this.quad) {
+        // 5.8.2: no clear page edges for a while (a white page on a white table): say it can be photographed by hand —
+        // the page's corners are then found in the photo itself
+        if (!this.noPageSince) this.noPageSince = Date.now();
+        this.setHint(Date.now() - this.noPageSince > 3500 && this.mode === 'doc' ? 'לא רואה את קצוות הדף? אפשר לצלם בלחיצה, והדף ייחתך אחרי הצילום' : this.modeHint());
+      }
+      return; }
+    this.noPageSince = 0;
     this.miss = 0;
     const prev = this.quad;
     const move = prev ? Math.max(...q.map((p, i) => Math.hypot(p[0] - prev[i][0], p[1] - prev[i][1]))) : 1;
@@ -806,7 +943,9 @@ const CAM = {
     this.spread = null;
     if (!q || (this.mode !== 'doc' && this.mode !== 'board')) return q;
     const s = spreadOf(c, q);
-    if (!s) return q;
+    // 5.8.2: in "מסמך" two pages are shown only when a spiral or a binding is really seen in the middle.
+    // A wide area by itself (a page lying sideways, or a table) is one page: an open book has its own mode, "ספר"
+    if (!s || !s.spiral) return q;
     // העמוד עם יותר כתב. כשההפרש קטן נשאר העמוד הקודם, כדי שהמסגרת לא תקפוץ
     const L = s.ink.left, Rr = s.ink.right, clear = Math.max(L, Rr) > 60 && Math.max(L, Rr) > Math.min(L, Rr) * 1.3;
     let side = this.pick === 'left' || this.pick === 'right' ? this.pick : clear ? (L > Rr ? 'left' : 'right') : (this.autoSide || (L > Rr ? 'left' : 'right'));
@@ -1419,6 +1558,12 @@ function sharpness(c) {
   for (let y = Math.round(H * 0.15); y < H * 0.85; y++) for (let x = Math.round(W * 0.15); x < W * 0.85; x++) {
     const k = y * W + x, v = Math.abs(4 * g[k] - g[k - 1] - g[k + 1] - g[k - W] - g[k + W]); hist[Math.min(1020, v | 0)]++; n++;
   }
+  // 5.8.2: a page with almost nothing written on it (or an empty area) has no sharp edges to measure: not "blurry"
+  const gh = new Uint32Array(256); let gn = 0;
+  for (let k = 0; k < g.length; k += 7) { gh[Math.min(255, g[k] | 0)]++; gn++; }
+  let c0 = 0, lo = 0, hi = 255; for (let v = 0; v < 256; v++) { c0 += gh[v]; if (c0 >= gn * 0.02) { lo = v; break; } }
+  c0 = 0; for (let v = 255; v >= 0; v--) { c0 += gh[v]; if (c0 >= gn * 0.02) { hi = v; break; } }
+  if (hi - lo < 45) return 99;
   let a = 0; for (let v = 1020; v >= 0; v--) { a += hist[v]; if (a >= n * 0.005) return v; }
   return 0;
 }
