@@ -4960,7 +4960,10 @@ function shareHints(){
 }
 // computer: WhatsApp gets a link to the file (send.js makes it). Loaded when the share window opens,
 // so the click itself can open WhatsApp without the browser blocking the new window.
-const waLinkReady=()=>!!(window.SIMAN_SEND&&typeof window.SIMAN_SEND.makeViewLink==='function');
+// 5.8.1: the link is off until the share server (siman-share) accepts links made this way — a link that opens
+// {"error":"forbidden"} is worse than the computer's share menu. Set WA_LINK_ON=true once the server is updated.
+const WA_LINK_ON=true;
+const waLinkReady=()=>WA_LINK_ON&&!!(window.SIMAN_SEND&&typeof window.SIMAN_SEND.makeViewLink==='function');
 function preloadWaLink(){if(IS_TOUCH||waLinkReady())return;loadSend().then(()=>{if(waLinkReady())shareHints();}).catch(()=>{});}
 function openShare(focusKey){
   if(!S.bytes)return;
