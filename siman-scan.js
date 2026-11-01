@@ -1,4 +1,5 @@
-/* 5.8.3: on a computer "מדף למסמך" opens with pictures from the computer (drag, choose, paste); the computer's camera stays as a choice. Phones and tablets: unchanged. */
+/* 5.8.4: PDF files of scanned / photographed pages can be added (a PDF button on every device, dragged or pasted; on a computer the drop area too).
+   5.8.3: on a computer "מדף למסמך" opens with pictures from the computer (drag, choose, paste); the computer's camera stays as a choice. Phones and tablets: unchanged. */
 /* 5.8.2: finding the page steadily — candidates checked against real straight edges (no frame rather than a wrong one), no "two pages" without a real spiral, a frame only after two matching finds, a faster blur (same result, ~10x faster), check picture 240, an empty area is not "blurry". 5.8.1: color, faster loop, 5 steady frames */
 /* =====================================================================
    סימן 5.4 — siman-scan.js
@@ -123,6 +124,10 @@ document.head.append(h(`<style id="simanCamCss">
 .scn-stack b{position:absolute;top:-8px;inset-inline-end:-8px;min-width:24px;height:24px;padding:0 6px;border-radius:12px;background:#FFD43B;color:#0A1222;font-size:13px;display:grid;place-items:center}
 .scn-stack[hidden]{visibility:hidden;display:block}
 .scn-gal{justify-self:end}
+/* 5.8.4: PDF of scanned pages, a button of its own on every device */
+.scn-gals{justify-self:end;display:flex;gap:8px;align-items:center}
+.scn-pdf b{font-size:12px;font-weight:800;letter-spacing:.02em;direction:ltr;color:#fff}
+@media (pointer:coarse){.scn-gals .scn-ib{width:46px;height:46px}}
 .scn-done{justify-self:start;height:44px;padding:0 18px;border-radius:12px;border:0;background:#FFD43B;color:#0A1222;font-weight:700;font-size:15px}
 .scn-body{flex:1;min-height:0;overflow:auto;padding:4px 14px 14px}
 .scn-name{display:flex;align-items:center;gap:8px;margin:2px 0 12px}
@@ -215,7 +220,7 @@ const root = h(`<div class="scn" hidden role="dialog" aria-modal="true" aria-lab
       <button class="scn-stack" type="button" data-a="review" hidden aria-label="מעבר לעמודים שנסרקו"><img alt=""><b>0</b></button>
       <button class="scn-shutter" type="button" data-a="shoot" aria-label="צילום">
         <svg class="ring" viewBox="0 0 88 88" aria-hidden="true"><circle cx="44" cy="44" r="42"/></svg><i></i></button>
-      <button class="scn-ib scn-gal" type="button" data-a="gallery" aria-label="ייבוא תמונות מהגלריה">${I.gallery}</button>
+      <div class="scn-gals"><button class="scn-ib scn-pdf" type="button" data-a="pdf" aria-label="ייבוא קובץ PDF" title="קובץ PDF"><b>PDF</b></button><button class="scn-ib scn-gal" type="button" data-a="gallery" aria-label="ייבוא תמונות מהגלריה">${I.gallery}</button></div>
     </div>
   </section>
 
@@ -275,8 +280,13 @@ const DESK = (() => { try {
   const ua = navigator.userAgent || '', tab = /iPhone|iPad|iPod|Android/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   return !tab && matchMedia('(pointer:fine)').matches;
 } catch (_) { return false; } })();
+// 5.8.4: PDF files can be chosen too — on a computer, iPhone and iPad. On Android a picker that mixes pictures and
+// files opens the file browser instead of the photo gallery, so there it stays pictures only, as before
+if (DESK) galIn.accept = 'image/*,application/pdf,.pdf';
+// the PDF button: PDF files only (iPhone, iPad and Android open their files app for it)
+const pdfIn = h('<input type="file" accept="application/pdf,.pdf" multiple hidden>');
 const camIn = h('<input type="file" accept="image/*" capture="environment" hidden>');
-root.append(galIn, camIn);
+root.append(galIn, camIn, pdfIn);
 const $r = s => root.querySelector(s);
 const V = { cam: $r('[data-v=cam]'), review: $r('[data-v=review]'), edit: $r('[data-v=edit]') };
 
@@ -553,6 +563,31 @@ function findSheetEdges(data, w, hh, prev) {
 // A photo from the gallery or the "זיהוי הדף" button: if nothing passed, the bright area as before, to adjust by hand
 function findSheet(data, w, hh, prev) { return findSheetEdges(data, w, hh, prev); }
 function findSheetLoose(data, w, hh) { return findSheetEdges(data, w, hh) || findSheetBright(data, w, hh); }
+// a page from a PDF is usually scanned already: only a sure page is cut, otherwise the whole page stays
+function sheetInStrict(img) {
+  const c = scaledCanvas(img, 240), x = c.getContext('2d', { willReadFrequently: true });
+  const q = findSheetEdges(x.getImageData(0, 0, c.width, c.height).data, c.width, c.height); free(c); return q;
+}
+// 5.8.4: a PDF of scanned or photographed pages: each page becomes a picture, like a photo from the gallery
+async function pdfPages(file, onPage) {
+  const lib = window.pdfjsLib || window['pdfjs-dist/build/pdf'];
+  if (!lib) throw new Error('קורא ה-PDF עוד לא נטען');
+  if (!lib.GlobalWorkerOptions.workerSrc) lib.GlobalWorkerOptions.workerSrc = 'pdf.worker.min.js';
+  const doc = await lib.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
+  const N = Math.min(doc.numPages, 60), out = [];
+  try {
+    for (let i = 1; i <= N; i++) {
+      onPage && onPage(i, N);
+      const pg = await doc.getPage(i), v1 = pg.getViewport({ scale: 1 });
+      const s = Math.min(4, 2600 / Math.max(v1.width, v1.height)), vp = pg.getViewport({ scale: s });
+      const c = canvasOf(vp.width, vp.height), x = c.getContext('2d');
+      x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height);
+      await pg.render({ canvasContext: x, viewport: vp }).promise;
+      out.push(await toBlob(c, 0.92)); free(c); pg.cleanup();
+    }
+  } finally { try { doc.destroy(); } catch (_) {} }
+  return { blobs: out, more: doc.numPages > N ? doc.numPages : 0 };
+}
 function sheetIn(img) {
   const c = scaledCanvas(img, 320), x = c.getContext('2d', { willReadFrequently: true });
   const q = findSheetLoose(x.getImageData(0, 0, c.width, c.height).data, c.width, c.height); free(c); return q;
@@ -836,8 +871,8 @@ const CAM = {
     this.vf.hidden = true; this.setHint(''); root.classList.add('desk-pick');
     const nc = $r('.scn-nocam'); nc.hidden = false;
     nc.innerHTML = `<div class="scn-desk">
-      <button class="scn-drop" type="button" data-n="gal">${I.gallery}<b>גוררים לכאן תמונות של דפים</b>
-        <span>או לוחצים כדי לבחור מהמחשב. אפשר כמה תמונות יחד: צילומים מהטלפון, מוואטסאפ או מסורק</span></button>
+      <button class="scn-drop" type="button" data-n="gal">${I.gallery}<b>גוררים לכאן תמונות או PDF של דפים</b>
+        <span>או לוחצים כדי לבחור מהמחשב. אפשר כמה קבצים יחד: צילומים מהטלפון, מוואטסאפ, או PDF מסורק</span></button>
       <div class="alt"><span>תמונה שהעתקתם? <kbd>${/Mac/.test(navigator.platform) ? '⌘' : 'Ctrl'}+V</kbd> מדביק אותה כאן</span>
         <button class="link" type="button" data-n="cam">צילום במצלמה של המחשב</button></div></div>`;
     nc.querySelector('[data-n=gal]').onclick = () => galIn.click();
@@ -1219,20 +1254,36 @@ const CAM = {
 
   /* ---- ייבוא מהגלריה ---- */
   async fromFiles(files) {
-    files = [...files].filter(f => /^image\//.test(f.type) || /\.(jpe?g|png|webp|heic|heif)$/i.test(f.name));
+    const isPdf = f => f.type === 'application/pdf' || /\.pdf$/i.test(f.name);
+    files = [...files].filter(f => isPdf(f) || /^image\//.test(f.type) || /\.(jpe?g|png|webp|heic|heif)$/i.test(f.name));
     if (!files.length) return;
+    // 5.8.4: PDF files: every page becomes a picture first (marked, so it is cut only when the page is clear)
+    if (files.some(isPdf)) {
+      const list = [], bad0 = [];
+      for (const f of files) {
+        if (!isPdf(f)) { list.push(f); continue; }
+        try {
+          const r = await pdfPages(f, (i, n) => this.busy(n > 1 ? `קורא את ה-PDF… עמוד ${i} מתוך ${n}` : 'קורא את ה-PDF…'));
+          r.blobs.forEach((b, i) => { b.fromPdf = true; b.pdfName = f.name + ' ' + (i + 1); list.push(b); });
+          if (r.more) say(`ב-PDF יש ${r.more} עמודים. נכנסו 60 הראשונים`);
+        } catch (e) { console.warn(e); bad0.push(f.name); }
+      }
+      this.busy(null);
+      if (bad0.length) say('לא הצלחתי לפתוח: ' + bad0.join(', '));
+      files = list; if (!files.length) return;
+    }
     const was = this.mode; if (this.mode === 'qr' || this.mode === 'id') this.mode = 'doc';
     const bad = [];
     for (const [i, f] of files.entries()) {
       this.busy(files.length > 1 ? `מכין את התמונות… ${i + 1} מתוך ${files.length}` : 'מכין את התמונה…');
       try {
         const img = await decodeImg(f), c = scaledCanvas(img, 4000); if (img.close) img.close();
-        let q = sheetIn(c), sp = null;
+        let q = f.fromPdf ? sheetInStrict(c) : sheetIn(c), sp = null;
         // מחברת פתוחה בתמונה: העמוד שיש בו יותר כתב
         if (q && this.mode === 'doc') { const sm = scaledCanvas(c, 900); sp = spreadOf(sm, q); free(sm); if (sp && sp.spiral) q = sp.ink.left > sp.ink.right ? sp.left : sp.right; }
         const b = await toBlob(c, 0.93); free(c);
         await this.addShot(b, q, true);
-      } catch (e) { console.warn(e); bad.push(f.name + (/heic|heif/i.test(f.type + f.name) ? ' (HEIC: שמרו כ-JPG)' : '')); }
+      } catch (e) { console.warn(e); bad.push((f.pdfName || f.name) + (/heic|heif/i.test(f.type + (f.name || '')) ? ' (HEIC: שמרו כ-JPG)' : '')); }
     }
     this.mode = was; this.busy(null);
     if (bad.length) say('לא הצלחתי לפתוח: ' + bad.join(', '));
@@ -1885,6 +1936,7 @@ root.addEventListener('click', e => {
     case 'pages': CAM.pick = CAM.pick === 'both' ? 'auto' : 'both'; CAM.quad = null; CAM.stable = 0; CAM.spreadTold = 0; return CAM.drawQuad();
     case 'shoot': return CAM.shoot();
     case 'gallery': return galIn.click();
+    case 'pdf': return pdfIn.click();
     case 'review': return CAM.show('review');
     case 'more': return CAM.show('cam');
     case 'inkall': return CAM.setAll({ ink: !CAM.pages.every(p => p.ink) });
@@ -1895,6 +1947,7 @@ root.addEventListener('click', e => {
 });
 $r('.scn-vf').addEventListener('pointerup', e => { if (e.pointerType === 'mouse' && e.button !== 0) return; CAM.tapPick(e); });
 galIn.onchange = e => { const f = [...e.target.files]; e.target.value = ''; CAM.fromFiles(f); };
+pdfIn.onchange = e => { const f = [...e.target.files]; e.target.value = ''; CAM.fromFiles(f); };
 camIn.onchange = e => { const f = [...e.target.files]; e.target.value = ''; CAM.fromFiles(f); };
 addEventListener('resize', () => { if (!root.hidden && CAM.view === 'cam') CAM.fit(); });
 // 5.8.3: pictures dragged onto the scanner, or pasted (Ctrl+V / ⌘V), become pages — on any device
@@ -1905,7 +1958,7 @@ root.addEventListener('drop', e => { if (!hasFiles(e)) return; e.preventDefault(
 document.addEventListener('paste', e => {
   if (root.hidden || CAM.view === 'edit' || !e.clipboardData) return;
   const t = e.target; if (t && t.closest && t.closest('input,textarea,[contenteditable="true"]')) return;
-  const files = [...e.clipboardData.items].filter(i => i.kind === 'file' && /^image\//.test(i.type)).map(i => i.getAsFile()).filter(Boolean);
+  const files = [...e.clipboardData.items].filter(i => i.kind === 'file' && (/^image\//.test(i.type) || i.type === 'application/pdf')).map(i => i.getAsFile()).filter(Boolean);
   if (!files.length) return;
   e.preventDefault(); CAM.fromFiles(files);
 });
