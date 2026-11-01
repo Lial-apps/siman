@@ -40,6 +40,7 @@ const I = {
   plus: SVG('<path d="M12 5v14M5 12h14"/>', 2.2),
   pdf: SVG('<path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4"/><path d="M9.5 13h5M9.5 16.5h5"/>'),
   word: SVG('<path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4"/><path d="M9 11l1.2 6 1.8-4.5 1.8 4.5L15 11"/>'),
+  xls: SVG('<path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4"/><path d="M9.5 11.5l4 5M13.5 11.5l-4 5"/>'),
   pen: SVG('<path d="M4 20l4-1L19 8l-3-3L5 16z"/><path d="M14 7l3 3"/>'),
   search: SVG('<circle cx="11" cy="11" r="6"/><path d="M20 20l-4.2-4.2"/>'),
   img: SVG('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 16l5-5 4 4 3-3 6 6"/>'),
@@ -95,6 +96,10 @@ document.head.append(h(`<style id="simanCamCss">
 .scn-shutter i{display:block;width:60px;height:60px;border-radius:50%;background:#fff;transition:transform .1s}
 .scn-shutter:active i{transform:scale(.9)}
 .scn-shutter:disabled{opacity:.4}
+.scn-shutter.rec i{width:30px;height:30px;border-radius:8px;background:#E5484D}
+.scn-mini{position:absolute;bottom:10px;inset-inline-start:10px;z-index:3;background:rgba(10,18,34,.8);border:1px solid rgba(255,255,255,.35);border-radius:10px;padding:4px;pointer-events:none}
+.scn-mini[hidden]{display:none}
+.scn-mini canvas{display:block}
 .scn-shutter svg.ring{position:absolute;inset:-6px;width:88px;height:88px;transform:rotate(-90deg);pointer-events:none}
 .scn-shutter .ring circle{fill:none;stroke:#3DDC97;stroke-width:4;stroke-dasharray:264;stroke-dashoffset:264;transition:stroke-dashoffset .12s linear}
 .scn-stack{justify-self:start;position:relative;width:58px;height:58px;border:0;padding:0;background:none}
@@ -168,7 +173,7 @@ document.head.append(h(`<style id="simanCamCss">
 </style>`));
 
 /* ---------------------------------------------------------------- המסך */
-const MODES = [['doc', 'מסמך'], ['book', 'ספר'], ['id', 'תעודה'], ['board', 'לוח'], ['qr', 'קוד QR']];
+const MODES = [['doc', 'מסמך'], ['book', 'ספר'], ['mega', 'מגה סריקה'], ['id', 'תעודה'], ['board', 'לוח'], ['qr', 'קוד QR']];
 const FILTERS = [['magic', 'משופר'], ['clean', 'ללא צללים'], ['orig', 'מקורי'], ['gray', 'אפור'], ['bw', 'שחור-לבן'], ['board', 'חזק']];
 const root = h(`<div class="scn" hidden role="dialog" aria-modal="true" aria-label="מדף למסמך: סריקה">
   <section class="scn-view" data-v="cam">
@@ -185,6 +190,7 @@ const root = h(`<div class="scn" hidden role="dialog" aria-modal="true" aria-lab
         <svg class="ov" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><polygon class="other" points=""/><polygon class="main" points=""/></svg><div class="scn-flash"></div></div>
       <div class="scn-nocam" hidden></div>
       <p class="scn-hint" role="status" aria-live="polite"></p>
+      <div class="scn-mini" hidden aria-hidden="true"><canvas width="150" height="150"></canvas></div>
       <div class="scn-sheet" hidden></div>
     </div>
     <div class="scn-modes" role="group" aria-label="סוג הסריקה">${MODES.map(([k, l]) => `<button type="button" data-m="${k}" aria-pressed="${k === 'doc'}">${l}</button>`).join('')}</div>
@@ -216,6 +222,7 @@ const root = h(`<div class="scn" hidden role="dialog" aria-modal="true" aria-lab
     <div class="scn-acts">
       <button class="scn-act main" type="button" data-x="pdf">${I.pdf}<div><b>שמירה כ־PDF</b><span>קובץ סרוק נקי, מוכן לשליחה</span></div></button>
       <button class="scn-act" type="button" data-x="word">${I.word}<div><b>Word לעריכה</b><span>הטקסט נקרא ונבנה מסמך ערוך</span></div></button>
+      <button class="scn-act" type="button" data-x="excel">${I.xls}<div><b>טבלה ל־Excel</b><span>הטבלה שבדף, לעריכה כגיליון</span></div></button>
       <button class="scn-act" type="button" data-x="open">${I.pen}<div><b>פתיחה בסימן</b><span>לחתימה, סימון, מילוי ועריכה</span></div></button>
       <button class="scn-act" type="button" data-x="ocr">${I.search}<div><b>PDF עם טקסט</b><span>אפשר לחפש ולהעתיק ממנו</span></div></button>
       <button class="scn-act" type="button" data-x="jpg">${I.img}<div><b>תמונות JPG</b><span>כל עמוד כתמונה</span></div></button>
@@ -365,6 +372,52 @@ function spreadOf(c, q) {
   return { t, ink: cnt, spiral,
     left: [TL, lerp(TL, TR, t - gap), lerp(BL, BR, t - gap), BL],
     right: [lerp(TL, TR, t + gap), TR, BR, lerp(BL, BR, t + gap)] };
+}
+
+/* ---- מגה סריקה: מציאת התזוזה בין שתי תמונות (phase correlation) ---- */
+function fft1(re, im, inv) {
+  const n = re.length;
+  for (let i = 1, j = 0; i < n; i++) { let bit = n >> 1; for (; j & bit; bit >>= 1) j ^= bit; j ^= bit; if (i < j) { let t = re[i]; re[i] = re[j]; re[j] = t; t = im[i]; im[i] = im[j]; im[j] = t; } }
+  for (let len = 2; len <= n; len <<= 1) {
+    const ang = 2 * Math.PI / len * (inv ? 1 : -1), wr = Math.cos(ang), wi = Math.sin(ang);
+    for (let i = 0; i < n; i += len) {
+      let cr = 1, ci = 0;
+      for (let k = 0; k < len / 2; k++) {
+        const a = i + k, b = a + len / 2, xr = re[b] * cr - im[b] * ci, xi = re[b] * ci + im[b] * cr;
+        re[b] = re[a] - xr; im[b] = im[a] - xi; re[a] += xr; im[a] += xi;
+        const t = cr * wr - ci * wi; ci = cr * wi + ci * wr; cr = t;
+      }
+    }
+  }
+  if (inv) for (let i = 0; i < n; i++) { re[i] /= n; im[i] /= n; }
+}
+function fft2(re, im, N, inv) {
+  const r = new Float64Array(N), i2 = new Float64Array(N);
+  for (let y = 0; y < N; y++) { const o = y * N; for (let x = 0; x < N; x++) { r[x] = re[o + x]; i2[x] = im[o + x]; } fft1(r, i2, inv); for (let x = 0; x < N; x++) { re[o + x] = r[x]; im[o + x] = i2[x]; } }
+  for (let x = 0; x < N; x++) { for (let y = 0; y < N; y++) { r[y] = re[y * N + x]; i2[y] = im[y * N + x]; } fft1(r, i2, inv); for (let y = 0; y < N; y++) { re[y * N + x] = r[y]; im[y * N + x] = i2[y]; } }
+}
+// spectrum of a grey N×N picture (with a soft window, so the picture edges do not look like a shift)
+function spectrum(g, N) {
+  const re = new Float64Array(N * N), im = new Float64Array(N * N);
+  let m = 0; for (let i = 0; i < N * N; i++) m += g[i]; m /= N * N;
+  for (let y = 0; y < N; y++) { const wy = 0.5 - 0.5 * Math.cos(2 * Math.PI * y / (N - 1));
+    for (let x = 0; x < N; x++) re[y * N + x] = (g[y * N + x] - m) * wy * (0.5 - 0.5 * Math.cos(2 * Math.PI * x / (N - 1))); }
+  fft2(re, im, N, false);
+  return { re, im };
+}
+// how far picture B moved relative to picture A, in pixels of the N×N grid, and how sure
+function phaseShift(A, B, N) {
+  const re = new Float64Array(N * N), im = new Float64Array(N * N);
+  for (let i = 0; i < N * N; i++) {
+    const r = A.re[i] * B.re[i] + A.im[i] * B.im[i], q = A.im[i] * B.re[i] - A.re[i] * B.im[i], m = Math.hypot(r, q) || 1;
+    re[i] = r / m; im[i] = q / m;
+  }
+  fft2(re, im, N, true);
+  let best = -1e9, bi = 0, sum = 0;
+  for (let i = 0; i < N * N; i++) { sum += Math.abs(re[i]); if (re[i] > best) { best = re[i]; bi = i; } }
+  let dx = bi % N, dy = (bi / N) | 0;
+  if (dx > N / 2) dx -= N; if (dy > N / 2) dy -= N;
+  return { dx, dy, conf: best / (sum / (N * N)) / (N * N) * 100, peak: best };
 }
 
 /* ---- יישור: מסגרת של ארבע פינות → דף ישר (מיפוי ריבוע→מרובע של Heckbert) ---- */
@@ -551,6 +604,7 @@ const CAM = {
   },
   stopCam() {
     clearTimeout(this.timer); this.timer = 0;
+    if (this.mega) this.megaCancel();
     if (this.stream) { this.stream.getTracks().forEach(t => t.stop()); this.stream = null; this.track = null; this.torch = false; $r('[data-a=torch]').setAttribute('aria-pressed', 'false'); }
     this.video.srcObject = null; this.quad = null; this.stable = 0; this.ic = null; this.spread = null; this.pick = 'auto'; this.drawQuad();
   },
@@ -577,14 +631,15 @@ const CAM = {
   },
   setHint(t) { this.hint.textContent = t; this.hint.hidden = !t; },
   modeHint() {
-    return { doc: 'כוונו את המצלמה אל הדף', book: 'ספר פתוח: שני העמודים בתוך המסגרת, התפר באמצע', id: this.idFront ? 'עכשיו הצד האחורי של התעודה' : 'הצד הקדמי של התעודה, בתוך המסגרת', board: 'כוונו אל הלוח', qr: 'כוונו אל הקוד' }[this.mode];
+    return { doc: 'כוונו את המצלמה אל הדף', book: 'ספר פתוח: שני העמודים בתוך המסגרת, התפר באמצע', id: this.idFront ? 'עכשיו הצד האחורי של התעודה' : 'הצד הקדמי של התעודה, בתוך המסגרת', board: 'כוונו אל הלוח', qr: 'כוונו אל הקוד', mega: this.mega && this.mega.on ? 'הזיזו לאט מעל כל הדף, באותו גובה' : 'דף גדול: לחצו על הכפתור, והזיזו את הטלפון לאט מעל כל הדף' }[this.mode];
   },
   setMode(m) {
     this.mode = m;
     root.querySelectorAll('.scn-modes [data-m]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.m === m)));
     const gd = $r('.scn-vf .guide');
     gd.innerHTML = m === 'id' ? '<div class="idbox"></div>' : m === 'book' ? '<div class="bookline"></div>' : m === 'qr' ? '<div class="qrbox"></div>' : '';
-    $r('[data-a=shoot]').style.visibility = m === 'qr' ? 'hidden' : ''; $r('[data-a=auto]').hidden = m === 'qr' || m === 'id';
+    $r('[data-a=shoot]').style.visibility = m === 'qr' ? 'hidden' : ''; $r('[data-a=auto]').hidden = m === 'qr' || m === 'id' || m === 'mega';
+    if (m !== 'mega' && this.mega) this.megaCancel();
     if (m !== 'id' && this.idFront) { free(this.idFront); this.idFront = null; }
     this.quad = null; this.stable = 0; this.drawQuad(); this.sheet(null);
     this.setHint(this.modeHint());
@@ -608,6 +663,7 @@ const CAM = {
     if (v.videoWidth && !this.shooting && !$r('.scn-sheet:not([hidden])')) {
       try {
         if (this.mode === 'qr') this.scanQr().catch(() => {});
+        else if (this.mode === 'mega') { if (this.mega && this.mega.on) this.megaStep(); }
         else {
           const k = 320 / Math.max(v.videoWidth, v.videoHeight), c = this.small || (this.small = document.createElement('canvas'));
           c.width = Math.round(v.videoWidth * k); c.height = Math.round(v.videoHeight * k);
@@ -624,7 +680,7 @@ const CAM = {
         }
       } catch (e) { console.warn(e); }
     }
-    this.timer = setTimeout(() => this.loop(), this.mode === 'qr' ? 220 : 110);
+    this.timer = setTimeout(() => this.loop(), this.mode === 'qr' ? 220 : this.mode === 'mega' ? 160 : 110);
   },
   // מעקב אחרי הדף בין תמונות: החלקה, יציבות, וצילום אוטומטי
   track2(q) {
@@ -685,7 +741,115 @@ const CAM = {
     this.pick = x > mid ? 'right' : 'left'; this.quad = null; this.stable = 0; this.spreadTold = 0;
     this.setHint(this.pick === 'right' ? 'נבחר העמוד הימני' : 'נבחר העמוד השמאלי');
   },
+  /* ---- מגה סריקה: דף גדול מ-A4 (שרטוט, פוסטר, מפה) נסרק בתנועה רציפה ----
+     כל כמה עשיריות שנייה נמדדת התזוזה של התמונה מהחלק האחרון שנשמר (phase correlation, במכשיר).
+     כשהטלפון זז כרבע מסך נשמר חלק חדש במקומו, ובסוף כל החלקים מחוברים לתמונה אחת גדולה */
+  megaFrame(full) {
+    const v = this.video, N = 256;
+    const c = this.megaC || (this.megaC = document.createElement('canvas')); c.width = c.height = N;
+    const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(v, 0, 0, N, N);
+    const d = x.getImageData(0, 0, N, N).data, g = new Float64Array(N * N);
+    for (let i = 0; i < N * N; i++) g[i] = d[i * 4] * 0.3 + d[i * 4 + 1] * 0.59 + d[i * 4 + 2] * 0.11;
+    const out = { S: spectrum(g, N) };
+    if (full) {
+      const k = Math.min(1, 1600 / Math.max(v.videoWidth, v.videoHeight));
+      out.c = canvasOf(v.videoWidth * k, v.videoHeight * k); out.c.getContext('2d').drawImage(v, 0, 0, out.c.width, out.c.height);
+      out.t = scaledCanvas(out.c, 120);
+    }
+    return out;
+  },
+  megaStart() {
+    const f = this.megaFrame(true);
+    this.mega = { on: true, tiles: [], ref: { S: f.S, x: 0, y: 0 }, tw: f.c.width, th: f.c.height, cur: [0, 0], lost: 0, map: canvasOf(4096, 4096) };
+    this.megaPlace(f, 0, 0);
+    $r('[data-a=shoot]').classList.add('rec'); $r('[data-a=shoot]').setAttribute('aria-label', 'סיום מגה סריקה');
+    $r('.scn-mini').hidden = false; this.megaMini(); this.setHint(this.modeHint());
+    try { navigator.vibrate && navigator.vibrate(20); } catch (_) {}
+  },
+  megaStep() {
+    const M = this.mega, N = 256, f = this.megaFrame(false), r = phaseShift(M.ref.S, f.S, N);
+    if (r.peak < 0.1) { if (++M.lost > 2) this.setHint('לאט יותר: חזרו מעט אל החלק הקודם'); return; }
+    M.lost = 0;
+    const x = M.ref.x + r.dx * M.tw / N, y = M.ref.y + r.dy * M.th / N; M.cur = [x, y];
+    if (Math.max(Math.abs(r.dx), Math.abs(r.dy)) > N * 0.26 && M.tiles.length < 80) {
+      const g = this.megaFrame(true), at = this.megaPlace(g, x, y);
+      M.ref = { S: g.S, x: at[0], y: at[1] }; M.cur = at;
+      try { navigator.vibrate && navigator.vibrate(8); } catch (_) {}
+      this.setHint(`נסרקו ${M.tiles.length} חלקים · ממשיכים לזוז, ולוחצים לסיום`);
+    }
+    this.megaMini();
+  },
+  // חלק חדש נבדק מול כל מה שכבר נסרק באותו מקום (לא רק מול החלק הקודם), ומתוקן,
+  // כך שהסטייה לא מצטברת כשעוברים לשורה הבאה של הדף
+  megaPlace(f, x, y) {
+    const M = this.mega, N = 256, mx = c => 2048 + c * N / M.tw, my = c => 2048 + c * N / M.th;
+    if (M.tiles.length) {
+      const rx = Math.round(mx(x)), ry = Math.round(my(y));
+      if (rx >= 0 && ry >= 0 && rx + N <= 4096 && ry + N <= 4096) {
+        const c = this.megaR || (this.megaR = canvasOf(N, N)), cx = c.getContext('2d', { willReadFrequently: true });
+        cx.fillStyle = '#808080'; cx.fillRect(0, 0, N, N); cx.drawImage(M.map, rx, ry, N, N, 0, 0, N, N);
+        const d = cx.getImageData(0, 0, N, N).data, g = new Float64Array(N * N);
+        for (let i = 0; i < N * N; i++) g[i] = d[i * 4] * 0.3 + d[i * 4 + 1] * 0.59 + d[i * 4 + 2] * 0.11;
+        const r = phaseShift(spectrum(g, N), f.S, N);
+        if (r.peak > 0.08 && Math.abs(r.dx) < N * 0.12 && Math.abs(r.dy) < N * 0.12) { x += r.dx * M.tw / N; y += r.dy * M.th / N; }
+      }
+    }
+    M.tiles.push({ c: f.c, t: f.t, x, y });
+    M.map.getContext('2d').drawImage(f.c, mx(x), my(y), N, N);
+    return [x, y];
+  },
+  // מפה קטנה בפינה: מה כבר נסרק, ואיפה המצלמה עכשיו
+  megaMini() {
+    const M = this.mega; if (!M) return;
+    const cv = $r('.scn-mini canvas'), x = cv.getContext('2d');
+    let x0 = Math.min(...M.tiles.map(t => t.x), M.cur[0]), y0 = Math.min(...M.tiles.map(t => t.y), M.cur[1]);
+    let x1 = Math.max(...M.tiles.map(t => t.x), M.cur[0]) + M.tw, y1 = Math.max(...M.tiles.map(t => t.y), M.cur[1]) + M.th;
+    const k = Math.min(150 / (x1 - x0), 150 / (y1 - y0));
+    cv.width = Math.max(20, Math.round((x1 - x0) * k)); cv.height = Math.max(20, Math.round((y1 - y0) * k));
+    for (const t of M.tiles) x.drawImage(t.t, (t.x - x0) * k, (t.y - y0) * k, M.tw * k, M.th * k);
+    x.strokeStyle = '#FFD43B'; x.lineWidth = 2; x.strokeRect((M.cur[0] - x0) * k + 1, (M.cur[1] - y0) * k + 1, M.tw * k - 2, M.th * k - 2);
+  },
+  megaCancel() {
+    if (!this.mega) return;
+    this.mega.tiles.forEach(t => { free(t.c); free(t.t); }); free(this.mega.map); this.mega = null;
+    $r('[data-a=shoot]').classList.remove('rec'); $r('[data-a=shoot]').setAttribute('aria-label', 'צילום'); $r('.scn-mini').hidden = true;
+  },
+  async megaStop() {
+    const M = this.mega; if (!M) return;
+    M.on = false;
+    // חלק אחרון מהמקום שבו המצלמה נמצאת עכשיו, אם זזה מאז
+    if (Math.hypot(M.cur[0] - M.ref.x, M.cur[1] - M.ref.y) > M.tw * 0.08) this.megaPlace(this.megaFrame(true), M.cur[0], M.cur[1]);
+    this.busy(`מחבר ${M.tiles.length} חלקים לתמונה אחת…`);
+    await sleep(30);
+    try {
+      const x0 = Math.min(...M.tiles.map(t => t.x)), y0 = Math.min(...M.tiles.map(t => t.y));
+      const W = Math.max(...M.tiles.map(t => t.x)) + M.tw - x0, H = Math.max(...M.tiles.map(t => t.y)) + M.th - y0;
+      const k = Math.min(1, 9000 / Math.max(W, H)), out = canvasOf(W * k, H * k), ox = out.getContext('2d');
+      ox.fillStyle = '#fff'; ox.fillRect(0, 0, out.width, out.height); ox.imageSmoothingQuality = 'high';
+      // כל חלק מצויר עם שוליים רכים, כדי שהחיבור בין החלקים לא ייראה
+      const fe = Math.round(Math.min(M.tw, M.th) * 0.06 * k);
+      for (const [i, t] of M.tiles.entries()) {
+        const w = Math.round(M.tw * k), h = Math.round(M.th * k), tc = canvasOf(w, h), tx = tc.getContext('2d');
+        tx.drawImage(t.c, 0, 0, w, h);
+        if (i && fe > 2) {
+          tx.globalCompositeOperation = 'destination-in';
+          const gx = tx.createLinearGradient(0, 0, w, 0); gx.addColorStop(0, 'rgba(0,0,0,0)'); gx.addColorStop(fe / w, '#000'); gx.addColorStop(1 - fe / w, '#000'); gx.addColorStop(1, 'rgba(0,0,0,0)');
+          tx.fillStyle = gx; tx.fillRect(0, 0, w, h);
+          const gy = tx.createLinearGradient(0, 0, 0, h); gy.addColorStop(0, 'rgba(0,0,0,0)'); gy.addColorStop(fe / h, '#000'); gy.addColorStop(1 - fe / h, '#000'); gy.addColorStop(1, 'rgba(0,0,0,0)');
+          tx.fillStyle = gy; tx.fillRect(0, 0, w, h);
+        }
+        ox.drawImage(tc, Math.round((t.x - x0) * k), Math.round((t.y - y0) * k)); free(tc);
+      }
+      const q = sheetIn(out), blob = await toBlob(out, 0.92); free(out);
+      this.megaCancel();
+      const p = newPage({ src: blob, quad: q || FULL.map(p => [...p]), auto: !!q, filter: this.defFilter });
+      this.pages.push(p); await refreshThumb(p); this.updateStack();
+      this.busy(null); this.cur = this.pages.length - 1; this.show('review');
+      say(q ? 'הדף הגדול חובר. אפשר ליישר את המסגרת בעריכת העמוד' : 'הדף הגדול חובר. אפשר לחתוך אותו בעריכת העמוד');
+    } catch (e) { console.error(e); this.busy(null); this.megaCancel(); say('החיבור נכשל: ' + (e.message || e)); }
+  },
   async shoot() {
+    if (this.mode === 'mega') { if (!this.stream) return; return this.mega && this.mega.on ? this.megaStop() : this.megaStart(); }
     if (this.shooting || !this.stream) return;
     const v = this.video; if (!v.videoWidth) return;
     this.shooting = true;
@@ -948,6 +1112,7 @@ const CAM = {
       else if (x === 'jpg') await this.saveJpgs();
       else if (x === 'open' || x === 'ocr') await this.toEditor(x === 'ocr');
       else if (x === 'word') await this.toWord();
+      else if (x === 'excel') await this.toExcel();
     } catch (e) { console.error(e); say('השמירה נכשלה: ' + (e.message || e)); }
     finally { this.busy(null); }
   },
@@ -979,6 +1144,48 @@ const CAM = {
     if (ocr) { if (typeof runOCR === 'function' && typeof S !== 'undefined' && S.pages) await runOCR(S.pages.map((_, i) => i)); }
     else say('הסריקה פתוחה: אפשר לחתום, לסמן ולמלא. לשמירה, כפתור השמירה למעלה');
   },
+  // טבלה בדף → גיליון Excel: כל טבלה בגיליון משלה, תאים לא ודאיים ברשימה נפרדת לבדיקה, ופתיחה בעורך הגיליונות של סימן
+  async toExcel() {
+    const AI = window.SIMAN_AI;
+    if (!AI) throw new Error('קריאת הטקסט לא נטענה');
+    const tables = [], t0 = Date.now(), strip = t => String(t).replace(/^\s*```(?:json)?|```\s*$/g, '');
+    for (const [i, p] of this.pages.entries()) {
+      const label = this.pages.length > 1 ? `עמוד ${i + 1} מתוך ${this.pages.length}: ` : '';
+      this.busy(label + 'מכין את התמונה…');
+      const pic = await tablePic(p);
+      const clock = setInterval(() => this.busy(`${label}קורא את הטבלה… ${Math.round((Date.now() - t0) / 1000)} שנ׳`), 1000);
+      let j;
+      try { j = JSON.parse(strip(await AI({ mode: 'table', image: pic.b64, strips: pic.strips, mime: 'image/jpeg' }, { timeout: 150000, onWait: s => this.busy(`השירות עמוס, ממשיך בעוד ${s} שניות…`) }))); }
+      finally { clearInterval(clock); }
+      for (const t of (j && j.tables) || []) if (Array.isArray(t.rows) && t.rows.some(r => Array.isArray(r) && r.some(c => String(c || '').trim()))) tables.push({ title: t.title || '', rows: t.rows, page: i + 1 });
+    }
+    if (!tables.length) throw new Error('לא נמצאה טבלה בדף');
+    this.busy('בונה את הגיליון…');
+    if (!window.XLSX || !XLSX.utils) await loadJs('xlsx.mini.min.js');
+    const wb = XLSX.utils.book_new(), unsure = [['גיליון', 'תא', 'מה נקרא']];
+    let he = 0, all = 0;
+    tables.forEach((t, ti) => {
+      const width = Math.max(...t.rows.map(r => (r || []).length));
+      const rows = t.rows.map(r => { const a = (r || []).map(c => String(c ?? '')); while (a.length < width) a.push(''); return a; });
+      const top = t.title ? [[t.title], []] : [], aoa = [...top], name = (tables.length > 1 ? `טבלה ${ti + 1}` : 'טבלה').slice(0, 31);
+      rows.forEach((r, ri) => aoa.push(r.map((c, ci) => {
+        all++; if (/[\u0590-\u05FF]/.test(c)) he++;
+        if (/\[\[/.test(c)) { c = c.replace(/\[\[|\]\]/g, ''); unsure.push([name, XLSX.utils.encode_cell({ r: top.length + ri, c: ci }), c]); }
+        return cellValue(c);
+      })));
+      const ws = XLSX.utils.aoa_to_sheet(aoa);
+      ws['!cols'] = [...Array(width).keys()].map(ci => ({ wch: Math.min(48, Math.max(8, ...rows.map(r => String(r[ci]).length + 2))) }));
+      XLSX.utils.book_append_sheet(wb, ws, name);
+    });
+    if (unsure.length > 1) { const ws = XLSX.utils.aoa_to_sheet(unsure); ws['!cols'] = [{ wch: 12 }, { wch: 8 }, { wch: 40 }]; XLSX.utils.book_append_sheet(wb, ws, 'לבדיקה'); }
+    // גיליון מימין לשמאל כשרוב התאים בעברית
+    if (he > all * 0.3) wb.Workbook = { Views: [{ RTL: true }] };
+    const bytes = new Uint8Array(XLSX.write(wb, { bookType: 'xlsx', type: 'array' })), name = this.fileBase() + '.xlsx';
+    this.busy(null); this.close(true);
+    if (typeof openExcelEditor === 'function') await openExcelEditor(bytes, name, false);
+    else download(new File([bytes], name, { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+    say(unsure.length > 1 ? `הטבלה מוכנה. ${unsure.length - 1} תאים לבדיקה ברשימה ״לבדיקה״` : 'הטבלה מוכנה לעריכה');
+  },
   async toWord() {
     const SC = window.SIMAN_SCAN;
     if (!SC || !SC.openReader) throw new Error('קריאת הטקסט לא נטענה');
@@ -992,6 +1199,25 @@ const CAM = {
     SC.openReader(); SC.name = name; SC.run(pics);
   },
 };
+
+/* ---- תמונה לקריאת טבלה: הדף בצבע נקי (קווי הטבלה נשמרים!), ועוד שלוש רצועות חדות מלמעלה למטה ---- */
+async function tablePic(p) {
+  const c = await render(Object.assign({}, p, { filter: p.filter === 'orig' || p.filter === 'bw' ? 'clean' : p.filter, ink: false }), 2600);
+  const u = c.toDataURL('image/jpeg', 0.88), strips = [], n = c.height > c.width * 1.1 ? 3 : 2, ov = 0.06;
+  for (let s = 0; s < n; s++) {
+    const y0 = Math.max(0, c.height * (s / n - ov)), y1 = Math.min(c.height, c.height * ((s + 1) / n + ov)), k = Math.min(1, 2000 / c.width);
+    const o = canvasOf(c.width * k, (y1 - y0) * k); o.getContext('2d').drawImage(c, 0, y0, c.width, y1 - y0, 0, 0, o.width, o.height);
+    strips.push(o.toDataURL('image/jpeg', 0.86).split(',')[1]); free(o);
+  }
+  free(c);
+  return { b64: u.split(',')[1], strips };
+}
+// תא: מספר רגיל נשמר כמספר (כדי שאפשר יהיה לחשב איתו), כל השאר כטקסט כמו שנכתב
+function cellValue(c) {
+  const t = String(c).trim(), n = t.replace(/,/g, '');
+  if (/^-?\d+(\.\d+)?$/.test(n) && !(/^-?0\d/.test(n)) && n.length < 16) return Number(n);
+  return t;
+}
 
 /* ---- תמונה לקריאת הטקסט: לא מה שיפה לעין, אלא מה שהכי קל לקרוא ----
    · הנייר לבן לגמרי, גם בצללים

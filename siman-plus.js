@@ -1301,6 +1301,7 @@ camIn.onchange = e => { const f = [...e.target.files]; e.target.value = ''; SC.f
 imgIn.onchange = e => { const f = [...e.target.files]; e.target.value = ''; SC.fromImages(f); };
 pdfIn.onchange = e => { const f = e.target.files[0]; e.target.value = ''; SC.fromPdf(f); };
 window.SIMAN_SCAN = SC;
+window.SIMAN_AI = ai;
 
 /* The writer's own words: names, places and work terms the person typed when fixing a reading.
    Kept on this device only, and sent with the next readings as a hint (used only when the letters fit). */
