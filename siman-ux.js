@@ -71,7 +71,7 @@ const css=document.createElement('style');css.textContent=`
 @media (max-width:720px){
   .sb-back,.a11y-fab{width:44px!important;height:44px!important;opacity:.92}
   .sb-back svg{width:22px!important;height:22px!important}
-  .brand .ver{display:none!important}
+  .brand .ver{font-size:11px!important;padding:1px 6px!important}
   html.v7-doc header.bar .group{gap:4px!important}
   html.v7-doc #redoBtn{display:none!important}
   html.v7-doc #toast,html.v7.v7-doc #toast{bottom:calc(84px + env(safe-area-inset-bottom,0px))!important}

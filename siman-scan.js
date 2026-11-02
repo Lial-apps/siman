@@ -73,7 +73,7 @@ document.head.append(h(`<style id="simanCamCss">
 .scn-ib[hidden]{display:none}
 .scn-pill{height:36px;padding:0 12px;border-radius:999px;border:1px solid rgba(255,255,255,.22);background:transparent;display:inline-flex;align-items:center;gap:6px;font-size:13.5px;white-space:nowrap}
 .scn-pill svg{width:18px;height:18px}
-.scn-pill[aria-pressed="true"]{background:#fff;color:var(--v7-on,#0A1222);border-color:#fff}
+.scn-pill[aria-pressed="true"]{background:#fff;color:#0A1222;border-color:#fff}
 .scn-stage{flex:1;min-height:0;position:relative;display:grid;place-items:center;overflow:hidden}
 .scn-vf{position:relative;border-radius:14px;overflow:hidden;background:#000}
 .scn-vf video{display:block;width:100%;height:100%;object-fit:fill}
@@ -95,19 +95,19 @@ document.head.append(h(`<style id="simanCamCss">
 /* 5.8.3 — computer: pictures from the computer instead of the camera */
 .scn-desk{width:min(560px,92%);display:flex;flex-direction:column;gap:14px;text-align:center}
 .scn-drop{display:flex;flex-direction:column;align-items:center;gap:10px;padding:34px 22px;border:2px dashed rgba(255,255,255,.35);border-radius:22px;background:rgba(255,255,255,.04);cursor:pointer;color:inherit;font:inherit}
-.scn-drop:hover,.scn.drag .scn-drop{border-color:var(--v7-accent,#FFD43B);background:rgba(255,212,59,.08)}
-.scn-drop:focus-visible{outline:3px solid var(--v7-accent,#FFD43B);outline-offset:3px}
+.scn-drop:hover,.scn.drag .scn-drop{border-color:#9DB8FF;background:rgba(255,212,59,.08)}
+.scn-drop:focus-visible{outline:3px solid #9DB8FF;outline-offset:3px}
 .scn-drop svg{width:44px;height:44px;opacity:.9}
 .scn-drop b{font-size:19px}
 .scn-drop span{font-size:14.5px;color:#B8C4D8;line-height:1.5}
 .scn-desk .alt{display:flex;flex-direction:column;gap:8px;align-items:center;font-size:14px;color:#B8C4D8}
 .scn-desk kbd{direction:ltr;display:inline-block;padding:1px 7px;border:1px solid rgba(255,255,255,.3);border-radius:6px;font:inherit;font-size:13px}
-.scn-desk .link{border:0;background:none;color:var(--v7-accent,#FFD43B);font:inherit;font-size:14.5px;text-decoration:underline;text-underline-offset:3px;cursor:pointer;min-height:44px;padding:0 8px}
+.scn-desk .link{border:0;background:none;color:#9DB8FF;font:inherit;font-size:14.5px;text-decoration:underline;text-underline-offset:3px;cursor:pointer;min-height:44px;padding:0 8px}
 .scn.desk-pick .scn-shutter,.scn.desk-pick [data-a=auto],.scn.desk-pick [data-a=torch],.scn.desk-pick [data-m=mega],.scn.desk-pick [data-m=qr]{visibility:hidden}
 .scn.desk-pick [data-m=mega],.scn.desk-pick [data-m=qr]{display:none}
 .scn-modes{flex:none;display:flex;gap:4px;padding:10px 8px 2px;overflow-x:auto;scrollbar-width:none}
 .scn-modes button{border:0;background:none;padding:7px 13px;border-radius:999px;font-size:14.5px;color:#9FB0C9;white-space:nowrap}
-.scn-modes button[aria-pressed="true"]{color:var(--v7-on,#0A1222);background:var(--v7-accent,#FFD43B);font-weight:700}
+.scn-modes button[aria-pressed="true"]{color:#0A1222;background:#9DB8FF;font-weight:700}
 .scn-bottom{flex:none;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:12px 18px 18px}
 .scn-shutter{width:76px;height:76px;border-radius:50%;border:4px solid #fff;background:transparent;display:grid;place-items:center;position:relative;padding:0}
 .scn-shutter i{display:block;width:60px;height:60px;border-radius:50%;background:#fff;transition:transform .1s}
@@ -121,14 +121,14 @@ document.head.append(h(`<style id="simanCamCss">
 .scn-shutter .ring circle{fill:none;stroke:#3DDC97;stroke-width:4;stroke-dasharray:264;stroke-dashoffset:264;transition:stroke-dashoffset .12s linear}
 .scn-stack{justify-self:start;position:relative;width:58px;height:58px;border:0;padding:0;background:none}
 .scn-stack img{width:100%;height:100%;object-fit:cover;border-radius:10px;border:2px solid #fff;display:block;background:#fff}
-.scn-stack b{position:absolute;top:-8px;inset-inline-end:-8px;min-width:24px;height:24px;padding:0 6px;border-radius:12px;background:var(--v7-accent,#FFD43B);color:var(--v7-on,#0A1222);font-size:13px;display:grid;place-items:center}
+.scn-stack b{position:absolute;top:-8px;inset-inline-end:-8px;min-width:24px;height:24px;padding:0 6px;border-radius:12px;background:#9DB8FF;color:#0A1222;font-size:13px;display:grid;place-items:center}
 .scn-stack[hidden]{visibility:hidden;display:block}
 .scn-gal{justify-self:end}
 /* 5.8.4: PDF of scanned pages, a button of its own on every device */
 .scn-gals{justify-self:end;display:flex;gap:8px;align-items:center}
 .scn-pdf b{font-size:12px;font-weight:800;letter-spacing:.02em;direction:ltr;color:#fff}
 @media (pointer:coarse){.scn-gals .scn-ib{width:46px;height:46px}}
-.scn-done{justify-self:start;height:44px;padding:0 18px;border-radius:12px;border:0;background:var(--v7-accent,#FFD43B);color:var(--v7-on,#0A1222);font-weight:700;font-size:15px}
+.scn-done{justify-self:start;height:44px;padding:0 18px;border-radius:12px;border:0;background:#3E6BF2;color:#fff;font-weight:700;font-size:15px}
 .scn-body{flex:1;min-height:0;overflow:auto;padding:4px 14px 14px}
 .scn-name{display:flex;align-items:center;gap:8px;margin:2px 0 12px}
 .scn-name input{flex:1;min-width:0;height:42px;border-radius:10px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);color:#fff;padding:0 12px;font:inherit;font-size:15px;direction:rtl}
@@ -153,7 +153,7 @@ document.head.append(h(`<style id="simanCamCss">
 .scn-act{min-height:52px;border-radius:12px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.05);display:flex;align-items:center;gap:10px;padding:8px 12px;text-align:right}
 .scn-act b{display:block;font-size:14.5px}
 .scn-act span{display:block;font-size:12px;color:#9FB0C9;line-height:1.3}
-.scn-act.main{background:var(--v7-accent,#FFD43B);border-color:var(--v7-accent,#FFD43B);color:var(--v7-on,#0A1222)}
+.scn-act.main{background:#3E6BF2;border-color:#3E6BF2;color:#fff}
 .scn-act.main span{color:#3B3413}
 .scn-edit{flex:1;min-height:0;display:grid;place-items:center;padding:8px 12px;position:relative}
 .scn-edit .canvas{position:relative;max-width:100%;max-height:100%}
@@ -162,31 +162,34 @@ document.head.append(h(`<style id="simanCamCss">
 .scn-crop img{display:block;max-width:100%;max-height:100%;pointer-events:none}
 .scn-crop svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
 .scn-crop .shade{fill:rgba(0,0,0,.5)}
-.scn-crop .edge{fill:none;stroke:var(--v7-accent,#FFD43B);stroke-width:3px;vector-effect:non-scaling-stroke}
-.scn-hd{position:absolute;width:34px;height:34px;margin:-17px 0 0 -17px;border-radius:50%;border:3px solid var(--v7-accent,#FFD43B);background:rgba(255,212,59,.25);touch-action:none;padding:0}
-.scn-hd.on{background:var(--v7-accent,#FFD43B)}
+.scn-crop .edge{fill:none;stroke:#9DB8FF;stroke-width:3px;vector-effect:non-scaling-stroke}
+.scn-hd{position:absolute;width:34px;height:34px;margin:-17px 0 0 -17px;border-radius:50%;border:3px solid #9DB8FF;background:rgba(255,212,59,.25);touch-action:none;padding:0}
+.scn-hd.on{background:#9DB8FF}
 .scn-tools{flex:none;display:flex;gap:6px;justify-content:center;flex-wrap:wrap;padding:8px 10px}
 .scn-tool{min-width:64px;height:58px;border:0;border-radius:12px;background:rgba(255,255,255,.06);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:12px;padding:4px 8px}
-.scn-tool[aria-pressed="true"]{background:var(--v7-accent,#FFD43B);color:var(--v7-on,#0A1222)}
+.scn-tool[aria-pressed="true"]{background:#9DB8FF;color:#0A1222}
 .scn-filters{flex:none;display:flex;gap:8px;overflow-x:auto;padding:4px 12px 12px;scrollbar-width:none}
 .scn-filters>:first-child,.scn-modes>:first-child{margin-inline-start:auto}.scn-filters>:last-child,.scn-modes>:last-child{margin-inline-end:auto}
 .scn-filters button{flex:none;border:2px solid transparent;border-radius:10px;background:rgba(255,255,255,.06);padding:4px 4px 6px;width:76px;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px}
 .scn-filters button img{width:64px;height:64px;object-fit:cover;border-radius:6px;background:#fff}
-.scn-filters button[aria-pressed="true"]{border-color:var(--v7-accent,#FFD43B)}
+.scn-filters button[aria-pressed="true"]{border-color:#9DB8FF}
 .scn-busy{position:absolute;inset:0;z-index:5;background:rgba(6,11,22,.78);display:grid;place-items:center;text-align:center;font-size:15.5px;padding:24px}
 .scn-busy[hidden]{display:none}
-.scn-busy i{display:block;width:42px;height:42px;margin:0 auto 14px;border-radius:50%;border:4px solid rgba(255,255,255,.2);border-top-color:var(--v7-accent,#FFD43B);animation:scnSpin 1s linear infinite}
+.scn [aria-pressed="true"],.scn [aria-checked="true"],.scn .on{color:#0A1222!important}
+.scn-busy .skip{display:block;margin:16px auto 0;min-height:44px;padding:0 20px;border-radius:12px;border:1px solid rgba(255,255,255,.35);background:transparent;color:#fff;font:inherit;font-weight:700;cursor:pointer}
+.scn-busy small{display:block;margin-top:8px;color:#B8C4D8;font-size:13.5px}
+.scn-busy i{display:block;width:42px;height:42px;margin:0 auto 14px;border-radius:50%;border:4px solid rgba(255,255,255,.2);border-top-color:#9DB8FF;animation:scnSpin 1s linear infinite}
 @keyframes scnSpin{to{transform:rotate(360deg)}}
-.scn-sheet{position:absolute;inset-inline:12px;bottom:12px;z-index:4;background:#fff;color:var(--v7-on,#0A1222);border-radius:16px;padding:16px;box-shadow:0 10px 40px rgba(0,0,0,.5)}
+.scn-sheet{position:absolute;inset-inline:12px;bottom:12px;z-index:4;background:#fff;color:#0A1222;border-radius:16px;padding:16px;box-shadow:0 10px 40px rgba(0,0,0,.5)}
 .scn-sheet[hidden]{display:none}
 .scn-sheet h3{margin:0 0 6px;font-size:16px}
 .scn-sheet .val{direction:ltr;text-align:left;unicode-bidi:isolate;word-break:break-all;background:#F1F4FA;border-radius:10px;padding:10px;font-size:14px;margin:0 0 12px;max-height:30vh;overflow:auto;-webkit-user-select:text;user-select:text}
 .scn-sheet .row{display:flex;gap:8px;flex-wrap:wrap}
-.scn-sheet button{height:40px;padding:0 14px;border-radius:10px;border:1px solid #CBD5E6;background:#fff;color:var(--v7-on,#0A1222)}
-.scn-sheet button.main{background:#0A1222;color:#fff;border-color:var(--v7-on,#0A1222)}
+.scn-sheet button{height:40px;padding:0 14px;border-radius:10px;border:1px solid #CBD5E6;background:#fff;color:#0A1222}
+.scn-sheet button.main{background:#0A1222;color:#fff;border-color:#0A1222}
 .scn-btn{height:42px;padding:0 16px;border-radius:12px;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.06);display:inline-flex;align-items:center;gap:8px;font-size:14.5px}
-.scn-btn.main{background:var(--v7-accent,#FFD43B);border-color:var(--v7-accent,#FFD43B);color:var(--v7-on,#0A1222);font-weight:700}
-.scn-toast{position:absolute;left:50%;bottom:24px;transform:translateX(-50%);z-index:6;max-width:90%;padding:10px 16px;border-radius:12px;background:#fff;color:var(--v7-on,#0A1222);font-size:14.5px;box-shadow:0 6px 24px rgba(0,0,0,.4);text-align:center}
+.scn-btn.main{background:#9DB8FF;border-color:#9DB8FF;color:#0A1222;font-weight:700}
+.scn-toast{position:absolute;left:50%;bottom:24px;transform:translateX(-50%);z-index:6;max-width:90%;padding:10px 16px;border-radius:12px;background:#fff;color:#0A1222;font-size:14.5px;box-shadow:0 6px 24px rgba(0,0,0,.4);text-align:center}
 .scn-toast[hidden]{display:none}
 .scn-vf .ov polygon.other{fill:rgba(0,0,0,.35);stroke:rgba(255,255,255,.6);stroke-dasharray:6 5}
 .scn-note{margin:10px 0 0;font-size:12.5px;color:#8FA1BC;line-height:1.5}
@@ -269,7 +272,7 @@ const root = h(`<div class="scn" hidden role="dialog" aria-modal="true" aria-lab
       <button class="scn-tool" type="button" data-t="del">${I.trash}<span>מחיקה</span></button>
     </div>
   </section>
-  <div class="scn-busy" hidden><div><i></i><span></span></div></div>
+  <div class="scn-busy" hidden><div><i></i><span></span><small></small><button type="button" class="skip" hidden></button></div></div>
   <p class="scn-toast" role="status" hidden></p>
 </div>`);
 document.body.append(root);
@@ -830,7 +833,10 @@ const CAM = {
     if (v === 'review') this.renderReview();
     if (v === 'edit') this.renderEdit();
   },
-  busy(msg) { const b = $r('.scn-busy'); b.hidden = !msg; if (msg) b.querySelector('span').textContent = msg; },
+  busy(msg, note, skip) { const b = $r('.scn-busy'); b.hidden = !msg; if (msg) b.querySelector('span').textContent = msg;
+    const n = b.querySelector('small'), k = b.querySelector('.skip');
+    if (note !== undefined) n.textContent = note || ''; if (!msg) n.textContent = '';
+    if (skip !== undefined) { k.hidden = !skip; if (skip) { k.textContent = skip.label; k.onclick = skip.run; } } if (!msg) k.hidden = true; },
 
   /* ---- מצלמה ---- */
   async startCam() {
@@ -1098,7 +1104,7 @@ const CAM = {
     const k = Math.min(150 / (x1 - x0), 150 / (y1 - y0));
     cv.width = Math.max(20, Math.round((x1 - x0) * k)); cv.height = Math.max(20, Math.round((y1 - y0) * k));
     for (const t of M.tiles) x.drawImage(t.t, (t.x - x0) * k, (t.y - y0) * k, M.tw * k, M.th * k);
-    x.strokeStyle = 'var(--v7-accent,#FFD43B)'; x.lineWidth = 2; x.strokeRect((M.cur[0] - x0) * k + 1, (M.cur[1] - y0) * k + 1, M.tw * k - 2, M.th * k - 2);
+    x.strokeStyle = '#9DB8FF'; x.lineWidth = 2; x.strokeRect((M.cur[0] - x0) * k + 1, (M.cur[1] - y0) * k + 1, M.tw * k - 2, M.th * k - 2);
   },
   megaCancel() {
     if (!this.mega) return;
@@ -1517,18 +1523,23 @@ const CAM = {
       await this.orient(p);
       this.busy(label + 'מכין את התמונה…');
       const pic = await tablePic(p);
-      let stage = 'קורא את הטבלה';
-      const clock = setInterval(() => this.busy(`${label}${stage}… ${Math.round((Date.now() - t0) / 1000)} שנ׳`), 1000);
+      // 5.9.3: the time shown is the time of THIS step, the user is told what to expect, and the second look
+      // (every cell against the picture — the slow part on a big table) can be skipped: the first reading is kept
+      let stage = 'קורא את הטבלה', st0 = Date.now();
+      const clock = setInterval(() => this.busy(`${label}${stage}… ${Math.round((Date.now() - st0) / 1000)} שנ׳`), 1000);
       let j = null;
       try {
         const wait = { timeout: 150000, onWait: s => this.busy(`השירות עמוס, ממשיך בעוד ${s} שניות…`) };
+        this.busy(`${label}${stage}…`, 'טבלה גדולה יכולה לקחת דקה או שתיים', false);
         j = JSON.parse(strip(await AI({ mode: 'table', image: pic.b64, strips: pic.strips, mime: 'image/jpeg' }, wait)));
-        if (okTables(j)) {
-          stage = 'בודק כל תא מול התמונה';
-          try { const k = JSON.parse(strip(await AI({ mode: 'tableCheck', image: pic.b64, strips: pic.strips, draft: j }, wait))); if (okTables(k)) j = Object.assign({}, j, k, { notes: k.notes || j.notes }); }
-          catch (e) { console.warn('table check', e); }   // the first reading stays
+        if (okTables(j) && (window.SIMAN_SCAN || {}).quality !== 'fast') {
+          stage = 'בודק כל תא מול התמונה'; st0 = Date.now();
+          const ctl = new AbortController();
+          this.busy(`${label}${stage}…`, 'הבדיקה מתקנת טעויות קריאה. אפשר לדלג ולקבל את הטבלה מיד, ולתקן בעצמכם את התאים שמסומנים בצהוב', { label: 'לדלג ולפתוח את הטבלה עכשיו', run: () => ctl.abort() });
+          try { const k = JSON.parse(strip(await AI({ mode: 'tableCheck', image: pic.b64, strips: pic.strips, draft: j }, Object.assign({}, wait, { signal: ctl.signal })))); if (okTables(k)) j = Object.assign({}, j, k, { notes: k.notes || j.notes }); }
+          catch (e) { if (!ctl.signal.aborted) console.warn('table check', e); }   // the first reading stays
         }
-      } finally { clearInterval(clock); }
+      } finally { clearInterval(clock); this.busy(label + 'בונה את הגיליון…', '', false); }
       if (!okTables(j)) continue;
       j.tables.forEach((t, ti) => sheets.push({ title: t.title || '', notes: ti === 0 ? (j.notes || []) : [], rows: t.rows, page: i + 1 }));
     }
