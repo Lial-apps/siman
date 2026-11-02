@@ -11,7 +11,7 @@
 <link rel="apple-touch-icon" sizes="180x180" href="icon-180.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="סימן">
-<script>/* 5.9.1 — כולם בעיצוב החדש. הצבע והמצב (בהיר / כהה / אוטומטי) נצבעים מיד, לפני שהדף מופיע, בלי הבהוב.
+<script>/* 5.9.2 — כולם בעיצוב החדש. הצבע והמצב (בהיר / כהה / אוטומטי) נצבעים מיד, לפני שהדף מופיע, בלי הבהוב.
    הערכים נשמרים ב-siman.v7.boot על ידי siman-v7.js, שם נמצאת רשימת הצבעים המלאה. */
 (function(){var d=document.documentElement;d.classList.add('v7');
 try{localStorage.removeItem('siman.design');localStorage.removeItem('siman.beta');}catch(e){}
@@ -1288,7 +1288,7 @@ body:has(#wed) .busy,body:has(#xed) .busy{z-index:1000}body:has(#wed) .toast,bod
 .btn.wedit{border-color:#2B579A;color:#2B579A;font-weight:600}
 
 /* =====================================================================
-   5.9.1 — iPhone / iPad (Apple HIG). Every rule says who it reaches:
+   5.9.2 — iPhone / iPad (Apple HIG). Every rule says who it reaches:
    @supports (-webkit-touch-callout:none) = iPhone and iPad only;
    @media (pointer:coarse) = touch screens (phones and tablets, Android too), never a mouse.
    ===================================================================== */
@@ -1348,7 +1348,7 @@ body:has(#wed) .busy,body:has(#xed) .busy{z-index:1000}body:has(#wed) .toast,bod
 </dialog>
 
 <header class="bar">
-  <div class="brand"><b title="גרסה 5.9.1">סימן</b><span class="ver">5.9.1</span><span class="fname" id="fname"></span></div>
+  <div class="brand"><b title="גרסה 5.9.2">סימן</b><span class="ver">5.9.2</span><span class="fname" id="fname"></span></div>
 
   <nav class="tools" id="tools" aria-label="כלים">
     <button class="tool" data-tool="select" aria-pressed="true" title="בחירה וגלילה (V)">
@@ -1728,7 +1728,7 @@ body:has(#wed) .busy,body:has(#xed) .busy{z-index:1000}body:has(#wed) .toast,bod
 <div class="busy hidden" id="busy" role="status" aria-live="polite"><div id="busyMsg">רגע…</div></div>
 
 <script src="pdf.min.js"></script>
-<!-- 5.9.1: pdf-lib and fontkit are needed only when saving or changing pages, so they no longer hold up the first screen -->
+<!-- 5.9.2: pdf-lib and fontkit are needed only when saving or changing pages, so they no longer hold up the first screen -->
 <script src="pdf-lib.min.js" defer></script>
 <script src="fontkit.umd.min.js" defer></script>
 <script>
@@ -2128,7 +2128,7 @@ async function startEdit(P,cx,cy){
   let blocks=await pageBlocks(P);
   if(!blocks||!blocks.length){toast('אין בעמוד טקסט לעריכה. אם הוא סרוק, לחצו "זיהוי טקסט (OCR)"');return;}
   let B=blockAt(P,cx,cy);if(!B){toast('לחצו על טקסט');return;}
-  // 5.9.1: some PDFs keep their text in a scrambled encoding (a font with no readable map), so what pdf.js reads
+  // 5.9.2: some PDFs keep their text in a scrambled encoding (a font with no readable map), so what pdf.js reads
   // is gibberish although the page looks fine. Editing that would replace the line with the gibberish —
   // so the page is read with OCR first, once, and the real words are edited.
   if(!P.ocr&&!S.anns.some(x=>x.type==='edit'&&x.page===P.i-1)&&(textQuality(P.lines||[])<.6||pageGarbled(P.lines)||textGarbled(B.text)||(B.text.replace(/\s/g,'').length>3&&textQuality([B])<.4))){
@@ -3622,7 +3622,7 @@ async function ocrPage(P){
   return lines.length;
 }
 // share of words that look like real words; low = a garbled text layer from a scanner
-// 5.9.1: a scrambled text layer (a font whose character map is broken): control characters and letters of a script
+// 5.9.2: a scrambled text layer (a font whose character map is broken): control characters and letters of a script
 // nobody writes in (Armenian, Georgian, private-use) appear inside the words; some files also map many glyphs to one
 // repeated string, which looks "readable" to textQuality. A line is garbled when such characters sit in it.
 const RE_GARB=/[\u0000-\u0008\u000B-\u001F\u0530-\u058F\u10A0-\u10FF\uE000-\uF8FF\uFFFD•]/;
@@ -4968,7 +4968,7 @@ function shareHints(){
   const asPdf=!!(SH.file&&SH.pdfAlt&&!canShareFile(SH.file));
   set('shWaHint',IS_TOUCH?(asPdf?'יישלח כ-PDF, בוחרים שיחה ושולחים':'הקובץ עצמו, בוחרים שיחה ושולחים'):waLinkReady()?'נפתח ישר בוואטסאפ, עם קישור לקובץ':'דרך תפריט השיתוף של המחשב, בלי הורדה');
   set('shMailHint',asPdf?'כקובץ PDF מצורף':'שליחת הקובץ כקובץ מצורף');
-  document.querySelector('.sh[data-share="wadesk"]').classList.add('hidden'); // one WhatsApp button on every device (5.9.1)
+  document.querySelector('.sh[data-share="wadesk"]').classList.add('hidden'); // one WhatsApp button on every device (5.9.2)
   const ad=IS_APPLE&&native;btn('airdrop').disabled=!ad;
   set('shAdHint',ad?'לאייפון, אייפד ומק שליד':'זמין רק באייפון, אייפד ומק');
   const qs=(IS_ANDROID||/Windows/i.test(UA))&&native;btn('quick').disabled=!qs;
@@ -4979,7 +4979,7 @@ function shareHints(){
 }
 // computer: WhatsApp gets a link to the file (send.js makes it). Loaded when the share window opens,
 // so the click itself can open WhatsApp without the browser blocking the new window.
-// 5.9.1: the link is off until the share server (siman-share) accepts links made this way — a link that opens
+// 5.9.2: the link is off until the share server (siman-share) accepts links made this way — a link that opens
 // {"error":"forbidden"} is worse than the computer's share menu. Set WA_LINK_ON=true once the server is updated.
 const WA_LINK_ON=true;
 const waLinkReady=()=>WA_LINK_ON&&!!(window.SIMAN_SEND&&typeof window.SIMAN_SEND.makeViewLink==='function');
@@ -5023,7 +5023,7 @@ function prepShare(focusKey){
     SH.file=f;renameShareFile();
     d.classList.remove('wait');shStatus(SH.msgs.join('. '));
     if(focusKey){const b=document.querySelector(`.sh[data-share="${focusKey}"]`);b&&b.focus();}
-    // 5.9.1: phones share only PDF through their share menu (a Word / Excel / PowerPoint file is refused).
+    // 5.9.2: phones share only PDF through their share menu (a Word / Excel / PowerPoint file is refused).
     // The PDF version is prepared now, in the background, so a tap on WhatsApp, mail or Quick Share sends it at once
     SH.pdfAlt=null;SH.altUsed=false;
     if(IS_TOUCH&&navigator.share&&SH.fmt==='office'&&!canShareFile(f)){
@@ -5302,7 +5302,7 @@ if('launchQueue' in window){
    ===================================================================== */
 (function(){
   const STATUS_URL=(typeof REGISTER_URL!=='undefined'&&REGISTER_URL)?REGISTER_URL.replace(/\/register$/,'/status'):'';
-  const U_KEY='siman.usage', T_KEY='siman.trial', APP_VER='5.9.1';
+  const U_KEY='siman.usage', T_KEY='siman.trial', APP_VER='5.9.2';
   const today=()=>new Date().toISOString().slice(0,10);
   const rd=k=>{try{return JSON.parse(localStorage.getItem(k)||'null');}catch(_){return null;}};
   const wr=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch(_){}};
@@ -5364,7 +5364,7 @@ if('launchQueue' in window){
 </script>
 
 <script>
-/* 5.9.1 — iPhone / iPad (Apple HIG): keyboard labels, zoom, on-screen keyboard. Android and computers are not touched here. */
+/* 5.9.2 — iPhone / iPad (Apple HIG): keyboard labels, zoom, on-screen keyboard. Android and computers are not touched here. */
 (function(){
   if(typeof IS_APPLE==='undefined')return;
   // Mac, iPhone and iPad keyboards: show ⌘ instead of Ctrl (the shortcuts accept both)
@@ -5387,17 +5387,17 @@ if('launchQueue' in window){
 })();
 </script>
 <script src="admin-panel.js"></script>
-<link rel="stylesheet" href="siman-phone.css?v=5.9.1">
-<script src="siman-phone.js?v=5.9.1" defer></script>
-<script src="a11y.js?v=5.9.1" defer></script>
+<link rel="stylesheet" href="siman-phone.css?v=5.9.2">
+<script src="siman-phone.js?v=5.9.2" defer></script>
+<script src="a11y.js?v=5.9.2" defer></script>
 <script src="siman-voice.js" defer></script>
-<script src="siman-back.js?v=5.9.1" defer></script>
-<!-- 5.9.1: one design for everyone (the ?beta=1 shell and the classic design were removed) -->
-<link rel="stylesheet" href="siman-v7.css?v=5.9.1">
-<script src="siman-v7.js?v=5.9.1" defer></script>
+<script src="siman-back.js?v=5.9.2" defer></script>
+<!-- 5.9.2: one design for everyone (the ?beta=1 shell and the classic design were removed) -->
+<link rel="stylesheet" href="siman-v7.css?v=5.9.2">
+<script src="siman-v7.js?v=5.9.2" defer></script>
 <script src="siman-media.js?v=5.3.2" defer></script>
 <script src="siman-scan.js?v=5.8.0" defer></script>
-<script src="siman-merge.js?v=5.9.1" defer></script>
-<script src="siman-ux.js?v=5.9.1" defer></script>
+<script src="siman-merge.js?v=5.9.2" defer></script>
+<script src="siman-ux.js?v=5.9.2" defer></script>
 </body>
 </html>

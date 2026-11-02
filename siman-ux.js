@@ -49,15 +49,16 @@ const css=document.createElement('style');css.textContent=`
 .ux-ic{display:inline-grid;place-items:center;width:38px;height:38px;border-radius:11px;font-weight:800;font-size:12px;color:#fff;flex:none;letter-spacing:.02em}
 .ux-ic.pdf{background:#C2362B}.ux-ic.docx{background:#2B579A}.ux-ic.xlsx{background:#1E7145}.ux-ic.pptx{background:#C43E1C}
 /* resume bar */
-.ux-resume{display:flex;align-items:center;gap:12px;margin:10px auto 0;max-width:980px;padding:10px 14px;border-radius:16px;background:var(--v7-soft,#DCE6FA);color:var(--v7-ink,#16213A);border:1px solid var(--v7-line,#D6E0F0)}
+.ux-resume{display:flex;align-items:center;gap:12px;margin:10px auto 0;max-width:min(980px,100%);min-width:0;box-sizing:border-box;width:100%;padding:10px 14px;border-radius:16px;background:var(--v7-soft,#DCE6FA);color:var(--v7-ink,#16213A);border:1px solid var(--v7-line,#D6E0F0)}
 .ux-resume .t{flex:1;min-width:0}.ux-resume b{display:block;font-size:15px}.ux-resume small{display:block;color:var(--v7-muted,#4B5B77);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ux-resume button{min-height:40px;padding:0 14px;border-radius:12px;border:1px solid var(--v7-line,#D6E0F0);background:var(--v7-surface,#fff);color:var(--v7-ink,#16213A);font:inherit;font-weight:700;cursor:pointer}
 .ux-resume button.pri{background:var(--v7-accent,#1D4ED8);color:var(--v7-on,#fff);border-color:transparent}
-@media (max-width:720px){.ux-resume{margin:10px 12px 0;flex-wrap:wrap}.ux-resume .t{flex:1 1 100%}.ux-resume button{flex:1}}
+@media (max-width:720px){.ux-resume{margin:10px 0 0;flex-wrap:wrap}.ux-resume .t{flex:1 1 100%}.ux-resume button{flex:1}}
 /* recent files on the first screen */
-.ux-recent{margin:18px 0 6px}.ux-recent .hd{display:flex;align-items:center;gap:10px;margin:0 0 8px}.ux-recent h2{margin:0;font-size:16px;font-weight:800;flex:1}
+.ux-recent{margin:18px 0 6px;min-width:0;max-width:100%}.ux-recent .hd{display:flex;align-items:center;gap:10px;margin:0 0 8px}.ux-recent h2{margin:0;font-size:16px;font-weight:800;flex:1}
 .ux-recent .hd button{border:0;background:none;color:var(--v7-muted,#4B5B77);font:inherit;font-size:13px;cursor:pointer;padding:4px 6px}
-.ux-recent .ls{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px}
+.ux-recent .ls{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px;min-width:0}
+.ux-rf{min-width:0}
 .ux-rf{position:relative;display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:14px;border:1px solid var(--v7-line,#D6E0F0);background:var(--v7-surface,#fff);color:var(--v7-ink,#16213A);cursor:pointer;text-align:start;font:inherit;min-height:56px}
 .ux-rf:hover{border-color:var(--v7-dash,#8FAEEB)}.ux-rf:focus-visible{outline:3px solid var(--v7-accent,#1D4ED8);outline-offset:2px}
 .ux-rf .n{flex:1;min-width:0}.ux-rf b{display:block;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;unicode-bidi:plaintext;text-align:start}.ux-rf small{color:var(--v7-muted,#4B5B77);font-size:12px}
