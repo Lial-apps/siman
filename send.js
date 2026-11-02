@@ -1,4 +1,4 @@
-/* סימן — שליחה לחתימה ושיתוף בקישור (5.8.2: שדות נוספים רק בהקשה, לא בגלילה; תיבות סימון בטופס).
+/* סימן — שליחה לחתימה ושיתוף בקישור (5.9.0: שדות נוספים רק בהקשה, לא בגלילה; תיבות סימון בטופס).
    השולח מסמן איפה כל אחד חותם, מקבל קישור לכל חותם ושולח אותו בוואטסאפ או במייל.
    החותם פותח את הקישור בטלפון או במחשב, בלי הרשמה ובלי התקנה, וחותם.
    המסמך החתום נבנה בדפדפן: המקור + החתימות + עמוד תיעוד (מי חתם, מתי, מאיזה מכשיר).
@@ -169,13 +169,15 @@ function labelKind(t){
   if(/ש[םס]\s|משפח|זהות|ת\s?ז\b|כתוב|טלפו|כית[הת]|תלמיד|מספר|address|phone/i.test(t))return'text';
   return null;
 }
+// a scrambled text layer (control characters, letters of a script nobody writes in) reads as nothing: the page is scanned for its blanks
+const garbledText=t=>{const m=String(t||'').match(/[\u0000-\u0008\u000B-\u001F\u0530-\u058F\u10A0-\u10FF\uE000-\uF8FF\uFFFD]/g);return !!m&&m.length>=Math.max(2,Math.round(String(t).length*.03));};
 async function scanTargets(pages,skip){
   if(!HOOK.ready())return[];
   const out=[];
   try{
     for(let i=0;i<pages.length&&i<12;i++){if(skip&&skip(i))continue;const{page}=pages[i];
       let txt='';try{txt=(await page.getTextContent()).items.map(x=>x.str).join('').trim();}catch(_){}
-      if(txt.length>40)continue;                       // a page with real text: found from its text already
+      if(txt.length>40&&!garbledText(txt))continue;     // a page with real text: found from its text already
       const v1=page.getViewport({scale:1}),sc=Math.min(4,2200/Math.max(v1.width,v1.height)),vp=page.getViewport({scale:sc});
       const c=document.createElement('canvas');c.width=Math.round(vp.width);c.height=Math.round(vp.height);const g=c.getContext('2d',{willReadFrequently:true});
       g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);await page.render({canvasContext:g,viewport:vp}).promise;
@@ -378,7 +380,7 @@ async function open(opts){
   side.addEventListener('change',e=>{if(e.target.matches('[data-qw]'))u.qpTouched=true;});
   // scanned pages: read in the background, the screen is already usable
   (async()=>{const withText=new Set(u.targets.map(t=>t.page));
-    let scanned=false;for(const p of u.pages){try{const t=(await p.page.getTextContent()).items.map(x=>x.str).join('').trim();if(t.length<=40){scanned=true;break;}}catch(_){}}
+    let scanned=false;for(const p of u.pages){try{const t=(await p.page.getTextContent()).items.map(x=>x.str).join('').trim();if(t.length<=40||garbledText(t)){scanned=true;break;}}catch(_){}}
     if(!scanned||!HOOK.ready())return;
     qpCount('(מחפש בטופס הסרוק…)');say('המסמך סרוק: מחפש בו את מקומות החתימה…');
     let more=[];try{more=await scanTargets(u.pages,i=>withText.has(i));}catch(e){console.warn('scan targets',e);}
