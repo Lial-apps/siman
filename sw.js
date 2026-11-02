@@ -1,5 +1,5 @@
 // סימן — service worker: works offline, picks up new versions automatically
-const CACHE = 'siman-v90'; // 5.9.2
+const CACHE = 'siman-v91'; // 5.9.3
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './pdf.min.js', './pdf.worker.min.js',
   './pdf-lib.min.js', './fontkit.umd.min.js', './icon-192.png', './icon-512.png', './icon-maskable-512.png', './jszip.min.js', './pptxgen.min.js', './office.js', './office-edit.js', './word-editor.js', './excel-editor.js', './docx-preview.min.js', './html2canvas.min.js', './xlsx.mini.min.js', './font-secular-he.woff2', './font-secular-lat.woff2', './send.js', './siman-plus.js', './siman-media.js', './ppt-editor.js', './office-ai.js', './office-translate.js', './a11y.js', './admin-panel.js', './font-rubik-400.ttf', './font-rubik-700.ttf', './siman-phone.css', './siman-phone.js', './siman-voice.js', './siman-asr-worker.js', './transformers.min.js', './siman-back.js', './siman-v7.css', './siman-v7.js', './siman-scan.js', './siman-merge.js', './siman-ux.js'];
 
@@ -31,6 +31,9 @@ self.addEventListener('fetch', e => {
     return;
   }
   if (req.method !== 'GET' || new URL(req.url).origin !== location.origin) return; // APIs go straight to the network
+  // 5.9.3: video and audio go straight to the browser. A video asks for byte ranges, which the cache cannot answer
+  // (Safari then shows nothing), and an old copy kept here hid the new landing-page video
+  if (req.headers.has('range') || /\.(mp4|webm|mov|m4a|mp3|ogg)$/i.test(new URL(req.url).pathname)) return;
   const path = new URL(req.url).pathname;
   const isPage = req.mode === 'navigate' || /\/(index\.html)?$/.test(path);
   // the app's own code: always the newest version when online, so an upload shows up on the next refresh
@@ -44,7 +47,7 @@ self.addEventListener('fetch', e => {
     // newest page when online, cached page when offline. Only the app itself is kept as the app page:
     // other pages (like sign.html, opened from a link) are kept under their own address
     const isApp = /\/(index\.html)?$/.test(path);
-    e.respondWith(fetch(req).then(r => { if (r.ok) { const copy = r.clone(); caches.open(CACHE).then(c => c.put(isApp ? './index.html' : req, copy)); } return r; })
+    e.respondWith(fetch(req, { cache: 'no-cache' }).then(r => { if (r.ok) { const copy = r.clone(); caches.open(CACHE).then(c => c.put(isApp ? './index.html' : req, copy)); } return r; })
       .catch(() => isApp ? caches.match('./index.html') : caches.match(req)));
     return;
   }
