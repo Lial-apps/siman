@@ -1,4 +1,4 @@
-/* סימן — עיצוב 7 (5.8.1): מסך פתיחה של אריחים ("בנטו"), מראה בהיר / כהה / אוטומטי, שישה צבעים, שפת ממשק.
+/* סימן — עיצוב 7 (5.8.2: שמות קצרים לאריחים הקטנים ברוסית ובאנגלית, שלא ייחתכו בטלפון): מסך פתיחה של אריחים ("בנטו"), מראה בהיר / כהה / אוטומטי, שישה צבעים, שפת ממשק.
    כל המשתמשים מקבלים את העיצוב הזה. אין יותר מעבר לעיצוב הקודם (גם לא בכתובת ?design=classic).
    הקובץ לא מזיז אף כפתור קיים: הוא מוסיף מסך פתיחה, כפתורים בסרגל וסרגל קבוצות בטלפון,
    וכל פעולה שלו לוחצת על הכפתור המקורי של האפליקציה. */
@@ -114,6 +114,13 @@
     ar: { appear: 'المظهر واللون', modeLabel: 'المظهر', colorLabel: 'اللون', modes: ['فاتح', 'داكن', 'تلقائي'], modeNote: 'في الوضع التلقائي تتبع الألوان إعداد الجهاز.', colors: ['سماوي', 'بحر', 'لافندر', 'غروب', 'توت', 'غابة'], fresh: 'جديد', searchShort: 'ماذا تريد أن تفعل؟', types: 'PDF وWord وExcel والعروض' },
     ru: { appear: 'Оформление и цвет', modeLabel: 'Оформление', colorLabel: 'Цвет', modes: ['Светлое', 'Тёмное', 'Авто'], modeNote: 'В режиме «Авто» цвета следуют настройке устройства.', colors: ['Небесный', 'Море', 'Лаванда', 'Закат', 'Малина', 'Лес'], fresh: 'Новое', searchShort: 'Что нужно сделать?', types: 'PDF, Word, Excel и презентации' },
     en: { appear: 'Appearance and color', modeLabel: 'Appearance', colorLabel: 'Color', modes: ['Light', 'Dark', 'Auto'], modeNote: 'In Auto, colors follow your device setting.', colors: ['Sky', 'Sea', 'Lavender', 'Sunset', 'Raspberry', 'Forest'], fresh: 'New', searchShort: 'What do you want to do?', types: 'PDF, Word, Excel and slides' }
+  };
+  // 5.8.2: short captions for the small tiles on a narrow screen. Russian and English words are long,
+  // and the tile is 1/4 of the screen: "Редактировать" was cut on both sides.
+  var SHORT = {
+    ru: { transcribe: 'Расшифровка', sign: 'Подпись', word: 'Правка Word', excel: 'Таблицы Excel', slides: 'Слайды', conv: 'PDF → Word', ask: 'Вопрос к файлу', send: 'На подпись', merge: 'Объединить', record: 'Запись' },
+    en: { transcribe: 'Transcribe', sign: 'Fill and sign', word: 'Edit Word', excel: 'Excel', slides: 'Slides', conv: 'PDF → Word', ask: 'Ask the file', send: 'For signature', merge: 'Merge / split', record: 'Record' },
+    ar: { transcribe: 'تفريغ تسجيل', sign: 'تعبئة وتوقيع', word: 'تحرير Word', excel: 'جداول Excel', slides: 'شرائح', conv: 'PDF ← Word', ask: 'اسأل الملف', send: 'للتوقيع', merge: 'دمج وتقسيم', record: 'تسجيل' }
   };
   var LANGS = ['he', 'ar', 'ru', 'en'];
   var lang = LS.get('siman.v7.lang');
@@ -287,6 +294,7 @@
     var onNarrow = function () { var s = $('v7Search'); if (s) s.placeholder = narrow() ? T2[lang].searchShort : T[lang].search; };
     if (narrowMq.addEventListener) narrowMq.addEventListener('change', onNarrow); else if (narrowMq.addListener) narrowMq.addListener(onNarrow);
   }
+  function short(k, full) { return narrow() && SHORT[lang] && SHORT[lang][k] ? SHORT[lang][k] : full; }
   function lbl(k) { var c = T[lang].cards[k]; return c ? c[0] + '. ' + c[1] : ''; }
   function buildHome() {
     var empty = $('empty');
@@ -302,10 +310,11 @@
           '<span class="v7-tt"><b>' + esc(C.translate[0]) + '</b><small>' + esc(C.translate[1]) + '</small></span></button>' +
         '<button type="button" class="v7-t v7-feat" data-v7="scan" aria-label="' + esc(lbl('scan')) + '"><span class="v7-art" aria-hidden="true"><span>' + ART.scan[0] + ARROW + ART.scan[1] + '</span></span>' +
           '<span class="v7-tt"><span class="v7-new-tag">' + esc(L2.fresh) + '</span><b>' + esc(C.scan[0]) + '</b><small>' + esc(C.scan[1]) + '</small></span></button>' +
-        '<button type="button" class="v7-t v7-wide" data-v7="transcribe" aria-label="' + esc(lbl('transcribe')) + '"><span class="v7-tt"><b>' + esc(C.transcribe[0]) + '</b><small>' + esc(C.transcribe[1]) + '</small></span>' + WAVE + '</button>' +
-        '<button type="button" class="v7-t v7-wide" data-v7="sign" aria-label="' + esc(lbl('sign')) + '"><span class="v7-tt"><b>' + esc(C.sign[0]) + '</b><small>' + esc(C.sign[1]) + '</small></span>' + SIGN + '</button>' +
+        '<button type="button" class="v7-t v7-wide" data-v7="transcribe" aria-label="' + esc(lbl('transcribe')) + '"><span class="v7-tt"><b>' + esc(short('transcribe', C.transcribe[0])) + '</b><small>' + esc(C.transcribe[1]) + '</small></span>' + WAVE + '</button>' +
+        '<button type="button" class="v7-t v7-wide" data-v7="sign" aria-label="' + esc(lbl('sign')) + '"><span class="v7-tt"><b>' + esc(short('sign', C.sign[0])) + '</b><small>' + esc(C.sign[1]) + '</small></span>' + SIGN + '</button>' +
         SMALL.map(function (k) {
           var name = k === 'record' ? L.record : C[k][0];
+          name = short(k, name);
           var full = k === 'record' ? L.record : lbl(k);
           return '<button type="button" class="v7-t v7-small" data-v7="' + k + '" aria-label="' + esc(full) + '"><span class="v7-ic2">' + svg(SMALL_IC[k], 22) + '</span><b>' + esc(name) + '</b></button>';
         }).join('') +

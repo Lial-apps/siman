@@ -42,6 +42,7 @@ html,body{margin:0;background:var(--bg);color:var(--n);font:15px/1.45 "Heebo",sy
 .f.mine.done{border:1px solid rgba(46,88,204,.35);background:rgba(46,88,204,.05);animation:none}
 .f.other{border:1px dashed #9AA6B8;background:rgba(154,166,184,.12);color:#7A879E}
 .f img{max-width:100%;max-height:100%;object-fit:contain}.f .tx{font-weight:400;color:#111;white-space:nowrap;padding:0 3px}
+.f.chk{border-radius:3px;font-size:14px;line-height:1;animation:none}.f.chk.mine{animation:pulse 2.2s infinite}.f.chk .tx{font-weight:900;font-size:1em;padding:0}.f.chk.other{font-size:9px}
 @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(46,88,204,.0)}50%{box-shadow:0 0 0 6px rgba(46,88,204,.18)}}
 .dock{position:fixed;inset-inline:0;bottom:0;z-index:20;background:#fff;border-top:1px solid var(--l);padding:12px 14px calc(12px + env(safe-area-inset-bottom));box-shadow:0 -10px 30px -18px rgba(22,33,58,.5)}
 .dock .in{max-width:900px;margin:0 auto;display:flex;flex-direction:column;gap:10px}
@@ -181,13 +182,13 @@ async function renderPages(){
 function drawFields(){
   for(const el of document.querySelectorAll('.f'))el.remove();
   const me=M.me!==null?M.signers[M.me]:null;const active=(M.mode==='sign'||(M.mode==='open'&&!M.open.closed))&&me&&me.status==='waiting';
-  for(const f of M.fields){const pg=pages[f.page];if(!pg)continue;const s=M.signers[f.signer];const el=document.createElement('div');el.className='f';el.dataset.fid=f.id;
+  for(const f of M.fields){const pg=pages[f.page];if(!pg)continue;const s=M.signers[f.signer];const el=document.createElement('div');el.className='f'+(f.type==='check'?' chk':'');el.dataset.fid=f.id;
     Object.assign(el.style,{left:f.x*100+'%',top:f.y*100+'%',width:f.w*100+'%',height:f.h*100+'%'});
     const val=s.status==='signed'&&s.values?s.values[f.id]:(me&&s.n===me.n?VALS[f.id]:null);
-    if(me&&s.n===me.n&&active){el.classList.add('mine');el.tabIndex=0;el.setAttribute('role','button');el.dataset.id=f.id;if(val)el.classList.add('done');}
-    else if(!val){el.classList.add('other');el.textContent=s.status==='declined'?'סירב/ה':`${SS.TYPES[f.type].l}: ${s.name}`;}
+    if(me&&s.n===me.n&&active){el.classList.add('mine');el.tabIndex=0;el.setAttribute('role','button');el.dataset.id=f.id;if(val)el.classList.add('done');if(f.type==='check'){el.setAttribute('role','checkbox');el.setAttribute('aria-checked',!!val);el.title='תיבת סימון: הקשה מסמנת, הקשה נוספת מנקה';}}
+    else if(!val){el.classList.add('other');el.textContent=f.type==='check'?'':s.status==='declined'?'סירב/ה':`${SS.TYPES[f.type].l}: ${s.name}`;if(f.type==='check')el.title=`${SS.TYPES.check.l}: ${s.name}`;}
     if(val){if(val.png)el.innerHTML=`<img alt="" src="${val.png}">`;else el.innerHTML=`<span class="tx" dir="auto">${esc(val.text)}</span>`;}
-    else if(el.classList.contains('mine'))el.textContent=f.type==='sig'?'✍️ כאן חותמים':f.type==='initials'?'ראשי תיבות':f.type==='name'?'השם שלך':f.type==='text'&&f.label?f.label:SS.TYPES[f.type].l;
+    else if(el.classList.contains('mine'))el.textContent=f.type==='check'?'':f.type==='sig'?'✍️ כאן חותמים':f.type==='initials'?'ראשי תיבות':f.type==='name'?'השם שלך':f.type==='text'&&f.label?f.label:SS.TYPES[f.type].l;
     pg.append(el);
   }
   for(const el of document.querySelectorAll('.f.mine'))el.onclick=el.onkeydown=e=>{if(e.type==='keydown'&&e.key!=='Enter'&&e.key!==' ')return;e.preventDefault();openField(M.fields.find(f=>f.id===el.dataset.id));};
@@ -232,6 +233,7 @@ async function download(share){
 let CUR=null;
 function openField(f){
   CUR=f;if(f.type==='sig'||f.type==='initials')return openSig(f);
+  if(f.type==='check'){if(VALS[f.id])delete VALS[f.id];else VALS[f.id]={text:'✓'};drawFields();dockSign.render();return;}  // 5.8.2: a tap checks, another tap clears
   if(f.type==='date'){VALS[f.id]={text:today()};drawFields();dockSign.render();return;}
   $('txtT').textContent=f.type==='name'?'השם שלך':f.label||'מה לכתוב כאן?';$('txtIn').value=(VALS[f.id]&&VALS[f.id].text)||'';$('txtDlg').hidden=false;setTimeout(()=>$('txtIn').focus(),50);
 }

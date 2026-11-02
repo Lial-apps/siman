@@ -1,4 +1,4 @@
-/* סימן — שליחה לחתימה ושיתוף בקישור (5.8.1: makeViewLink לוואטסאפ במחשב).
+/* סימן — שליחה לחתימה ושיתוף בקישור (5.8.2: שדות נוספים רק בהקשה, לא בגלילה; תיבות סימון בטופס).
    השולח מסמן איפה כל אחד חותם, מקבל קישור לכל חותם ושולח אותו בוואטסאפ או במייל.
    החותם פותח את הקישור בטלפון או במחשב, בלי הרשמה ובלי התקנה, וחותם.
    המסמך החתום נבנה בדפדפן: המקור + החתימות + עמוד תיעוד (מי חתם, מתי, מאיזה מכשיר).
@@ -9,7 +9,7 @@ const API='https://siman-share.siman-app.workers.dev/docs';
 const HOST=API.replace(/\/docs$/,'');
 const LIST_KEY='siman.sent';
 const COLORS=['#2E58CC','#D9480F','#1F8A4C','#7A3EB1','#C2255C','#0B7285','#8F5B00','#495057','#5F3DC4','#2B8A3E'];
-const TYPES={sig:{l:'חתימה',w:.26,h:.06},initials:{l:'ראשי תיבות',w:.12,h:.05},name:{l:'שם החותם',w:.24,h:.035},date:{l:'תאריך',w:.16,h:.035},text:{l:'טקסט',w:.26,h:.035}};
+const TYPES={sig:{l:'חתימה',w:.26,h:.06},initials:{l:'ראשי תיבות',w:.12,h:.05},name:{l:'שם החותם',w:.24,h:.035},date:{l:'תאריך',w:.16,h:.035},text:{l:'טקסט',w:.26,h:.035},check:{l:'תיבת סימון',w:.024,h:.024}};
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
 const pdfjs=()=>{const p=window.pdfjsLib||window['pdfjs-dist/build/pdf'];if(p&&!p.GlobalWorkerOptions.workerSrc)p.GlobalWorkerOptions.workerSrc='pdf.worker.min.js';return p;};
 const fmtDate=d=>{const x=new Date(d);return isNaN(x)?'':x.toLocaleString('he-IL',{day:'numeric',month:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'});};
@@ -44,6 +44,10 @@ async function textPng(t,wPt,hPt){
   g.fillText(t,rtl?c.width-2*S:2*S,c.height-fs*.32*S);           // sits on the line, like handwriting
   return{bytes:new Uint8Array(await (await new Promise(r=>c.toBlob(r,'image/png'))).arrayBuffer()),w,h,rtl};
 }
+// a check mark drawn by hand: no font needed, so it always comes out the same
+async function checkPng(sz){const S=8,c=document.createElement('canvas');c.width=c.height=Math.max(16,Math.round(sz*S));const g=c.getContext('2d'),n=c.width;
+  g.strokeStyle='#111';g.lineWidth=n*.11;g.lineCap='round';g.lineJoin='round';g.beginPath();g.moveTo(n*.2,n*.52);g.lineTo(n*.42,n*.74);g.lineTo(n*.82,n*.26);g.stroke();
+  return new Uint8Array(await (await new Promise(r=>c.toBlob(r,'image/png'))).arrayBuffer());}
 async function fieldPng(f,val,wPt,hPt){
   const S=4,c=document.createElement('canvas');c.width=Math.max(8,Math.round(wPt*S));c.height=Math.max(8,Math.round(hPt*S));const g=c.getContext('2d');
   if(val.png){const img=new Image();img.src=val.png;await img.decode();const k=Math.min(c.width/img.width,c.height/img.height);const w=img.width*k,h=img.height*k;
@@ -89,6 +93,7 @@ async function buildSigned(meta,pdfBytes){
   for(const s of meta.signers){if(s.status!=='signed'||!s.values)continue;
     for(const f of meta.fields.filter(x=>x.signer===s.n)){const val=s.values[f.id];const pg=pages[f.page];if(!val||!pg||!f.r)continue;
       const rot=((pg.getRotation().angle%360)+360)%360;const[x1,y1,x2,y2]=f.r;const minX=Math.min(x1,x2),maxX=Math.max(x1,x2),minY=Math.min(y1,y2),maxY=Math.max(y1,y2);const Wr=maxX-minX,Hr=maxY-minY;
+      if(f.type==='check'){if(!val.text&&!val.png)continue;const pngB=await checkPng(Math.max(Wr,Hr));const im=await doc.embedPng(pngB);const sz=Math.min(Wr,Hr);pg.drawImage(im,{x:minX+(Wr-sz)/2,y:minY+(Hr-sz)/2,width:sz,height:sz});continue;}
       if(!val.png&&rot===0&&String(val.text||'').trim()){const tp=await textPng(String(val.text).trim(),Wr,Hr);const im=await doc.embedPng(tp.bytes);
         pg.drawImage(im,{x:tp.rtl?maxX-tp.w:minX,y:minY,width:tp.w,height:tp.h});continue;}
       const side=rot===90||rot===270;const img=await doc.embedPng(await fieldPng(f,val,side?Hr:Wr,side?Wr:Hr));
@@ -192,6 +197,46 @@ async function scanTargets(pages,skip){
   return out;
 }
 
+// printed check boxes ("☐ אני מסכים/ה"): small hollow squares in the page picture, found by their four dark sides
+function findBoxes(g,W,H){
+  const d=g.getImageData(0,0,W,H).data,dark=new Uint8Array(W*H);
+  for(let i=0,j=0;i<dark.length;i++,j+=4)dark[i]=(d[j]*.3+d[j+1]*.59+d[j+2]*.11)<150?1:0;
+  const minS=Math.max(8,Math.round(W*.015)),maxS=Math.round(W*.05),out=[];  // smaller than ~9pt is a letter (a final mem is a hollow square too)
+  const rowDark=(y,x0,x1)=>{let n=0;for(let x=x0;x<=x1;x++)n+=dark[y*W+x];return n/(x1-x0+1);};
+  const colDark=(x,y0,y1)=>{let n=0;for(let y=y0;y<=y1;y++)n+=dark[y*W+x];return n/(y1-y0+1);};
+  for(let y=0;y<H-minS;y++){let x=0;const row=y*W;
+    while(x<W){if(!dark[row+x]){x++;continue;}let e=x;while(e<W&&dark[row+e])e++;const len=e-x;
+      if(len>=minS&&len<=maxS&&y+len<H){const x0=x,x1=e-1,s=len;
+        // the top side is this run; look for a bottom side and two vertical sides of the same length (a square, +-15%)
+        let found=null;
+        for(let yb=y+Math.round(s*.85);yb<=Math.min(H-1,y+Math.round(s*1.15));yb++){if(rowDark(yb,x0,x1)>=.8){found=yb;break;}}
+        if(found!==null&&colDark(x0,y,found)>=.8&&colDark(x1,y,found)>=.8){
+          const ih=found-y;let inner=0,cnt=0;for(let yy=y+Math.round(ih*.3);yy<=found-Math.round(ih*.3);yy++)for(let xx=x0+Math.round(s*.3);xx<=x1-Math.round(s*.3);xx++){inner+=dark[yy*W+xx];cnt++;}
+          // a check box stands alone: a light ring around it (a letter has its neighbours right next to it)
+          // (its label sits on one side, so one side may be busy; above and below must be clear, and the sides thin)
+          const m=Math.max(3,Math.round(s*.25));
+          const band=(ya,yb,xa,xb)=>{let n=0,c=0;for(let yy=Math.max(0,ya);yy<=Math.min(H-1,yb);yy++)for(let xx=Math.max(0,xa);xx<=Math.min(W-1,xb);xx++){n+=dark[yy*W+xx];c++;}return c?n/c:1;};
+          const gp=Math.max(2,Math.round(s*.12)); // past the line's own thickness and its soft edge
+          const top=band(y-m-gp,y-1-gp,x0,x1),bot=band(found+1+gp,found+m+gp,x0,x1),lft=band(y,found,x0-m-gp,x0-1-gp),rgt=band(y,found,x1+1+gp,x1+m+gp);
+          let th=0;const cx=x0+(s>>1);while(y+th<=found&&dark[(y+th)*W+cx])th++;
+          if(cnt&&inner/cnt<.25&&top<.06&&bot<.06&&(lft<.06||rgt<.06)&&th/s<=.2&&!out.some(o=>Math.abs(o.x-x0)<s*.6&&Math.abs(o.y-y)<s*.6))out.push({x:x0,y,w:s,h:ih+1});}}
+      x=e;}}
+  return out.filter(b=>b.w>=minS).slice(0,80);
+}
+// the boxes of a page, as targets (kind "check"); the page is drawn once, small
+async function boxTargets(pages){
+  const out=[];
+  for(let i=0;i<pages.length&&i<40;i++){const{page}=pages[i];
+    try{const v1=page.getViewport({scale:1}),sc=Math.min(2.5,1400/Math.max(v1.width,v1.height)),vp=page.getViewport({scale:sc});
+      const c=document.createElement('canvas');c.width=Math.round(vp.width);c.height=Math.round(vp.height);const g=c.getContext('2d',{willReadFrequently:true});
+      g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);await page.render({canvasContext:g,viewport:vp}).promise;
+      const W=c.width,H=c.height;
+      for(const b of findBoxes(g,W,H))out.push({page:i,x:b.x/W,y:b.y/H,w:b.w/W,h:b.h/H,kind:'check',src:'box',label:''});
+    }catch(e){console.warn('boxes',e);}
+  }
+  return out;
+}
+
 /* ------------------------------------------------------------ the list of documents I sent */
 const listGet=()=>{try{return JSON.parse(localStorage.getItem(LIST_KEY)||'[]');}catch(_){return[];}};
 const listSet=l=>{try{localStorage.setItem(LIST_KEY,JSON.stringify(l.slice(0,200)));}catch(_){}};
@@ -246,7 +291,9 @@ const CSS=`
 #snd .tool{touch-action:none;cursor:grab}
 #snd .s-ghost{position:fixed;z-index:970;pointer-events:none;padding:6px 10px;border-radius:7px;background:#EAF0FD;border:2px solid var(--b);color:var(--b);font-weight:600;font-size:12.5px;transform:translate(-50%,-50%);box-shadow:0 8px 20px -8px rgba(0,0,0,.4);white-space:nowrap}
 #snd .s-tg{position:absolute;inset:0;pointer-events:none}
-#snd .s-t{position:absolute;border:1.5px dashed #D49A00;background:rgba(255,212,59,.14);border-radius:4px}
+#snd .s-t{position:absolute;border:1.5px dashed #D49A00;background:rgba(255,212,59,.14);border-radius:4px}#snd .s-t.chk{border-radius:3px}#snd .s-t.chk i{display:none}
+#snd .s-f.chk{border-radius:3px;min-width:14px;min-height:14px}#snd .s-f.chk span{font-size:11px;padding:0}#snd .s-f.chk .lbl{display:none}#snd .s-f.chk .rs{display:none}#snd .s-f.chk.on .del{top:-20px;inset-inline-end:-2px;border-radius:50%}
+#snd .s-hint{position:fixed;left:50%;transform:translateX(-50%);bottom:24px;max-width:min(420px,calc(100% - 24px));padding:10px 14px;border-radius:14px;background:#16213A;color:#fff;font-size:13.5px;line-height:1.45;box-shadow:0 10px 24px -10px rgba(0,0,0,.5);z-index:3;pointer-events:none;transition:opacity .3s}#snd .s-hint.off{opacity:0}#snd .s-pages{position:relative}
 #snd .s-t i{position:absolute;bottom:100%;inset-inline-start:0;font-style:normal;font-size:10px;font-weight:600;line-height:1;color:#7A5300;background:#FFF4D6;padding:2px 4px;border-radius:3px;white-space:nowrap;margin-bottom:1px}
 #snd .s-f.snap{box-shadow:0 0 0 4px rgba(255,212,59,.75)}
 #snd .qp>summary{list-style:none;cursor:pointer;width:100%;justify-content:center}#snd .qp>summary::-webkit-details-marker{display:none}
@@ -254,7 +301,7 @@ const CSS=`
 #snd .qp-row{display:flex;flex-wrap:wrap;gap:5px 12px;align-items:center}#snd .qp-row>b{width:100%;font-size:12px;color:var(--mu)}
 #snd .ck small{color:var(--mu)}#snd .ck input:disabled+span{opacity:.5}
 #snd .resp{display:flex;flex-wrap:wrap;gap:2px;margin:6px 0}#snd button.chip{border:0;cursor:pointer;font:inherit;font-size:12.5px}#snd button.chip:hover{filter:brightness(.94)}
-@media (max-width:760px){#snd .s-main{flex-direction:column-reverse}#snd .s-side{width:auto;max-height:46vh;border:0;border-top:1px solid var(--l)}#snd .s-pages{padding:14px 8px 40px}}
+@media (max-width:760px){#snd .s-main{flex-direction:column-reverse}#snd .s-side{width:auto;max-height:46vh;border:0;border-top:1px solid var(--l)}#snd .s-pages{padding:14px 8px 40px}#snd .s-hint{bottom:96px}}
 `;
 let U=null; // the open screen
 function shell(title,actions){
@@ -295,7 +342,7 @@ async function open(opts){
     <div><h3 style="margin-bottom:8px">מה להוסיף בשביל <span data-who></span>?</h3><div class="tools"><button class="tool combo" data-combo>חתימה + שם החותם + תאריך</button>${Object.entries(TYPES).map(([k,v])=>`<button class="tool${k==='sig'?' on':''}" data-tool="${k}" aria-pressed="${k==='sig'}">${v.l}</button>`).join('')}</div>
       <p class="hint" style="margin-top:8px">גוררים שדה אל המסמך, או בוחרים שדות ולוחצים על המסמך. ליד מקום חתימה בטופס (מסומן בצהוב מקווקו) השדה נצמד אליו לבד. אפשר לגרור, להגדיל ולמחוק.</p>
       <details class="qp" data-qp style="margin-top:8px"><summary class="s-btn sm">הצבה מהירה…</summary><div class="qp-in">
-        <div class="qp-row"><b>מה להוסיף</b><label class="ck"><input type="checkbox" data-qt="sig" checked><span>חתימה</span></label><label class="ck"><input type="checkbox" data-qt="name" checked><span>שם החותם</span></label><label class="ck"><input type="checkbox" data-qt="date" checked><span>תאריך</span></label><label class="ck"><input type="checkbox" data-qt="initials"><span>ראשי תיבות</span></label><label class="ck" data-qtext><input type="checkbox" data-qt="text" checked><span>שדות טקסט של הטופס (שם התלמיד, ת״ז…)</span></label></div>
+        <div class="qp-row"><b>מה להוסיף</b><label class="ck"><input type="checkbox" data-qt="sig" checked><span>חתימה</span></label><label class="ck"><input type="checkbox" data-qt="name" checked><span>שם החותם</span></label><label class="ck"><input type="checkbox" data-qt="date" checked><span>תאריך</span></label><label class="ck"><input type="checkbox" data-qt="initials"><span>ראשי תיבות</span></label><label class="ck" data-qtext><input type="checkbox" data-qt="text" checked><span>שדות טקסט של הטופס (שם התלמיד, ת״ז…)</span></label><label class="ck" data-qtcheck hidden><input type="checkbox" data-qt="check" checked><span>תיבות הסימון של הטופס</span></label></div>
         <div class="qp-row"><b>איפה</b><label class="ck"><input type="radio" name="qpw" value="form" data-qw><span>במקומות החתימה שבטופס <small data-qpn></small></span></label><label class="ck"><input type="radio" name="qpw" value="end" data-qw checked><span>בסוף המסמך</span></label><label class="ck"><input type="radio" name="qpw" value="each" data-qw><span>בתחתית כל עמוד</span></label></div>
         <div class="qp-row" data-qpwho><b>בשביל מי</b><label class="ck"><input type="radio" name="qpp" value="all" checked><span>כל החותמים</span></label><label class="ck"><input type="radio" name="qpp" value="cur"><span>רק <span data-qpcur></span></span></label></div>
         <button class="s-btn sm pri" data-qpgo>הוספה</button></div></details></div>
@@ -318,12 +365,16 @@ async function open(opts){
   busy(false);
   const side=u.body.querySelector('.s-side');
   try{u.targets=await findTargets(u.pages);}catch(_){u.targets=[];}
-  const TL={sig:'מקום לחתימה',name:'מקום לשם',date:'מקום לתאריך',text:'מקום לטקסט'};
+  const TL={sig:'מקום לחתימה',name:'מקום לשם',date:'מקום לתאריך',text:'מקום לטקסט',check:'תיבת סימון'};
   const drawTargets=list=>{for(const t of list){const pgx=u.pages[t.page];let tg=pgx.box.querySelector('.s-tg');if(!tg){tg=document.createElement('div');tg.className='s-tg';pgx.box.insertBefore(tg,pgx.lay);}
-    const el=document.createElement('div');el.className='s-t';el.style.cssText=`left:${t.x*100}%;top:${t.y*100}%;width:${t.w*100}%;height:${t.h*100}%`;el.innerHTML=`<i>${TL[t.kind]||'מקום לחתימה'}</i>`;el.title=t.label||'';tg.append(el);}};
+    const el=document.createElement('div');el.className='s-t'+(t.kind==='check'?' chk':'');el.style.cssText=`left:${t.x*100}%;top:${t.y*100}%;width:${t.w*100}%;height:${t.h*100}%`;el.innerHTML=`<i>${TL[t.kind]||'מקום לחתימה'}</i>`;el.title=t.label||'';tg.append(el);}};
   const qpCount=(busyMsg)=>{const fr=side.querySelector('[data-qw][value="form"]'),n=u.targets.length;fr.disabled=!n;side.querySelector('[data-qpn]').textContent=busyMsg||(n?`(נמצאו ${n})`:'(לא נמצאו במסמך)');if(n&&!fr.checked&&!u.qpTouched)fr.checked=true;};
   drawTargets(u.targets);qpCount();
   if(u.targets.length)setTimeout(()=>say(`נמצאו במסמך ${u.targets.length} מקומות לחתימה (מסומנים בצהוב). שדה שגוררים לידם נצמד אליהם`),400);
+  // 5.8.2: printed check boxes, in the background
+  (async()=>{let boxes=[];try{boxes=await boxTargets(u.pages);}catch(e){console.warn('box targets',e);}
+    if(U!==u||!boxes.length)return;u.targets.push(...boxes);u.targets.sort((a,b)=>a.page-b.page||a.y-b.y||b.x-a.x);drawTargets(boxes);qpCount();
+    side.querySelector('[data-qtcheck]').hidden=false;say(`נמצאו בטופס ${boxes.length} תיבות סימון. בוחרים "תיבת סימון" ולוחצים עליהן, או "הצבה מהירה"`);})();
   side.addEventListener('change',e=>{if(e.target.matches('[data-qw]'))u.qpTouched=true;});
   // scanned pages: read in the background, the screen is already usable
   (async()=>{const withText=new Set(u.targets.map(t=>t.page));
@@ -342,29 +393,29 @@ async function open(opts){
     side.querySelector('[data-who]').textContent=u.signers[u.cur].name||`חותם ${u.cur+1}`;side.querySelector('[data-who]').style.color=COLORS[u.cur%COLORS.length];
   };
   const fieldTitle=f=>`${f.type==='text'&&f.label?f.label:TYPES[f.type].l}${u.how==='open'?'':` · ${u.signers[f.signer].name||'חותם '+(f.signer+1)}`}`;
-  const retitle=f=>{const sp=f.el&&f.el.querySelector('span');if(sp)sp.textContent=fieldTitle(f);};
+  const retitle=f=>{if(!f.el)return;f.el.title=fieldTitle(f);const sp=f.el.querySelector('span');if(sp&&f.type!=='check')sp.textContent=fieldTitle(f);};
   const askLabel=f=>{const v=prompt('מה החותם צריך לכתוב כאן? (למשל: שם התלמיד, כיתה, תעודת זהות)',f.label||'');if(v!==null){f.label=cleanLabel(v);retitle(f);}};
-  const fieldEl=f=>{const pgx=u.pages[f.page];const el=document.createElement('div');el.className='s-f';const col=COLORS[f.signer%COLORS.length];
+  const fieldEl=f=>{const pgx=u.pages[f.page];const el=document.createElement('div');el.className='s-f'+(f.type==='check'?' chk':'');const col=COLORS[f.signer%COLORS.length];
     el.style.cssText=`left:${f.x*100}%;top:${f.y*100}%;width:${f.w*100}%;height:${f.h*100}%;border-color:${col};background:${col}1F;color:${col}`;
-    el.innerHTML=`<span>${esc(fieldTitle(f))}</span><button class="del" style="background:${col}" aria-label="מחיקה">×</button>${f.type==='text'?`<button class="lbl" style="background:${col}" aria-label="שינוי הכותרת" title="מה החותם צריך לכתוב כאן">✎</button>`:''}<i class="rs" style="background:${col}"></i>`;
+    el.title=fieldTitle(f);el.innerHTML=`<span>${f.type==='check'?'✓':esc(fieldTitle(f))}</span><button class="del" style="background:${col}" aria-label="מחיקה">×</button>${f.type==='text'?`<button class="lbl" style="background:${col}" aria-label="שינוי הכותרת" title="מה החותם צריך לכתוב כאן">✎</button>`:''}<i class="rs" style="background:${col}"></i>`;
     f.el=el;pgx.lay.append(el);return el;};
   const redraw=()=>{for(const p of u.pages)p.lay.innerHTML='';for(const f of u.fields){fieldEl(f);if(f===u.sel)f.el.classList.add('on');}drawSigners();};
   const select=f=>{u.sel=f;for(const x of u.fields)x.el&&x.el.classList.toggle('on',x===f);};
   const add=(page,x,y,type,signer)=>{const T=TYPES[type];const pgx=u.pages[page];const ar=pgx.vp.width/pgx.vp.height;
     const w=T.w,h=T.h*ar;const f={page,type,signer,x:Math.max(0,Math.min(1-w,x-w/2)),y:Math.max(0,Math.min(1-h,y-h/2)),w,h};u.fields.push(f);fieldEl(f);select(f);drawSigners();return f;};
   // several fields at once: the first where the click was, the rest one under the other
-  const ORDER=['sig','initials','name','date','text'];
+  const ORDER=['sig','initials','name','date','text','check'];
   const placeGroup=(page,x,y,types,signer)=>{types=ORDER.filter(t=>types.includes(t));let top=null;const made=[];
     for(const t of types){const f=add(page,x,top===null?y:0,t,signer);if(top!==null){f.y=Math.min(1-f.h,top);f.el.style.top=f.y*100+'%';}top=f.y+f.h+.006;made.push(f);}return made;};
   // a field fits itself into a place to sign: a form field exactly, a printed line by sitting on it
   const setPos=f=>Object.assign(f.el.style,{left:f.x*100+'%',top:f.y*100+'%',width:f.w*100+'%',height:f.h*100+'%'});
-  const fitTo=(f,t)=>{if(f.type==='text'&&t.label&&!f.label){f.label=t.label;retitle(f);}if(t.src==='form'){f.x=t.x;f.y=t.y;f.w=t.w;f.h=Math.max(t.h,.012);}
+  const fitTo=(f,t)=>{if(f.type==='text'&&t.label&&!f.label){f.label=t.label;retitle(f);}if(t.src==='form'||t.src==='box'){f.x=t.x;f.y=t.y;f.w=t.w;f.h=Math.max(t.h,.01);}
     else{f.x=t.x;f.w=t.w;f.y=Math.max(0,Math.min(1-f.h,t.y+t.h*1.15-f.h));}
     setPos(f);f.el.classList.add('snap');setTimeout(()=>f.el&&f.el.classList.remove('snap'),800);};
   const taken=(t,f)=>u.fields.some(o=>o!==f&&o.page===t.page&&o.x<t.x+t.w&&o.x+o.w>t.x&&o.y<t.y+t.h*1.2&&o.y+o.h>t.y-t.h*.2&&Math.abs((o.x+o.w/2)-(t.x+t.w/2))<t.w/2);
   const snapField=f=>{let best=null,bd=.04;const want=f.type==='initials'?'sig':f.type;const cx=f.x+f.w/2,cy=f.y+f.h/2;
     for(const t of u.targets){if(t.page!==f.page||taken(t,f))continue;const dx=Math.max(t.x-cx,0,cx-(t.x+t.w)),dy=Math.max(t.y-cy,0,cy-(t.y+t.h));
-      const d=Math.hypot(dx,dy)+(t.kind&&f.type!=='text'&&t.kind!==want?.025:0);if(d<bd){bd=d;best=t;}}
+      if((t.kind==='check')!==(f.type==='check'))continue;const d=Math.hypot(dx,dy)+(t.kind&&f.type!=='text'&&t.kind!==want?.025:0);if(d<bd){bd=d;best=t;}}
     if(best){fitTo(f,best);return true;}return false;};
   const setHow=m=>{if(m===u.how)return;
     if(m==='open'){if(u.fields.some(f=>f.signer>0)&&!confirm('בקישור לקבוצה יש סוג חותם אחד. השדות של שאר החותמים יימחקו. להמשיך?'))return;
@@ -377,7 +428,7 @@ async function open(opts){
   // quick placement, by choice
   const quick=()=>{
     const where=(side.querySelector('[data-qw]:checked')||{}).value||'end';
-    const types=[...side.querySelectorAll('[data-qt]:checked')].map(x=>x.dataset.qt).filter(t=>t!=='text'||where==='form');if(!types.length){say('בוחרים לפחות שדה אחד',1);return;}
+    const types=[...side.querySelectorAll('[data-qt]:checked')].map(x=>x.dataset.qt).filter(t=>(t!=='text'&&t!=='check')||where==='form');if(!types.length){say('בוחרים לפחות שדה אחד',1);return;}
     const who=u.how==='open'||u.signers.length<2||(side.querySelector('[name=qpp]:checked')||{}).value==='cur'?[u.cur]:u.signers.map((_,i)=>i);
     let added=0;
     if(where==='form'){
@@ -385,7 +436,7 @@ async function open(opts){
       const miss=[];
       for(const type of ORDER.filter(t=>types.includes(t))){if(type==='initials'&&types.includes('sig'))continue;const list=byKind[type==='initials'?'sig':type]||[];if(!list.length){miss.push(TYPES[type].l);continue;}
         list.forEach((t,j)=>{if(taken(t))return;const f=add(t.page,t.x+t.w/2,t.y+t.h/2,type,who[j%who.length]);fitTo(f,t);added++;});}
-      if(miss.length)setTimeout(()=>say(`בטופס לא נמצא מקום ל${miss.filter(m=>m!==TYPES.text.l).join(', ל')||'שדות טקסט'}. אפשר לגרור אותם ידנית`),1200);
+      if(miss.filter(m=>m!==TYPES.text.l&&m!==TYPES.check.l).length)setTimeout(()=>say(`בטופס לא נמצא מקום ל${miss.filter(m=>m!==TYPES.text.l&&m!==TYPES.check.l).join(', ל')}. אפשר לגרור אותם ידנית`),1200);
     }else{
       const pgs=where==='each'?u.pages.map((_,i)=>i):[u.pages.length-1];const n=who.length;
       for(const pi of pgs)who.forEach((s,i)=>{const col=n<=2?(i===0?.75:.25):(1-(i%3+.5)/3);const row=Math.floor(i/(n<=2?2:3));added+=placeGroup(pi,col,(where==='each'?.84:.78)-row*.13,types,s).length;});
@@ -436,15 +487,27 @@ async function open(opts){
         else{f.x=Math.max(0,Math.min(1-f.w,o.x+dx));f.y=Math.max(0,Math.min(1-f.h,o.y+dy));}
         Object.assign(fe.style,{left:f.x*100+'%',top:f.y*100+'%',width:f.w*100+'%',height:f.h*100+'%'});};
       const up=()=>{fe.removeEventListener('pointermove',mv);fe.removeEventListener('pointerup',up);if(!rs&&(Math.abs(f.x-o.x)>.004||Math.abs(f.y-o.y)>.004))snapField(f);};fe.addEventListener('pointermove',mv);fe.addEventListener('pointerup',up);return;}
-    const made=placeGroup(+box.dataset.p,(e.clientX-R.left)/R.width,(e.clientY-R.top)/R.height,[...u.tools],u.cur);
-    for(const f of made)snapField(f);
-    const t=made.find(f=>f.type==='text'&&!f.label);if(t)setTimeout(()=>askLabel(t),50);
+    // 5.8.2: a field is placed only by a short tap that does not move. A scroll, a pinch, a long press
+    // or a drag used to drop a signature on every touch of the screen.
+    if(tap&&tap.id!==e.pointerId){tap=null;return;}
+    tap={id:e.pointerId,x:e.clientX,y:e.clientY,t:Date.now(),box,R};
   });
+  let tap=null;
+  const tapEnd=e=>{const t=tap;if(!t||t.id!==e.pointerId)return;tap=null;
+    if(e.type!=='pointerup'||Date.now()-t.t>450||Math.hypot(e.clientX-t.x,e.clientY-t.y)>8)return;
+    if(e.target.closest('.s-f'))return;
+    const made=placeGroup(+t.box.dataset.p,(t.x-t.R.left)/t.R.width,(t.y-t.R.top)/t.R.height,[...u.tools],u.cur);
+    for(const f of made)snapField(f);
+    const tx=made.find(f=>f.type==='text'&&!f.label);if(tx)setTimeout(()=>askLabel(tx),50);};
+  P.addEventListener('pointerup',tapEnd);P.addEventListener('pointercancel',tapEnd);
+  P.addEventListener('pointermove',e=>{if(tap&&tap.id===e.pointerId&&Math.hypot(e.clientX-tap.x,e.clientY-tap.y)>8)tap=null;});
+  // on a touch screen: say once how fields are placed
+  if(matchMedia('(pointer:coarse)').matches){const h=document.createElement('div');h.className='s-hint';h.innerHTML='<b>הקשה קצרה</b> על המסמך מוסיפה שדה במקום הזה. גלילה לא מוסיפה כלום.';u.root.append(h);setTimeout(()=>h.classList.add('off'),7000);setTimeout(()=>h.remove(),7500);}
   u.onDel=e=>{if((e.key==='Delete'||e.key==='Backspace')&&u.sel&&!/INPUT|TEXTAREA/.test(document.activeElement.tagName)){e.preventDefault();u.sel.el.remove();u.fields=u.fields.filter(x=>x!==u.sel);u.sel=null;drawSigners();}};
   u.cleanup=()=>{if(u.pdf)u.pdf.destroy();};
   drawSigners();
   const mapFields=()=>u.fields.map(f=>{const vp=u.pages[f.page].vp;const W=vp.width,H=vp.height;const a=vp.convertToPdfPoint(f.x*W,f.y*H),b=vp.convertToPdfPoint((f.x+f.w)*W,(f.y+f.h)*H);
-      return{signer:f.signer,page:f.page,type:f.type,x:f.x,y:f.y,w:f.w,h:f.h,r:[a[0],a[1],b[0],b[1]].map(v=>+v.toFixed(2)),req:true,label:f.type==='text'?f.label||'':''};});
+      return{signer:f.signer,page:f.page,type:f.type,x:f.x,y:f.y,w:f.w,h:f.h,r:[a[0],a[1],b[0],b[1]].map(v=>+v.toFixed(2)),req:f.type!=='check',label:f.type==='text'?f.label||'':''};});
   u.root.querySelector('[data-go]').onclick=async()=>{
     if(u.how==='open'){if(!u.fields.length){say('עוד לא סימנת איפה חותמים',1);return;}
       await upload(u,{mode:'open',title:side.querySelector('[data-title]').value.trim()||title,note:side.querySelector('[data-note]').value.trim(),ask:side.querySelector('[data-ask]').value.trim(),
@@ -565,5 +628,5 @@ async function makeViewLink(o){
   return {url:viewLink(rec.id,rec.v),text:msgFor(rec,null,o)};
 }
 
-window.SIMAN_SEND={open,openView,makeViewLink,list,links,close,buildSigned,getMeta,getPdf,api,signLink,viewLink,groupLink,ownerLink,findTargets,scanTargets,findBlanks,labelKind,hook:HOOK,HOST,devName,COLORS,TYPES,isOpen:()=>!!U};
+window.SIMAN_SEND={open,openView,makeViewLink,list,links,close,buildSigned,getMeta,getPdf,api,signLink,viewLink,groupLink,ownerLink,findTargets,scanTargets,findBlanks,findBoxes,boxTargets,labelKind,hook:HOOK,HOST,devName,COLORS,TYPES,isOpen:()=>!!U};
 })();

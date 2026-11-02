@@ -277,6 +277,19 @@ html.v7[data-theme="dark"] .v7-new-tag{color:var(--v7-accent)}
   .v7-home .v7-new{gap:8px}
 }
 @media (max-width:360px){.v7-small b{font-size:11.5px}}
+/* 5.8.2: long captions (Russian, English) never get cut in the middle of a word: the row grows, words may break with a hyphen */
+.v7-t b,.v7-t small{overflow-wrap:break-word;hyphens:auto}
+@media (max-width:720px){
+  html.v7:not([lang="he"]) .v7-bento{grid-auto-rows:minmax(84px,auto)}
+  html.v7:not([lang="he"]) .v7-small b{-webkit-line-clamp:3;font-size:11.5px;letter-spacing:-.01em}
+  html.v7:not([lang="he"]) .v7-small{padding:8px 4px 7px}
+  html.v7:not([lang="he"]) .v7-wide b{font-size:13px;letter-spacing:-.01em}
+  html.v7:not([lang="he"]) .v7-wide .v7-tt{flex:1 1 auto;min-width:0}
+  html.v7:not([lang="he"]) .v7-sig{width:58px;height:24px}
+  html.v7:not([lang="he"]) .v7-wave{gap:2px;transform:scale(.85)}
+  html.v7:not([lang="he"]) .v7-open b{font-size:17px}
+  html.v7:not([lang="he"]) .v7-feat b{font-size:15px}
+}
 @media (max-width:720px){.v7-home .v7-only-wide{display:none}}
 @media (min-width:721px){.v7-home .v7-only-narrow{display:none}}
 

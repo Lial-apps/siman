@@ -59,7 +59,7 @@ export default {
         if (mode === 'sign' && !signers.length) return fail('no signers');
         const fields = (Array.isArray(meta.fields) ? meta.fields : []).slice(0, MAX_FIELDS).map((f, i) => ({
           id: 'f' + i, signer: Math.max(0, Math.min(signers.length - 1, +f.signer || 0)), page: Math.max(0, +f.page || 0),
-          type: ['sig', 'initials', 'name', 'date', 'text'].includes(f.type) ? f.type : 'sig',
+          type: ['sig', 'initials', 'name', 'date', 'text', 'check'].includes(f.type) ? f.type : 'sig', // 5.8.2: check boxes
           x: +(+f.x).toFixed(5), y: +(+f.y).toFixed(5), w: +(+f.w).toFixed(5), h: +(+f.h).toFixed(5), label: clip(f.label, 60), req: f.req !== false,
           r: Array.isArray(f.r) && f.r.length === 4 && f.r.every(v => isFinite(+v)) ? f.r.map(v => +(+v).toFixed(2)) : null
         })).filter(f => [f.x, f.y, f.w, f.h].every(v => isFinite(v) && v >= -0.01 && v <= 1.01));
