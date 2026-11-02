@@ -1118,23 +1118,47 @@ const insRows=()=>structural('r',X.sel.r1,X.sel.r2-X.sel.r1+1);
 const insCols=()=>structural('c',X.sel.c1,X.sel.c2-X.sel.c1+1);
 const delRows=()=>structural('r',X.sel.r1,-(X.sel.r2-X.sel.r1+1));
 const delCols=()=>structural('c',X.sel.c1,-(X.sel.c2-X.sel.c1+1));
-function sortSel(desc){
+function sortSel(desc,auto){
   const sh=cur();let s={...X.sel};
-  if(s.r1===s.r2){ // the block around the active cell
-    let a=X.act.r,b=X.act.r;const has=r=>{const c=cellAt(sh,r,X.act.c);return c&&(c.v!==null||c.f);};
-    while(a>0&&has(a-1))a--;while(has(b+1))b++;
-    s={r1:a,r2:b,c1:0,c2:sh.maxC};
-    const h=cellAt(sh,a,X.act.c),n=cellAt(sh,a+1,X.act.c);if(h&&typeof h.v==='string'&&n&&typeof n.v==='number')s.r1=a+1;
-  }
+  if(auto===undefined)auto=(s.r1===s.r2&&s.c1===s.c2);
+  // 5.9.1: a single cell means "the table around it" — the two-dimensional block of filled cells (like Excel),
+  // not every column of the sheet. Title rows above the table (merged, or with only a cell or two) are left out,
+  // and a header row is detected, so the user does not need to select anything first.
+  if(auto)s=region();
+  const filled=r=>{let n=0;for(let c=s.c1;c<=s.c2;c++){const x=cellAt(sh,r,c);if(x&&(x.v!==null&&x.v!==''||x.f))n++;}return n;};
+  const mergedRow=r=>sh.merges.some(m=>r>=m.r1&&r<=m.r2&&m.c2>=s.c1&&m.c1<=s.c2);
+  // the widest row in the block is the table itself; the title lines above it are narrower or merged
+  if(auto){let wide=0;for(let r=s.r1;r<=s.r2;r++)wide=Math.max(wide,filled(r));
+    let guard=0;
+    while(s.r1<s.r2&&guard++<8&&(mergedRow(s.r1)||filled(s.r1)<wide))s.r1++;
+    guard=0;while(s.r2>s.r1&&guard++<8&&(mergedRow(s.r2)||filled(s.r2)<=1))s.r2--;}
   if(s.r2<=s.r1)return hint('סמנו כמה שורות למיון');
-  if(sh.merges.some(m=>m.r2>=s.r1&&m.r1<=s.r2&&m.c2>=s.c1&&m.c1<=s.c2))return hint('אי אפשר למיין תאים ממוזגים');
+  if(sh.merges.some(m=>m.r2>=s.r1&&m.r1<=s.r2&&m.c2>=s.c1&&m.c1<=s.c2)){
+    // a selection that swallowed a merged title: offer to sort the table under it instead of just refusing
+    const g=region();let t={...g};
+    const f2=r=>{let n=0;for(let c=t.c1;c<=t.c2;c++){const x=cellAt(sh,r,c);if(x&&(x.v!==null&&x.v!==''||x.f))n++;}return n;};
+    let wd=0;for(let r=t.r1;r<=t.r2;r++)wd=Math.max(wd,f2(r));let gd=0;
+    while(t.r1<t.r2&&gd++<8&&(sh.merges.some(m=>t.r1>=m.r1&&t.r1<=m.r2&&m.c2>=t.c1&&m.c1<=t.c2)||f2(t.r1)<wd))t.r1++;
+    const clean=!sh.merges.some(m=>m.r2>=t.r1&&m.r1<=t.r2&&m.c2>=t.c1&&m.c1<=t.c2);
+    if(clean&&t.r2>t.r1&&X.act.c>=t.c1&&X.act.c<=t.c2){X.sel={r1:X.act.r<t.r1?t.r1:X.act.r,c1:X.act.c,r2:X.act.r<t.r1?t.r1:X.act.r,c2:X.act.c};X.act={r:X.sel.r1,c:X.act.c};return sortSel(desc,true);}
+    return hint('אי אפשר למיין תאים ממוזגים. סמנו את שורות הנתונים בלבד, או לחצו על תא אחד בטבלה ואז על המיון');}
+  if(X.act.c<s.c1||X.act.c>s.c2)X.act={...X.act,c:s.c1};
+  // a header row: all text, while the row under it has a number somewhere (or is typed differently)
+  const types=r=>{const t=[];for(let c=s.c1;c<=s.c2;c++){const x=cellAt(sh,r,c);if(x&&x.v!==null&&x.v!=='')t.push(typeof x.v);}return t;};
+  const t0=types(s.r1),t1=types(s.r1+1);
+  if(t0.length&&t0.every(t=>t==='string')&&t1.length&&(t1.some(t=>t==='number')||t1.join()!==t0.join()))s.r1++;
+  if(s.r2<=s.r1)return hint('סמנו כמה שורות למיון');
+  const by=X.act.c;
   change(()=>{
-    const rows=[];for(let r=s.r1;r<=s.r2;r++){const cells=[];for(let c=s.c1;c<=s.c2;c++){const x=cellAt(sh,r,c);if(x)cells.push(x);sh.cells.delete(key(r,c));}rows.push({cells,k:valueOf(X.si,r,X.act.c)});}
+    // the sort key is read BEFORE the row's cells are removed from the sheet (reading it after left every key empty,
+    // so nothing actually moved — that was the bug behind "sorting does nothing")
+    const rows=[];for(let r=s.r1;r<=s.r2;r++){const k=valueOf(X.si,r,by);const cells=[];for(let c=s.c1;c<=s.c2;c++){const x=cellAt(sh,r,c);if(x)cells.push(x);sh.cells.delete(key(r,c));}rows.push({cells,k});}
     X.calc.reset();
     const rank=v=>v===null||v===undefined||v===''?2:typeof v==='number'?0:1;
-    rows.sort((x,y)=>{const a=x.k,b=y.k;const ra=rank(a),rb=rank(b);if(ra!==rb)return ra-rb;if(ra===2)return 0;const d=ra===0?a-b:String(a).localeCompare(String(b),'he');return desc?-d:d;});
+    rows.sort((x,y)=>{const a=x.k,b=y.k;const ra=rank(a),rb=rank(b);if(ra!==rb)return ra-rb;if(ra===2)return 0;const d=ra===0?a-b:String(a).localeCompare(String(b),'he',{numeric:true});return desc?-d:d;});
     rows.forEach((row,i)=>{for(const c of row.cells){c.r=s.r1+i;c.mod=true;delete c.ast;sh.cells.set(key(c.r,c.c),c);}});
   });
+  select(s.r1,by);X.anchor={r:s.r1,c:by};select(s.r2,s.c2,true);X.act={r:s.r1,c:by};paintSel();hint(`מוינו ${s.r2-s.r1+1} שורות לפי עמודה ${colName(by)}${desc?' (מהגדול לקטן)':''}`);
 }
 function autoSum(){
   const sh=cur(),{r,c}=X.act;const num=(rr,cc)=>{const x=cellAt(sh,rr,cc);return x&&(typeof x.v==='number'||x.f)&&!(x.f&&/^SUM\(/i.test(x.f)&&false);};
@@ -2499,8 +2523,11 @@ function aiApply(actions){
       else if(op==='freeze'){const sh=cur();const r=Math.max(0,+a.rows||0),c=Math.max(0,+a.cols||0);sh.freeze=r||c?{r,c}:null;sh.viewDirty=true;touch();done.push(op);}
       else if(op==='sort'){const g=aiRange(a.range||'used');if(!g){skipped.push(op);continue;}
         const by=a.by!==undefined?(/^\d+$/.test(String(a.by))?g.c1+(+a.by)-1:aiCol(a.by)):g.c1;
-        let s={...g};if(a.header!==false&&s.r2>s.r1){const h=cellAt(cur(),s.r1,by);if(h&&typeof h.v==='string')s.r1++;}
-        X.sel=s;X.act={r:s.r1,c:Math.max(s.c1,Math.min(s.c2,by))};sortSel(!!a.desc||a.order==='desc');done.push(op);}
+        const whole=!a.range||/^(used|all|selection)$/i.test(String(a.range));
+        if(whole){X.act={r:g.r1,c:Math.max(g.c1,Math.min(g.c2,by))};X.sel={r1:X.act.r,c1:X.act.c,r2:X.act.r,c2:X.act.c};sortSel(!!a.desc||a.order==='desc',true);}
+        else{let s={...g};if(a.header!==false&&s.r2>s.r1){const h=cellAt(cur(),s.r1,by);if(h&&typeof h.v==='string')s.r1++;}
+          X.sel=s;X.act={r:s.r1,c:Math.max(s.c1,Math.min(s.c2,by))};sortSel(!!a.desc||a.order==='desc',false);}
+        done.push(op);}
       else if(op==='clear'){const g=aiRange(a.range);if(!g){skipped.push(op);continue;}const sh=cur();
         one(()=>{for(const cell of [...sh.cells.values()])if(cell.r>=g.r1&&cell.r<=g.r2&&cell.c>=g.c1&&cell.c<=g.c2){if(a.formats){cell.s=0;}if(a.values!==false){cell.v=null;cell.f=null;cell.t='n';delete cell.ast;}cell.mod=true;}X.st.st.css=null;});done.push(op);}
       else if(op==='direction'||op==='rtl'){const sh=cur();sh.rtl=a.rtl!==undefined?!!a.rtl:a.dir!=='ltr';sh.viewDirty=true;touch();done.push(op);}

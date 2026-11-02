@@ -404,11 +404,38 @@ function parseReply(raw) {
 const cleanReply = t => String(t || '').replace(/\s*\[(?:עמ['׳]?|עמוד|עמודים|p\.|pp\.|page)\s*[\d\s,–-]+\]/gi, '').trim();
 // the request is read against the file that is open NOW; the answer may come back after the user moved to
 // another file, so asking (plan) and making the changes (applyPlan) are two steps
+// 5.9.1 — Excel: a sort request is understood here, at once, without the server ("מיין/סדר את הטבלה לפי מק"ט מהקטן לגדול")
+function localPlan(k, question, ctx) {
+  if (k !== 'xlsx') return null;
+  const q = String(question || '');
+  if (!/מיי?ן|מיון|סדר|לסדר|תסדר|sort|order/i.test(q)) return null;
+  if (/גופן|עיצוב|רוחב|סכום|נוסח|מחק|הוסף|format|width|sum|delete|insert/i.test(q)) return null;
+  const desc = /יורד|מהגדול|הגדול לקטן|descending|desc\b|z-a|ת-א/i.test(q) && !/מהקטן|עולה|ascending/i.test(q);
+  // the column: a letter ("עמודה B"), or the text of a header cell quoted in the request
+  let by = null;
+  const m = /עמודה\s+([A-Z]{1,2})\b|\bcolumn\s+([A-Z]{1,2})\b|\b([A-Z]{1,2})\s*(?:column|עמודה)/i.exec(q);
+  if (m) by = (m[1] || m[2] || m[3]).toUpperCase();
+  if (!by) {
+    const cells = [];
+    for (const line of String(ctx.text || '').split('\n')) for (const part of line.replace(/^\s*שורה\s*\d+:\s*/, '').split(' | ')) { const mm = /^([A-Z]{1,3})\d+=([\s\S]*)$/.exec(part.trim()); if (mm) cells.push({ col: mm[1], t: mm[2].replace(/\{[^}]*\}$/, '').trim() }); }
+    const norm = t => t.replace(/["'״׳\s]/g, '');
+    const qn = norm(q);
+    // the header the user names FIRST is the one to sort by ("לפי מק\"ט … שאר העמודות: תאור מוצר, מספר צבע")
+    let best = null;
+    for (const c of cells) { const t = norm(c.t); if (t.length < 2 || !/[\u0590-\u05FFA-Za-z]/.test(t)) continue; const at = qn.indexOf(t); if (at < 0) continue;
+      if (!best || at < best.at || (at === best.at && t.length > best.t.length)) best = { col: c.col, t, at }; }
+    if (best) by = best.col;
+  }
+  if (!by) return null;
+  const hebCol = by;
+  return { kind: k, reply: `מיינתי את הטבלה לפי עמודה ${hebCol}${desc ? ', מהגדול לקטן' : ', מהקטן לגדול'}. כל שורה נשארה שלמה.`, actions: [{ op: 'sort', range: 'used', by, desc, header: true }], local: true };
+}
 async function plan(question, opts = {}) {
   const k = liveKind(); const A = apiOf(k);
   if (!k || !A || !A.assist) throw new Error('העוזר עובד בתוך עורך ה-Word, ה-Excel או ה-PowerPoint');
-  if (typeof window.SIMAN_AI !== 'function') throw new Error('השירות החכם לא נטען. רעננו את הדף');
   const ctx = A.assist.context(); if (!ctx) throw new Error('העורך סגור');
+  const local = localPlan(k, question, ctx); if (local) return local;
+  if (typeof window.SIMAN_AI !== 'function') throw new Error('השירות החכם לא נטען. רעננו את הדף');
   const prompt = COMMON.replace('{APP}', ED[k].app) + '\n' + SPEC[k] + `\n\nThe file name: "${ctx.name}".\nThe user's request: """${question}"""`;
   const raw = await window.SIMAN_AI({ mode: 'ask', text: ctx.text, question: prompt, history: opts.history || [] }, { onWait: opts.onWait, signal: opts.signal });
   const obj = parseReply(raw);
