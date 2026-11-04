@@ -322,6 +322,13 @@ html.v7[data-theme="dark"] .ai-res .done,html.v7[data-theme="dark"] .ai-res butt
 /* 5.9.6: the menus' text stays light in dark mode (also the selected option and the small grey notes) */
 html.v7[data-theme="dark"] .we-pop .mi,html.v7[data-theme="dark"] #xed .xe-pop .mi,html.v7[data-theme="dark"] .pe-pop .mi{color:var(--v7-ink)!important}
 html.v7[data-theme="dark"] .we-pop small,html.v7[data-theme="dark"] #xed .xe-pop small,html.v7[data-theme="dark"] .pe-pop small,html.v7[data-theme="dark"] #xed .xe-pop [style*="color:#7A879E"]{color:var(--v7-muted)!important}
+/* 5.9.6 — the editors' small windows ("נמצאה עבודה שלא נשמרה", "לשמור את השינויים?", find and replace, links…)
+   were white boxes with the dark mode's light text on them */
+html.v7[data-theme="dark"] .we-dlg-in,html.v7[data-theme="dark"] #xed .xe-dlg-in,html.v7[data-theme="dark"] .pe-dlg-in{background:var(--v7-surface)!important;color:var(--v7-ink)!important;border:1px solid var(--v7-line)}
+html.v7[data-theme="dark"] .we-dlg-in p,html.v7[data-theme="dark"] .we-dlg-in label,html.v7[data-theme="dark"] #xed .xe-dlg-in p,html.v7[data-theme="dark"] #xed .xe-dlg-in label,html.v7[data-theme="dark"] .pe-dlg-in p,html.v7[data-theme="dark"] .pe-dlg-in label{color:var(--v7-muted)!important}
+html.v7[data-theme="dark"] .we-dlg-in .acts button:not(.pri):not(.warn),html.v7[data-theme="dark"] #xed .xe-dlg-in .acts button:not(.pri):not(.warn),html.v7[data-theme="dark"] .pe-dlg-in .acts button:not(.pri):not(.warn){background:var(--v7-soft)!important;color:var(--v7-ink)!important;border-color:var(--v7-line)!important}
+html.v7[data-theme="dark"] .we-dlg-in .acts .pri,html.v7[data-theme="dark"] #xed .xe-dlg-in .acts .pri,html.v7[data-theme="dark"] .pe-dlg-in .acts .pri{background:var(--v7-accent)!important;border-color:var(--v7-accent)!important;color:#160F33!important;font-weight:700}
+html.v7[data-theme="dark"] .we-dlg-in input,html.v7[data-theme="dark"] .we-dlg-in select,html.v7[data-theme="dark"] .we-dlg-in textarea,html.v7[data-theme="dark"] #xed .xe-dlg-in input,html.v7[data-theme="dark"] #xed .xe-dlg-in select,html.v7[data-theme="dark"] #xed .xe-dlg-in textarea,html.v7[data-theme="dark"] .pe-dlg-in input,html.v7[data-theme="dark"] .pe-dlg-in select,html.v7[data-theme="dark"] .pe-dlg-in textarea{background:var(--v7-bg)!important;color:var(--v7-ink)!important;border-color:var(--v7-line)!important}
 /* 5.9.6 — found by the contrast check of the whole app in dark mode */
 /* Word: the symbols (₪ € ©…) were white on white */
 html.v7[data-theme="dark"] .we-pop .syms button{background:var(--v7-surface)!important;color:var(--v7-ink)!important;border-color:var(--v7-line)!important}
