@@ -67,6 +67,9 @@ body.fz-filling .a11y-fab,body.fz-filling .sb-back{visibility:hidden}
 .fzp .hd{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:14px}
 .fzp .hd b{font-size:15px}
 .fzp .hd .cnt{margin-inline-start:auto;color:#6B5A92;font-size:12.5px}
+.fzp .lens{display:flex;justify-content:center;overflow:hidden;margin:0 0 8px;border:1.5px solid #CFC4EA;border-radius:12px;background:#fff;padding:4px}
+.fzp .lens[hidden]{display:none}
+.fzp .lens canvas{display:block;max-width:100%;height:auto!important}
 .fzp textarea{display:block;width:100%;box-sizing:border-box;min-height:46px;max-height:40vh;resize:none;overflow-y:auto;border:2px solid #6B2BD9;border-radius:12px;padding:10px 12px;font:16px/1.45 "AlefEmbed",Rubik,Arial,sans-serif;color:#1C2333;background:#FBFAFF;unicode-bidi:plaintext;text-align:start;transition:height .08s}
 .fzp textarea:focus{outline:3px solid rgba(107,43,217,.25);outline-offset:0}
 .fzp .row{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;align-items:center}
@@ -122,7 +125,11 @@ function labelFor(items, b, pageRtl) {
   const left = cand.filter(t => t.x1 <= b.x0 + 3).sort((a, c) => c.x1 - a.x1)[0];
   const near = t => t && Math.abs((t === right ? t.x0 - b.x1 : b.x0 - t.x1)) < 160;
   const first = pageRtl ? (near(right) ? right : near(left) ? left : null) : (near(left) ? left : near(right) ? right : null);
-  return first ? { text: first.s, fh: first.fh } : null;
+  if (first) return { text: first.s, fh: first.fh };
+  // the label is written above the line ("שם מלא של התלמיד/ה:" and the line under it)
+  const above = items.filter(t => !t.blank && t.y1 <= b.y0 + 4 && b.y0 - t.y1 < Math.max(14, t.fh * 1.6) && t.x0 < b.x1 && t.x1 > b.x0)
+    .sort((a, c) => c.y1 - a.y1)[0];
+  return above ? { text: above.s, fh: above.fh, above: true } : null;
 }
 
 // the page drawn small: ink as 1/0
@@ -267,6 +274,8 @@ async function detectPage(P, widgets) {
     const wd = W1 * (kd === 'sig' ? .24 : .2);
     const x0 = it.rtl ? Math.max(8, it.x0 - 6 - wd) : it.x1 + 6, x1 = it.rtl ? it.x0 - 6 : Math.min(W1 - 8, it.x1 + 6 + wd);
     if (items.some(t => t !== it && t.x0 < x1 && t.x1 > x0 && t.y0 < it.y1 && t.y1 > it.y0)) continue;  // something is written there
+    // the label of a line under it (label above, line below): that line is the place, not the space beside the label
+    if (out.some(o => o.kind !== 'check' && o.y1 > it.y1 && o.y0 - it.y1 < Math.max(16, it.fh * 2.5) && o.x0 < it.x1 + 4 && o.x1 > it.x0 - 4)) continue;
     push({ x0, x1, y0: it.y0 - 2, y1: it.y1 + 2, kind: kd, label: s, rtl: it.rtl, fh: it.fh });
   }
   out.forEach(t => { t.page = P.i - 1; });
@@ -388,12 +397,56 @@ function act(t) {
 /* ---------------------------------------------------------------- חלונית המילוי */
 const pnl = document.createElement('div'); pnl.className = 'fzp'; pnl.hidden = true; pnl.setAttribute('role', 'dialog');
 pnl.innerHTML = `<div class="hd"><b class="ttl"></b><span class="lab"></span><span class="cnt"></span></div>
+<div class="lens" aria-hidden="true"><canvas></canvas></div>
 <textarea rows="1" dir="auto" enterkeyhint="next" autocomplete="on"></textarea>
 <div class="row"><span class="chips"></span><span class="sp"></span><button type="button" data-a="del"></button><button type="button" class="main" data-a="next"></button><button type="button" data-a="done"></button></div>
 <div class="tip"></div>`;
 document.body.append(pnl);
 const ta = pnl.querySelector('textarea');
 const grow = () => { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight + 4, innerHeight * .4) + 'px'; };
+
+/* 5.9.6: the magnifier — on a phone the keyboard and this window cover the page, so the window itself shows
+   the piece of the form being filled (the line and the words beside it), enlarged, with the text written into it live */
+const lensBox = pnl.querySelector('.lens'), lensC = lensBox.querySelector('canvas');
+const LZ = { t: null, img: null, crop: null, s: 1, job: 0 };
+async function lensOpen(t) {
+  const my = ++LZ.job; LZ.t = t; LZ.img = null;
+  const P = S.pages[t.page]; if (!P) { lensBox.hidden = true; return; }
+  const vp1 = P.page.getViewport({ scale: 1 }), W = vp1.width;
+  // the field and the words beside it (Hebrew: on its right), at most ~300pt wide
+  const side = 150, maxW = 300;
+  let x0 = t.rtl ? t.x0 - 8 : t.x0 - side, x1 = t.rtl ? t.x1 + side : t.x1 + 8;
+  x0 = Math.max(0, x0); x1 = Math.min(W, x1);
+  if (x1 - x0 > maxW) { if (t.rtl) x0 = x1 - maxW; else x1 = x0 + maxW; }
+  const y0 = Math.max(0, t.y0 - (t.kind === 'cell' ? 4 : 10)), y1 = Math.min(vp1.height, t.y1 + 8);
+  const cssW = Math.max(200, Math.min(620, innerWidth) - 28);
+  const s = Math.min(3.2, cssW / (x1 - x0)), dpr = Math.min(2, window.devicePixelRatio || 1), k = s * dpr;
+  const c = document.createElement('canvas'); c.width = Math.round((x1 - x0) * k); c.height = Math.round((y1 - y0) * k);
+  const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
+  lensBox.hidden = false;
+  lensC.width = c.width; lensC.height = c.height; lensC.style.width = (x1 - x0) * s + 'px'; lensC.style.height = (y1 - y0) * s + 'px';
+  try { await P.page.render({ canvasContext: g, viewport: P.page.getViewport({ scale: k }), transform: [1, 0, 0, 1, -x0 * k, -y0 * k], annotationMode: 0 }).promise; }
+  catch (e) { if (my === LZ.job) lensBox.hidden = true; return; }
+  if (my !== LZ.job) return;
+  LZ.img = c; LZ.crop = { x0, y0, x1, y1 }; LZ.s = k;
+  lensDraw();
+}
+function lensDraw() {
+  const t = LZ.t, c = LZ.img; if (!t || !c || lensBox.hidden) return;
+  const g = lensC.getContext('2d'), k = LZ.s, { x0, y0 } = LZ.crop, X = v => (v - x0) * k, Y = v => (v - y0) * k;
+  g.clearRect(0, 0, lensC.width, lensC.height); g.drawImage(c, 0, 0);
+  const a = annOf(t);
+  // the field itself, lightly marked
+  g.fillStyle = 'rgba(255,216,77,.28)'; g.fillRect(X(t.x0), Y(t.y0), (t.x1 - t.x0) * k, (t.y1 - t.y0) * k);
+  if (!a || a.type !== 'text' || !String(a.text || '').trim()) return;
+  const size = a.size, f = a.fz || {};
+  const fs = [...a.text].find(ch => RTL_CH.test(ch) || LTR_CH.test(ch)), rtl = fs ? RTL_CH.test(fs) : f.rtl;
+  g.font = `${a.bold ? 700 : 400} ${size * k}px ${typeof cssFont === 'function' ? cssFont(a.font) : 'Arial'}`;
+  g.fillStyle = a.color || '#1C2333'; g.textBaseline = 'alphabetic'; g.direction = rtl ? 'rtl' : 'ltr'; g.textAlign = rtl ? 'right' : 'left';
+  const base = (f.top != null ? f.top : t.y1 - size * 1.08) + size * 1.08 - .5;
+  const lines = String(a.text).split('\n');
+  lines.forEach((ln, i) => g.fillText(ln, rtl ? X(f.r != null ? f.r : t.x1) : X(f.l != null ? f.l : t.x0), Y(base + i * size * 1.35)));
+}
 function openPanel(t) {
   F.cur = t; const l = L(), P = S.pages[t.page];
   let a = annOf(t);
@@ -419,13 +472,14 @@ function openPanel(t) {
   if (isText) { ta.value = a.text || ''; ta.placeholder = l.ph; ta.dir = 'auto'; ta.inputMode = kd === 'id' || kd === 'phone' ? 'numeric' : kd === 'date' ? 'text' : 'text'; }
   count(); pnl.hidden = false; document.body.classList.add('fz-filling'); paint(P); place(); bar();
   if (isText) { ta.focus({ preventScroll: true }); grow(); try { ta.setSelectionRange(ta.value.length, ta.value.length); } catch (_) {} }
+  lensOpen(t);
   setTimeout(() => show(t), 30);
 }
 function sync() {
   const t = F.cur, a = t && annOf(t); if (!a || a.type !== 'text') return;
   a.text = ta.value; setDirty(true); fit(a);
   const tx = document.querySelector(`.tw[data-id="${a.id}"] .tx`); if (tx && tx.textContent !== a.text) tx.textContent = a.text;
-  grow(); pnl.querySelector('[data-a=del]').hidden = !a.text;
+  grow(); pnl.querySelector('[data-a=del]').hidden = !a.text; lensDraw();
 }
 ta.addEventListener('input', sync);
 ta.addEventListener('keydown', e => {
