@@ -60,7 +60,7 @@ html.v7.nb:not(#_) .bar .fname{max-width:18vw;overflow:hidden;text-overflow:elli
 html.v7.nb:not(.v7-doc):not(#_) .opts{display:none}
 html.v7.nb:not(#_) .nb-top .group.zoom{gap:6px}
 html.v7.nb:not(#_) .nb-top #installBtn{width:auto;padding:0 14px}
-html.v7.nb:not(#_) .nb-case{flex:1 1 100%;order:1;display:flex;align-items:center;flex-wrap:wrap;gap:6px 8px;min-width:0;
+html.v7.nb:not(#_) .nb-case{flex:1 1 100%;order:1;display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:6px 8px;min-width:0;
   background:var(--v7-surface);border:2.5px solid var(--nb-edge);border-radius:20px;box-shadow:5px 5px 0 var(--nb-shadow);padding:6px 10px}
 html.v7.nb:not(#_) .nb-case > .group{display:flex;align-items:center;flex-wrap:wrap;gap:8px}
 html.v7.nb:not(#_) .nb-case .btn{min-height:38px;padding:0 14px}
@@ -133,6 +133,14 @@ html.v7.nb .v7-t::before{content:"";position:absolute;top:-12px;inset-inline-sta
 html.v7.nb[dir="ltr"] .v7-t::before,html.v7.nb .v7-home[dir="ltr"] .v7-t::before{transform:translateX(-50%) rotate(-4deg)}
 @media (hover:hover){html.v7.nb:not(#_) .v7-t:hover{transform:rotate(0) scale(1.04)!important;z-index:2;box-shadow:6px 6px 0 var(--nb-st-ink)}}
 html.v7.nb:not(#_) .v7-t:focus-visible{outline:3px solid var(--v7-accent);outline-offset:4px}
+/* מחשב: עיגול בכתב יד שמצטייר סביב המדבקה כשהעכבר עליה (או כשמגיעים אליה במקלדת) */
+html.v7.nb .v7-t .nb-ring{display:none}
+@media (hover:hover){
+  html.v7.nb .v7-t .nb-ring{display:block;position:absolute;inset:-14px;width:calc(100% + 28px);height:calc(100% + 28px);pointer-events:none;overflow:visible;z-index:3}
+  html.v7.nb .v7-t .nb-ring path{fill:none;stroke:var(--v7-accent);stroke-width:3.5;stroke-linecap:round;stroke-dasharray:900;stroke-dashoffset:900;transition:stroke-dashoffset .6s ease}
+  html.v7.nb .v7-t:hover .nb-ring path,html.v7.nb .v7-t:focus-visible .nb-ring path{stroke-dashoffset:0}
+}
+@media (prefers-reduced-motion:reduce){html.v7.nb .v7-t .nb-ring path{transition:none}}
 html.v7.nb .v7-t .v7-words,html.v7.nb .v7-t .v7-art,html.v7.nb .v7-t .v7-wave,html.v7.nb .v7-t .v7-sig,html.v7.nb .v7-t .v7-ic2{display:none}
 html.v7.nb .v7-t .nb-e{font-size:30px;line-height:1;margin-bottom:6px}
 html.v7.nb .v7-t .v7-tt{gap:2px}

@@ -72,6 +72,8 @@
       var s = document.createElement('span');
       s.className = 'nb-e'; s.setAttribute('aria-hidden', 'true'); s.textContent = EMOJI[k];
       t.prepend(s);
+      // the hand-drawn circle that draws itself around the sticker on hover (siman-nb.css, computers only)
+      t.insertAdjacentHTML('beforeend', '<svg class="nb-ring" viewBox="0 0 200 160" preserveAspectRatio="none" aria-hidden="true"><path d="M110 6 C 170 4, 198 40, 194 84 C 190 130, 140 156, 92 154 C 40 152, 4 122, 6 78 C 8 34, 50 8, 120 12"/></svg>');
     });
   }
 
