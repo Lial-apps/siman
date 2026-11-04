@@ -940,7 +940,7 @@ const BASE_CSS = `
 .pe-brand{display:flex;align-items:center;gap:7px;white-space:nowrap}
 .pe-brand b{font-size:17px;color:#fff;background:linear-gradient(transparent 58%,rgba(255,212,59,.55) 58%);padding:0 2px}
 .pe-mark{width:24px;height:24px;border-radius:5px;background:#2B579A;color:#fff;display:grid;place-items:center;font:700 13px Georgia,serif}
-.pe-sub{color:#9AA7BE;font-size:13px}
+.pe-sub{color:rgba(255,255,255,.82);font-size:13px}
 .pe-namebox{direction:ltr;display:flex;align-items:center;max-width:340px;min-width:90px;flex:0 1 340px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);border-radius:7px;padding:0 8px;margin-inline-start:10px}
 .pe-name{flex:1;min-width:0;background:none;border:0;color:#fff;font:inherit;padding:6px 0;outline:none}
 .pe-namebox:focus-within{border-color:var(--wm)}

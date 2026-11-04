@@ -118,6 +118,8 @@ body.fz-filling .a11y-fab,body.fz-filling .sb-back{visibility:hidden}
 [data-theme=dark] .fzp .row button{background:#241D48;color:#EDE9F7;border-color:#4B3F86}
 [data-theme=dark] .fzp .row button.main{background:#8B5CF6;border-color:#8B5CF6}
 [data-theme=dark] .fzp .row button.sun,[data-theme=dark] .fzbar .go{background:#F5CD3D;color:#2B1660}
+[data-theme=dark] .fzp .hd .cnt,[data-theme=dark] .fzp .tip{color:#B9AEE0}
+[data-theme=dark] .fzp .lens{border-color:#4B3F86}
 `;
 document.head.append(css);
 
@@ -468,7 +470,7 @@ async function lensOpen(t) {
   const P = S.pages[t.page]; if (!P) { lensBox.hidden = true; return; }
   const vp1 = P.page.getViewport({ scale: 1 }), W = vp1.width;
   // the field and the words beside it (Hebrew: on its right), at most ~300pt wide
-  const side = 150, maxW = 300;
+  const side = 210, maxW = 380;
   let x0 = t.rtl ? t.x0 - 8 : t.x0 - side, x1 = t.rtl ? t.x1 + side : t.x1 + 8;
   x0 = Math.max(0, x0); x1 = Math.min(W, x1);
   if (x1 - x0 > maxW) { if (t.rtl) x0 = x1 - maxW; else x1 = x0 + maxW; }

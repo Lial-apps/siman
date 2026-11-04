@@ -154,7 +154,7 @@ document.head.append(h(`<style id="simanCamCss">
 .scn-act b{display:block;font-size:14.5px}
 .scn-act span{display:block;font-size:12px;color:#9FB0C9;line-height:1.3}
 .scn-act.main{background:#3E6BF2;border-color:#3E6BF2;color:#fff}
-.scn-act.main span{color:#3B3413}
+.scn-act.main span{color:rgba(255,255,255,.85)}
 .scn-edit{flex:1;min-height:0;display:grid;place-items:center;padding:8px 12px;position:relative}
 .scn-edit .canvas{position:relative;max-width:100%;max-height:100%}
 .scn-edit img.big{display:block;max-width:100%;max-height:100%;background:#fff;border-radius:4px;box-shadow:0 6px 30px rgba(0,0,0,.5)}
@@ -173,6 +173,7 @@ document.head.append(h(`<style id="simanCamCss">
 .scn-filters button{flex:none;border:2px solid transparent;border-radius:10px;background:rgba(255,255,255,.06);padding:4px 4px 6px;width:76px;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px}
 .scn-filters button img{width:64px;height:64px;object-fit:cover;border-radius:6px;background:#fff}
 .scn-filters button[aria-pressed="true"]{border-color:#9DB8FF}
+.scn .scn-filters button[aria-pressed="true"]{color:#EEF3FB!important;font-weight:700} /* 5.9.6: the chosen filter's name stays light (it has no light background behind it) */
 .scn-busy{position:absolute;inset:0;z-index:5;background:rgba(6,11,22,.78);display:grid;place-items:center;text-align:center;font-size:15.5px;padding:24px}
 .scn-busy[hidden]{display:none}
 .scn [aria-pressed="true"],.scn [aria-checked="true"],.scn .on{color:#0A1222!important}

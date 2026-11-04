@@ -685,7 +685,7 @@ const CSS=`
 #xed .xe-brand{display:flex;align-items:center;gap:7px;white-space:nowrap}
 #xed .xe-brand b{font-size:17px;color:#fff;background:linear-gradient(transparent 58%,rgba(255,212,59,.55) 58%);padding:0 2px}
 #xed .xe-mark{width:24px;height:24px;border-radius:5px;background:var(--xg);color:#fff;display:grid;place-items:center;font:700 13px Arial,sans-serif}
-#xed .xe-sub{color:#9AA7BE;font-size:13px}
+#xed .xe-sub{color:rgba(255,255,255,.8);font-size:13px}
 #xed .xe-namebox{direction:ltr;display:flex;align-items:center;max-width:340px;min-width:90px;flex:0 1 340px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);border-radius:7px;padding:0 8px;margin-inline-start:10px}
 #xed .xe-name{flex:1;min-width:0;background:none;border:0;color:#fff;font:inherit;padding:6px 0;outline:none}
 #xed .xe-namebox:focus-within{border-color:var(--xm)}#xed .xe-ext{color:#9AA7BE;font-size:12px}

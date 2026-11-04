@@ -322,6 +322,19 @@ html.v7[data-theme="dark"] .ai-res .done,html.v7[data-theme="dark"] .ai-res butt
 /* 5.9.6: the menus' text stays light in dark mode (also the selected option and the small grey notes) */
 html.v7[data-theme="dark"] .we-pop .mi,html.v7[data-theme="dark"] #xed .xe-pop .mi,html.v7[data-theme="dark"] .pe-pop .mi{color:var(--v7-ink)!important}
 html.v7[data-theme="dark"] .we-pop small,html.v7[data-theme="dark"] #xed .xe-pop small,html.v7[data-theme="dark"] .pe-pop small,html.v7[data-theme="dark"] #xed .xe-pop [style*="color:#7A879E"]{color:var(--v7-muted)!important}
+/* 5.9.6 — found by the contrast check of the whole app in dark mode */
+/* Word: the symbols (₪ € ©…) were white on white */
+html.v7[data-theme="dark"] .we-pop .syms button{background:var(--v7-surface)!important;color:var(--v7-ink)!important;border-color:var(--v7-line)!important}
+html.v7[data-theme="dark"] .we-pop .syms button:hover{background:var(--v7-soft)!important}
+/* Word: the style gallery shows the styles on white paper, so its small labels stay dark */
+html.v7[data-theme="dark"] #weGal button small{color:#5D6982!important}
+/* send for signing: the field buttons ("חתימה + שם החותם + תאריך", "ראשי תיבות") were light text on light buttons */
+html.v7[data-theme="dark"] #snd .tool{background:var(--v7-surface)!important;color:var(--v7-ink)!important;border-color:var(--v7-dash,var(--v7-line))!important}
+html.v7[data-theme="dark"] #snd .tool.combo{background:var(--v7-soft)!important;border-color:var(--v7-accent)!important}
+/* PowerPoint: the hint line */
+html.v7[data-theme="dark"] #peHint{color:#AFC4FF!important}
+/* transcript: the speakers' names keep their colour, lighter so they read on the dark page */
+html.v7[data-theme="dark"] #vx .vx-ln .who .nm,html.v7[data-theme="dark"] #vx .vx-spk b,html.v7[data-theme="dark"] #vx .vx-chip b{filter:brightness(1.75) saturate(.85)}
 html.v7[data-theme="dark"] .oa-menu button,html.v7[data-theme="dark"] .oa-drop button,html.v7[data-theme="dark"] .ai-res{color:var(--v7-ink)!important}
 html.v7[data-theme="dark"] .oa-menu .sep{background:var(--v7-line)!important}
 html.v7[data-theme="dark"] .otr-langs button{background:var(--v7-bg)!important;color:var(--v7-ink)!important;border-color:var(--v7-line)!important}
