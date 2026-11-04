@@ -1,7 +1,7 @@
 // סימן — service worker: works offline, picks up new versions automatically
-const CACHE = 'siman-v93'; // 5.9.5
+const CACHE = 'siman-v94'; // 5.9.6
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './pdf.min.js', './pdf.worker.min.js',
-  './pdf-lib.min.js', './fontkit.umd.min.js', './icon-192.png', './icon-512.png', './icon-maskable-512.png', './jszip.min.js', './pptxgen.min.js', './office.js', './office-edit.js', './word-editor.js', './excel-editor.js', './docx-preview.min.js', './html2canvas.min.js', './xlsx.mini.min.js', './font-secular-he.woff2', './font-secular-lat.woff2', './send.js', './siman-plus.js', './siman-media.js', './ppt-editor.js', './office-ai.js', './office-translate.js', './a11y.js', './admin-panel.js', './font-rubik-400.ttf', './font-rubik-700.ttf', './siman-phone.css', './siman-phone.js', './siman-voice.js', './siman-asr-worker.js', './transformers.min.js', './siman-back.js', './siman-v7.css', './siman-v7.js', './siman-scan.js', './siman-merge.js', './siman-ux.js', './siman-nb.css', './siman-nb.js'];
+  './pdf-lib.min.js', './fontkit.umd.min.js', './icon-192.png', './icon-512.png', './icon-maskable-512.png', './jszip.min.js', './pptxgen.min.js', './office.js', './office-edit.js', './word-editor.js', './excel-editor.js', './docx-preview.min.js', './html2canvas.min.js', './xlsx.mini.min.js', './font-secular-he.woff2', './font-secular-lat.woff2', './send.js', './siman-plus.js', './siman-media.js', './ppt-editor.js', './office-ai.js', './office-translate.js', './a11y.js', './admin-panel.js', './font-rubik-400.ttf', './font-rubik-700.ttf', './siman-phone.css', './siman-phone.js', './siman-voice.js', './siman-asr-worker.js', './transformers.min.js', './siman-back.js', './siman-v7.css', './siman-v7.js', './siman-scan.js', './siman-merge.js', './siman-ux.js', './siman-nb.css', './siman-nb.js', './siman-fill.js'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
@@ -11,6 +11,9 @@ self.addEventListener('activate', e => {
   e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => /^siman-v\d+$/.test(k) && k !== CACHE).map(k => caches.delete(k))))
     .then(() => self.clients.claim()));
 });
+// 5.9.6: a weak connection does not hold the app on a blank screen: after 6 seconds the saved copy is used
+const fresh = req => new Promise((res, rej) => { const t = setTimeout(() => rej(new Error('slow')), 6000);
+  fetch(req, { cache: 'no-cache' }).then(r => { clearTimeout(t); res(r); }, e => { clearTimeout(t); rej(e); }); });
 self.addEventListener('fetch', e => {
   const req = e.request;
   // a file shared to סימן from another app (Android share sheet: WhatsApp voice messages, call recordings, PDFs):
@@ -37,21 +40,21 @@ self.addEventListener('fetch', e => {
   const path = new URL(req.url).pathname;
   const isPage = req.mode === 'navigate' || /\/(index\.html)?$/.test(path);
   // the app's own code: always the newest version when online, so an upload shows up on the next refresh
-  const isAppCode = /\/(office|office-edit|word-editor|excel-editor|siman-register|send|siman-plus|ppt-editor|a11y|office-ai|office-translate|siman-voice|siman-asr-worker|siman-back|siman-scan|siman-merge|siman-ux)\.js$/.test(path) || /\/siman-(phone|v7|nb)\.(css|js)$/.test(path);
+  const isAppCode = /\/(office|office-edit|word-editor|excel-editor|siman-register|send|siman-plus|ppt-editor|a11y|office-ai|office-translate|siman-voice|siman-asr-worker|siman-back|siman-scan|siman-merge|siman-ux|siman-fill|admin-panel|siman-media|siman-ai|siman-share)\.js$/.test(path) || /\/siman-(phone|v7|nb)\.(css|js)$/.test(path);
   if (isAppCode) {
-    e.respondWith(fetch(req, { cache: 'no-cache' }).then(r => { if (r.ok) { const copy = r.clone(); caches.open(CACHE).then(c => c.put(req, copy)); } return r; })
-      .catch(() => caches.match(req)));
+    e.respondWith(fresh(req).then(r => { if (r.ok) { const copy = r.clone(); caches.open(CACHE).then(c => c.put(req, copy)); } return r; })
+      .catch(() => caches.match(req, { ignoreSearch: true }).then(h => h || fetch(req))));
     return;
   }
   if (isPage) {
     // newest page when online, cached page when offline. Only the app itself is kept as the app page:
     // other pages (like sign.html, opened from a link) are kept under their own address
     const isApp = /\/(index\.html)?$/.test(path);
-    e.respondWith(fetch(req, { cache: 'no-cache' }).then(r => { if (r.ok) { const copy = r.clone(); caches.open(CACHE).then(c => c.put(isApp ? './index.html' : req, copy)); } return r; })
+    e.respondWith(fresh(req).then(r => { if (r.ok) { const copy = r.clone(); caches.open(CACHE).then(c => c.put(isApp ? './index.html' : req, copy)); } return r; })
       .catch(() => isApp ? caches.match('./index.html') : caches.match(req)));
     return;
   }
-  e.respondWith(caches.match(req).then(hit => hit || fetch(req).then(r => {
+  e.respondWith(caches.match(req, { ignoreSearch: true }).then(hit => hit || fetch(req).then(r => {
     if (r.ok) { const copy = r.clone(); caches.open(CACHE).then(c => c.put(req, copy)); }
     return r;
   })));

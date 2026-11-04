@@ -843,6 +843,12 @@ const CAM = {
     if (DESK && !this.deskCam) return this.deskPick();
     root.classList.remove('desk-pick');
     if (this.stream) { this.loop(); return; }
+    // 5.9.6: a double tap does not open two cameras (the light would stay on); each new start tries the full photo again
+    if (this.starting) return;
+    this.starting = true; this.noPhoto = false;
+    try { return await this.startCam2(); } finally { this.starting = false; }
+  },
+  async startCam2() {
     const nc = $r('.scn-nocam');
     nc.hidden = true;
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return this.noCam('הדפדפן הזה לא נותן גישה ישירה למצלמה.');
@@ -890,7 +896,9 @@ const CAM = {
     const nc = $r('.scn-nocam'); nc.hidden = false;
     nc.innerHTML = `<h3>המצלמה לא זמינה</h3><p>${esc(msg)}</p><div class="row">
       <button class="scn-btn main" type="button" data-n="cam">${I.auto} צילום במצלמה של המכשיר</button>
-      <button class="scn-btn" type="button" data-n="gal">${I.gallery} בחירת תמונות</button></div>`;
+      <button class="scn-btn" type="button" data-n="gal">${I.gallery} בחירת תמונות</button>
+      <button class="scn-btn" type="button" data-n="retry">${I.rot} לנסות שוב</button></div>`;
+    nc.querySelector('[data-n=retry]').onclick = () => { nc.hidden = true; this.startCam(); };
     nc.querySelector('[data-n=cam]').onclick = () => camIn.click();
     nc.querySelector('[data-n=gal]').onclick = () => galIn.click();
   },
@@ -1004,7 +1012,9 @@ const CAM = {
     try {
       const ic = this.ic || (this.ic = new ImageCapture(this.track));
       const pb = await Promise.race([ic.takePhoto(), sleep(5000).then(() => null)]);
-      if (!pb) { this.noPhoto = true; return null; }
+      // one slow photo is not a reason to give up the full picture for good: after two slow ones it is the video frame
+      if (!pb) { this.slowPhoto = (this.slowPhoto || 0) + 1; if (this.slowPhoto >= 2) this.noPhoto = true; return null; }
+      this.slowPhoto = 0;
       const bmp = await decodeImg(pb), [pw, ph] = dimsOf(bmp);
       if ((pw > ph) !== (W > H)) { if (bmp.close) bmp.close(); this.noPhoto = true; return null; }   // מסובבת אחרת מהווידאו: לא בטוח
       const av = W / H, ap = pw / ph;
@@ -1335,11 +1345,11 @@ const CAM = {
     stg.innerHTML = `<img class="big" alt="עמוד ${this.cur + 1}" src="${p.thumb}">`;
     $r('[data-e=tools]').hidden = false;
     // תצוגה חדה יותר מהתמונה הקטנה
-    const v = p.ver; render(p, 1400).then(c => { if (v === p.ver && this.view === 'edit' && !this.cropping && this.pages[this.cur] === p) { const im = stg.querySelector('img.big'); if (im) im.src = c.toDataURL('image/jpeg', 0.85); } free(c); });
+    const v = p.ver; render(p, 1400).then(c => { if (v === p.ver && this.view === 'edit' && !this.cropping && this.pages[this.cur] === p) { const im = stg.querySelector('img.big'); if (im) im.src = c.toDataURL('image/jpeg', 0.85); } free(c); }).catch(e => console.warn('preview', e));
     // דוגמאות של כל מסנן על העמוד הזה
     const fl = $r('[data-e=filters]'); fl.hidden = false;
     fl.innerHTML = FILTERS.map(([k, l]) => `<button type="button" data-ef="${k}" aria-pressed="${p.filter === k}"><img alt=""><span>${l}</span></button>`).join('');
-    fl.querySelectorAll('[data-ef]').forEach(b => b.onclick = async () => { p.filter = b.dataset.ef; this.busy('מחיל…'); await refreshThumb(p); this.busy(null); this.renderEdit(); });
+    fl.querySelectorAll('[data-ef]').forEach(b => b.onclick = async () => { p.filter = b.dataset.ef; await this.step('מחיל…', () => refreshThumb(p)); this.renderEdit(); });
     const base = await (async () => { const img = await decodeImg(p.src); const c = rotated(warp(img, p.quad, 160), p.rot); if (img.close) img.close(); return c; })();
     for (const b of fl.querySelectorAll('[data-ef]')) {
       const c = canvasOf(base.width, base.height); c.getContext('2d').drawImage(base, 0, 0);
@@ -1384,14 +1394,20 @@ const CAM = {
       if (f) { q = f; draw(); b.textContent = 'זוהה ✓'; } else b.textContent = 'לא זוהה, גררו את הפינות'; };
     stg.querySelector('[data-c=ok]').onclick = async () => {
       if (quadArea(q) < 0.02) { say('המסגרת קטנה מדי'); return; }
-      p.quad = q; p.cropEdited = true; this.cropping = false; this.busy('מיישר את הדף…'); await refreshThumb(p); this.busy(null); this.updateStack(); this.renderEdit();
+      p.quad = q; p.cropEdited = true; this.cropping = false; await this.step('מיישר את הדף…', () => refreshThumb(p)); this.updateStack(); this.renderEdit();
     };
+  },
+  // 5.9.6: a step that may fail (a picture too big for the phone's memory) never leaves the "working" screen stuck
+  async step(msg, fn) {
+    this.busy(msg);
+    try { await fn(); } catch (e) { console.error(e); say('הפעולה לא הצליחה' + (e && e.message ? ': ' + e.message : '') + '. אפשר לנסות שוב'); }
+    finally { this.busy(null); }
   },
   async tool(t) {
     const p = this.pages[this.cur]; if (!p) return;
     if (t === 'crop') { this.cropping = !this.cropping; return this.renderEdit(); }
-    if (t === 'rot') { p.rot = (p.rot + 90) % 360; this.busy('מסובב…'); await refreshThumb(p); this.busy(null); this.updateStack(); return this.renderEdit(); }
-    if (t === 'ink') { p.ink = !p.ink; this.busy(p.ink ? 'מוחק את סימני העט…' : 'מחזיר…'); await refreshThumb(p); this.busy(null); return this.renderEdit(); }
+    if (t === 'rot') { p.rot = (p.rot + 90) % 360; await this.step('מסובב…', () => refreshThumb(p)); this.updateStack(); return this.renderEdit(); }
+    if (t === 'ink') { p.ink = !p.ink; await this.step(p.ink ? 'מוחק את סימני העט…' : 'מחזיר…', () => refreshThumb(p)); return this.renderEdit(); }
     if (t === 'all') { await this.setAll({ filter: p.filter, ink: p.ink }); this.show('edit'); say('הסגנון הוחל על כל העמודים'); return; }
     if (t === 'del') { this.pages.splice(this.cur, 1); this.updateStack(); if (!this.pages.length) return this.show('cam'); this.cur = Math.min(this.cur, this.pages.length - 1); return this.renderEdit(); }
   },
@@ -1422,7 +1438,8 @@ const CAM = {
     return new File([await pdf.save()], this.fileBase() + '.pdf', { type: 'application/pdf' });
   },
   async act(x) {
-    if (!this.pages.length) return;
+    if (!this.pages.length || this.acting) return;   // a second tap does not save twice
+    this.acting = true;
     try {
       if (x === 'pdf') { const f = await this.buildPdf(); this.busy(null); download(f); say('הקובץ נשמר בתיקיית ההורדות'); }
       else if (x === 'share') { const f = await this.buildPdf(); this.busy(null); try { await navigator.share({ files: [f], title: f.name }); } catch (e) { if (e.name !== 'AbortError') download(f); } }
@@ -1431,7 +1448,7 @@ const CAM = {
       else if (x === 'word') await this.toWord();
       else if (x === 'excel') await this.toExcel();
     } catch (e) { console.error(e); say('השמירה נכשלה: ' + (e.message || e)); }
-    finally { this.busy(null); }
+    finally { this.busy(null); this.acting = false; }
   },
   async saveJpgs() {
     const [max, qq] = this.quality(), base = this.fileBase(), files = [];
@@ -1452,8 +1469,9 @@ const CAM = {
   },
   async toEditor(ocr) {
     if (typeof openFile !== 'function') throw new Error('העורך לא נטען');
-    const f = await this.buildPdf(); this.busy(null);
+    // asked before the work, not after it
     if (typeof S !== 'undefined' && S.dirty && !confirm('בקובץ הפתוח יש שינויים שלא נשמרו. לפתוח את הסריקה במקומו?')) return;
+    const f = await this.buildPdf(); this.busy(null);
     try { if (typeof S !== 'undefined') S.dirty = false; } catch (_) {}
     this.close(true);
     await openFile(f);
@@ -1519,7 +1537,7 @@ const CAM = {
     for (const [i, p] of this.pages.entries()) {
       const label = this.pages.length > 1 ? `עמוד ${i + 1} מתוך ${this.pages.length}: ` : '';
       this.busy(label + 'בודק שהדף ישר…');
-      if (p.doc) await p.doc;
+      if (p.doc) await Promise.race([p.doc, sleep(4000)]);
       await this.orient(p);
       this.busy(label + 'מכין את התמונה…');
       const pic = await tablePic(p);
@@ -1558,13 +1576,20 @@ const CAM = {
     const pics = [];
     for (const [i, p] of this.pages.entries()) {
       this.busy(`בודק שעמוד ${i + 1} ישר…`);
-      if (p.doc) await p.doc;
+      // the background check gets a few seconds, not minutes (it is only a help)
+      if (p.doc) await Promise.race([p.doc, sleep(4000)]);
+      await sleep(0);
       await this.orient(p);
       this.busy(`מכין עמוד ${i + 1} מתוך ${this.pages.length} לקריאה…`);
       pics.push(await readingPic(p, SC.quality === 'fast'));
     }
     const name = this.fileBase();
-    this.busy(null); this.close(true);
+    this.busy(null);
+    // 5.9.6: the scanned pages are kept until the reading succeeds: if it fails (no internet, the daily limit),
+    // "חזרה לעמודים" brings the scanner back with every page, instead of photographing everything again
+    this.stopCam(); root.hidden = true; document.documentElement.style.overflow = '';
+    SC.onFail = () => { SC.onFail = SC.onOk = null; root.hidden = false; document.documentElement.style.overflow = 'hidden'; this.show('review'); };
+    SC.onOk = () => { SC.onFail = SC.onOk = null; this.close(true); };
     SC.openReader(); SC.name = name; SC.run(pics);
   },
 };
@@ -1978,6 +2003,8 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) CAM.stopCam(); else CAM.startCam();
 });
 root.addEventListener('keydown', e => {
+  // while something is being saved, Escape does not jump back to the camera in the middle of it
+  if (e.key === 'Escape' && (CAM.acting || !$r('.scn-busy').hidden)) { e.stopPropagation(); e.preventDefault(); return; }
   if (e.key === 'Escape') { e.stopPropagation(); if (CAM.view === 'edit') { CAM.cropping = false; CAM.show('review'); } else if (CAM.view === 'review') CAM.show('cam'); else CAM.close(); }
   else if ((e.key === ' ' || e.key === 'Enter') && CAM.view === 'cam' && e.target === root) { e.preventDefault(); CAM.shoot(); }
 });

@@ -167,14 +167,26 @@ async function decode16k(blob) {
   const audio = await new Promise((res, rej) => { try { const p = ctx.decodeAudioData(buf, res, rej); if (p && p.then) p.then(res, rej); } catch (e) { rej(e); } })
     .catch(() => { throw new Error('could not decode'); });
   const n = audio.length, nc = audio.numberOfChannels;
-  let mono = nc === 1 ? audio.getChannelData(0).slice() : new Float32Array(n);
+  // 5.9.6: a call recorded with each side on its own channel: who spoke when is read straight from the channels
+  let stereo = null;
+  if (nc === 2) {
+    const L = audio.getChannelData(0), R = audio.getChannelData(1); let lr = 0, ll = 0, rr = 0;
+    for (let i = 0; i < n; i += 50) { lr += L[i] * R[i]; ll += L[i] * L[i]; rr += R[i] * R[i]; }
+    const corr = Math.abs(lr) / Math.sqrt(ll * rr + 1e-12), bal = ll / (rr + 1e-12);
+    if (corr < 0.5 && bal > 0.02 && bal < 50) stereo = { L: energies(resample(L, audio.sampleRate, SR)), R: energies(resample(R, audio.sampleRate, SR)) };
+  }
+  // (mono: the decoded channel itself, without a copy — long recordings no longer run out of memory on phones)
+  let mono = nc === 1 ? audio.getChannelData(0) : new Float32Array(n);
   if (nc > 1) { for (let c = 0; c < nc; c++) { const ch = audio.getChannelData(c); for (let i = 0; i < n; i++) mono[i] += ch[i]; } for (let i = 0; i < n; i++) mono[i] /= nc; }
   mono = resample(mono, audio.sampleRate, SR);
+  if (mono === audio.getChannelData(0)) mono = mono.slice();   // already 16 kHz: the filter below must not change the decoded sound
+  await new Promise(r => setTimeout(r, 0));                   // the screen gets a moment to update
   // rumble, hum and wind under 80 Hz are removed: they only confuse the engine
   { const a = 0.9695; let px = 0, py = 0; for (let i = 0; i < mono.length; i++) { const x = mono[i]; py = a * (py + x - px); px = x; mono[i] = py; } }
   // a quiet phone recording is brought up to a good level (peak ~90%)
   let peak = 0; for (let i = 0; i < mono.length; i += 7) { const v = Math.abs(mono[i]); if (v > peak) peak = v; }
   if (peak > 0.01 && peak < 0.9) { const g = Math.min(8, 0.9 / peak); for (let i = 0; i < mono.length; i++) mono[i] *= g; }
+  if (stereo) mono.stereo = stereo;
   return mono;
 }
 const F = 320, FPS = SR / F;            // 20 ms frames
@@ -223,7 +235,7 @@ function level(a) {
   return a;
 }
 // who spoke when (in the engine worker): 10-second windows, 5 seconds apart
-async function diarize(pcm, K, onProg) {
+async function diarize(pcm, K, onProg, opt) {
   await ASR.call({ type: 'dz-begin' });
   const W = 10 * SR, H = 5 * SR;
   for (let o = 0, first = true; o < pcm.length; o += H, first = false) {
@@ -233,7 +245,43 @@ async function diarize(pcm, K, onProg) {
     if (onProg) onProg(Math.min(1, (o + W) / pcm.length));
     if (last) break;
   }
-  return ASR.call({ type: 'dz-end', speakers: K || 0 });
+  return ASR.call({ type: 'dz-end', speakers: K || 0, minSpeakers: (opt && opt.minK) || 0, kind: (opt && opt.kind) || '' });
+}
+// 5.9.6: a two-channel call: in each 20 ms the louder side (by 6 dB) is speaking; short flickers are smoothed away
+function turnsFromStereo(st) {
+  const { L, R } = st, n = Math.min(L.length, R.length);
+  const thr = Math.max(threshold(L.filter((_, i) => i % 5 === 0)), threshold(R.filter((_, i) => i % 5 === 0)) ) * 0.9;
+  const raw = []; let cur = null, prev = -1;
+  for (let f = 0; f < n; f++) {
+    const l = L[f], r = R[f]; let k = -1;
+    if (Math.max(l, r) >= thr) { const d = 20 * Math.log10((l + 1e-6) / (r + 1e-6)); k = d > 6 ? 0 : d < -6 ? 1 : prev; }
+    if (k >= 0) prev = k;
+    if (cur && cur.spk === k) cur.e = (f + 1) / FPS;
+    else { cur = { spk: k, s: f / FPS, e: (f + 1) / FPS }; raw.push(cur); }
+  }
+  let out = [];
+  for (const t of raw.filter(t => t.spk >= 0)) { const p = out[out.length - 1]; if (p && p.spk === t.spk && t.s - p.e < 0.5) p.e = t.e; else out.push({ ...t }); }
+  out = out.filter((t, i) => t.e - t.s >= 0.4 || out.length < 2 || (i > 0 && out[i - 1].spk === t.spk));
+  const merged = [];
+  for (const t of out) { const p = merged[merged.length - 1]; if (p && p.spk === t.spk && t.s - p.e < 0.8) p.e = t.e; else merged.push(t); }
+  const used = new Set(merged.map(t => t.spk));
+  return { turns: merged, speakers: used.size };
+}
+// speech the speaker separation missed (a quiet far side, a voice it was unsure of) is still written,
+// under the speaker closest in time — no words are lost
+function fillGaps(pcm, parts, turns) {
+  const extra = [];
+  for (const g of plan(pcm)) {
+    let cov = 0; for (const p of parts) cov += Math.max(0, Math.min(p.e, g.e) - Math.max(p.s, g.s));
+    if (cov >= 0.5 * (g.e - g.s)) continue;
+    let best = null, d = Infinity;
+    for (const t of turns) { const dd = Math.max(0, t.s * SR - g.e, g.s - t.e * SR); if (dd < d) { d = dd; best = t; } }
+    // only the part of the gap that no line covers
+    let s = g.s, e = g.e;
+    for (const p of parts) { if (p.s <= s && p.e > s) s = p.e; if (p.s < e && p.e >= e) e = p.s; }
+    if (e - s >= 0.6 * SR) extra.push({ s, e, spk: 'd' + (best ? best.spk : 0) });
+  }
+  return extra.length ? [...parts, ...extra].sort((a, b) => a.s - b.s) : parts;
 }
 // the speaker turns become the lines: a long turn is cut at a pause, a turn is never mixed with another
 function partsFromTurns(pcm, turns) {
@@ -815,6 +863,7 @@ async function transcribeFile(file, opts) {
     kind, lang, spk: spkMode, quality, duration: opts.duration || null, segments: [], speakers: {}, analysis: null, tr: {}, chat: [], tasksDone: {}, status: 'working', engine: 'local',
   };
   const sig = JOB.ctl.signal;
+  const awake = keepAwake();
   try {
     // the audio is kept on the device first: nothing is lost if something fails
     await DB.putAudio(id, file); await DB.put(item);
@@ -841,16 +890,25 @@ async function transcribeFile(file, opts) {
     step('prep', 'done', longDur(item.duration));
     // who spoke when (on the device); if it fails, the transcript is still made, as one speaker
     let parts = null;
-    if (spkMode !== '1' && item.duration > 4) {
+    // a call recorded with each side on its own channel: the two sides are the two speakers, with no download
+    if (pcm.stereo && ((spkMode === 'auto' && kind === 'call') || spkMode === '2') && item.duration > 4) {
+      step('spk', 'now');
+      try {
+        const r = turnsFromStereo(pcm.stereo);
+        if (r.turns.length && r.speakers === 2) { parts = fillGaps(pcm, partsFromTurns(pcm, r.turns), r.turns); step('spk', 'done', '2 דוברים · לפי ערוצי השיחה'); }
+      } catch (err) { console.warn('stereo speakers', err); }
+    }
+    if (!parts && spkMode !== '1' && item.duration > 4) {
       step('spk', 'now');
       try {
         const files = {};
         if (!(await cached('https://huggingface.co/onnx-community/wespeaker-voxceleb-resnet34-LM/resolve/main/config.json'))) await roomFor(40);
         await ASR.dzLoad(p => { files[p.file] = p; const { l, t } = progressSum(files); if (t > 2e6 && l < t) { bar('spk', l / t); step('spk', 'now', 'הורדה חד-פעמית ' + mb(l) + ' מתוך ' + mb(t)); } });
-        const K = spkMode === 'auto' ? 0 : +spkMode;
-        const r = await diarize(pcm, K, f => { bar('spk', f); step('spk', 'now', Math.round(f * 100) + '%'); });
+        // "5 ומעלה" is at least 5 (a meeting of 7 stays 7)
+        const K = spkMode === 'auto' || spkMode === '5' ? 0 : +spkMode, minK = spkMode === '5' ? 5 : 0;
+        const r = await diarize(pcm, K, f => { bar('spk', f); step('spk', 'now', Math.round(f * 100) + '%'); }, { minK, kind });
         if (sig.aborted) throw abortErr();
-        if (r.turns && r.turns.length) parts = partsFromTurns(pcm, r.turns);
+        if (r.turns && r.turns.length) parts = fillGaps(pcm, partsFromTurns(pcm, r.turns), r.turns);
         step('spk', 'done', r.speakers === 1 ? 'דובר אחד' : r.speakers + ' דוברים');
       } catch (err) {
         if (err.name === 'AbortError') throw err;
@@ -901,7 +959,16 @@ async function transcribeFile(file, opts) {
       if (item.errorInfo) techBox(s.querySelector('.vx-work'), item.errorInfo);
     } else say(item.error);
     throw e;
-  }
+  } finally { awake(); }
+}
+// 5.9.6: the screen stays on while a transcript is made (a phone that locks stops the engine), and leaving asks first
+function keepAwake() {
+  let lock = null, on = true;
+  const get = async () => { try { if (on && document.visibilityState === 'visible' && navigator.wakeLock) lock = await navigator.wakeLock.request('screen'); } catch (_) {} };
+  const vis = () => { if (document.visibilityState === 'visible') get(); };
+  const guard = e => { e.preventDefault(); e.returnValue = ''; };
+  get(); document.addEventListener('visibilitychange', vis); addEventListener('beforeunload', guard);
+  return () => { on = false; document.removeEventListener('visibilitychange', vis); removeEventListener('beforeunload', guard); try { lock && lock.release(); } catch (_) {} };
 }
 function techBox(box, info) {
   if (!box || box.querySelector('.vx-tech')) return;
@@ -1368,7 +1435,10 @@ const REC = { mr: null, chunks: [], stream: null, t0: 0, acc: 0, timer: 0, cutT:
 async function startRec() {
   if (!consentOk()) return;
   if (!navigator.mediaDevices || !window.MediaRecorder) { say('הדפדפן הזה לא יכול להקליט. נסו Chrome, Edge או Safari מעודכן'); return; }
-  try { REC.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 } }); }
+  // 5.9.6: with several speakers the voices are kept natural (noise suppression and automatic volume
+  // make all voices sound alike, and the speakers are then harder to tell apart)
+  const many = String(prefs.spk || 'auto') !== '1';
+  try { REC.stream = await navigator.mediaDevices.getUserMedia({ audio: many ? { echoCancellation: true, noiseSuppression: false, autoGainControl: false, channelCount: 1 } : { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 } }); }
   catch (e) { say(e && e.name === 'NotAllowedError' ? 'צריך לאשר גישה למיקרופון כדי להקליט' : 'לא נמצא מיקרופון'); return; }
   const types = ['audio/webm;codecs=opus', 'audio/ogg;codecs=opus', 'audio/mp4', 'audio/webm'];
   REC.mime = types.find(t => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)) || '';
@@ -1376,6 +1446,10 @@ async function startRec() {
   Object.assign(REC, { chunks: [], acc: 0, pend: [], pendLen: 0, off: 0, floor: [], segs: [], chain: Promise.resolve(), engineOk: false, cancel: false, abandon: false, lang: prefs.lang || 'he', kind: prefs.kind, spk: String(prefs.spk || 'auto') });
   REC.mr.ondataavailable = e => { if (e.data && e.data.size) REC.chunks.push(e.data); };
   REC.mr.onstop = finishRec;
+  // 5.9.6: the microphone cut off (a phone call came in, the earphones were taken out): what was recorded is kept
+  const tr = REC.stream.getAudioTracks()[0];
+  if (tr) tr.onended = () => { if (REC.mr && REC.mr.state !== 'inactive') { say('המיקרופון התנתק. מה שהוקלט עד עכשיו נשמר'); stopRec(); } };
+  REC.mr.onerror = e => { console.warn('recorder', e); if (REC.mr && REC.mr.state !== 'inactive') { say('ההקלטה נעצרה. מה שהוקלט עד עכשיו נשמר'); stopRec(); } };
   show('rec');
   const s = root.querySelector('#vxRec');
   s.innerHTML = `<div class="vx-rec"><div class="tm" id="vxRecT">0:00</div><div class="st" id="vxRecS">מקליט</div><canvas id="vxRecC"></canvas>

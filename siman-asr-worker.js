@@ -76,7 +76,7 @@ async function build(key, device, model) {
       key, device: 'webgpu', model, dispose: () => m.dispose(),
       run: async (audio, lang) => {
         const { input_features } = await proc(audio);
-        const ids = await m.generate({ inputs: input_features, language: lang || 'he', task: 'transcribe', max_new_tokens: 220 });
+        const ids = await m.generate({ inputs: input_features, language: lang || 'he', task: 'transcribe', max_new_tokens: 320 });
         return tok.batch_decode(ids, { skip_special_tokens: true })[0] || '';
       },
     };
@@ -96,7 +96,7 @@ async function build(key, device, model) {
       dispose: () => model.dispose(),
       run: async audio => {
         const { input_features } = await proc(audio);          // padded to a 30-second window
-        const ids = await model.generate({ inputs: input_features, decoder_input_ids: [start], max_new_tokens: 220 });
+        const ids = await model.generate({ inputs: input_features, decoder_input_ids: [start], max_new_tokens: 320 });
         return tok.batch_decode(ids, { skip_special_tokens: true })[0] || '';
       },
     };
@@ -225,10 +225,22 @@ async function dzWindow(audio, offset, first, last) {
   DS.windows.push(w);
 }
 const dot = (a, b) => { let s = 0; for (let i = 0; i < a.length; i++) s += a[i] * b[i]; return s; };
-function clusterAll(K) {
-  const items = [];
-  DS.windows.forEach((w, wi) => w.local.forEach((l, k) => { if (l) items.push({ wi, k, v: l.v, sec: l.sec }); }));
-  if (!items.length) return new Map();
+/* 5.9.6 — better speaker counting:
+   · only voiceprints made of at least 1.5 s of speech build the speakers (short ones are noisy and made "extra" people);
+     the short ones join the closest speaker afterwards
+   · a chosen number (2, 3, 4) is reached without noise / laughter groups taking a real speaker's place
+   · "5 ומעלה" is a minimum, not exactly 5
+   · automatic: pyannote's threshold gives a first answer; one more or one less speaker is taken when it
+     separates the voices clearly better (silhouette of the voiceprints)
+   · phone calls (narrow sound) get a slightly lower threshold, and someone who spoke a little is no longer swallowed */
+function clusterAll(K, opt) {
+  opt = opt || {};
+  const minK = +opt.minK || 0, call = opt.kind === 'call';
+  const all = [];
+  DS.windows.forEach((w, wi) => w.local.forEach((l, k) => { if (l) all.push({ wi, k, v: l.v, sec: l.sec }); }));
+  if (!all.length) return new Map();
+  let items = all.filter(i => i.sec >= 1.5), weak = all.filter(i => i.sec < 1.5);
+  if (items.length < 3) { items = all; weak = []; }
   // 1. very similar voiceprints are joined first (keeps the next step small)
   let C = [];
   for (const it of items) {
@@ -241,29 +253,69 @@ function clusterAll(K) {
   }
   // 2. then the most alike groups are joined, until the number of speakers asked for — or, when not given,
   //    until the closest two are clearly different voices (pyannote's threshold for this voiceprint model)
-  const T = 0.30;
-  const merge = (a, b) => { for (let i = 0; i < a.sum.length; i++) a.sum[i] += b.sum[i]; a.sec += b.sec; a.items.push(...b.items); let nn = 0; for (const x of a.sum) nn += x * x; nn = Math.sqrt(nn) || 1; a.n = a.sum.map(x => x / nn); };
+  const T = call ? 0.25 : 0.30;
+  const norm = a => { let nn = 0; for (const x of a.sum) nn += x * x; nn = Math.sqrt(nn) || 1; a.n = a.sum.map(x => x / nn); };
+  const merge = (a, b) => { for (let i = 0; i < a.sum.length; i++) a.sum[i] += b.sum[i]; a.sec += b.sec; a.items.push(...b.items); norm(a); };
+  const total0 = C.reduce((a, c) => a + c.sec, 0);
+  // with a chosen number, tiny groups (a cough, laughter, music) wait aside, so they do not take a real speaker's place
+  let aside = [];
+  if (K) { const big = C.filter(c => c.sec >= Math.max(2, total0 * 0.01)); if (big.length >= K) { aside = C.filter(c => !big.includes(c)); C = big; } }
+  // how clearly the groups are apart: the mean silhouette of every voiceprint against the groups' centres
+  const sil = groups => {
+    if (groups.length < 2) return -1; let s = 0, w = 0;
+    for (const g of groups) for (const it of g.items) {
+      const a = 1 - dot(it.v, g.n); let b = Infinity;
+      for (const o of groups) if (o !== g) b = Math.min(b, 1 - dot(it.v, o.n));
+      s += it.sec * ((b - a) / Math.max(a, b, 1e-6)); w += it.sec;
+    }
+    return w ? s / w : -1;
+  };
+  const snap = list => list.map(c => ({ sum: Float32Array.from(c.sum), sec: c.sec, n: c.n, items: c.items.slice() }));
   // (a table of how alike every two groups are; after each join only one row is worked out again)
   const N = C.length, S = new Float32Array(N * N), alive = new Uint8Array(N).fill(1);
   for (let i = 0; i < N; i++) for (let j = i + 1; j < N; j++) S[i * N + j] = S[j * N + i] = dot(C[i].n, C[j].n);
-  let left = N;
+  let left = N, atT = null; const levels = new Map();
+  const live = () => C.filter((_, i) => alive[i]);
+  const floorK = Math.max(1, minK);
   while (left > 1) {
     let bi = -1, bj = -1, bs = -2;
     for (let i = 0; i < N; i++) if (alive[i]) for (let j = i + 1; j < N; j++) if (alive[j] && S[i * N + j] > bs) { bs = S[i * N + j]; bi = i; bj = j; }
-    if (K ? left <= K : bs < T) break;
+    if (K) { if (left <= K) break; }
+    else {
+      if (left <= 10) levels.set(left, snap(live()));
+      if (!atT && bs < T) atT = left;
+      // keep going a little past the threshold, to compare one speaker fewer
+      if (atT && left < atT - 1) break;
+      if (left <= floorK) break;
+    }
     merge(C[bi], C[bj]); alive[bj] = 0; left--;
     for (let j = 0; j < N; j++) if (alive[j] && j !== bi) S[bi * N + j] = S[j * N + bi] = dot(C[bi].n, C[j].n);
   }
-  C = C.filter((_, i) => alive[i]);
+  if (!K) {
+    if (left <= 10) levels.set(left, snap(live()));
+    const kT = Math.max(floorK, atT || left);
+    let pick = kT, best = levels.has(kT) ? sil(levels.get(kT)) : -1;
+    for (const k of kT > 1 ? [kT - 1, kT + 1] : []) {
+      if (k < Math.max(2, floorK) || !levels.has(k)) continue;
+      const s = sil(levels.get(k)); if (s > best + 0.05) { best = s; pick = k; }
+    }
+    C = levels.get(pick) || live();
+  } else C = live();
+  // the groups that waited aside join the closest speaker
+  for (const a of aside) { let bj = 0, bs = -2; C.forEach((c, j) => { const s = dot(a.n, c.n); if (s > bs) { bs = s; bj = j; } }); merge(C[bj], a); }
   // 3. without a given number: a "speaker" with very little speech is joined to the closest one
+  //    (very little = under 3 s or 1.5%; a little more is joined only when the voice is alike)
   if (!K) {
     const total = C.reduce((a, c) => a + c.sec, 0);
     C.sort((a, b) => b.sec - a.sec);
-    for (let i = C.length - 1; i > 0; i--) if (C[i].sec < total * 0.04 || C[i].sec < 4) {
+    for (let i = C.length - 1; i > 0 && C.length > floorK; i--) {
       let bj = 0, bs = -2; for (let j = 0; j < i; j++) { const s = dot(C[i].n, C[j].n); if (s > bs) { bs = s; bj = j; } }
-      merge(C[bj], C[i]); C.splice(i, 1);
+      const tiny = C[i].sec < Math.max(3, total * 0.015), small = C[i].sec < total * 0.03 && bs > 0.15;
+      if (tiny || small) { merge(C[bj], C[i]); C.splice(i, 1); }
     }
   }
+  // the short voiceprints: to the closest speaker, when it is close enough (otherwise linkByOverlap decides)
+  for (const it of weak) { let bj = -1, bs = 0.2; C.forEach((c, j) => { const s = dot(it.v, c.n); if (s > bs) { bs = s; bj = j; } }); if (bj >= 0) C[bj].items.push(it); }
   const map = new Map();
   C.forEach((c, ci) => c.items.forEach(it => map.set(it.wi + ':' + it.k, ci)));
   return map;
@@ -284,8 +336,8 @@ function linkByOverlap(map) {
     if (best != null) map.set(key, best);
   }
 }
-function dzEnd(K) {
-  const map = clusterAll(K);
+function dzEnd(K, opt) {
+  const map = clusterAll(K, opt);
   linkByOverlap(map);
   let turns = [];
   DS.windows.forEach((w, wi) => w.runs.forEach(r => { const c = map.get(wi + ':' + r.k); if (c != null) turns.push({ s: r.s, e: r.e, spk: c }); }));
@@ -311,7 +363,7 @@ async function dzHandle(m) {
   if (m.type === 'dz-load') { await dzLoad(); return {}; }
   if (m.type === 'dz-begin') { await dzLoad(); DS = { windows: [] }; return {}; }
   if (m.type === 'dz-win') { await dzWindow(m.audio, m.offset, !!m.first, !!m.last); return {}; }
-  if (m.type === 'dz-end') return dzEnd(m.speakers ? +m.speakers : 0);
+  if (m.type === 'dz-end') return dzEnd(m.speakers ? +m.speakers : 0, { minK: m.minSpeakers || 0, kind: m.kind || '' });
   return null;
 }
 

@@ -590,6 +590,8 @@ window.SIMAN_TABS = { TB, switchTo, closeTab, mergeAll, zipAll, openMany, tabInf
    ===================================================================== */
 async function ai(payload, { onWait, signal, timeout = 300000 } = {}) {
   for (let attempt = 0; attempt < 4; attempt++) {
+    // 5.9.6: with no internet at all there is nothing to wait for (before: three retries, 30 seconds of "working")
+    if (navigator.onLine === false) throw new Error('אין חיבור לאינטרנט');
     let r, d, status;
     const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), timeout);
     if (signal) signal.addEventListener('abort', () => ctl.abort(), { once: true });
@@ -1027,9 +1029,11 @@ const SC = {
     if (src === 'doc' && S.doc) this.fromDoc();
   },
   close() {
-    if (this.running) { this.stop = true; }
+    // 5.9.6: closing while a page is being read stops the request itself (before, the window waited for it)
+    if (this.running) { this.stop = true; if (this.ctl) this.ctl.abort(); }
     else if ((this.pages.some(p => p.blocks) || this.tray.length) && !confirm('לסגור? הטקסט שזוהה לא יישמר')) return;
     dlg.close();
+    if (this.onFail && !this.pages.some(p => p.blocks)) { const f = this.onFail; this.onFail = this.onOk = null; f(); }
   },
   pick() {
     this.pages = []; this.tray = []; this.stop = false; this.running = false; this.name = '';
@@ -1156,12 +1160,12 @@ const SC = {
     if (append) this.pages = this.pages.filter(p => p.blocks || p.err);
     const start = append ? this.pages.length : 0;
     this.pages = append ? this.pages.concat(fresh) : fresh;
-    this.running = true; this.stop = false;
+    this.running = true; this.stop = false; this.ctl = new AbortController();
     const b = this.body();
     b.innerHTML = `<p class="sc-status" role="status" style="margin:0 0 14px;font-size:15px"></p><ul class="sc-prog">${fresh.map((p, i) => `<li><img alt="עמוד ${start + i + 1}" src="${p.url}"><span>ממתין</span></li>`).join('')}</ul>`;
     const f = this.foot(); f.classList.remove('hidden');
     f.innerHTML = '<span class="hint" style="margin-inline-end:auto"></span><button class="btn" type="button" data-a="stop">עצירה</button>';
-    f.querySelector('[data-a=stop]').onclick = () => { this.stop = true; };
+    f.querySelector('[data-a=stop]').onclick = () => { this.stop = true; this.ctl.abort(); };
     const st = b.querySelector('.sc-status'), lis = [...b.querySelectorAll('.sc-prog li')];
     for (let i = 0; i < fresh.length; i++) {
       if (this.stop) break;
@@ -1171,10 +1175,11 @@ const SC = {
       st.textContent = line + '…';
       const clock = setInterval(() => { const sec = Math.round((Date.now() - t0) / 1000); li.querySelector('span').textContent = `קורא… ${sec} שנ׳`; st.textContent = `${line} · ${sec} שניות${sec > 45 ? ' (דף צפוף לוקח לפעמים עד שתי דקות)' : ''}`; }, 1000);
       try {
-        const raw = await readPage(p, this.hint, this.quality, { onWait: s => { st.textContent = `השירות עמוס, ממשיך בעוד ${s} שניות…`; }, onLines: (d, n) => { li.querySelector('span').textContent = `שורה ${d} מתוך ${n}`; }, onCheck: () => { li.querySelector('span').textContent = 'בודק את כל הדף שוב…'; } }).finally(() => clearInterval(clock));
+        const raw = await readPage(p, this.hint, this.quality, { signal: this.ctl.signal, onWait: s => { st.textContent = `השירות עמוס, ממשיך בעוד ${s} שניות…`; }, onLines: (d, n) => { li.querySelector('span').textContent = `שורה ${d} מתוך ${n}`; }, onCheck: () => { li.querySelector('span').textContent = 'בודק את כל הדף שוב…'; } }).finally(() => clearInterval(clock));
         p.blocks = parseBlocks(raw); p.lang = p.blocks.lang;
         li.className = 'ok'; li.querySelector('span').textContent = p.blocks.length ? `${p.blocks.length} קטעים` : 'עמוד ריק';
       } catch (e) {
+        if (this.stop && e && e.name === 'AbortError') { li.className = ''; li.querySelector('span').textContent = 'נעצר'; break; }
         p.err = e.message || String(e); li.className = 'bad'; li.querySelector('span').textContent = 'לא נקרא';
         if (/מכסה|לא הוקם|חוסם|אין חיבור/.test(p.err)) { st.textContent = p.err; this.stop = true; break; }
       }
@@ -1183,11 +1188,14 @@ const SC = {
     this.running = false;
     const done = this.pages.filter(p => p.blocks);
     if (!done.length && !append) {
-      st.textContent = (this.pages.find(p => p.err) || {}).err || 'לא זוהה טקסט';
-      f.innerHTML = '<span class="hint" style="margin-inline-end:auto"></span><button class="btn" type="button" data-a="again">התחלה מחדש</button>';
-      f.querySelector('[data-a=again]').onclick = () => this.pick();
+      st.textContent = (this.pages.find(p => p.err) || {}).err || (this.stop ? 'הקריאה נעצרה' : 'לא זוהה טקסט');
+      f.innerHTML = '<span class="hint" style="margin-inline-end:auto"></span>' + (this.onFail ? '<button class="btn primary" type="button" data-a="back">חזרה לעמודים שצילמתי</button> ' : '') + '<button class="btn" type="button" data-a="again">התחלה מחדש</button>';
+      f.querySelector('[data-a=again]').onclick = () => { this.onFail = this.onOk = null; this.pick(); };
+      const bk = f.querySelector('[data-a=back]');
+      if (bk) bk.onclick = () => { const fn = this.onFail; this.onFail = this.onOk = null; dlg.close(); fn(); };
       return;
     }
+    if (this.onOk) { const fn = this.onOk; this.onFail = this.onOk = null; try { fn(); } catch (_) {} }
     this.review();
   },
   keepEdits() { for (const p of this.pages) if (p.ed && p.ed.isConnected) p.html = p.ed.innerHTML; },
@@ -1326,8 +1334,10 @@ window.SIMAN_VOCAB = VOCAB;
    in a few requests of up to 6 lines, two at a time. On the ivrit.ai Hebrew handwriting benchmark this is
    where the reading models are by far the most accurate. Other pages (a PDF, an old reader photo) are read
    as one page, as before. The answer has the same shape either way: {"lang","blocks"}. */
-async function readPage(p, hint, quality, { onWait, onLines, onCheck } = {}) {
-  if (!p.lines || !p.lines.length) return ai({ mode: 'scan', image: p.b64, strips: p.strips || [], mime: 'image/jpeg', hint, quality }, { timeout: 150000, onWait });
+async function readPage(p, hint, quality, { onWait, onLines, onCheck, signal } = {}) {
+  if (!p.lines || !p.lines.length) return ai({ mode: 'scan', image: p.b64, strips: p.strips || [], mime: 'image/jpeg', hint, quality }, { timeout: 150000, onWait, signal });
+  // 5.9.6: no internet / the daily limit: stop at once, instead of rows of [?] and more requests that will fail too
+  const FATAL = /מכסה|אין חיבור|חוסם|לא הוקם/;
   const L = p.lines, B = 6, got = new Array(L.length).fill(null), starts = [];
   for (let i = 0; i < L.length; i += B) starts.push(i);
   let next = 0, done = 0, firstErr = null, lang = null;
@@ -1336,15 +1346,21 @@ async function readPage(p, hint, quality, { onWait, onLines, onCheck } = {}) {
     while (next < starts.length) {
       const s0 = starts[next++], part = L.slice(s0, s0 + B);
       try {
-        const raw = await ai({ mode: 'lines', lines: part, lines2: (p.lines2 || []).slice(s0, s0 + B), vocab: VOCAB.top(), hint, quality }, { timeout: 130000, onWait });
+        if (signal && signal.aborted) throw new DOMException('stop', 'AbortError');
+        const raw = await ai({ mode: 'lines', lines: part, lines2: (p.lines2 || []).slice(s0, s0 + B), vocab: VOCAB.top(), hint, quality }, { timeout: 130000, onWait, signal });
         const j = JSON.parse(strip(raw));
         if (j.lang && !lang) lang = j.lang;
         (j.lines || []).forEach((r, k) => { const n = Number.isInteger(r.n) && r.n >= 1 && r.n <= part.length ? r.n - 1 : k; if (n < part.length && !got[s0 + n]) got[s0 + n] = r; });
-      } catch (e) { firstErr = firstErr || e; }
+      } catch (e) {
+        if ((e && e.name === 'AbortError') || FATAL.test(e && e.message || '')) { next = starts.length; firstErr = e; fatal = e; return; }
+        firstErr = firstErr || e;
+      }
       done += part.length; onLines && onLines(Math.min(done, L.length), L.length);
     }
   };
+  let fatal = null;
   await Promise.all([worker(), worker()]);
+  if (fatal) throw fatal;
   if (!got.some(Boolean)) throw firstErr || new Error('לא זוהה טקסט');
   // מבט שני על כל הדף יחד: כל השורות והקריאה הראשונה. מתקן מילים לפי נושא הדף ומסמן בצהוב כל מילה לא בטוחה
   if (quality !== 'fast') {
@@ -1354,7 +1370,8 @@ async function readPage(p, hint, quality, { onWait, onLines, onCheck } = {}) {
       const idx = [...Array(Math.min(15, L.length - s0)).keys()].map(k => s0 + k);
       if (!idx.some(i => got[i])) continue;
       try {
-        const raw = await ai({ mode: 'linesCheck', lines: idx.map(i => views[i]), draft: idx.map(i => got[i] || { kind: 'text', text: '[[?]]' }), vocab: VOCAB.top(), hint }, { timeout: 100000, onWait });
+        if (signal && signal.aborted) break;
+        const raw = await ai({ mode: 'linesCheck', lines: idx.map(i => views[i]), draft: idx.map(i => got[i] || { kind: 'text', text: '[[?]]' }), vocab: VOCAB.top(), hint }, { timeout: 100000, onWait, signal });
         const j = JSON.parse(strip(raw));
         const fixed = j.lines || [];
         if (fixed.length === idx.length) fixed.forEach((r, k) => { if (r && typeof r.text === 'string') got[idx[k]] = r; });
@@ -1370,7 +1387,11 @@ async function readPage(p, hint, quality, { onWait, onLines, onCheck } = {}) {
     if (r.kind === 'arrow' || /^[↓↙↘⬇←→⇣⟵⟶\s]+$/.test(text)) { if (blocks.length) joinNext = true; return; }
     if (joinNext && blocks.length) { blocks[blocks.length - 1].text += ' ← ' + text; joinNext = false; return; }
     joinNext = false;
-    blocks.push({ t: r.kind === 'list' ? 'li' : r.kind === 'title' && blocks.length < 2 ? 'h2' : 'p', text });
+    // 5.9.6: a line that continues the sentence of the line before is the same paragraph
+    // (before, every written line became a paragraph of its own and had to be joined by hand in Word)
+    const prev = blocks[blocks.length - 1], t = r.kind === 'list' ? 'li' : r.kind === 'title' && blocks.length < 2 ? 'h2' : 'p';
+    if (t === 'p' && prev && prev.t === 'p' && prev.text !== '[[?]]' && r.kind !== 'title' && !/[.!?:;׃…"״)\]]$/.test(prev.text) && !/^[-•*–\d]+[.)]?\s/.test(text) && prev.text.length > 25) { prev.text += ' ' + text; return; }
+    blocks.push({ t, text });
   });
   return JSON.stringify({ lang: lang || hint || 'he', blocks });
 }

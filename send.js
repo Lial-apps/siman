@@ -17,8 +17,10 @@ const fmtDate=d=>{const x=new Date(d);return isNaN(x)?'':x.toLocaleString('he-IL
 const today=()=>new Date().toLocaleDateString('he-IL',{day:'2-digit',month:'2-digit',year:'numeric'});
 
 /* ------------------------------------------------------------ server */
-async function api(path,opt={}){
-  let r;try{r=await fetch(API+path,opt);}catch(_){throw new Error('אין חיבור לאינטרנט, או שהשירות לא זמין כרגע');}
+async function api(path,opt={},ms=90000){
+  // 5.9.6: a request that hangs ends after a minute and a half with a clear message (before: "מעלה…" forever)
+  const c=new AbortController(),tm=setTimeout(()=>c.abort(),ms);
+  let r;try{r=await fetch(API+path,{...opt,signal:c.signal});}catch(e){throw new Error(e&&e.name==='AbortError'?'השרת לא ענה בזמן. בדקו את האינטרנט ונסו שוב':'אין חיבור לאינטרנט, או שהשירות לא זמין כרגע');}finally{clearTimeout(tm);}
   if(!r.ok){let m='';try{m=(await r.json()).error;}catch(_){}throw new Error(m||('שגיאה '+r.status));}
   return /json/.test(r.headers.get('Content-Type')||'')?r.json():new Uint8Array(await r.arrayBuffer());
 }
@@ -567,6 +569,8 @@ async function open(opts){
   };
 }
 async function upload(u,meta){
+  // 5.9.6: a second tap while uploading does not send the document twice
+  if(u.uploading)return;u.uploading=true;const go=u.root.querySelector('[data-go]');if(go)go.disabled=true;
   const o=u.opts;busy(true,'מעלה את המסמך…');
   try{
     const fd=new FormData();fd.append('meta',JSON.stringify({...meta,from:{name:o.sender&&o.sender.name||'',mail:o.sender&&o.sender.mail||''}}));
@@ -575,6 +579,7 @@ async function upload(u,meta){
     const rec={id:r.id,k:r.owner,v:r.view,title:meta.title,mode:meta.mode,created:new Date().toISOString(),expires:r.expires,signers:(r.signers||[]).map(s=>({n:s.n,name:s.name,t:s.token})),note:meta.note||'',ask:meta.ask||''};
     listSet([rec,...listGet()]);u.dirty=false;busy(false);links(rec,o);
   }catch(e){busy(false);say('השליחה נכשלה: '+(e.message||e),1);}
+  finally{u.uploading=false;if(go)go.disabled=false;}
 }
 
 /* ---------- step 2: the links */

@@ -1283,7 +1283,7 @@ dialog.cmd-dlg[open]{animation:cmdIn .16s ease-out}
 
 
 /* Word editor */
-body:has(#wed) .busy,body:has(#xed) .busy{z-index:1000}body:has(#wed) .toast,body:has(#xed) .toast{z-index:1001}
+body:has(#wed) .busy,body:has(#xed) .busy,body:has(#ped) .busy{z-index:1000}body:has(#wed) .toast,body:has(#xed) .toast,body:has(#ped) .toast{z-index:1001}
 .of-ico.sign{background:#16213A;font-size:20px;padding-bottom:12px;letter-spacing:0}
 .btn.wedit{border-color:#2B579A;color:#2B579A;font-weight:600}
 
@@ -1348,7 +1348,7 @@ body:has(#wed) .busy,body:has(#xed) .busy{z-index:1000}body:has(#wed) .toast,bod
 </dialog>
 
 <header class="bar">
-  <div class="brand"><b title="גרסה 5.9.5">סימן</b><span class="ver">5.9.5</span><span class="fname" id="fname"></span></div>
+  <div class="brand"><b title="גרסה 5.9.6">סימן</b><span class="ver">5.9.6</span><span class="fname" id="fname"></span></div>
 
   <nav class="tools" id="tools" aria-label="כלים">
     <button class="tool" data-tool="select" aria-pressed="true" title="בחירה וגלילה (V)">
@@ -1847,7 +1847,12 @@ async function openFile(file,handle){
     await buildPages();
     setTool(S.tool);
     if(S.hasForm&&!S.office)toast('יש בקובץ שדות טופס. לחצו עליהם כדי למלא');
+    // 5.9.6: a PDF locked against changes opens for reading, but a saved copy may come out damaged: the user is told now, not after saving
+    try{const tail=new TextDecoder('latin1').decode(bytes.subarray(Math.max(0,bytes.length-262144)));
+      if(!S.office&&/\/Encrypt\s/.test(tail))setTimeout(()=>toast('הקובץ נעול לשינויים על ידי מי שיצר אותו. אפשר לקרוא ולמלא, אבל אם העותק השמור יוצא פגום: מדפיסים אותו ל-PDF ופותחים את ההדפסה'),2800);}catch(_){}
     fitWidth();
+    // 5.9.6: the places to fill in a form are found by themselves (siman-fill.js), without holding the file back
+    if(window.SIMAN_FILL&&!S.office)setTimeout(()=>SIMAN_FILL.run().catch(e=>console.warn('fill',e)),0);
     if(!$('tpanel').classList.contains('hidden'))detect();
     if(afterOpen){const f=afterOpen;afterOpen=null;setTimeout(f,250);}
     if(!$('pgpanel').classList.contains('hidden'))renderThumbs();
@@ -2629,7 +2634,8 @@ async function buildPdf(){
       const rot=PDFLib.degrees(vp1.rotation||0);
       lines.forEach((line,k)=>{
         if(!line)return;
-        const{base,runs}=bidiRuns(line);
+        // 5.9.6: a line of only numbers (a date, an ID) in a place found on an English form stays on the left, as on screen
+        const{base,runs}=bidiRuns(line,a.fz&&!a.fz.rtl&&![...line].some(c=>RE_R.test(c)||RE_LL.test(c))?'L':undefined);
         const parts=runs.map(r=>{const s=runForPdf(r);return{s,w:font.widthOfTextAtSize(s,size)};});
         const total=parts.reduce((t,p)=>t+p.w,0);
         const rtl=line?base==='R':boxRtl; // unicode-bidi:plaintext => per-line direction
@@ -3009,12 +3015,17 @@ async function callTranslate(text,target){
   if(target==='he'||target==='ar'){const p=parseTr(r.raw);r={...r,raw:(p.lang?`LANG: ${p.lang}\n---\n`:'')+fixScripts(p.text,target,text)};}
   return r;
 }
+// 5.9.6: a translation request that hangs (a weak phone connection) ends after 90 seconds, and "עצירה" ends it at once
+function fetchT(u,o={},ms=90000){
+  const c=new AbortController(),t=setTimeout(()=>c.abort(),ms),iv=setInterval(()=>{if(TR.stop)c.abort();},300);
+  return fetch(u,{...o,signal:c.signal}).finally(()=>{clearTimeout(t);clearInterval(iv);});
+}
 async function callTranslateOnce(text,target,second){
   const st=loadST();const key=st.provider==='claude'?st.claudeKey:st.geminiKey;
   if(st.provider!=='builtin'&&!key)return{error:'NO_KEY'};
   try{
     if(st.provider==='claude'){
-      const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      const r=await fetchT('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
         body:JSON.stringify({model:st.model,max_tokens:8000,system:trSystem(target),messages:[{role:'user',content:`<page>\n${text}\n</page>`}]})});
       const d=await r.json().catch(()=>({}));
       if(!r.ok)return{error:(d.error&&d.error.message)||('HTTP '+r.status),status:r.status};
@@ -3025,16 +3036,18 @@ async function callTranslateOnce(text,target,second){
     for(let attempt=0;attempt<5;attempt++){
       const r=st.provider==='builtin'
         ?((target==='he'||target==='en')&&!second
-          ?await fetch(TRANSLATE_URL,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({text,target})})
-          :await fetch(AI_URL,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({mode:'translate',text,target})}))
-        :await fetch(url,{method:'POST',headers:{'content-type':'application/json','x-goog-api-key':key},body});
+          ?await fetchT(TRANSLATE_URL,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({text,target})})
+          :await fetchT(AI_URL,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({mode:'translate',text,target})}))
+        :await fetchT(url,{method:'POST',headers:{'content-type':'application/json','x-goog-api-key':key},body});
       const d=await r.json().catch(()=>({}));
       if(r.status===429||r.status===503){
         if(/per ?day/i.test(JSON.stringify(d)))return{error:'DAILY_LIMIT',status:429};
         const info=((d.error&&d.error.details)||[]).find(x=>x.retryDelay);
         const wait=info?Math.min(60,parseFloat(info.retryDelay)||10):10*(attempt+1);
         status(`שירות התרגום עמוס, ממתין ${Math.round(wait)} שניות…`);
-        await sleep(wait*1000+500);continue;
+        for(let w=wait*1000+500;w>0&&!TR.stop;w-=500)await sleep(500);
+        if(TR.stop)return{error:'STOPPED'};
+        continue;
       }
       if(!r.ok){const msg=(d.error&&d.error.message)||('HTTP '+r.status);return{error:msg,status:/API key not valid|API_KEY_INVALID/i.test(msg)?401:r.status};}
       const c=(d.candidates||[])[0];
@@ -3146,11 +3159,12 @@ async function runTranslate(){
   const worker=async()=>{
     while(queue.length&&!TR.stop&&!failed){
       const i=queue.shift();const el=pageCard(i);
-      const text=await pageText(i);
+      // 5.9.6: one damaged page does not stop the whole translation (and does not leave the panel locked)
+      let text='';try{text=await pageText(i);}catch(e){console.warn('page text',e);el.textContent='לא הצלחתי לקרוא את הטקסט של העמוד הזה';el.className='tt err';continue;}
       if(text.replace(/\s/g,'').length<2){el.textContent='אין טקסט בעמוד הזה. אם הוא סרוק: "עמודים" ← "זיהוי טקסט (OCR)", ואז לתרגם שוב.';el.className='tt err';TR.pages[i]={text:'',target};done++;continue;}
       el.textContent='מתרגם…';
       const r=await callTranslate(text,target);
-      if(r.error){el.textContent=errText(r);el.className='tt err';if(['NO_KEY','NETWORK','DAILY_LIMIT'].includes(r.error)||r.status===401||r.status===403||(r.status===400&&/credit|balance/i.test(r.error)))failed=r;continue;}
+      if(r.error){if(TR.stop){el.textContent='נעצר';break;}el.textContent=errText(r);el.className='tt err';if(['NO_KEY','NETWORK','DAILY_LIMIT'].includes(r.error)||r.status===401||r.status===403||(r.status===400&&/credit|balance/i.test(r.error)))failed=r;continue;}
       const p=parseTr(r.raw);
       if(p.lang&&!TR.langFromApi){TR.langFromApi=p.lang;$('tpLang').textContent=LANG_HE[p.lang]||p.lang;}
       TR.pages[i]={text:cleanText(p.text),target};renderTT(el,i);
@@ -3159,8 +3173,9 @@ async function runTranslate(){
   };
   status(`מתרגם ${idx.length===1?'עמוד אחד':idx.length+' עמודים'}…`);
   // Gemini's free tier allows only a few requests a minute, so pages go one at a time
-  await Promise.all(Array.from({length:st.provider==='claude'?3:1},worker));
-  TR.running=false;$('tpGo').disabled=false;$('tpStop').classList.add('hidden');
+  try{await Promise.all(Array.from({length:st.provider==='claude'?3:1},worker));}
+  catch(e){console.error(e);failed=failed||{error:String(e&&e.message||e)};}
+  finally{TR.running=false;$('tpGo').disabled=false;$('tpStop').classList.add('hidden');}
   if(failed){status(errText(failed),true);if(failed.error==='NO_KEY'||failed.status===401)openSettings(true);}
   else if(TR.stop)status(`נעצר. תורגמו ${done} עמודים.`);
   else status(`התרגום הושלם (${done} עמודים).`);
@@ -3561,7 +3576,9 @@ addEventListener('keydown',e=>{
   const mod=e.ctrlKey||e.metaKey;
   const K=x=>e.code==='Key'+x.toUpperCase()||e.key.toLowerCase()===x;
   if(mod&&K('k')){e.preventDefault();openCmd();return;}
-  if(mod&&K('s')){e.preventDefault();savePdf(e.shiftKey);return;}
+  // 5.9.6: while something is working, the shortcuts do not start it again
+  if(mod&&(K('s')||K('o')||K('p'))&&!$('busy').classList.contains('hidden')){e.preventDefault();return;}
+  if(mod&&K('s')){e.preventDefault();if(!e.repeat)savePdf(e.shiftKey);return;}
   if(mod&&K('o')){e.preventDefault();pickFile();return;}
   if(mod&&K('p')&&S.doc){e.preventDefault();printDoc();return;}
   if(typing)return;
@@ -3576,7 +3593,9 @@ addEventListener('keydown',e=>{
   if(!mod&&map[k]){setTool(map[k]);}
 });
 document.addEventListener('pointerdown',e=>{if(S.picked&&!e.target.closest('.iw,.tw .grip,#delSelBtn'))pickAnn(null);},true);
-addEventListener('beforeunload',e=>{if(S.dirty&&!S.noWarn){e.preventDefault();e.returnValue='';}});
+// 5.9.6: also a file with changes in another tab of סימן (before, only the tab on screen was checked)
+const anyDirty=()=>{if(S.dirty)return true;try{return !!(window.SIMAN_TABS&&SIMAN_TABS.TB.list.some(t=>SIMAN_TABS.tabInfo(t).dirty));}catch(_){return false;}};
+addEventListener('beforeunload',e=>{if(anyDirty()&&!S.noWarn){e.preventDefault();e.returnValue='';}});
 let rT;addEventListener('resize',()=>{clearTimeout(rT);rT=setTimeout(updatePageInfo,150);});
 setTool('select');
 
@@ -3588,9 +3607,11 @@ let tessWorker=null,tessLog=null;
 function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=()=>rej(new Error('הטעינה נכשלה'));document.head.append(s);});}
 async function getTess(){
   if(!window.Tesseract)await loadScript(TESS_URL);
-  if(!tessWorker)tessWorker=await Tesseract.createWorker(['heb','eng'],1,{logger:m=>tessLog&&tessLog(m)});
+  // 5.9.6: the download of the engine shows how far it got; a failed start is not kept (the next try starts clean)
+  if(!tessWorker)tessWorker=Tesseract.createWorker(['heb','eng'],1,{logger:m=>{if(tessLog&&m.status==='recognizing text')tessLog(m);else if(/load|download|init/i.test(m.status||'')&&m.progress!=null){const b=$('busyMsg');if(b&&!$('busy').classList.contains('hidden'))b.textContent=`מוריד את מנוע זיהוי הטקסט (פעם אחת)… ${Math.round(m.progress*100)}%`;}}}).catch(e=>{tessWorker=null;throw e;});
   return tessWorker;
 }
+function resetTess(){const w=tessWorker;tessWorker=null;if(w)Promise.resolve(w).then(x=>x.terminate()).catch(()=>{});}
 async function ocrPage(P){
   const v1=P.page.getViewport({scale:1});const scale=Math.max(2,Math.min(3.5,2600/Math.max(v1.width,v1.height)));
   const vp=P.page.getViewport({scale});const c=document.createElement('canvas');c.width=Math.ceil(vp.width);c.height=Math.ceil(vp.height);
@@ -3599,6 +3620,7 @@ async function ocrPage(P){
   const w=await getTess();
   const{data}=await w.recognize(c,{},{blocks:true,text:false});
   const imgData=ctx.getImageData(0,0,c.width,c.height).data;
+  const cw=c.width;c.width=c.height=0; // the big picture is let go at once (phones run out of memory)
   const lines=[];
   for(const b of data.blocks||[])for(const para of b.paragraphs||[]){let first=true;for(const l of para.lines||[]){
     const t0=cleanText((l.text||'').replace(/\s+/g,' ').trim());if(!t0||(l.confidence!=null&&l.confidence<25)){continue;}
@@ -3607,7 +3629,7 @@ async function ocrPage(P){
     const lineH=l.bbox.y1-l.bbox.y0;const pieces=[];
     for(const w of words){const pc=pieces[pieces.length-1];
       const g=pc?w.bbox.x0-pc.x1:0;
-      const split=!pc||g>Math.max(lineH*1.6,12)||(g>2&&ruleInPx(imgData,c.width,pc.x1+1,w.bbox.x0-1,l.bbox.y0+lineH*.15,l.bbox.y1-lineH*.15));
+      const split=!pc||g>Math.max(lineH*1.6,12)||(g>2&&ruleInPx(imgData,cw,pc.x1+1,w.bbox.x0-1,l.bbox.y0+lineH*.15,l.bbox.y1-lineH*.15));
       if(!split){pc.ws.push(w);pc.x1=Math.max(pc.x1,w.bbox.x1);}else pieces.push({ws:[w],x1:w.bbox.x1});}
     const lineRtl=paraDir(t0,'R')==='R';
     const parts=pieces.length>1?pieces.map(pc=>{const ws=lineRtl?pc.ws.slice().reverse():pc.ws;return{t:cleanText(ws.map(w=>w.text.trim()).join(' ')),bbox:{x0:Math.min(...pc.ws.map(w=>w.bbox.x0)),x1:Math.max(...pc.ws.map(w=>w.bbox.x1)),y0:l.bbox.y0,y1:l.bbox.y1}};}):[{t:t0,bbox:l.bbox}];
@@ -3641,6 +3663,7 @@ async function runOCR(idx){
     for(const i of idx){
       const P=S.pages[i];const has=await pageLines(P);
       if(has&&has.length&&!P.ocr&&textQuality(has)>=.6){skipped++;continue;}
+      if(P.ocr&&has&&has.length){skipped++;continue;}   // 5.9.6: a page already read is not read again
       tessLog=m=>{if(m.status==='recognizing text')$('busyMsg').textContent=`מזהה טקסט… עמוד ${i+1} (${Math.round((m.progress||0)*100)}%)`;};
       found+=await ocrPage(P);done++;
     }
@@ -3648,7 +3671,7 @@ async function runOCR(idx){
     if(done)toast(`זוהו ${found} שורות ב-${done} עמודים. עכשיו אפשר לערוך, לתרגם ולהעתיק`);
     else toast(skipped?'בעמודים האלה כבר יש טקסט, אין צורך בזיהוי':'לא נמצאו עמודים לזיהוי');
     if(done){setDirty(true);TR.reset();}
-  }catch(e){console.error(e);busy(false);toast('זיהוי הטקסט נכשל: '+(e.message||e)+'. בדקו חיבור לאינטרנט');}
+  }catch(e){console.error(e);busy(false);resetTess();toast('זיהוי הטקסט נכשל: '+(e.message||e)+'. בדקו חיבור לאינטרנט');}
   finally{tessLog=null;}
 }
 $('ocrBtn').onclick=()=>runOCR([currentPageIndex()]);
@@ -3843,7 +3866,7 @@ $('mergeBtn').onclick=()=>$('mergeFile').click();
 $('mergeFile').onchange=async e=>{
   const files=[...e.target.files];e.target.value='';if(!files.length)return;
   if(S.hasForm&&!confirm('הוספת קובץ תבטל את שדות הטופס בקובץ. להמשיך?'))return;
-  const extra=[];for(const f of files)extra.push(new Uint8Array(await f.arrayBuffer()));
+  const extra=[];try{for(const f of files)extra.push(new Uint8Array(await f.arrayBuffer()));}catch(err){toast('לא הצלחתי לקרוא את אחד הקבצים. ייתכן שהוא לא הורד במלואו למכשיר');return;}
   const order=S.pages.map((_,k)=>({src:0,i:k,rot:0}));
   busy(true,'קורא את הקבצים…');
   try{for(let x=0;x<extra.length;x++){const d=await PDFLib.PDFDocument.load(extra[x],{ignoreEncryption:true});for(let k=0;k<d.getPageCount();k++)order.push({src:x+1,i:k,rot:0});}}
@@ -3908,7 +3931,7 @@ window.__exportPages=exportPages;
    ===================================================================== */
 const OFFICE_MIME={pptx:'application/vnd.openxmlformats-officedocument.presentationml.presentation',xlsx:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',docx:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'};
 let officeLibs=null;
-const loadOfficeLibs=()=>officeLibs||(officeLibs=(async()=>{if(!window.JSZip)await loadScript('jszip.min.js');if(!window.PptxGenJS)await loadScript('pptxgen.min.js');if(!window.OFFICE)await loadScript('office.js');})());
+const loadOfficeLibs=()=>officeLibs||(officeLibs=(async()=>{if(!window.JSZip)await loadScript('jszip.min.js');if(!window.PptxGenJS)await loadScript('pptxgen.min.js');if(!window.OFFICE)await loadScript('office.js');})().catch(e=>{officeLibs=null;throw e;}));
 const OF={};
 function showOfficeView(on){
   $('officeView').classList.toggle('hidden',!on);if(on)$('wordEditBtn').classList.add('hidden');$('pages').classList.toggle('hidden',on);
@@ -4131,7 +4154,7 @@ async function openPptEditor(bytes,name,isNew,handle){
 const newPpt=()=>{if(needReg()){showReg();return;}openPptEditor(null,'מצגת חדשה.pptx',true);};
 $('wordEditBtn').onclick=async()=>{
   if(!S.office||(S.office.kind!=='docx'&&S.office.kind!=='xlsx'))return;let bytes=S.office.bytes;
-  if(S.anns.length){busy(true,'מכניס את הסימונים למסמך…');try{const{file}=await buildOfficeFile();bytes=new Uint8Array(await file.arrayBuffer());}catch(e){console.error(e);}finally{busy(false);}}
+  if(S.anns.length){busy(true,'מכניס את הסימונים למסמך…');try{const{file}=await buildOfficeFile();bytes=new Uint8Array(await file.arrayBuffer());}catch(e){console.error(e);toast('לא הצלחתי להכניס את הסימונים למסמך, הוא נפתח בלעדיהם. כדי לשמור אותם: שמירה כ-PDF');}finally{busy(false);}}
   if(S.office.kind==='xlsx')openExcelEditor(bytes,S.office.name);else openWordEditor(bytes,S.office.name);
 };
 const officeOutName=()=>`${S.office.base}${S.office.plain?'':' - ערוך'}.${S.office.kind}`;
@@ -5293,7 +5316,7 @@ if('launchQueue' in window){
   launchQueue.setConsumer(async p=>{if(p.files&&p.files.length){for(const h of p.files){try{await openFile(await h.getFile(),h);}catch(e){console.error(e);}}}});
 }
 </script>
-<script src="siman-plus.js"></script>
+<script src="siman-plus.js?v=5.9.6"></script>
 <script>
 /* =====================================================================
    4.7 — launch period (4 months per user) + feature-use counting
@@ -5390,15 +5413,16 @@ if('launchQueue' in window){
 <link rel="stylesheet" href="siman-phone.css?v=5.9.3">
 <script src="siman-phone.js?v=5.9.3" defer></script>
 <script src="a11y.js?v=5.9.3" defer></script>
-<script src="siman-voice.js" defer></script>
+<script src="siman-voice.js?v=5.9.6" defer></script>
 <script src="siman-back.js?v=5.9.3" defer></script>
 <!-- 5.9.3: one design for everyone (the ?beta=1 shell and the classic design were removed) -->
 <link rel="stylesheet" href="siman-v7.css?v=5.9.5">
 <script src="siman-v7.js?v=5.9.5" defer></script>
 <script src="siman-media.js?v=5.3.2" defer></script>
-<script src="siman-scan.js?v=5.8.0" defer></script>
-<script src="siman-merge.js?v=5.9.3" defer></script>
+<script src="siman-scan.js?v=5.9.6" defer></script>
+<script src="siman-merge.js?v=5.9.6" defer></script>
 <script src="siman-ux.js?v=5.9.5" defer></script>
+<script src="siman-fill.js?v=5.9.6" defer></script>
 <link rel="stylesheet" href="siman-nb.css?v=5.9.5">
 <script src="siman-nb.js?v=5.9.5" defer></script>
 </body>
