@@ -316,9 +316,12 @@ html.v7[data-theme="dark"] #xed .xdd:hover,html.v7[data-theme="dark"] #xed .xfb:
 html.v7[data-theme="dark"] .we-pop,html.v7[data-theme="dark"] #xed .xe-pop,html.v7[data-theme="dark"] .pe-pop,
 html.v7[data-theme="dark"] .oa-menu,html.v7[data-theme="dark"] .oa-drop,html.v7[data-theme="dark"] #wed .cmc,
 html.v7[data-theme="dark"] .otr-box,html.v7[data-theme="dark"] #xed .xe-tip{background:var(--v7-surface)!important;color:var(--v7-ink)!important;border-color:var(--v7-line)!important}
-html.v7[data-theme="dark"] .we-pop .mi:hover,html.v7[data-theme="dark"] .we-pop .mi.on,html.v7[data-theme="dark"] #xed .xe-pop .mi:hover,html.v7[data-theme="dark"] .pe-pop .mi:hover,html.v7[data-theme="dark"] .pe-pop .mi.on,
+html.v7[data-theme="dark"] .we-pop .mi:hover,html.v7[data-theme="dark"] .we-pop .mi.on,html.v7[data-theme="dark"] #xed .xe-pop .mi:hover,html.v7[data-theme="dark"] #xed .xe-pop .mi.on,html.v7[data-theme="dark"] #xed .dvl .mi.on,html.v7[data-theme="dark"] .pe-pop .mi:hover,html.v7[data-theme="dark"] .pe-pop .mi.on,
 html.v7[data-theme="dark"] .oa-menu button:hover,html.v7[data-theme="dark"] .oa-menu button.on,html.v7[data-theme="dark"] .oa-drop button.on,html.v7[data-theme="dark"] .oa-drop button:hover,html.v7[data-theme="dark"] .oa-drop button .ico,
 html.v7[data-theme="dark"] .ai-res .done,html.v7[data-theme="dark"] .ai-res button:hover,html.v7[data-theme="dark"] #wed .we-toc:hover,html.v7[data-theme="dark"] #wed .we-wc:hover,html.v7[data-theme="dark"] #ped .pe-toc:hover,html.v7[data-theme="dark"] #ped .pe-wc:hover{background:var(--v7-soft)!important}
+/* 5.9.6: the menus' text stays light in dark mode (also the selected option and the small grey notes) */
+html.v7[data-theme="dark"] .we-pop .mi,html.v7[data-theme="dark"] #xed .xe-pop .mi,html.v7[data-theme="dark"] .pe-pop .mi{color:var(--v7-ink)!important}
+html.v7[data-theme="dark"] .we-pop small,html.v7[data-theme="dark"] #xed .xe-pop small,html.v7[data-theme="dark"] .pe-pop small,html.v7[data-theme="dark"] #xed .xe-pop [style*="color:#7A879E"]{color:var(--v7-muted)!important}
 html.v7[data-theme="dark"] .oa-menu button,html.v7[data-theme="dark"] .oa-drop button,html.v7[data-theme="dark"] .ai-res{color:var(--v7-ink)!important}
 html.v7[data-theme="dark"] .oa-menu .sep{background:var(--v7-line)!important}
 html.v7[data-theme="dark"] .otr-langs button{background:var(--v7-bg)!important;color:var(--v7-ink)!important;border-color:var(--v7-line)!important}

@@ -753,7 +753,7 @@ const CSS=`
 #xed .xe-pop .pal{display:grid;grid-template-columns:repeat(10,22px);gap:4px}
 #xed .xe-pop .pal button{width:22px;height:22px;border-radius:4px;border:1px solid rgba(0,0,0,.15);cursor:pointer;padding:0}
 #xed .xe-pop .mi{display:flex;align-items:center;gap:8px;width:100%;border:0;background:none;padding:7px 10px;border-radius:7px;cursor:pointer;text-align:start;white-space:nowrap}
-#xed .xe-pop .mi:hover{background:#EEF2F8}#xed .xe-pop .sep{height:1px;background:var(--xl);margin:5px 0}
+#xed .xe-pop .mi:hover,#xed .xe-pop .mi.on{background:#EEF2F8}#xed .xe-pop .sep{height:1px;background:var(--xl);margin:5px 0}
 #xed .xe-dlg{position:absolute;inset:0;z-index:40;background:rgba(22,33,58,.35);display:grid;place-items:center}#xed .xe-dlg[hidden]{display:none}
 #xed .xe-dlg-in{background:#fff;border-radius:14px;padding:18px 20px;width:min(420px,92vw);box-shadow:0 24px 60px -20px rgba(0,0,0,.45)}
 #xed .xe-dlg-in h3{margin:0 0 10px;font-size:17px}#xed .xe-dlg-in p{color:var(--xmu);font-size:13px;line-height:1.5;margin:4px 0 0}
@@ -1309,7 +1309,7 @@ function openPop(kind,btn){
   else if(kind==='margins'){const M=[['normal','רגילים','1.91 למעלה ולמטה, 1.78 בצדדים',.75,.7],['wide','רחבים','2.54 מכל צד',1,1],['narrow','צרים','1.91 למעלה ולמטה, 0.64 בצדדים',.75,.25]];
     pop(btn,M.map(m=>`<button type="button" class="mi" data-v="${m[0]}"><b>${m[1]}</b><small style="margin-inline-start:auto;color:#5D6982">${m[2]} ס״מ</small></button>`).join('')+'<div class="sep"></div><button type="button" class="mi" data-v="custom">שוליים מותאמים…</button>',v=>{
       if(v==='custom')return marginsDialog();const m=M.find(x=>x[0]===v);setPage({t:m[3],b:m[3],l:m[4],r:m[4]});});}
-  else if(kind==='orient'){const l=cur().page.orient==='landscape';pop(btn,`<button type="button" class="mi"${!l?' style="background:#EEF2F8"':''} data-v="portrait">לאורך</button><button type="button" class="mi"${l?' style="background:#EEF2F8"':''} data-v="landscape">לרוחב</button>`,v=>setPage({orient:v}));}
+  else if(kind==='orient'){const l=cur().page.orient==='landscape';pop(btn,`<button type="button" class="mi${!l?' on':''}" data-v="portrait">לאורך</button><button type="button" class="mi${l?' on':''}" data-v="landscape">לרוחב</button>`,v=>setPage({orient:v}));}
   else if(kind==='paper')pop(btn,[9,1,5,11,8].map(k=>`<button type="button" class="mi" data-v="${k}"><b>${PAPER[k][0]}</b><small style="margin-inline-start:auto;color:#5D6982">${(PAPER[k][1]*2.54).toFixed(1)} × ${(PAPER[k][2]*2.54).toFixed(1)} ס״מ</small></button>`).join(''),v=>setPage({paper:+v}));
   else if(kind==='fit')pop(btn,[['none','בלי התאמה','מודפס בגודל הרגיל'],['w','כל העמודות בעמוד אחד','לרוחב עמוד אחד'],['all','כל הגיליון בעמוד אחד','מוקטן כדי להיכנס לעמוד']].map(x=>`<button type="button" class="mi" data-v="${x[0]}"><b>${x[1]}</b><small style="margin-inline-start:auto;color:#5D6982">${x[2]}</small></button>`).join(''),v=>{
     if(v==='none')setPage({fit:false,scale:100});else if(v==='w')setPage({fit:true,fw:1,fh:0});else setPage({fit:true,fw:1,fh:1});});
