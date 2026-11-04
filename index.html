@@ -13,12 +13,12 @@
 <meta name="apple-mobile-web-app-title" content="סימן">
 <script>/* 5.9.3 — כולם בעיצוב החדש. הצבע והמצב (בהיר / כהה / אוטומטי) נצבעים מיד, לפני שהדף מופיע, בלי הבהוב.
    הערכים נשמרים ב-siman.v7.boot על ידי siman-v7.js, שם נמצאת רשימת הצבעים המלאה. */
-(function(){var d=document.documentElement;d.classList.add('v7');
+(function(){var d=document.documentElement;d.classList.add('v7','nb');
 try{localStorage.removeItem('siman.design');localStorage.removeItem('siman.beta');}catch(e){}
 var b=null;try{b=JSON.parse(localStorage.getItem('siman.v7.boot')||'null');}catch(e){}
 if(!b||!b.l||!b.d){b={mode:'auto',
- l:{bg:'#EEF3FB',surface:'#FFFFFF',ink:'#0F213F',muted:'#4B5B77',line:'#D6E0F0',accent:'#1D4ED8',on:'#FFFFFF',dash:'#8FAEEB',soft:'#DCE6FA',art:'#1D4ED8',deep:'#0F213F',deep2:'#1B2F55',tile2:'#0F213F'},
- d:{bg:'#14161C',surface:'#1E2129',ink:'#F1F2F5',muted:'#A9AFBC',line:'#2E323C',accent:'#8FB0FF',on:'#0B1530',dash:'#4A5F8F',soft:'#1F2B47',art:'#1D4ED8',deep:'#0E1015',deep2:'#1A1D24',tile2:'#1D4ED8'}};}
+ l:{bg:'#EAFBF3',surface:'#FFFFFF',ink:'#2B1660',muted:'#5B4E80',line:'#CBEFDD',accent:'#6B2BD9',on:'#FFFFFF',dash:'#B9A3F0',soft:'#EEE6FF',art:'#6B2BD9',deep:'#2B1660',deep2:'#3D2580',tile2:'#2B1660'},
+ d:{bg:'#17112E',surface:'#211A3F',ink:'#F2EEFF',muted:'#B3A9D6',line:'#342B5C',accent:'#B79BFF',on:'#1A0B40',dash:'#6A55A8',soft:'#2D2547',art:'#6B2BD9',deep:'#0D0820',deep2:'#1A1236',tile2:'#6B2BD9'}};}
 var dark=b.mode==='dark'||(b.mode!=='light'&&!!(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches));
 var v=dark?b.d:b.l;for(var k in v)d.style.setProperty('--v7-'+k,v[k]);
 d.setAttribute('data-theme',dark?'dark':'light');
@@ -1348,7 +1348,7 @@ body:has(#wed) .busy,body:has(#xed) .busy{z-index:1000}body:has(#wed) .toast,bod
 </dialog>
 
 <header class="bar">
-  <div class="brand"><b title="גרסה 5.9.4">סימן</b><span class="ver">5.9.4</span><span class="fname" id="fname"></span></div>
+  <div class="brand"><b title="גרסה 5.9.5">סימן</b><span class="ver">5.9.5</span><span class="fname" id="fname"></span></div>
 
   <nav class="tools" id="tools" aria-label="כלים">
     <button class="tool" data-tool="select" aria-pressed="true" title="בחירה וגלילה (V)">
@@ -5393,11 +5393,13 @@ if('launchQueue' in window){
 <script src="siman-voice.js" defer></script>
 <script src="siman-back.js?v=5.9.3" defer></script>
 <!-- 5.9.3: one design for everyone (the ?beta=1 shell and the classic design were removed) -->
-<link rel="stylesheet" href="siman-v7.css?v=5.9.3">
-<script src="siman-v7.js?v=5.9.3" defer></script>
+<link rel="stylesheet" href="siman-v7.css?v=5.9.5">
+<script src="siman-v7.js?v=5.9.5" defer></script>
 <script src="siman-media.js?v=5.3.2" defer></script>
 <script src="siman-scan.js?v=5.8.0" defer></script>
 <script src="siman-merge.js?v=5.9.3" defer></script>
-<script src="siman-ux.js?v=5.9.3" defer></script>
+<script src="siman-ux.js?v=5.9.5" defer></script>
+<link rel="stylesheet" href="siman-nb.css?v=5.9.5">
+<script src="siman-nb.js?v=5.9.5" defer></script>
 </body>
 </html>

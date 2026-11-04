@@ -1,0 +1,239 @@
+/* סימן 5.9.5 — עיצוב "מחברת": נייר משבצות, מדבקות, קווי דיו עבים וצללים מוזזים.
+   שכבת עיצוב בלבד מעל siman-v7.css: פועלת רק כש-<html> מקבל גם v7 וגם nb (מ-5.9.5 כולם מקבלים).
+   הצבעים נשארים מהערכה שהמשתמש בחר (ברירת המחדל: "מחברת"), כך שגם שאר הצבעים מקבלים את המראה החדש.
+   כדי לחזור לעיצוב הקודם מספיק להסיר את siman-nb.css ו-siman-nb.js מ-index.html. */
+
+html.v7.nb:not(#_){
+  --nb-edge:var(--v7-ink);            /* קווי הדיו של כפתורים וסרגלים */
+  --nb-shadow:var(--v7-ink);          /* הצל המוזז */
+  --nb-grid:var(--v7-line);           /* קווי המשבצות */
+  --nb-st-ink:#2B1660;                /* הטקסט והקו של המדבקות: תמיד כהה, כמו על פתק אמיתי */
+  --nb-sun:#FFD84D;--nb-rose:#FF8FB8;--nb-sky:#8FD3FF;--nb-mint:#2ED3A0;--nb-lilac:#D9C8FF;--nb-paper:#FFFFFF;
+  --nb-head:"SF-secular","SF-rubik",Rubik,"Noto Sans Arabic","Segoe UI",Arial,sans-serif;
+}
+html.v7.nb[data-theme="dark"]:not(#_){
+  --nb-edge:var(--v7-dash);--nb-shadow:#05030F;--nb-grid:rgba(255,255,255,.055);
+  --nb-sun:#F5CD3D;--nb-rose:#F58AB3;--nb-sky:#86C8F2;--nb-mint:#33C394;--nb-lilac:#C9B6FA;--nb-paper:#EDE9F7;
+}
+
+/* ---------- נייר משבצות במסך הפתיחה (בזמן עבודה על מסמך הרקע נשאר שקט) ---------- */
+html.v7.nb:not(.v7-doc):not(#_) .desk{background-color:var(--v7-bg);
+  background-image:linear-gradient(var(--nb-grid) 1px,transparent 1px),linear-gradient(90deg,var(--nb-grid) 1px,transparent 1px);background-size:28px 28px}
+
+/* ---------- הסרגל העליון ---------- */
+html.v7.nb:not(#_) .bar{background:var(--v7-bg);border-bottom:0;box-shadow:none}
+html.v7.nb:not(.v7-doc):not(#_) .bar{background:transparent}
+html.v7.nb:not(.v7-doc):not(#_) .opts{background:transparent;border-bottom:0}
+html.v7.nb:not(#_) .brand b{font-family:var(--nb-head);font-weight:700;font-synthesis:none;font-size:28px;color:var(--v7-accent);transform:rotate(-3deg);flex-direction:column;align-items:stretch;gap:0;line-height:1}
+html.v7.nb:not(#_) .brand b::before{display:none}
+html.v7.nb:not(#_) .brand b::after{display:block;content:"";height:6px;margin-top:-5px;border-radius:6px;background:var(--nb-mint);opacity:.75}
+html.v7.nb:not(#_) .ver{border:2px solid var(--nb-edge);border-radius:999px;background:var(--v7-surface);color:var(--v7-ink);padding:0 8px}
+html.v7.nb:not(#_) .bar .btn,html.v7.nb:not(#_) .bar .icon-btn{border:2px solid var(--nb-edge);border-radius:999px;background:var(--v7-surface);color:var(--v7-ink);transition:transform .12s,box-shadow .12s}
+html.v7.nb:not(#_) .bar .btn:hover:not(:disabled),html.v7.nb:not(#_) .bar .icon-btn:hover:not(:disabled){background:var(--v7-soft);border-color:var(--nb-edge);transform:translateY(-1px)}
+html.v7.nb:not(#_) .bar .btn:disabled,html.v7.nb:not(#_) .bar .icon-btn:disabled{border-style:dashed;opacity:.45;box-shadow:none}
+html.v7.nb:not(#_) .bar .btn.primary,html.v7.nb:not(#_) .bar .btn.primary:hover:not(:disabled){background:var(--v7-accent);border-color:var(--nb-edge);color:var(--v7-on);font-weight:700}
+html.v7.nb:not(#_) .split-btn{border-radius:999px;box-shadow:2px 2px 0 var(--nb-shadow)}
+html.v7.nb:not(#_) .split-btn:has(.btn:disabled){box-shadow:none}
+html.v7.nb:not(#_) .split-btn .btn.primary:first-child{border-start-end-radius:0;border-end-end-radius:0}
+html.v7.nb:not(#_) .split-btn .btn.caret{border-start-start-radius:0;border-end-start-radius:0;border-inline-start-width:0}
+html.v7.nb:not(#_) .bar .btn.ai,html.v7.nb:not(#_) .bar #aiBtn{background:var(--nb-lilac);color:var(--nb-st-ink)}
+html.v7.nb:not(#_) .bar .btn.share{border-color:var(--nb-edge);color:var(--v7-ink)}
+html.v7.nb:not(#_) .bar .btn.share svg{color:var(--v7-ink)}
+html.v7.nb:not(#_) .bar .btn.cmd{background:var(--v7-surface);border:2.5px solid var(--nb-edge);color:var(--v7-muted);box-shadow:3px 3px 0 var(--nb-shadow)}
+html.v7.nb:not(#_) .bar .btn.cmd svg{color:var(--v7-ink)}
+html.v7.nb:not(#_) .bar .btn.cmd kbd{background:var(--nb-sun);color:var(--nb-st-ink);border:1.5px solid var(--nb-st-ink);border-radius:6px}
+html.v7.nb:not(#_) .bar .v7-hbtn,html.v7.nb:not(#_) .bar #setBtn{box-shadow:2px 2px 0 var(--nb-shadow)}
+
+/* שתי שורות (siman-nb.js מסדר את הכפתורים): למעלה הלוגו מימין והחיפוש וההגדרות משמאל, מתחת "קלמר" אחד עם כל הכלים והפעולות */
+html.v7.nb:not(#_) .bar{display:flex;flex-wrap:wrap;align-items:center;gap:12px 14px;padding:14px clamp(14px,2.2vw,32px) 12px}
+html.v7.nb:not(#_) .bar > .nb-top{order:0;width:auto;max-width:none;overflow:visible;margin-inline-start:auto;display:flex;align-items:center;gap:10px;flex-wrap:nowrap}
+html.v7.nb:not(#_) .nb-top .icon-btn,html.v7.nb:not(#_) .nb-top #shareBtn{width:42px;height:42px;padding:0;display:inline-grid;place-items:center;border-width:2.5px;box-shadow:2px 2px 0 var(--nb-shadow)}
+html.v7.nb:not(#_) .nb-top #shareBtn .lbl{display:none}
+html.v7.nb:not(#_) .nb-top #shareBtn svg{width:19px;height:19px}
+html.v7.nb:not(#_) .nb-top .hidden{display:none!important}
+html.v7.nb:not(#_) .nb-top #setBtn{background:var(--nb-lilac);color:var(--nb-st-ink);border-color:var(--nb-st-ink)}
+html.v7.nb:not(#_) .nb-top #setBtn svg{color:var(--nb-st-ink)}
+html.v7.nb:not(#_) .nb-top #cmdBtn{min-width:min(400px,24vw);height:44px;justify-content:flex-start;gap:8px;padding:0 16px}
+html.v7.nb:not(#_) .nb-top #cmdBtn .lbl{display:inline!important}
+html.v7.nb:not(#_) .nb-top #cmdBtn kbd{display:inline-block!important;margin-inline-start:auto}
+html.v7.nb:not(#_) .bar .fname{max-width:18vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+html.v7.nb:not(.v7-doc):not(#_) .opts{display:none}
+html.v7.nb:not(#_) .nb-top .group.zoom{gap:6px}
+html.v7.nb:not(#_) .nb-top #installBtn{width:auto;padding:0 14px}
+html.v7.nb:not(#_) .nb-case{flex:1 1 100%;order:1;display:flex;align-items:center;flex-wrap:wrap;gap:6px 8px;min-width:0;
+  background:var(--v7-surface);border:2.5px solid var(--nb-edge);border-radius:20px;box-shadow:5px 5px 0 var(--nb-shadow);padding:6px 10px}
+html.v7.nb:not(#_) .nb-case > .group{display:flex;align-items:center;flex-wrap:wrap;gap:8px}
+html.v7.nb:not(#_) .nb-case .btn{min-height:38px;padding:0 14px}
+html.v7.nb:not(#_) .nb-case .icon-btn{width:38px;height:38px;padding:0;display:inline-grid;place-items:center}
+html.v7.nb .nb-sep{flex:none;align-self:stretch;margin:6px 4px;border-inline-start:2.5px dashed var(--nb-grid)}
+
+/* הכלים בתוך הקלמר: בלי מסגרת משלהם (המסגרת היא של הקלמר כולו) */
+html.v7.nb:not(#_) .tools{background:var(--v7-surface);border:2.5px solid var(--nb-edge);border-radius:20px;padding:5px;box-shadow:5px 5px 0 var(--nb-shadow)}
+@media (min-width:721px){
+  html.v7.nb:not(#_) .nb-case .tools{background:none;border:0;box-shadow:none;padding:0;margin:0}
+}
+html.v7.nb:not(#_) .tool{border:2px solid transparent;border-radius:14px;transition:transform .12s,background .12s}
+html.v7.nb:not(#_) .tool:hover{background:var(--v7-bg);border-color:var(--nb-edge)}
+html.v7.nb:not(#_) .tool[aria-pressed="true"]{background:var(--nb-sun);border-color:var(--nb-st-ink);color:var(--nb-st-ink);transform:rotate(-3deg);box-shadow:2px 2px 0 var(--nb-st-ink)}
+html.v7.nb:not(#_) .tool[aria-pressed="true"] span,html.v7.nb:not(#_) .tool[aria-pressed="true"] svg{color:var(--nb-st-ink);background:none}
+html.v7.nb .tool[data-tool="highlight"]::before,html.v7.nb .tool[data-tool="text"]::before,html.v7.nb .tool[data-tool="redact"]::before,html.v7.nb .tool[data-action="sign"]::before{width:0;background:none;border-inline-start:2.5px dashed var(--nb-grid)}
+html.v7.nb[data-theme="dark"] .tool::before{border-color:var(--v7-line)!important}
+
+/* הודעות קופצות: פתק צהוב */
+html.v7.nb:not(#_) .toast{background:var(--nb-sun);color:var(--nb-st-ink);border:2.5px solid var(--nb-st-ink);border-radius:14px;box-shadow:4px 4px 0 var(--nb-st-ink)}
+
+/* ---------- מסך הפתיחה ---------- */
+html.v7.nb:not(#_) .empty{align-content:start}
+/* nothing on the first screen may push it wider than the window (the recent-files row scrolls inside itself) */
+html.v7.nb:not(#_) .empty > *,html.v7.nb .v7-home > *,html.v7.nb .nb-btns,html.v7.nb .nb-open,html.v7.nb .nb-dt{min-width:0;max-width:100%}
+html.v7.nb:not(#_) .wl-text{align-items:flex-start;text-align:start}
+html.v7.nb:not(#_) .wl-hi{color:var(--v7-accent);font-size:19px;font-weight:400;margin:6px 0 0}
+html.v7.nb body.dragging .welcome::after{display:none}
+html.v7.nb .v7-home{color:var(--v7-ink)}
+html.v7.nb .v7-home h1{font-family:var(--nb-head);font-weight:700;font-synthesis:none;text-align:start;font-size:clamp(46px,6vw,86px);line-height:1.02;margin:0}
+html.v7.nb .v7-home .nb-tilt{display:inline-block;transform:rotate(-4deg);background:var(--nb-sun);color:var(--nb-st-ink);padding:0 12px;border-radius:12px}
+html.v7.nb .v7-home .v7-sub{text-align:start;font-size:clamp(16px,1.5vw,18px);line-height:1.7;color:var(--v7-ink);max-width:480px}
+html.v7.nb:not(#_) .v7-search{max-width:none;margin:0;border:2.5px solid var(--nb-edge);border-radius:999px;box-shadow:3px 3px 0 var(--nb-shadow);min-height:50px}
+html.v7.nb:not(#_) .v7-search:focus-within{border-color:var(--v7-accent);box-shadow:3px 3px 0 var(--v7-accent)}
+html.v7.nb:not(#_) .v7-search svg{color:var(--v7-ink)}
+
+/* אזור הגרירה וההדבקה */
+.nb-drop{display:none}
+html.v7.nb .nb-drop{display:flex;align-items:center;gap:20px;padding:16px 16px 16px 22px;border:3px dashed var(--v7-accent);border-radius:26px;background:color-mix(in srgb,var(--v7-surface) 70%,transparent);cursor:pointer;transition:transform .2s,background .2s,box-shadow .2s,border-color .2s}
+html.v7.nb .nb-btns{display:flex;gap:10px;flex:none}
+html.v7.nb .nb-open{background:var(--v7-accent);color:var(--v7-on);border:3px solid var(--nb-st-ink);border-radius:20px;padding:16px 30px;font:inherit;font-size:21px;font-weight:700;cursor:pointer;box-shadow:6px 6px 0 var(--nb-shadow);transition:transform .12s,box-shadow .12s}
+html.v7.nb[data-theme="dark"] .nb-open{border-color:var(--nb-shadow)}
+html.v7.nb .nb-open:hover{transform:translate(2px,2px);box-shadow:4px 4px 0 var(--nb-shadow)}
+html.v7.nb .nb-open:active{transform:translate(6px,6px);box-shadow:0 0 0 var(--nb-shadow)}
+html.v7.nb .nb-paste{display:none;align-items:center;justify-content:center;gap:6px;background:var(--nb-paper);color:var(--nb-st-ink);border:3px solid var(--nb-st-ink);border-radius:20px;padding:0 16px;font:inherit;font-size:17px;cursor:pointer;box-shadow:4px 4px 0 var(--nb-shadow)}
+html.v7.nb .nb-paste:active{transform:translate(4px,4px);box-shadow:0 0 0 var(--nb-shadow)}
+html.v7.nb .nb-paste svg{width:20px;height:20px}
+html.v7.nb .nb-dt{display:flex;align-items:center;gap:10px;min-width:0}
+html.v7.nb .nb-dt svg{width:40px;height:40px;flex:none;color:var(--v7-accent);transition:transform .25s}
+html.v7.nb .nb-dt b{display:block;font-size:17px;font-weight:400}
+html.v7.nb .nb-dt small{display:block;font-size:12.5px;color:var(--v7-muted);margin-top:3px;white-space:nowrap}
+html.v7.nb .nb-dt kbd{font-family:inherit;font-size:11px;border:1.5px solid var(--v7-ink);border-radius:5px;padding:0 5px;background:var(--v7-surface);direction:ltr;display:inline-block}
+html.v7.nb .nb-dt .nb-hot{display:none}
+html.v7.nb .nb-only-narrow{display:none}
+html.v7.nb body.dragging .nb-drop{border-style:solid;border-color:var(--nb-st-ink);background:var(--nb-sun);color:var(--nb-st-ink);box-shadow:5px 5px 0 var(--nb-st-ink);transform:rotate(-1deg)}
+html.v7.nb body.dragging .nb-dt svg{transform:translateY(5px) rotate(-8deg);color:var(--nb-st-ink)}
+html.v7.nb body.dragging .nb-dt .nb-idle{display:none}
+html.v7.nb body.dragging .nb-dt .nb-hot{display:block;font-family:var(--nb-head);font-size:20px;color:var(--nb-st-ink)}
+html.v7.nb .nb-field{display:none;border:2.5px dashed var(--v7-ink);background:var(--v7-surface);color:var(--v7-ink);border-radius:14px;padding:14px;text-align:center;font-size:16px;caret-color:transparent;outline:0}
+html.v7.nb .nb-field.show{display:block}
+html.v7.nb .nb-field:focus{background:var(--nb-sun);color:var(--nb-st-ink)}
+
+/* המדבקות */
+html.v7.nb .v7-bento{grid-template-columns:repeat(3,minmax(0,1fr));grid-auto-rows:minmax(124px,auto);gap:22px 20px;padding:8px 4px 0}
+html.v7.nb .v7-bento .v7-open{display:none}
+html.v7.nb:not(#_) .v7-t{grid-column:auto;grid-row:auto;overflow:visible;flex-direction:column;justify-content:flex-start;align-items:flex-start;gap:4px;padding:22px 16px 16px;
+  background:var(--nb-paper);color:var(--nb-st-ink);border:2.5px solid var(--nb-st-ink);border-radius:16px;box-shadow:4px 4px 0 var(--nb-st-ink);transition:transform .2s}
+html.v7.nb[data-theme="dark"]:not(#_) .v7-t{box-shadow:4px 4px 0 var(--nb-shadow)}
+html.v7.nb .v7-t::before{content:"";position:absolute;top:-12px;inset-inline-start:50%;width:54px;height:20px;background:rgba(255,255,255,.72);border:1px solid rgba(43,22,96,.2);transform:translateX(50%) rotate(-4deg);pointer-events:none}
+html.v7.nb[dir="ltr"] .v7-t::before,html.v7.nb .v7-home[dir="ltr"] .v7-t::before{transform:translateX(-50%) rotate(-4deg)}
+@media (hover:hover){html.v7.nb:not(#_) .v7-t:hover{transform:rotate(0) scale(1.04)!important;z-index:2;box-shadow:6px 6px 0 var(--nb-st-ink)}}
+html.v7.nb:not(#_) .v7-t:focus-visible{outline:3px solid var(--v7-accent);outline-offset:4px}
+html.v7.nb .v7-t .v7-words,html.v7.nb .v7-t .v7-art,html.v7.nb .v7-t .v7-wave,html.v7.nb .v7-t .v7-sig,html.v7.nb .v7-t .v7-ic2{display:none}
+html.v7.nb .v7-t .nb-e{font-size:30px;line-height:1;margin-bottom:6px}
+html.v7.nb .v7-t .v7-tt{gap:2px}
+html.v7.nb:not(#_) .v7-t b{font-size:18px;font-weight:700;color:var(--nb-st-ink);-webkit-line-clamp:3}
+html.v7.nb:not(#_) .v7-t small{font-size:13px;color:var(--nb-st-ink);opacity:.78}
+html.v7.nb:not(#_) .v7-new-tag{background:var(--nb-st-ink);color:var(--nb-sun);order:-1;margin-bottom:2px}
+html.v7.nb:not(#_) .v7-t[data-v7="translate"],html.v7.nb:not(#_) .v7-t[data-v7="conv"]{background:var(--nb-sky)}
+html.v7.nb:not(#_) .v7-t[data-v7="scan"],html.v7.nb:not(#_) .v7-t[data-v7="slides"]{background:var(--nb-sun)}
+html.v7.nb:not(#_) .v7-t[data-v7="transcribe"],html.v7.nb:not(#_) .v7-t[data-v7="ask"]{background:var(--nb-lilac)}
+html.v7.nb:not(#_) .v7-t[data-v7="sign"],html.v7.nb:not(#_) .v7-t[data-v7="send"]{background:var(--nb-rose)}
+html.v7.nb:not(#_) .v7-t[data-v7="excel"],html.v7.nb:not(#_) .v7-t[data-v7="record"]{background:var(--nb-mint)}
+html.v7.nb .v7-bento .v7-t:nth-child(4n+2){transform:rotate(-3deg)}
+html.v7.nb .v7-bento .v7-t:nth-child(4n+3){transform:rotate(2deg)}
+html.v7.nb .v7-bento .v7-t:nth-child(4n){transform:rotate(-1deg)}
+html.v7.nb .v7-bento .v7-t:nth-child(4n+1){transform:rotate(2.5deg)}
+
+/* קבצים אחרונים */
+html.v7.nb .ux-recent{margin:24px 0 0}
+html.v7.nb .ux-recent .hd{flex-wrap:wrap;gap:6px 14px;margin:0 0 18px}
+html.v7.nb .ux-recent h2{font-family:var(--nb-head);font-weight:700;font-synthesis:none;font-size:30px;flex:0 1 auto;position:relative;padding-bottom:6px;
+  background:linear-gradient(var(--nb-mint),var(--nb-mint)) bottom/100% 5px no-repeat;border-radius:2px}
+html.v7.nb .ux-recent .hd button[data-clear]{color:var(--v7-accent);text-decoration:underline;text-underline-offset:3px;font-size:15px}
+html.v7.nb .ux-recent .ls{grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:22px 20px;padding:10px 4px 6px}
+html.v7.nb:not(#_) .ux-rf{position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:10px;min-height:150px;padding:18px 14px 14px;text-align:start;
+  background:var(--nb-paper);color:var(--nb-st-ink);border:2.5px solid var(--nb-st-ink);border-radius:6px 22px 6px 6px;box-shadow:4px 4px 0 var(--nb-st-ink);transition:transform .2s}
+html.v7.nb[data-theme="dark"]:not(#_) .ux-rf{box-shadow:4px 4px 0 var(--nb-shadow)}
+html.v7.nb .ux-rf:nth-child(odd){transform:rotate(-1.5deg)}
+html.v7.nb .ux-rf:nth-child(even){transform:rotate(1.5deg)}
+@media (hover:hover){html.v7.nb .ux-rf:hover{transform:rotate(0) translateY(-4px)}}
+html.v7.nb .ux-rf::before{content:"";position:absolute;top:-10px;inset-inline-start:50%;width:40px;height:18px;background:rgba(255,255,255,.72);border:1px solid rgba(43,22,96,.2);transform:translateX(50%) rotate(-4deg)}
+html.v7.nb .ux-rf > svg{width:34px;height:34px;flex:none}
+html.v7.nb .ux-rf .n{display:flex;flex-direction:column;gap:6px;min-width:0;width:100%;margin-top:auto}
+html.v7.nb .ux-rf .n b{color:var(--nb-st-ink);font-size:15px;line-height:1.35;white-space:normal;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-word}
+html.v7.nb .ux-rf .n small{color:var(--nb-st-ink);opacity:.7}
+html.v7.nb .ux-rf .x{position:absolute;top:8px;inset-inline-end:8px;color:var(--nb-st-ink)}
+html.v7.nb .nb-nav{display:none;gap:8px;margin-inline-start:auto}
+html.v7.nb .nb-nav button{width:38px;height:38px;border-radius:50%;border:2.5px solid var(--nb-edge);background:var(--v7-surface);color:var(--v7-ink);font:inherit;font-size:18px;cursor:pointer;box-shadow:2px 2px 0 var(--nb-shadow);padding:0}
+html.v7.nb .nb-nav button:disabled{opacity:.35;border-style:dashed;box-shadow:none;cursor:default}
+
+/* יצירת קובץ חדש ושורת הפרטיות */
+html.v7.nb .v7-new{color:var(--v7-ink);justify-content:center;margin-top:18px}
+html.v7.nb:not(#_) .v7-home .v7-new .v7-b{border:2px solid var(--nb-edge);border-radius:999px;background:var(--v7-surface);box-shadow:2px 2px 0 var(--nb-shadow);min-height:42px;padding:0 18px}
+@media (hover:hover){html.v7.nb:not(#_) .v7-home .v7-new .v7-b:hover{background:var(--v7-soft);transform:translateY(-1px)}}
+html.v7.nb .v7-private{align-self:center;color:var(--v7-ink);background:var(--v7-surface);border:2px dashed var(--nb-mint);border-radius:12px;padding:8px 14px;margin-top:6px}
+html.v7.nb .v7-private svg{color:var(--nb-mint)}
+
+/* בחירת הצבע: שבעה צבעים בארבע עמודות */
+html.v7.nb .v7-sw{grid-template-columns:repeat(4,minmax(0,1fr))}
+
+/* מחשב: הכותרת ואזור הגרירה מימין, המדבקות משמאל */
+@media (min-width:1000px){
+  html.v7.nb .v7-home{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);grid-template-rows:auto auto auto auto 1fr;column-gap:56px;row-gap:22px;align-items:start;padding-top:8px}
+  html.v7.nb .v7-home > *{grid-column:1;min-width:0}
+  html.v7.nb .v7-home > .v7-bento{grid-column:2;grid-row:1 / 6;align-self:start}
+  html.v7.nb .v7-home > .ux-recent,html.v7.nb .v7-home > .v7-new,html.v7.nb .v7-home > .v7-private{grid-column:1 / -1}
+  html.v7.nb .v7-home > .ux-recent{margin-top:44px}
+  html.v7.nb .v7-home > .nb-field{grid-column:1}
+}
+@media (min-width:721px) and (max-width:999px){
+  html.v7.nb .v7-bento{grid-template-columns:repeat(4,minmax(0,1fr))}
+}
+
+/* טלפון */
+@media (max-width:720px){
+  html.v7.nb .v7-home{gap:18px}
+  html.v7.nb .v7-home h1{font-size:clamp(44px,13vw,60px)}
+  html.v7.nb .nb-drop{flex-direction:column;align-items:stretch;gap:12px;padding:12px;border-radius:24px}
+  html.v7.nb .nb-open{flex:1;padding:15px 10px;font-size:19px}
+  html.v7.nb .nb-paste{display:inline-flex}
+  html.v7.nb .nb-dt{justify-content:center}
+  html.v7.nb .nb-only-wide,html.v7.nb .nb-dt .nb-only-wide{display:none}
+  html.v7.nb .nb-only-narrow{display:inline}
+  html.v7.nb .bar .btn.cmd kbd{display:none}
+  /* טלפון: בשורה העליונה רק אייקונים, והקלמר מופיע רק כשמסמך פתוח (הכלים עצמם עוברים למגש בתחתית, כמו קודם) */
+  html.v7.nb:not(#_) .bar{padding:10px 12px 8px;gap:8px}
+  html.v7.nb:not(#_) .bar > .nb-top{gap:6px}
+  html.v7.nb:not(#_) .nb-top #cmdBtn{min-width:0;width:42px;padding:0;justify-content:center}
+  html.v7.nb:not(#_) .nb-top #cmdBtn .lbl,html.v7.nb:not(#_) .nb-top #cmdBtn kbd{display:none!important}
+  /* במסך הפתיחה יש שורת חיפוש משלו ואין עדיין מה לשתף: בטלפון שני הכפתורים חוזרים כשמסמך פתוח */
+  html.v7.nb:not(.v7-doc):not(#_) .nb-top #cmdBtn,html.v7.nb:not(.v7-doc):not(#_) .nb-top #shareBtn{display:none}
+  html.v7.nb:not(#_) .nb-top .icon-btn{width:40px;height:40px}
+  html.v7.nb:not(.v7-doc):not(#_) .nb-case{display:none}
+  html.v7.nb.v7-doc:not(#_) .nb-case{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;border-radius:16px;padding:4px 6px;box-shadow:3px 3px 0 var(--nb-shadow)}
+  html.v7.nb.v7-doc:not(#_) .nb-case::-webkit-scrollbar{display:none}
+  html.v7.nb.v7-doc:not(#_) .nb-case > .group{flex-wrap:nowrap}
+  html.v7.nb.v7-doc .nb-sep{display:none}
+  html.v7.nb .v7-bento{grid-template-columns:repeat(3,minmax(0,1fr));grid-auto-rows:minmax(96px,auto);gap:16px 12px;padding-top:12px}
+  html.v7.nb:not(#_) .v7-t{padding:16px 8px 10px;align-items:center;text-align:center;border-radius:14px;box-shadow:3px 3px 0 var(--nb-st-ink)}
+  html.v7.nb .v7-t .v7-tt{align-items:center}
+  html.v7.nb .v7-t .nb-e{font-size:24px;margin-bottom:4px}
+  html.v7.nb:not(#_) .v7-t b{font-size:13.5px;line-height:1.2}
+  html.v7.nb:not(#_) .v7-t small{display:none}
+  html.v7.nb .v7-t::before{width:40px;height:16px;top:-9px}
+  html.v7.nb .ux-recent h2{font-size:26px}
+  html.v7.nb .nb-nav{display:flex}
+  html.v7.nb:not(#_) .ux-recent .ls{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scroll-behavior:smooth;gap:16px;padding:14px 16px 12px;margin:0 -16px;scrollbar-width:none}
+  html.v7.nb .ux-recent .ls::-webkit-scrollbar{display:none}
+  html.v7.nb:not(#_) .ux-rf{flex:0 0 44%;scroll-snap-align:start;min-height:140px}
+  html.v7.nb .ux-rf .x{display:none}
+  html.v7.nb .v7-new{justify-content:flex-start}
+}
+@media (prefers-reduced-motion:reduce){
+  html.v7.nb .v7-t,html.v7.nb .ux-rf,html.v7.nb .tool[aria-pressed="true"],html.v7.nb .brand b,html.v7.nb .nb-tilt{transform:none!important}
+}

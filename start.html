@@ -3,218 +3,489 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>סימן – חותמים, מסמנים, מתרגמים ושולחים מסמכים</title>
+<title>סימן — מה נסמן היום?</title>
 <meta name="description" content="סימן: חותמים וממלאים טפסים, אוספים חתימות בקישור, מסמנים ומתקנים טקסט, מתרגמים, מתמללים שיחות והקלטות, הופכים צילום של דף למסמך ושולחים בוואטסאפ. PDF, וורד, אקסל ופאוורפוינט, בעברית מלאה.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://siman.siman-app.workers.dev/start.html">
-<meta property="og:title" content="סימן – כל מה שעושים עם מסמך, באפליקציה אחת">
+<meta property="og:title" content="סימן — מה נסמן היום?">
 <meta property="og:description" content="חותמים, מסמנים, מתקנים, מתרגמים, מתמללים ושולחים. PDF, וורד, אקסל ופאוורפוינט, בעברית מלאה. כרגע בחינם.">
 <meta property="og:image" content="https://siman.siman-app.workers.dev/siman-share.jpg">
 <meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="theme-color" content="#2B8FE8">
+<meta name="theme-color" content="#EAFBF3" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#17112E" media="(prefers-color-scheme: dark)">
+<meta name="color-scheme" content="light dark">
 <link rel="icon" href="icon-192.png">
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700&family=Rubik:wght@500;700;800;900&display=swap" rel="stylesheet">
+<link rel="apple-touch-icon" sizes="180x180" href="icon-180.png">
 <style>
-:root{--ink:#13233A;--ink2:#47566D;--sky:#2B8FE8;--sky-d:#1D6FBA;--wash:#E6F2FD;--paper:#fff;--marker:#FFD43B;--green:#1F9D6B;--red:#D9443A;--line:#DCE6F2;color-scheme:light}
-*{box-sizing:border-box;margin:0;padding:0}
-html{scroll-behavior:smooth}
-body{font-family:Heebo,"Assistant",Arial,sans-serif;color:var(--ink);background:var(--paper);direction:rtl;text-align:right;line-height:1.6;font-size:18px;-webkit-font-smoothing:antialiased}
-h1,h2,h3,.btn,.brand{font-family:Rubik,Heebo,Arial,sans-serif}
-a{color:inherit}
-.wrap{max-width:1120px;margin:0 auto;padding:0 22px}
-:focus-visible{outline:3px solid var(--sky);outline-offset:3px;border-radius:6px}
-/* top */
-.top{position:sticky;top:0;z-index:20;background:rgba(255,255,255,.92);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line);padding-top:env(safe-area-inset-top,0px)}
-.top .wrap{display:flex;align-items:center;justify-content:space-between;height:64px}
-.brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:22px;text-decoration:none}
-.logo{width:38px;height:38px;border-radius:11px;background:var(--marker);display:grid;place-items:center;font-weight:900;font-size:24px;box-shadow:0 3px 0 #E0B400;font-family:Rubik}
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-weight:700;text-decoration:none;border-radius:14px;padding:15px 26px;font-size:19px;transition:transform .12s,box-shadow .12s}
-.btn-main{background:var(--ink);color:#fff;box-shadow:0 4px 0 #000}
-.btn-main:hover{transform:translateY(-1px)}
-.btn-main:active{transform:translateY(3px);box-shadow:0 1px 0 #000}
-.btn-soft{background:var(--wash);color:var(--sky-d)}
-.btn-sm{padding:9px 16px;font-size:16px;border-radius:11px;box-shadow:0 3px 0 #000}
+/* fonts: same local files and family names as the app (index.html) */
+@font-face{font-family:"SF-rubik";font-weight:400;font-display:swap;src:url(font-rubik-400.ttf) format("truetype")}
+@font-face{font-family:"SF-rubik";font-weight:700;font-display:swap;src:url(font-rubik-700.ttf) format("truetype")}
+@font-face{font-family:"SF-secular";font-display:swap;src:url(font-secular-he.woff2) format("woff2");unicode-range:U+0307-0308,U+0590-05FF,U+200C-2010,U+20AA,U+25CC,U+FB1D-FB4F}
+@font-face{font-family:"SF-secular";font-display:swap;src:url(font-secular-lat.woff2) format("woff2");unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+
+:root{
+  --ink:#2B1660;--violet:#6B2BD9;--sun:#FFD84D;--rose:#FF8FB8;--sky:#8FD3FF;--mint:#2ED3A0;--lilac:#D9C8FF;--cream:#FFF4DC;
+  --paper:#EAFBF3;--grid:#CBEFDD;--surface:#fff;--text:#2B1660;--soft:#4A3B7A;--edge:#2B1660;--shadow:#2B1660;--link:#6B2BD9;--logo:#6B2BD9;
+  --tape:rgba(255,255,255,.72);color-scheme:light;
+  --hfont:"SF-secular","SF-rubik","Segoe UI",Arial,sans-serif;
+}
+@media (prefers-color-scheme:dark){
+  :root{--paper:#17112E;--grid:rgba(217,200,255,.075);--surface:#211A3F;--text:#F2EEFF;--soft:#C9BFEA;--edge:#9C86E8;--shadow:#06030F;--link:#C9B3FF;--logo:#C2A8FF;--tape:rgba(255,255,255,.28);color-scheme:dark}
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;overflow-x:clip}
+body{margin:0;color:var(--text);font-family:"SF-rubik",system-ui,"Segoe UI",Arial,sans-serif;font-size:18px;line-height:1.6;overflow-x:hidden;-webkit-font-smoothing:antialiased;
+  background:var(--paper);background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:28px 28px}
+a{color:var(--link)}
+h1,h2,h3{font-family:var(--hfont);font-weight:400;margin:0;line-height:1.15}
+p{margin:0}
+:focus-visible{outline:3px solid var(--violet);outline-offset:3px;border-radius:8px}
+.wrap{max-width:1180px;margin:0 auto;padding:0 clamp(16px,3vw,40px)}
+.ltr{direction:ltr;unicode-bidi:isolate;display:inline-block}
+kbd{font-family:inherit;font-size:.8em;border:1.5px solid var(--ink);border-radius:6px;padding:0 6px;background:var(--sun);color:var(--ink);direction:ltr;display:inline-block;line-height:1.5}
+
+/* header */
+.head{display:flex;align-items:center;gap:14px;padding-top:calc(16px + env(safe-area-inset-top,0px))}
+.logo{font-family:var(--hfont);font-size:34px;color:var(--logo);transform:rotate(-3deg);line-height:1;text-decoration:none}
+.logo::after{content:"";display:block;height:6px;margin-top:-4px;background:var(--mint);border-radius:6px;opacity:.7}
+/* like the app's top row: logo and version on the right, outlined pills on the left */
+.ver{font-size:12px;border:2px solid var(--edge);border-radius:999px;padding:0 8px;background:var(--surface);color:var(--text);line-height:1.6}
+.nav{display:flex;align-items:center;gap:10px;margin-inline-start:auto}
+.nav a{color:var(--text);text-decoration:none;padding:6px 16px;border-radius:999px;border:2.5px solid var(--edge);background:var(--surface);box-shadow:2px 2px 0 var(--shadow);font-size:16px;transition:transform .12s}
+.nav a:hover{transform:translateY(-1px);background:var(--lilac);color:var(--ink)}
+.nav a.btn{border-width:3px;border-color:var(--ink);background:var(--violet);color:#fff;box-shadow:4px 4px 0 var(--shadow)}
+
+/* the new app screen, as screenshots */
+.shots{display:grid;grid-template-columns:minmax(0,1fr) 230px;gap:40px;align-items:center;margin:0 0 48px}
+.win{border:4px solid var(--ink);border-radius:22px;overflow:hidden;background:#fff;box-shadow:10px 10px 0 var(--shadow);transform:rotate(-1deg);position:relative}
+.win .bar{height:34px;border-bottom:3px solid var(--ink);display:flex;align-items:center;gap:8px;padding:0 14px;direction:ltr;background:#fff}
+.win .bar i{width:12px;height:12px;border-radius:50%;border:2px solid var(--ink)}
+.win .bar i:nth-child(1){background:var(--rose)}.win .bar i:nth-child(2){background:var(--sun)}.win .bar i:nth-child(3){background:var(--mint)}
+.win img,.ph img{display:block;width:100%;height:auto}
+.ph{border:5px solid var(--ink);border-radius:36px;overflow:hidden;background:#fff;box-shadow:8px 8px 0 var(--shadow);transform:rotate(2.5deg)}
+.shots figcaption{grid-column:1/-1;text-align:center;color:var(--soft);font-size:16px}
+@media (max-width:760px){.shots{grid-template-columns:1fr;gap:28px}.ph{width:62%;margin:0 auto}}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;font-family:var(--hfont);font-size:21px;line-height:1.2;border:3px solid var(--ink);border-radius:20px;padding:16px 30px;transition:transform .12s,box-shadow .12s;cursor:pointer}
+.btn-main{background:var(--violet);color:#fff;box-shadow:6px 6px 0 var(--shadow)}
+.btn-main:hover{transform:translate(2px,2px);box-shadow:4px 4px 0 var(--shadow)}
+.btn-main:active{transform:translate(6px,6px);box-shadow:0 0 0 var(--shadow)}
+.btn-soft{background:var(--surface);color:var(--text);border-color:var(--edge);box-shadow:4px 4px 0 var(--shadow)}
+.btn-soft:hover{background:var(--sun);color:var(--ink);border-color:var(--ink)}
+.btn-soft:active{transform:translate(4px,4px);box-shadow:0 0 0 var(--shadow)}
+.btn-sm{font-size:17px;padding:9px 18px;border-radius:14px;box-shadow:3px 3px 0 var(--shadow)}
+.btn-sm:active{transform:translate(3px,3px)}
+
+/* shared bits */
+section{padding:72px 0}
+.sec-h{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 16px;margin-bottom:12px}
+h2{font-size:clamp(32px,4.4vw,48px)}
+.u{position:relative;display:inline-block;white-space:nowrap}
+.u svg{position:absolute;right:-2%;bottom:-12px;width:104%;height:14px;overflow:visible}
+.u path{fill:none;stroke-width:4.5;stroke-linecap:round}
+.sub{color:var(--soft);max-width:58ch;margin-top:14px}
+.label{display:inline-block;font-family:var(--hfont);font-size:17px;background:var(--sun);color:var(--ink);border:2.5px solid var(--ink);border-radius:10px;padding:2px 12px;transform:rotate(-3deg);box-shadow:3px 3px 0 var(--shadow)}
+.taped{position:relative}
+.taped::before{content:"";position:absolute;top:-12px;right:50%;width:58px;height:20px;background:var(--tape);border:1px solid rgba(43,22,96,.2);transform:translateX(50%) rotate(-4deg);z-index:1}
+
 /* hero */
-.hero{background:linear-gradient(180deg,var(--wash),#fff 85%);padding:54px 0 70px;overflow:hidden}
-.hero .wrap{display:grid;grid-template-columns:1.15fr .85fr;gap:48px;align-items:center}
-.hero h1{font-weight:900;font-size:clamp(2.3rem,5.4vw,4rem);line-height:1.08;letter-spacing:-.5px}
-.lead{font-size:clamp(1.1rem,1.9vw,1.3rem);color:var(--ink2);margin-top:18px;max-width:34ch}
-.verbs{display:flex;flex-wrap:wrap;gap:8px;margin-top:24px}
-.verbs span{background:#fff;border:1.5px solid var(--line);border-radius:30px;padding:6px 14px;font-weight:500;font-size:16px}
-.ctas{display:flex;flex-wrap:wrap;gap:12px;margin-top:30px}
-.free{margin-top:14px;font-size:15px;color:var(--ink2)}
-.phone{justify-self:center;width:min(310px,78vw);aspect-ratio:9/16;border-radius:38px;background:var(--ink);padding:10px;box-shadow:0 30px 60px rgba(19,35,58,.25);transform:rotate(-2.5deg);position:relative}
-.phone video{width:100%;height:100%;border-radius:29px;display:block;object-fit:cover;background:var(--wash)}
-.sound{position:absolute;bottom:22px;left:50%;transform:translateX(-50%);background:rgba(19,35,58,.85);color:#fff;border:0;border-radius:30px;padding:8px 16px;font:600 15px Heebo,Arial,sans-serif;cursor:pointer;white-space:nowrap}
-/* features */
-section.block{padding:76px 0}
-h2{font-weight:800;font-size:clamp(1.8rem,3.6vw,2.6rem);line-height:1.15;letter-spacing:-.3px}
-.sub{color:var(--ink2);margin-top:10px;max-width:56ch}
-.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:38px}
-.feat{border:1.5px solid var(--line);border-radius:20px;padding:22px 22px 24px;background:#fff}
-.feat h3{font-size:21px;font-weight:700;margin-top:18px}
-.feat p{color:var(--ink2);margin-top:6px;font-size:17px}
-.more{margin-top:28px;color:var(--ink2);font-size:17px;max-width:70ch}
-.mini{height:128px;border-radius:14px;background:var(--wash);position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center}
-.sheet{width:150px;height:104px;background:#fff;border-radius:8px;box-shadow:0 6px 14px rgba(19,35,58,.12);padding:14px 14px;position:relative}
-.sheet i{display:block;height:7px;border-radius:4px;background:#D3DDE9;margin-bottom:9px}
-.sheet .hl{background:var(--marker);height:11px}
-.tag{position:absolute;top:-10px;left:-12px;font:800 13px Rubik,Arial;color:#fff;padding:4px 9px;border-radius:7px}
-.chip{font:700 15px Rubik,Arial;background:#fff;border-radius:20px;padding:7px 13px;box-shadow:0 4px 10px rgba(19,35,58,.1)}
-.arrow{color:var(--sky);font:800 22px Rubik,Arial;margin:0 10px}
-.pg{width:56px;height:74px;background:#fff;border-radius:6px;box-shadow:0 5px 12px rgba(19,35,58,.14);display:grid;place-items:end center;padding-bottom:6px;font:700 15px Rubik,Arial;color:var(--sky);margin:0 4px}
-.ico{width:46px;height:46px;border-radius:14px;display:grid;place-items:center;margin:0 5px}
-/* facts */
-.facts{background:var(--ink);color:#fff;padding:44px 0}
-.facts .wrap{display:grid;grid-template-columns:repeat(3,1fr);gap:28px}
-.facts b{display:block;font-family:Rubik;font-size:21px}
-.facts span{color:#B9C8DC;font-size:16px}
-/* install */
-.inst{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:34px}
-.inst a{display:block;text-decoration:none;border-radius:20px;padding:24px;background:var(--wash);border:1.5px solid transparent;transition:border-color .15s}
-.inst a:hover{border-color:var(--sky)}
-.inst b{display:block;font-family:Rubik;font-size:21px;margin-bottom:4px}
-.inst span{color:var(--ink2);font-size:16px}
-.inst em{display:inline-block;margin-top:14px;font-style:normal;font-weight:700;color:var(--sky-d)}
+.hero{padding:40px 0 64px}
+.hero .wrap{display:grid;grid-template-columns:1.1fr .9fr;gap:48px;align-items:center}
+.hi{font-size:20px;color:var(--link)}
+h1{font-size:clamp(54px,7.2vw,96px);line-height:1;margin:8px 0 22px}
+h1 .tilt{display:inline-block;transform:rotate(-4deg);background:var(--sun);color:var(--ink);padding:0 14px;border-radius:14px}
+h1 .u svg{bottom:-14px;height:16px}
+.lead{font-size:clamp(18px,1.8vw,21px);max-width:30em;color:var(--text)}
+.ctas{display:flex;flex-wrap:wrap;gap:14px 16px;margin-top:30px}
+.free{margin-top:20px;display:inline-flex;gap:8px;align-items:center;background:var(--surface);border:2px dashed var(--mint);border-radius:12px;padding:8px 14px;font-size:16px}
+
+/* hero sheet illustration */
+.stage{position:relative;max-width:440px;width:100%;justify-self:center;padding:26px 10px 58px}
+.sheet{position:relative;background:#fff;color:var(--ink);border:3px solid var(--ink);border-radius:6px 26px 6px 6px;box-shadow:7px 7px 0 var(--shadow);padding:30px 26px 26px;transform:rotate(2deg)}
+.sheet::before{width:70px;top:-13px}
+.tag{display:inline-block;font-size:13px;font-weight:700;border:2px solid var(--ink);border-radius:8px;padding:1px 9px;direction:ltr;color:var(--ink);line-height:1.5}
+.t-pdf{background:var(--rose)}.t-doc{background:var(--sky)}.t-xls{background:var(--mint)}.t-ppt{background:var(--sun)}
+.sheet .ttl{display:block;font-family:var(--hfont);font-size:22px;margin:14px 0 12px}
+.sheet .ln{display:block;height:6px;border-radius:3px;background:var(--grid);margin:9px 0}
+@media (prefers-color-scheme:dark){.sheet .ln{background:#CBEFDD}}
+.sheet .hl{display:inline;background:linear-gradient(transparent 22%,var(--sun) 22%,var(--sun) 88%,transparent 88%);padding:0 4px;font-size:16px}
+.check{display:flex;align-items:center;gap:24px;padding-inline-start:4px;margin:18px 0 8px;font-size:16px}
+.box{position:relative;width:24px;height:24px;border:2.5px solid var(--ink);border-radius:5px;display:grid;place-items:center;flex:none}
+.box svg.v{width:18px;height:18px}
+.box svg.ring{position:absolute;width:56px;height:46px;left:-17px;top:-13px;overflow:visible}
+.sign{position:relative;margin-top:22px;padding-top:44px;border-bottom:2.5px dashed var(--ink);font-size:13px;opacity:.95}
+.sign svg{position:absolute;top:0;right:8px;width:170px;height:56px}
+.sign span{position:absolute;bottom:-24px;left:0}
+.pin{position:absolute;font-family:var(--hfont);font-size:18px;color:var(--ink);border:2.5px solid var(--ink);border-radius:14px;padding:8px 14px;box-shadow:4px 4px 0 var(--shadow);white-space:nowrap}
+.pin.p1{background:var(--rose);top:0;left:-6px;transform:rotate(-7deg)}
+.pin.p2{background:var(--sky);bottom:0;right:-8px;transform:rotate(4deg)}
+.pin.p3{background:var(--mint);bottom:36%;left:-22px;transform:rotate(5deg)}
+
+/* video */
+.vid .wrap{display:grid;grid-template-columns:1fr auto;gap:56px;align-items:center}
+.vid-txt .sub{margin-top:18px}
+.vid-txt ul{list-style:none;padding:0;margin:22px 0 0;display:grid;gap:10px}
+.vid-txt li{display:flex;gap:10px;align-items:baseline}
+.vid-txt li::before{content:"";flex:none;width:12px;height:12px;border:2.5px solid var(--ink);border-radius:50%;background:var(--sun);transform:translateY(1px)}
+.frame{position:relative;width:min(340px,82vw);background:var(--surface);border:3px solid var(--ink);border-radius:26px;box-shadow:8px 8px 0 var(--shadow);padding:12px;transform:rotate(-1.5deg)}
+@media (prefers-color-scheme:dark){.frame{border-color:var(--edge)}}
+.frame::before,.frame::after{content:"";position:absolute;top:-6px;width:84px;height:24px;background:var(--tape);border:1px solid rgba(43,22,96,.2);z-index:2}
+.frame::before{right:-24px;transform:rotate(38deg)}
+.frame::after{left:-24px;transform:rotate(-38deg)}
+.frame video{display:block;width:100%;aspect-ratio:9/16;border-radius:16px;background:#CBEFDD;object-fit:cover}
+.frame .label{position:absolute;bottom:-18px;right:24px;z-index:3}
+.sound{position:absolute;top:26px;left:50%;transform:translateX(-50%);background:var(--sun);color:var(--ink);border:2.5px solid var(--ink);border-radius:999px;padding:7px 16px;font:inherit;font-size:16px;box-shadow:3px 3px 0 var(--ink);cursor:pointer;white-space:nowrap;z-index:3}
+.sound:active{transform:translate(calc(-50% + 3px),3px);box-shadow:0 0 0 var(--ink)}
+
+/* features: stickers */
+.board{display:grid;grid-template-columns:repeat(4,1fr);gap:30px 26px;margin-top:44px}
+.sticker{position:relative;border:2.5px solid var(--ink);border-radius:16px;padding:24px 18px 20px;box-shadow:4px 4px 0 var(--shadow);color:var(--ink);transition:transform .2s}
+.sticker:hover{transform:rotate(0) scale(1.03)!important;z-index:2}
+.sticker .e{font-size:30px;display:block;line-height:1;margin-bottom:10px}
+.sticker h3{font-size:21px;margin-bottom:6px}
+.sticker p{font-size:16px;line-height:1.55}
+.sticker q{quotes:'"' '"';font-weight:700}
+.sticker:nth-child(6n+1){background:var(--sun);transform:rotate(-2.5deg)}
+.sticker:nth-child(6n+2){background:var(--rose);transform:rotate(1.8deg)}
+.sticker:nth-child(6n+3){background:var(--sky);transform:rotate(-1deg)}
+.sticker:nth-child(6n+4){background:var(--cream);transform:rotate(2.4deg)}
+.sticker:nth-child(6n+5){background:var(--mint);transform:rotate(-1.8deg)}
+.sticker:nth-child(6n+6){background:var(--lilac);transform:rotate(1.2deg)}
+.sticker.more{background:transparent!important;border-style:dashed;border-color:var(--edge);box-shadow:none;color:var(--text);display:flex;flex-direction:column;justify-content:center;gap:6px;text-decoration:none}
+.sticker.more::before{display:none}
+.sticker.more b{font-family:var(--hfont);font-weight:400;font-size:22px;color:var(--link)}
+.sticker svg.circle{position:absolute;inset:-12px;width:calc(100% + 24px);height:calc(100% + 24px);pointer-events:none;overflow:visible}
+.sticker svg.circle path{fill:none;stroke:var(--violet);stroke-width:3.5;stroke-linecap:round;stroke-dasharray:900;stroke-dashoffset:900;transition:stroke-dashoffset .6s ease}
+.sticker:hover svg.circle path{stroke-dashoffset:0}
+
+/* new design */
+.news{display:grid;grid-template-columns:repeat(3,1fr);gap:26px;margin-top:40px}
+.new{position:relative;background:var(--surface);border:2.5px solid var(--edge);border-radius:6px 22px 6px 6px;box-shadow:5px 5px 0 var(--shadow);padding:26px 22px 22px}
+.new:nth-child(1){transform:rotate(-1deg)}.new:nth-child(2){transform:rotate(1deg)}.new:nth-child(3){transform:rotate(-.6deg)}
+.num{position:absolute;top:-18px;left:18px;width:40px;height:40px;border-radius:50%;background:var(--sun);color:var(--ink);border:2.5px solid var(--ink);display:grid;place-items:center;font-family:var(--hfont);font-size:20px;box-shadow:2px 2px 0 var(--shadow)}
+.new h3{font-size:23px;margin-bottom:8px}
+.new p{color:var(--soft);font-size:17px}
+.mini{margin-top:18px;height:92px;border-radius:14px;display:flex;align-items:center;justify-content:center;gap:10px;background:var(--paper);border:2px dashed var(--grid)}
+@media (prefers-color-scheme:dark){.mini{border-color:rgba(217,200,255,.18)}}
+.mini.dz{border:3px dashed var(--violet);flex-direction:column;gap:4px;font-size:14px}
+.mini.dz svg{width:34px;height:34px;color:var(--violet)}
+@media (prefers-color-scheme:dark){.mini.dz svg{color:var(--logo)}}
+.mini .st{width:44px;height:44px;border:2px solid var(--ink);border-radius:9px;box-shadow:2px 2px 0 var(--shadow);display:grid;place-items:center;font-size:20px}
+.mini .st:nth-child(1){background:var(--sun);transform:rotate(-6deg)}.mini .st:nth-child(2){background:var(--rose);transform:rotate(4deg)}.mini .st:nth-child(3){background:var(--sky);transform:rotate(-3deg)}.mini .st:nth-child(4){background:var(--mint);transform:rotate(5deg)}
+.mini .fc{width:54px;height:66px;background:#fff;border:2px solid var(--ink);border-radius:4px 12px 4px 4px;box-shadow:2px 2px 0 var(--shadow);padding:6px;display:flex;flex-direction:column;gap:5px}
+.mini .fc:nth-child(odd){transform:rotate(-4deg)}.mini .fc:nth-child(even){transform:rotate(3deg)}
+.mini .fc i{display:block;height:4px;border-radius:2px;background:#CBEFDD}.mini .fc i:first-child{height:9px;width:60%;border-radius:3px}
+.mini .fc:nth-child(1) i:first-child{background:var(--rose)}.mini .fc:nth-child(2) i:first-child{background:var(--sky)}.mini .fc:nth-child(3) i:first-child{background:var(--mint)}
+
+/* who */
+.who{display:grid;grid-template-columns:repeat(4,1fr);gap:22px;margin-top:40px}
+.who div{background:var(--surface);border:2.5px solid var(--edge);border-radius:18px;padding:20px 18px;box-shadow:4px 4px 0 var(--shadow)}
+.who b{display:block;font-family:var(--hfont);font-weight:400;font-size:22px;margin-bottom:4px}
+.who b span{display:inline-block;width:14px;height:14px;border-radius:4px;border:2px solid var(--ink);margin-inline-end:8px;transform:rotate(-8deg)}
+.who p{color:var(--soft);font-size:16px}
+
+/* everywhere */
+.chips{display:flex;flex-wrap:wrap;gap:12px;margin-top:30px}
+.chip{display:inline-flex;align-items:center;gap:8px;background:var(--surface);border:2.5px solid var(--edge);border-radius:999px;padding:7px 16px;font-size:16px;box-shadow:2px 2px 0 var(--shadow)}
+.chip .tag{font-size:12px}
+.inst{display:grid;grid-template-columns:repeat(3,1fr);gap:26px;margin-top:42px}
+.inst a{position:relative;display:flex;flex-direction:column;gap:6px;text-decoration:none;color:var(--ink);border:2.5px solid var(--ink);border-radius:18px;padding:26px 22px 22px;box-shadow:5px 5px 0 var(--shadow);transition:transform .15s,box-shadow .15s}
+.inst a:nth-child(1){background:var(--sky);transform:rotate(-1.2deg)}
+.inst a:nth-child(2){background:var(--lilac);transform:rotate(1deg)}
+.inst a:nth-child(3){background:var(--mint);transform:rotate(-.8deg)}
+.inst a:hover{transform:rotate(0) translate(-2px,-2px);box-shadow:7px 7px 0 var(--shadow)}
+.inst a:active{transform:translate(4px,4px);box-shadow:0 0 0 var(--shadow)}
+.inst svg{width:34px;height:34px}
+.inst b{font-family:var(--hfont);font-weight:400;font-size:24px}
+.inst span{font-size:16px}
+.inst em{font-style:normal;margin-top:auto;padding-top:10px;font-weight:700;text-decoration:underline;text-underline-offset:4px}
+
+/* faq */
+.faq{max-width:780px;margin-top:36px;display:grid;gap:16px}
+.faq details{background:var(--surface);border:2.5px solid var(--edge);border-radius:16px;box-shadow:4px 4px 0 var(--shadow)}
+.faq summary{cursor:pointer;list-style:none;padding:16px 20px;font-family:var(--hfont);font-size:21px;display:flex;justify-content:space-between;gap:12px;align-items:center}
+.faq summary::-webkit-details-marker{display:none}
+.faq summary::after{content:"+";flex:none;width:32px;height:32px;border-radius:50%;background:var(--sun);color:var(--ink);border:2px solid var(--ink);display:grid;place-items:center;font-family:"SF-rubik",Arial,sans-serif;font-size:22px;line-height:1;transition:transform .2s}
+.faq details[open] summary::after{transform:rotate(45deg)}
+.faq details p{padding:0 20px 18px;color:var(--soft)}
+
 /* final */
-.final{background:var(--marker);padding:70px 0;text-align:center}
-.final h2{max-width:20ch;margin:0 auto}
-.final p{margin:12px auto 26px;color:#3a3200;max-width:44ch}
-footer{padding:30px 0 calc(30px + env(safe-area-inset-bottom,0px));font-size:15px;color:var(--ink2)}
-footer .wrap{display:flex;flex-wrap:wrap;gap:12px 28px;justify-content:space-between}
-footer a{color:var(--sky-d)}
-@media (max-width:860px){
- .hero{padding-top:30px}
- .hero .wrap{grid-template-columns:1fr;gap:40px}
- .grid,.inst{grid-template-columns:1fr 1fr}
- .facts .wrap{grid-template-columns:1fr;gap:18px}
+.final{padding:40px 0 80px}
+.final-card{position:relative;max-width:860px;margin:0 auto;text-align:center;background:var(--sun);color:var(--ink);border:3px solid var(--ink);border-radius:8px 30px 8px 8px;box-shadow:8px 8px 0 var(--shadow);padding:52px 28px 46px;transform:rotate(-1deg)}
+.final-card::before{width:80px;top:-13px}
+.final-card h2{max-width:16em;margin:0 auto}
+.final-card p{max-width:36em;margin:14px auto 28px}
+.final-card .btn-main{box-shadow:6px 6px 0 var(--ink)}
+
+footer{padding:10px 0 calc(34px + env(safe-area-inset-bottom,0px));font-size:15px;color:var(--soft)}
+footer .wrap{display:flex;flex-wrap:wrap;gap:10px 26px;align-items:center;border-top:2.5px dashed var(--grid);padding-top:24px}
+@media (prefers-color-scheme:dark){footer .wrap{border-color:rgba(217,200,255,.2)}}
+footer .brand{font-family:var(--hfont);font-size:20px;color:var(--text)}
+footer nav{display:flex;flex-wrap:wrap;gap:8px 20px}
+
+/* responsive */
+@media (max-width:1100px){.board{grid-template-columns:repeat(3,1fr)}}
+@media (max-width:900px){
+  .hero .wrap{grid-template-columns:1fr;gap:34px}
+  .hero{padding-top:24px}
+  .stage{max-width:400px}
+  .vid .wrap{grid-template-columns:1fr;gap:40px}
+  .frame{justify-self:center}
+  .board{grid-template-columns:repeat(2,1fr);gap:26px 20px}
+  .news,.inst{grid-template-columns:1fr;max-width:520px}
+  .who{grid-template-columns:repeat(2,1fr)}
 }
+@media (max-width:700px){.nav a:not(.btn){display:none}}
 @media (max-width:560px){
- body{font-size:17px}
- .grid,.inst{grid-template-columns:1fr}
- .top .btn-sm{padding:8px 12px;font-size:15px}
- .ctas .btn{flex:1 1 100%}
- section.block{padding:58px 0}
+  body{font-size:17px}
+  section{padding:56px 0}
+  .ctas .btn{flex:1 1 100%}
+  .board{grid-template-columns:1fr;gap:24px}
+  .sticker{padding:22px 18px 18px}
+  .pin{font-size:16px;padding:6px 11px}
+  .pin.p3{left:-6px}
+  .sheet{padding:26px 18px 22px}
+  .who{grid-template-columns:1fr}
+  .final-card{padding:44px 20px 38px}
 }
-@media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{transition:none!important;animation:none!important}
+  html{scroll-behavior:auto}
+  .sticker svg.circle{display:none}
+}
 </style>
 </head>
 <body>
-<header class="top"><div class="wrap">
- <a class="brand" href="#"><span class="logo" aria-hidden="true">ס</span>סימן</a>
- <a class="btn btn-main btn-sm" href="https://siman.siman-app.workers.dev/">לפתוח את סימן</a>
-</div></header>
+<header class="wrap head">
+  <a class="logo" href="#top" aria-label="סימן, לראש הדף">סימן</a>
+  <span class="ver ltr">5.9.5</span>
+  <nav class="nav" aria-label="ניווט בדף">
+    <a href="#video">סרטון</a>
+    <a href="#features">מה עושים</a>
+    <a href="#faq">שאלות</a>
+    <a class="btn btn-main btn-sm" href="https://siman.siman-app.workers.dev/">פותחים את סימן</a>
+  </nav>
+</header>
 
-<main>
-<section class="hero"><div class="wrap">
- <div>
-  <h1>כל מה שעושים עם מסמך, באפליקציה אחת.</h1>
-  <p class="lead">חותמים, מסמנים, מתקנים, מתרגמים, מתמללים ושולחים. PDF, וורד, אקסל ופאוורפוינט, בעברית מלאה, בטלפון ובמחשב.</p>
-  <div class="verbs" aria-label="מה עושים בסימן"><span>חתימה</span><span>מילוי טפסים</span><span>מרקר והערות</span><span>תיקון טקסט</span><span>תרגום</span><span>איחוד ופיצול</span><span>תמלול שיחות</span><span>צילום למסמך</span><span>PDF לוורד</span><span>שליחה בוואטסאפ</span></div>
-  <div class="ctas">
-   <a class="btn btn-main" href="https://siman.siman-app.workers.dev/">לפתוח את סימן בחינם</a>
-   <a class="btn btn-soft" href="#install">להתקנה בטלפון או במחשב</a>
+<main id="top">
+<!-- 1. hero -->
+<section class="hero">
+  <div class="wrap">
+    <div>
+      <p class="hi">היי, זה סימן 👋</p>
+      <h1>מה <span class="tilt">נסמן</span><br><span class="u">היום?<svg viewBox="0 0 200 14" preserveAspectRatio="none" aria-hidden="true"><path d="M3 9 C 50 2, 120 14, 197 5" stroke="var(--rose)"/></svg></span></h1>
+      <p class="lead">פותחים PDF, וורד, אקסל או מצגת, ואז מסמנים, חותמים, מתרגמים ושולחים. בטלפון ובמחשב, והקובץ נשאר אצלכם.</p>
+      <div class="ctas">
+        <a class="btn btn-main" href="https://siman.siman-app.workers.dev/">פותחים את סימן ✦</a>
+        <a class="btn btn-soft" href="#install">להתקנה בטלפון או במחשב</a>
+      </div>
+      <p class="free">🔖 בחינם כרגע, עם כל היכולות. בלי כרטיס אשראי.</p>
+    </div>
+
+    <div class="stage" aria-hidden="true">
+      <div class="sheet taped">
+        <span class="tag t-pdf">PDF</span>
+        <span class="ttl">אישור השתתפות בטיול</span>
+        <span class="ln"></span><span class="ln" style="width:82%"></span>
+        <span class="hl">יש להחזיר עד יום חמישי</span>
+        <span class="ln" style="width:64%"></span>
+        <span class="check"><span class="box"><svg class="v" viewBox="0 0 24 24"><path d="M4 13l5 5L20 6" fill="none" stroke="#6B2BD9" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg><svg class="ring" viewBox="0 0 56 46"><path d="M30 3 C 48 2, 55 14, 53 25 C 51 38, 36 44, 24 43 C 10 42, 2 33, 3 22 C 4 11, 14 4, 34 6" fill="none" stroke="#6B2BD9" stroke-width="2.6" stroke-linecap="round"/></svg></span>מאשרים את ההשתתפות</span>
+        <div class="sign"><svg viewBox="0 0 300 100"><path d="M14 70 C 30 20, 46 18, 50 52 S 66 90, 80 50 S 104 18, 112 54 C 118 80, 130 74, 140 48 C 150 26, 160 40, 158 60 C 156 78, 176 72, 190 46 S 220 30, 230 56 C 236 70, 252 66, 286 40" fill="none" stroke="#2B1660" stroke-width="6" stroke-linecap="round"/></svg><span>חתימה</span></div>
+      </div>
+      <span class="pin p1">נחתם ✓</span>
+      <span class="pin p3">🎙️ לתמלל</span>
+      <span class="pin p2">שלום ← <span class="ltr">Hello</span></span>
+    </div>
   </div>
-  <p class="free">כרגע בחינם, עם כל היכולות. בלי כרטיס אשראי.</p>
- </div>
- <div class="phone">
-  <video id="vid" src="siman-video-593.mp4" poster="siman-video-593.jpg" autoplay muted loop playsinline preload="metadata" aria-label="סרטון הדגמה של סימן, כדקה"></video>
-  <button class="sound" id="sound" type="button">להפעלה עם סאונד</button>
- </div>
-</div></section>
+</section>
 
-<section class="block" id="features"><div class="wrap">
- <h2>כל מה שסימן יודע לעשות</h2>
- <p class="sub">כל מה שהייתם מדפיסים, סורקים, מקלידים מחדש או שולחים למישהו אחר לסדר, עושים עכשיו לבד, מהטלפון או מהמחשב.</p>
- <div class="grid">
-  <article class="feat">
-   <div class="mini"><div class="sheet"><i></i><i style="width:70%"></i><svg viewBox="0 0 300 100" width="118" height="40" aria-hidden="true"><path d="M14 70 C 30 20, 46 18, 50 52 S 66 90, 80 50 S 104 18, 112 54 C 118 80, 130 74, 140 48 C 150 26, 160 40, 158 60 C 156 78, 176 72, 190 46 S 220 30, 230 56 C 236 70, 252 66, 286 40" fill="none" stroke="#13233A" stroke-width="7" stroke-linecap="round"/></svg></div></div>
-   <h3>חותמים וממלאים טפסים</h3><p>ממלאים שדות, מסמנים וי וחותמים באצבע או בעכבר. סימן מוצא לבד בטופס את תיבות הסימון ואת המקומות לשם ולחתימה. בלי מדפסת ובלי סורק.</p>
-  </article>
-  <article class="feat">
-   <div class="mini"><div style="text-align:center"><div class="chip">חתמו <b style="color:var(--green)">26</b> מתוך 28</div><div style="width:150px;height:9px;border-radius:5px;background:#fff;margin:12px auto 0;overflow:hidden"><i style="display:block;width:93%;height:100%;background:var(--green)"></i></div></div></div>
-   <h3>אוספים חתימות בקישור</h3><p>קישור אישי לכל חותם, או קישור אחד לכל הקבוצה, למשל להורים בכיתה. החותמים ממלאים, מסמנים וי וחותמים מהטלפון, ואתם רואים מי כבר חתם.</p>
-  </article>
-  <article class="feat">
-   <div class="mini"><div class="sheet"><i></i><i class="hl"></i><i style="width:60%"></i><i></i><svg style="position:absolute;top:44px;right:30px" width="64" height="26" aria-hidden="true"><ellipse cx="32" cy="13" rx="29" ry="10" fill="none" stroke="#D9443A" stroke-width="3"/></svg></div></div>
-   <h3>מסמנים, כותבים ומתקנים</h3><p>מרקר, עט והערות בעברית. משנים מילה או מספר, והטקסט המקורי באמת מוחלף.</p>
-  </article>
-  <article class="feat">
-   <div class="mini"><span class="chip">שלום</span><span class="arrow" aria-hidden="true">←</span><span class="chip" dir="ltr">Hello</span><span class="chip" dir="ltr" style="margin-right:6px">Привет</span></div>
-   <h3>מתרגמים ושומרים על העיצוב</h3><p>לעברית, לאנגלית, לרוסית, לערבית, לצרפתית ולספרדית. התרגום נכנס למקום המקורי, והעיצוב נשאר.</p>
-  </article>
-  <article class="feat">
-   <div class="mini"><div style="display:flex;align-items:center;gap:3px;height:46px"><i style="display:block;width:5px;height:12px;border-radius:3px;background:var(--sky)"></i><i style="display:block;width:5px;height:26px;border-radius:3px;background:var(--sky)"></i><i style="display:block;width:5px;height:40px;border-radius:3px;background:var(--sky)"></i><i style="display:block;width:5px;height:22px;border-radius:3px;background:var(--sky)"></i><i style="display:block;width:5px;height:34px;border-radius:3px;background:var(--sky)"></i><i style="display:block;width:5px;height:16px;border-radius:3px;background:var(--sky)"></i><i style="display:block;width:5px;height:44px;border-radius:3px;background:var(--sky)"></i><i style="display:block;width:5px;height:28px;border-radius:3px;background:var(--sky)"></i><i style="display:block;width:5px;height:18px;border-radius:3px;background:var(--sky)"></i><i style="display:block;width:5px;height:36px;border-radius:3px;background:var(--sky)"></i><i style="display:block;width:5px;height:24px;border-radius:3px;background:var(--sky)"></i><i style="display:block;width:5px;height:14px;border-radius:3px;background:var(--sky)"></i><i style="display:block;width:5px;height:30px;border-radius:3px;background:var(--sky)"></i><i style="display:block;width:5px;height:42px;border-radius:3px;background:var(--sky)"></i><i style="display:block;width:5px;height:20px;border-radius:3px;background:var(--sky)"></i><i style="display:block;width:5px;height:12px;border-radius:3px;background:var(--sky)"></i></div><span class="arrow" aria-hidden="true">←</span><span class="chip">התמליל</span></div>
-   <h3>מתמללים שיחות והקלטות</h3><p>שיחות, שיעורים, ישיבות והודעות קוליות מוואטסאפ. הדוברים מופרדים, והתמליל נפתח כקובץ וורד. ההקלטה לא יוצאת מהמכשיר.</p>
-  </article>
-  <article class="feat">
-   <div class="mini"><div class="sheet" style="width:84px;height:100px;background:#EDE5D3;transform:rotate(-8deg)"><i style="background:#8b826f"></i><i style="background:#8b826f;width:70%"></i><i style="background:#8b826f"></i></div><span class="arrow" aria-hidden="true">←</span><div class="sheet" style="width:84px;height:100px"><span class="tag" style="background:#2B5CC9">וורד</span><i></i><i style="width:70%"></i><i></i></div></div>
-   <h3>מצלמים דף ומקבלים מסמך</h3><p>צילום או סריקה של דף, מודפס או כתוב, הופכים למסמך וורד או PDF מסודר. זיהוי טקסט בעברית ובאנגלית.</p>
-  </article>
-  <article class="feat">
-   <div class="mini"><div class="chip" style="max-width:190px;line-height:1.4">עד מתי צריך להגיש?</div></div>
-   <h3>שואלים את המסמך</h3><p>עוזר חכם עונה על שאלות עם הפניה לסעיף, ומקריא את המסמך בקול.</p>
-  </article>
-  <article class="feat">
-   <div class="mini"><span class="tag" style="position:static;background:#2B5CC9;margin:0 4px">וורד</span><span class="tag" style="position:static;background:#1E8A4C;margin:0 4px">אקסל</span><span class="tag" style="position:static;background:#C2410C;margin:0 4px">פאוורפוינט</span></div>
-   <h3>וורד, אקסל ופאוורפוינט</h3><p>עורכים קבצי אופיס, ממיינים ומסננים טבלאות, ואומרים לעוזר מה לעשות, בכתיבה או בקול: "הכן לי כותרת" או "סדר את הטבלה לפי מק״ט". בטלפון הטקסט נשבר לרוחב המסך, נוח לקריאה ולכתיבה. מצגת שלא נפתחת? סימן מנסה לתקן אותה.</p>
-  </article>
-  <article class="feat">
-   <div class="mini"><div class="sheet" style="width:92px"><span class="tag" style="background:var(--red)">PDF</span><i></i><i></i><i style="width:60%"></i></div><span class="arrow" aria-hidden="true">←</span><div class="sheet" style="width:92px"><span class="tag" style="background:#2B5CC9">וורד</span><i></i><i></i><i style="width:60%"></i></div></div>
-   <h3>ממירים PDF לקבצים עריכים</h3><p>לוורד, לאקסל או לפאוורפוינט, ובוחרים בדיוק אילו עמודים להמיר.</p>
-  </article>
-  <article class="feat">
-   <div class="mini"><div class="pg">1</div><div class="pg" style="transform:translateY(-12px) rotate(-4deg)">4</div><div class="pg">2</div><div class="pg">3</div></div>
-   <h3>מאחדים, מפצלים ומסדרים</h3><p>גוררים עמודים, מסובבים ומוחקים. מחברים כמה קבצים לאחד בסדר שבוחרים, ומפצלים קובץ גדול: כל עמוד לקובץ, לפי טווחי עמודים או כל כמה עמודים, עם שמות שנוצרים לבד.</p>
-  </article>
-  <article class="feat">
-   <div class="mini"><div class="sheet"><i></i><i style="background:#13233A;height:11px;width:65%"></i><i></i><i style="width:55%"></i></div></div>
-   <h3>משחירים, מוסיפים תמונות ומדפיסים</h3><p>מסתירים פרטים רגישים, מוסיפים תמונות, מעתיקים אזור ממסמך אחד ומדביקים באחר.</p>
-  </article>
-  <article class="feat">
-   <div class="mini"><span class="ico" style="background:#25D366"><svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18l1.3-3.6A8 8 0 1 1 8.6 19z" fill="#fff"/></svg></span><span class="ico" style="background:var(--sky)"><svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2" fill="#fff"/><path d="M3.5 7l8.5 6 8.5-6" stroke="#2B8FE8" stroke-width="1.8" fill="none"/></svg></span><span class="ico" style="background:#F3A13A"><svg width="28" height="28" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 18a4.5 4.5 0 0 1-.6-9A6 6 0 0 1 18 9.5 4.3 4.3 0 0 1 17.5 18z" fill="#fff"/></svg></span></div>
-   <h3>שולחים ושומרים</h3><p>בוואטסאפ ובמייל, ל־Google Drive ול־iCloud, ב־AirDrop וב־Quick Share. ישר מתוך האפליקציה.</p>
-  </article>
- </div>
- <p class="more">ועוד: שמירה אוטומטית של הטיוטה והמשך מאיפה שהפסקתם, קבצים אחרונים במסך הפתיחה, כמה מסמכים פתוחים במקביל בלשוניות, פעולות על כמה קבצים בבת אחת, ביטול ו״בצע שוב״, תפריט נגישות, ממשק בעברית, ערבית, רוסית ואנגלית, מצב בהיר או כהה ובחירת צבע לאפליקציה.</p>
-</div></section>
+<!-- 2. video -->
+<section class="vid" id="video">
+  <div class="wrap">
+    <div class="vid-txt">
+      <div class="sec-h"><h2>ככה זה <span class="u">נראה<svg viewBox="0 0 200 14" preserveAspectRatio="none" aria-hidden="true"><path d="M3 9 C 50 2, 120 14, 197 5" stroke="var(--mint)"/></svg></span></h2></div>
+      <p class="sub">דקה אחת, וכבר רואים איך עובדים עם סימן בטלפון: פותחים קובץ, עובדים עליו ושולחים.</p>
+      <ul>
+        <li>מסמנים וכותבים על המסמך</li>
+        <li>חותמים באצבע</li>
+        <li>שולחים בוואטסאפ או במייל</li>
+      </ul>
+    </div>
+    <div class="frame">
+      <video id="vid" src="siman-video-593.mp4" poster="siman-video-593.jpg" controls muted loop playsinline preload="metadata" aria-label="סרטון הדגמה של סימן, כדקה"></video>
+      <button class="sound" id="sound" type="button">🔊 להפעלה עם סאונד</button>
+      <span class="label">סרטון של דקה</span>
+    </div>
+  </div>
+</section>
 
-<section class="facts" aria-label="עוד על סימן"><div class="wrap">
- <div><b>PDF, וורד, אקסל ופאוורפוינט</b><span>וגם קובצי שמע, וידאו ותמונות. הכול נפתח באותה אפליקציה.</span></div>
- <div><b>עברית מלאה</b><span>ממשק, גופנים וכיווניות בעברית, בלי טקסט הפוך.</span></div>
- <div><b>הקובץ נשאר אצלכם</b><span>סימון, עריכה וחתימה נעשים במכשיר שלכם, וגם התמלול: ההקלטה לא יוצאת ממנו.</span></div>
-</div></section>
+<!-- 3. features -->
+<section id="features">
+  <div class="wrap">
+    <div class="sec-h"><h2>מה עושים <span class="u">בסימן<svg viewBox="0 0 200 14" preserveAspectRatio="none" aria-hidden="true"><path d="M3 9 C 50 2, 120 14, 197 5" stroke="var(--violet)"/></svg></span></h2></div>
+    <p class="sub">כל מה שהייתם מדפיסים, סורקים או מקלידים מחדש. עכשיו עושים את זה לבד, מהטלפון או מהמחשב.</p>
+    <div class="board">
+      <article class="sticker taped"><span class="e" aria-hidden="true">✍️</span><h3>ממלאים וחותמים</h3><p>סימן מוצא לבד בטופס את תיבות הסימון ואת המקומות לחתימה. חותמים באצבע או בעכבר.</p></article>
+      <article class="sticker taped"><span class="e" aria-hidden="true">👥</span><h3>חתימות מכל הקבוצה</h3><p>קישור אחד לכל הקבוצה, למשל להורים בכיתה. רואים מי כבר חתם ומי עוד לא.</p></article>
+      <article class="sticker taped"><span class="e" aria-hidden="true">🖍️</span><h3>מסמנים ומתקנים</h3><p>מרקר, עט והערות. משנים מילה או מספר בתוך הקובץ, והטקסט המקורי באמת מתחלף.</p></article>
+      <article class="sticker taped"><span class="e" aria-hidden="true">🌍</span><h3>מתרגמים לשש שפות</h3><p>עברית, אנגלית, ערבית, רוסית, צרפתית וספרדית. העיצוב נשאר, גם בוורד, באקסל ובפאוורפוינט.</p></article>
+      <article class="sticker taped"><span class="e" aria-hidden="true">🎙️</span><h3>מתמללים</h3><p>שיחות, שיעורים והודעות קוליות הופכים לטקסט. ההקלטה לא יוצאת מהמכשיר.</p></article>
+      <article class="sticker taped"><span class="e" aria-hidden="true">📷</span><h3>מצלמים דף</h3><p>מצלמים דף מודפס או כתוב, ומקבלים מסמך שאפשר לערוך.</p></article>
+      <article class="sticker taped"><span class="e" aria-hidden="true">💬</span><h3>שואלים את המסמך</h3><p>שואלים שאלה ומקבלים תשובה מתוך המסמך. אפשר גם לבקש שיקריא בקול.</p></article>
+      <article class="sticker taped"><span class="e" aria-hidden="true">📊</span><h3>וורד, אקסל ומצגות</h3><p>עורכים את הקובץ ואומרים לעוזר מה לעשות, למשל <q>סדר את הטבלה לפי מק״ט</q>.</p></article>
+      <article class="sticker taped"><span class="e" aria-hidden="true">✂️</span><h3>מאחדים, מפצלים, ממירים</h3><p>מחברים קבצים, מפצלים לפי טווחי עמודים, וממירים PDF לוורד, לאקסל או לפאוורפוינט.</p></article>
+      <article class="sticker taped"><span class="e" aria-hidden="true">📤</span><h3>שולחים בלחיצה</h3><p>בוואטסאפ, במייל או לענן, ישר מתוך סימן.</p></article>
+      <article class="sticker taped"><span class="e" aria-hidden="true">💾</span><h3>שום דבר לא הולך לאיבוד</h3><p>הטיוטה נשמרת לבד. חוזרים וממשיכים מאיפה שעצרתם, והקבצים האחרונים מחכים במסך הבית.</p></article>
+      <a class="sticker more" href="about.html"><b>ויש עוד ←</b><span>המדריך המלא והסרטון הארוך</span></a>
+    </div>
+  </div>
+</section>
 
-<section class="block" id="install"><div class="wrap">
- <h2>מתקינים בפחות מדקה</h2>
- <p class="sub">סימן עובד גם ישר מהדפדפן. מי שמתקין מקבל אייקון משלו וחלון נפרד, והעדכונים מגיעים לבד.</p>
- <div class="inst">
-  <a href="https://siman.siman-app.workers.dev/install.html"><b>בטלפון</b><span>אנדרואיד ואייפון. הדף מזהה את הטלפון ומראה מה ללחוץ.</span><br><em>להתקנה בטלפון</em></a>
-  <a href="https://apps.microsoft.com/detail/9NWJTDTM2JJX?hl=he&amp;gl=IL"><b>במחשב Windows</b><span>מורידים מ־Microsoft Store, כמו כל תוכנה.</span><br><em>ל־Microsoft Store</em></a>
-  <a href="https://siman.siman-app.workers.dev/"><b>בכל דפדפן</b><span>גם במק ובכל מחשב אחר. בלי התקנה בכלל.</span><br><em>לפתוח את סימן</em></a>
- </div>
-</div></section>
+<!-- 4. new design -->
+<section id="new">
+  <div class="wrap">
+    <div class="sec-h"><h2>חדש <span class="u">בעיצוב<svg viewBox="0 0 200 14" preserveAspectRatio="none" aria-hidden="true"><path d="M3 9 C 50 2, 120 14, 197 5" stroke="var(--sun)"/></svg></span></h2><span class="label">מסך בית חדש</span></div>
+    <figure class="shots">
+      <div class="win"><div class="bar" aria-hidden="true"><i></i><i></i><i></i></div><img src="siman-595-desktop.png" width="1920" height="1080" loading="lazy" alt="מסך הבית החדש של סימן במחשב: למעלה הלוגו, החיפוש וההגדרות, מתחת קלמר הכלים, ובמסך עצמו הכותרת 'מה נסמן היום?', אזור גרירה ומדבקות של כל הפעולות"></div>
+      <div class="ph"><img src="siman-595-phone.png" width="1170" height="2532" loading="lazy" alt="מסך הבית החדש של סימן בטלפון, עם כפתור פתיחה וכפתור הדבקה"></div>
+      <figcaption>ככה נראית סימן עכשיו, במחשב ובטלפון</figcaption>
+    </figure>
+    <div class="news">
+      <div class="new">
+        <span class="num">1</span>
+        <h3>גוררים או מדביקים</h3>
+        <p>גוררים קובץ למסך הבית, או מדביקים אותו: <kbd>Ctrl V</kbd> במחשב, וכפתור "הדבקה" בטלפון.</p>
+        <div class="mini dz" aria-hidden="true"><svg viewBox="0 0 40 40"><path d="M10 4h14l8 8v24H10z" fill="#fff" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/><path d="M24 4v8h8" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/><path d="M21 17v11M16.5 23.5L21 28l4.5-4.5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>משחררים כאן</div>
+      </div>
+      <div class="new">
+        <span class="num">2</span>
+        <h3>כל הכלים על מסך אחד</h3>
+        <p>לסמן, לחתום, לתרגם, לתמלל. כל כלי הוא מדבקה, ולוחצים על מה שצריך.</p>
+        <div class="mini" aria-hidden="true"><span class="st">🖍️</span><span class="st">✍️</span><span class="st">🌍</span><span class="st">🎙️</span></div>
+      </div>
+      <div class="new">
+        <span class="num">3</span>
+        <h3>ממשיכים מאיפה שעצרנו</h3>
+        <p>הקבצים האחרונים מחכים בשורה אחת במסך הבית. לחיצה, וחוזרים לעבוד.</p>
+        <div class="mini" aria-hidden="true"><span class="fc"><i></i><i></i><i></i></span><span class="fc"><i></i><i></i><i></i></span><span class="fc"><i></i><i></i><i></i></span></div>
+      </div>
+    </div>
+  </div>
+</section>
 
-<section class="final"><div class="wrap">
- <h2>המסמך הבא כבר לא יחכה למדפסת</h2>
- <p>כרגע בחינם עם כל היכולות, בכפוף לתנאי השימוש. כשנוסיף מסלול בתשלום, נודיע מראש במייל.</p>
- <a class="btn btn-main" href="https://siman.siman-app.workers.dev/">לפתוח את סימן בחינם</a>
-</div></section>
+<!-- 5. who -->
+<section id="who">
+  <div class="wrap">
+    <div class="sec-h"><h2>למי זה <span class="u">מתאים<svg viewBox="0 0 200 14" preserveAspectRatio="none" aria-hidden="true"><path d="M3 9 C 50 2, 120 14, 197 5" stroke="var(--rose)"/></svg></span></h2></div>
+    <div class="who">
+      <div><b><span style="background:var(--sun)"></span>מורים וגננות</b><p>אישור טיול לכל ההורים בקישור אחד, ורואים מי כבר חתם.</p></div>
+      <div><b><span style="background:var(--rose)"></span>הורים</b><p>טופס מבית הספר נחתם מהטלפון, בלי להדפיס ובלי לסרוק.</p></div>
+      <div><b><span style="background:var(--sky)"></span>משרדים ועסקים</b><p>חוזים, הצעות מחיר וטבלאות. ממלאים, מתקנים ושולחים.</p></div>
+      <div><b><span style="background:var(--mint)"></span>סטודנטים</b><p>מתמללים שיעור, מסמנים את הסיכום ושואלים את החומר.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 6. everywhere + install -->
+<section id="install">
+  <div class="wrap">
+    <div class="sec-h"><h2>עובד בכל <span class="u">מקום<svg viewBox="0 0 200 14" preserveAspectRatio="none" aria-hidden="true"><path d="M3 9 C 50 2, 120 14, 197 5" stroke="var(--sky)"/></svg></span></h2></div>
+    <p class="sub">סימן עובד ישר מהדפדפן. מי שמתקין מקבל אייקון משלו וחלון נפרד, והעדכונים מגיעים לבד.</p>
+    <div class="chips">
+      <span class="chip"><span class="tag t-pdf">PDF</span><span class="tag t-doc">Word</span><span class="tag t-xls">Excel</span><span class="tag t-ppt">PowerPoint</span></span>
+      <span class="chip">עברית מלאה, בלי טקסט הפוך</span>
+      <span class="chip">📱 טלפון ומחשב</span>
+      <span class="chip">🌗 בהיר או כהה</span>
+      <span class="chip">♿ תפריט נגישות</span>
+    </div>
+    <div class="inst">
+      <a href="https://apps.microsoft.com/detail/9NWJTDTM2JJX?hl=he&amp;gl=IL">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5.5l7.5-1v7H3zM11.5 4.3L21 3v8.5h-9.5zM3 12.5h7.5v7L3 18.5zM11.5 12.5H21V21l-9.5-1.3z" fill="#2B1660"/></svg>
+        <b>Windows</b><span>מורידים מ־Microsoft Store, כמו כל תוכנה.</span><em>ל־Microsoft Store</em>
+      </a>
+      <a href="https://siman.siman-app.workers.dev/">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2" fill="none" stroke="#2B1660" stroke-width="2.2"/><path d="M8 20h8M12 16v4" stroke="#2B1660" stroke-width="2.2" stroke-linecap="round"/></svg>
+        <b>Mac וכל מחשב</b><span>פותחים בדפדפן, בלי התקנה בכלל. ב־Chrome או ב־Edge אפשר גם להתקין כאפליקציה.</span><em>לפתוח את סימן</em>
+      </a>
+      <a href="https://siman.siman-app.workers.dev/install.html">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="2.5" width="12" height="19" rx="2.5" fill="none" stroke="#2B1660" stroke-width="2.2"/><path d="M10.5 18.5h3" stroke="#2B1660" stroke-width="2.2" stroke-linecap="round"/></svg>
+        <b>אנדרואיד ואייפון</b><span>הדף מזהה את הטלפון ומראה מה ללחוץ.</span><em>להתקנה בטלפון</em>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- 7. faq -->
+<section id="faq">
+  <div class="wrap">
+    <div class="sec-h"><h2>שאלות <span class="u">קצרות<svg viewBox="0 0 200 14" preserveAspectRatio="none" aria-hidden="true"><path d="M3 9 C 50 2, 120 14, 197 5" stroke="var(--mint)"/></svg></span></h2></div>
+    <div class="faq">
+      <details>
+        <summary>הקבצים שלי עולים לאיזשהו מקום?</summary>
+        <p>הקובץ נשאר אצלכם. סימון, עריכה וחתימה נעשים במכשיר שלכם, וגם התמלול: ההקלטה לא יוצאת ממנו. כל הפרטים ב<a href="privacy.html">מדיניות הפרטיות</a>.</p>
+      </details>
+      <details>
+        <summary>כמה זה עולה?</summary>
+        <p>כרגע בחינם, עם כל היכולות, בכפוף ל<a href="terms.html">תנאי השימוש</a>. כשנוסיף מסלול בתשלום, נודיע מראש במייל.</p>
+      </details>
+      <details>
+        <summary>אילו קבצים אפשר לפתוח?</summary>
+        <p>PDF, וורד (גם קובצי DOC ישנים), אקסל ופאוורפוינט. וגם תמונות, קובצי שמע ווידאו. הכול נפתח באותה אפליקציה.</p>
+      </details>
+      <details>
+        <summary>צריך להתקין? זה עובד בלי אינטרנט?</summary>
+        <p>לא חייבים להתקין, סימן עובד ישר מהדפדפן. אחרי הפתיחה הראשונה הוא נפתח גם בלי חיבור. מי שרוצה אייקון משלו יכול <a href="#install">להתקין בטלפון או במחשב</a>.</p>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- 8. final -->
+<section class="final">
+  <div class="wrap">
+    <div class="final-card taped">
+      <h2>המסמך הבא כבר לא יחכה למדפסת</h2>
+      <p>כרגע בחינם עם כל היכולות. פותחים, מסמנים, וזהו.</p>
+      <a class="btn btn-main" href="https://siman.siman-app.workers.dev/">פותחים את סימן ✦</a>
+    </div>
+  </div>
+</section>
 </main>
 
-<footer><div class="wrap">
- <span><b>סימן</b> של Almos Apps</span>
- <span>רוצים לראות הכול? <a href="https://siman.siman-app.workers.dev/about.html">המדריך המלא והסרטון הארוך</a></span>
- <span><a href="https://siman.siman-app.workers.dev/terms.html">תנאי שימוש</a></span>
- <span>יצירת קשר: <a href="mailto:almos.apps@gmail.com" dir="ltr">almos.apps@gmail.com</a></span>
-</div></footer>
+<footer>
+  <div class="wrap">
+    <span class="brand">סימן</span><span>של Almos Apps</span>
+    <nav aria-label="קישורים">
+      <a href="about.html">המדריך המלא</a>
+      <a href="privacy.html">פרטיות</a>
+      <a href="terms.html">תנאי שימוש</a>
+      <a href="accessibility.html">הצהרת נגישות</a>
+      <span>יצירת קשר: <a href="mailto:almos.apps@gmail.com" dir="ltr">almos.apps@gmail.com</a></span>
+    </nav>
+  </div>
+</footer>
 
 <script>
-const v=document.getElementById('vid'),s=document.getElementById('sound');
-s.addEventListener('click',()=>{v.muted=false;v.loop=false;v.currentTime=0;v.controls=true;v.play();s.remove();});
-if(window.matchMedia('(prefers-reduced-motion: reduce)').matches){v.removeAttribute('autoplay');v.pause();v.controls=true;}
+(function(){
+  var v=document.getElementById('vid'),s=document.getElementById('sound');
+  var calm=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function dropBtn(){if(s&&s.parentNode)s.remove();}
+  s.addEventListener('click',function(){v.muted=false;v.loop=false;v.currentTime=0;v.play();dropBtn();});
+  v.addEventListener('volumechange',function(){if(!v.muted)dropBtn();});
+  // silent preview loop while the video is on screen (like the old page), never with reduced motion
+  if(!calm&&'IntersectionObserver' in window){
+    new IntersectionObserver(function(es){es.forEach(function(e){
+      if(!v.muted)return;
+      if(e.isIntersecting){var p=v.play();if(p&&p.catch)p.catch(function(){});}else v.pause();
+    });},{threshold:.4}).observe(v);
+  }
+  // hand-drawn circle on stickers (hover)
+  if(!calm)document.querySelectorAll('.sticker:not(.more)').forEach(function(el){
+    el.insertAdjacentHTML('beforeend','<svg class="circle" viewBox="0 0 200 160" preserveAspectRatio="none" aria-hidden="true"><path d="M110 6 C 170 4, 198 40, 194 84 C 190 130, 140 156, 92 154 C 40 152, 4 122, 6 78 C 8 34, 50 8, 120 12"/></svg>');
+  });
+})();
 </script>
 </body>
 </html>

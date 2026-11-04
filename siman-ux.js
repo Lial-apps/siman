@@ -13,7 +13,7 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const narrow=()=>matchMedia('(max-width:720px)').matches;
 const lang=()=>document.documentElement.getAttribute('lang')||'he';
 const T={
-  he:{resume:'להמשיך מאיפה שהפסקת?',resumeSub:(n,t)=>`${n} · נשמר ${t}`,go:'המשך',drop:'לא, להתחיל מחדש',recent:'קבצים אחרונים',clear:'ניקוי',remove:'הסרה מהרשימה',
+  he:{resume:'להמשיך מאיפה שהפסקת?',resumeSub:(n,t)=>`${n} · נשמר ${t}`,go:'המשך',drop:'לא, להתחיל מחדש',recent:'ממשיכים מאיפה שעצרנו',clear:'ניקוי',remove:'הסרה מהרשימה',
     ago:{now:'לפני רגע',min:n=>`לפני ${n} דק׳`,hr:n=>`לפני ${n} שע׳`,day:n=>`לפני ${n} ימים`},more:'עוד',reflowOn:'תצוגת טלפון',reflowOff:'תצוגת דף',reflowTip:'תצוגת טלפון: הטקסט נשבר לרוחב המסך. הקובץ עצמו לא משתנה',
     restored:'הטיוטה שוחזרה. השינויים האחרונים שלך כאן',redo:'בצע שוב (Ctrl+Y)',savedLocal:'הטיוטה נשמרת אוטומטית במכשיר'},
   ar:{resume:'المتابعة من حيث توقفت؟',resumeSub:(n,t)=>`${n} · حُفظ ${t}`,go:'متابعة',drop:'لا، البدء من جديد',recent:'الملفات الأخيرة',clear:'مسح',remove:'إزالة من القائمة',
