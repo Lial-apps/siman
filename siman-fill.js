@@ -30,6 +30,32 @@ const T = {
     today: 'Сегодня', asV: 'Галочка ✓', asSig: 'Подпись', asText: 'Текст', del: 'Удалить', ph: 'Пишите здесь…', otherSig: 'Другая подпись', tip: 'Enter: далее · Shift+Enter: новая строка' }
 };
 const L = () => T[LANG()] || T.he;
+// 5.9.6 (second round): what the window says about suggestions, checks and the end of the form
+const TX = {
+  he: { prev: 'הקודם', save: 'הכול מולא ✓ · שמירה', badId: 'מספר הזהות לא תקין (ספרת ביקורת). כדאי לבדוק', badPhone: 'מספר הטלפון נראה קצר או ארוך מדי', badMail: 'כתובת המייל לא נראית תקינה', addr: 'כתובת', email: 'מייל', tipK: 'Enter / Tab: הבא · Shift+Tab: הקודם · Shift+Enter: שורה חדשה' },
+  en: { prev: 'Back', save: 'All filled ✓ · Save', badId: 'This ID number does not check out. Worth a look', badPhone: 'The phone number looks too short or too long', badMail: 'The e-mail address does not look right', addr: 'Address', email: 'E-mail', tipK: 'Enter / Tab: next · Shift+Tab: back · Shift+Enter: new line' },
+  ar: { prev: 'السابق', save: 'تمت التعبئة ✓ · حفظ', badId: 'رقم الهوية غير صحيح. يستحسن التحقق', badPhone: 'رقم الهاتف يبدو قصيرًا أو طويلًا جدًا', badMail: 'عنوان البريد لا يبدو صحيحًا', addr: 'العنوان', email: 'البريد', tipK: 'Enter / Tab: التالي · Shift+Tab: السابق · Shift+Enter: سطر جديد' },
+  ru: { prev: 'Назад', save: 'Всё заполнено ✓ · Сохранить', badId: 'Номер ID не проходит проверку. Стоит проверить', badPhone: 'Номер телефона слишком короткий или длинный', badMail: 'Адрес почты выглядит неверно', addr: 'Адрес', email: 'Почта', tipK: 'Enter / Tab: далее · Shift+Tab: назад · Shift+Enter: новая строка' }
+};
+const LX = () => TX[LANG()] || TX.he;
+const kindName = t => { const k = t.kind === 'cell' ? (t.sub && t.sub !== 'text' ? t.sub : 'cell') : t.kind; return L().k[k] || LX()[k] || L().k.text; };
+// what was typed before, kept only on this device: the next form suggests it (name, ID, phone, address, e-mail)
+const MEM_KEY = 'siman.fill.mem', MEM_KINDS = ['name', 'id', 'phone', 'addr', 'email'];
+const memGet = () => { try { return JSON.parse(localStorage.getItem(MEM_KEY) || '{}') || {}; } catch (_) { return {}; } };
+function memPut(kind, v) {
+  v = String(v || '').trim(); if (!v || v.length > 80 || !MEM_KINDS.includes(kind)) return;
+  const m = memGet(); m[kind] = [v, ...(m[kind] || []).filter(x => x !== v)].slice(0, 3);
+  try { localStorage.setItem(MEM_KEY, JSON.stringify(m)); } catch (_) {}
+}
+// Israeli ID: 9 digits with a check digit
+const idOk = v => { const d = String(v).replace(/\D/g, ''); if (!d || d.length > 9) return false; const s = d.padStart(9, '0'); let t = 0; for (let i = 0; i < 9; i++) { let x = +s[i] * (i % 2 + 1); if (x > 9) x -= 9; t += x; } return t % 10 === 0; };
+function warnFor(kind, v) {
+  v = String(v || '').trim(); if (!v) return '';
+  if (kind === 'id' && /^\d[\d\s-]*$/.test(v) && v.replace(/\D/g, '').length >= 5 && !idOk(v)) return LX().badId;
+  if (kind === 'phone' && /\d/.test(v)) { const n = v.replace(/\D/g, '').length; if (n < 9 || n > 13) return LX().badPhone; }
+  if (kind === 'email' && v.length > 3 && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v)) return LX().badMail;
+  return '';
+}
 const RTL_CH = /[֐-ࣿיִ-﷿ﹰ-﻿]/, LTR_CH = /[A-Za-zÀ-ɏЀ-ӿ]/;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -69,6 +95,14 @@ body.fz-filling .a11y-fab,body.fz-filling .sb-back{visibility:hidden}
 .fzp .hd .cnt{margin-inline-start:auto;color:#6B5A92;font-size:12.5px}
 .fzp .lens{display:flex;justify-content:center;overflow:hidden;margin:0 0 8px;border:1.5px solid #CFC4EA;border-radius:12px;background:#fff;padding:4px}
 .fzp .lens[hidden]{display:none}
+.fzp .warn{margin-top:6px;font-size:13px;color:#9A3412;background:#FFF4E5;border-radius:8px;padding:5px 9px}
+.fzp .warn[hidden],.fzp .mem[hidden]{display:none}
+.fzp .mem{display:flex;gap:6px;margin-top:8px;overflow-x:auto;scrollbar-width:none}
+.fzp .mem button{flex:none;max-width:70%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:inherit;font-size:13.5px;min-height:36px;padding:0 12px;border-radius:999px;border:1.5px dashed #6B2BD9;background:#F4EEFF;color:#2B1660;cursor:pointer;unicode-bidi:plaintext}
+.fzp .mem button::before{content:"↺ ";opacity:.6}
+.fzbar .go.fin{background:#2ED3A0}
+[data-theme=dark] .fzp .mem button{background:#241D48;color:#EDE9F7;border-color:#C9B6FA}
+[data-theme=dark] .fzp .warn{background:#3A2414;color:#FFD3A8}
 .fzp .lens canvas{display:block;max-width:100%;height:auto!important}
 .fzp textarea{display:block;width:100%;box-sizing:border-box;min-height:46px;max-height:40vh;resize:none;overflow-y:auto;border:2px solid #6B2BD9;border-radius:12px;padding:10px 12px;font:16px/1.45 "AlefEmbed",Rubik,Arial,sans-serif;color:#1C2333;background:#FBFAFF;unicode-bidi:plaintext;text-align:start;transition:height .08s}
 .fzp textarea:focus{outline:3px solid rgba(107,43,217,.25);outline-offset:0}
@@ -100,7 +134,9 @@ function kindOf1(t) {
   if (/חתימ|ח\s?ת\s?י\s?מ|signature|sign here|توقيع|подпис/i.test(t)) return 'sig';
   if (/תאריך|date|تاريخ|дата/i.test(t)) return 'date';
   if (/(^|\s)ת\s?ז(\s|$)|תעודת זהות|מס(פר)?\s*זהות|\bid\b|identity|هوية|паспорт/i.test(t)) return 'id';
+  if (/מייל|דוא\s?ל|e-?mail|بريد|почт/i.test(t)) return 'email';
   if (/טלפון|נייד|phone|mobile|هاتف|телефон/i.test(t)) return 'phone';
+  if (/כתובת|רחוב|address|عنوان|адрес/i.test(t)) return 'addr';
   if (/(^|\s)שם(\s|$)|משפחה|name|اسم|имя|фамил/i.test(t)) return 'name';
   return 'text';
 }
@@ -270,7 +306,7 @@ async function detectPage(P, widgets) {
   // 3. a label with nothing after it ("חתימה:" at the end of a line): the space beside it
   for (const it of items) {
     const s = it.s.trim(); if (s.length > 30 || !/[:：]\s*$/.test(s)) continue;
-    const kd = kindOf(s); if (kd !== 'sig' && kd !== 'date' && kd !== 'name' && kd !== 'id') continue;
+    const kd = kindOf(s); if (!['sig', 'date', 'name', 'id', 'phone', 'email'].includes(kd)) continue;
     const wd = W1 * (kd === 'sig' ? .24 : .2);
     const x0 = it.rtl ? Math.max(8, it.x0 - 6 - wd) : it.x1 + 6, x1 = it.rtl ? it.x0 - 6 : Math.min(W1 - 8, it.x1 + 6 + wd);
     if (items.some(t => t !== it && t.x0 < x1 && t.x1 > x0 && t.y0 < it.y1 && t.y1 > it.y0)) continue;  // something is written there
@@ -294,7 +330,21 @@ async function detectPage(P, widgets) {
 }
 
 /* ---------------------------------------------------------------- המצב */
-const F = { list: [], cur: null, run: 0, busy: false };
+const F = { list: [], cur: null, run: 0, busy: false, doc: null };
+// each open file has its own places (switching between files in tabs brings back that file's places and what was filled)
+const FOUND = new WeakMap();
+let ensureT = 0;
+function ensure() {
+  if (!S.doc || F.doc === S.doc || S.office) return true;
+  clearTimeout(ensureT);
+  ensureT = setTimeout(() => {
+    if (!S.doc || F.doc === S.doc) return;
+    if (F.cur) { pnl.hidden = true; F.cur = null; document.body.classList.remove('fz-filling'); }
+    if (FOUND.has(S.doc)) { F.doc = S.doc; F.list = FOUND.get(S.doc); paintAll(); bar(); }
+    else run().catch(e => console.warn('fill', e));
+  }, 0);
+  return false;
+}
 const annOf = t => t.ann && S.anns.find(a => a.id === t.ann);
 const open = () => F.list.filter(t => !annOf(t));
 
@@ -304,12 +354,13 @@ function layerOf(P) {
 }
 function paint(P) {
   if (!P || !P.ann) return;
+  if (!ensure()) { if (P.fzl) P.fzl.innerHTML = ''; return; }
   const ly = layerOf(P); ly.innerHTML = '';
   const vp1 = P.page.getViewport({ scale: 1 });
   for (const t of F.list) { if (t.page !== P.i - 1) continue;
     const d = document.createElement('div'); d.className = 'fz ' + t.kind + (annOf(t) ? ' done' : '') + (F.cur === t ? ' cur' : '');
     d.tabIndex = annOf(t) ? -1 : 0; d.setAttribute('role', 'button');
-    const nm = L().k[t.kind === 'cell' ? (t.sub && t.sub !== 'text' ? t.sub : 'cell') : t.kind] || L().k.text;
+    const nm = kindName(t);
     d.setAttribute('aria-label', nm + (t.label ? ': ' + t.label : ''));
     Object.assign(d.style, { left: t.x0 / vp1.width * 100 + '%', top: t.y0 / vp1.height * 100 + '%', width: (t.x1 - t.x0) / vp1.width * 100 + '%', height: (t.y1 - t.y0) / vp1.height * 100 + '%' });
     const k = document.createElement('span'); k.className = 'fzk'; k.textContent = nm; d.append(k);
@@ -344,7 +395,7 @@ function fit(a) {
   const left = rtl ? f.r - w : f.l;
   const pt = vp1.convertToPdfPoint(left, f.top);
   a.w = w; a.x = pt[0]; a.y = pt[1];
-  const el = document.querySelector(`.tw[data-id="${a.id}"]`);
+  const el = P.tl.querySelector(`.tw[data-id="${a.id}"]`);
   if (el) { const [l, tp] = toCss(P, a.x, a.y); el.style.left = l + 'px'; el.style.top = tp + 'px'; const tx = el.querySelector('.tx'); if (tx) { tx.style.width = a.w * S.zoom + 'px'; tx.style.resize = 'none'; tx.dir = rtl ? 'rtl' : 'ltr'; tx.style.textAlign = rtl ? 'right' : 'left'; } }
 }
 function textAt(t, text) {
@@ -385,6 +436,7 @@ function sigInto(t) {
 function dropAnn(t) { const a = annOf(t); t.ann = null; if (a && typeof removeAnn === 'function') removeAnn(a.id); }
 
 function act(t) {
+  if (F.doc !== S.doc || !F.list.includes(t)) return;   // a place of a file that is no longer the one on screen
   if (F.cur && F.cur !== t) closePanel(true);
   if (t.kind === 'check') {
     if (annOf(t)) dropAnn(t); else imgAt(t, CHECK || (CHECK = checkSrc()), 1, false);
@@ -399,7 +451,9 @@ const pnl = document.createElement('div'); pnl.className = 'fzp'; pnl.hidden = t
 pnl.innerHTML = `<div class="hd"><b class="ttl"></b><span class="lab"></span><span class="cnt"></span></div>
 <div class="lens" aria-hidden="true"><canvas></canvas></div>
 <textarea rows="1" dir="auto" enterkeyhint="next" autocomplete="on"></textarea>
-<div class="row"><span class="chips"></span><span class="sp"></span><button type="button" data-a="del"></button><button type="button" class="main" data-a="next"></button><button type="button" data-a="done"></button></div>
+<div class="warn" role="status" hidden></div>
+<div class="mem" hidden></div>
+<div class="row"><span class="chips"></span><span class="sp"></span><button type="button" data-a="del"></button><button type="button" data-a="prev"></button><button type="button" class="main" data-a="next"></button><button type="button" data-a="done"></button></div>
 <div class="tip"></div>`;
 document.body.append(pnl);
 const ta = pnl.querySelector('textarea');
@@ -452,14 +506,15 @@ function openPanel(t) {
   let a = annOf(t);
   const isText = !(a && a.type === 'img');
   if (isText && !a) a = textAt(t, '');
-  const nm = l.k[t.kind === 'cell' ? (t.sub && t.sub !== 'text' ? t.sub : 'cell') : t.kind] || l.k.text;
+  const nm = kindName(t);
   pnl.querySelector('.ttl').textContent = nm;
   pnl.querySelector('.lab').textContent = t.label && t.label.length < 40 ? '· ' + t.label.replace(BLANK, '').replace(/[:：]\s*$/, '') : '';
   pnl.querySelector('[data-a=next]').textContent = l.next + ' ›';
   pnl.querySelector('[data-a=done]').textContent = l.done;
   pnl.querySelector('[data-a=del]').textContent = l.del;
   { const an = annOf(t); pnl.querySelector('[data-a=del]').hidden = !an || (an.type === 'text' && !String(an.text || '').trim()); }
-  pnl.querySelector('.tip').textContent = l.tip;
+  pnl.querySelector('.tip').textContent = LX().tipK;
+  { const pv = pnl.querySelector('[data-a=prev]'); pv.textContent = '‹ ' + LX().prev; pv.hidden = F.list.indexOf(t) <= 0; }
   const chips = pnl.querySelector('.chips'); chips.innerHTML = '';
   const chip = (txt, fn, cls) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = txt; if (cls) b.className = cls; b.onclick = fn; chips.append(b); };
   const kd = t.kind === 'cell' ? t.sub : t.kind;
@@ -469,7 +524,9 @@ function openPanel(t) {
   if (isText && (t.kind === 'cell' || (t.x1 - t.x0) < 60)) chip(l.asV, () => { dropAnn(t); imgAt(t, CHECK || (CHECK = checkSrc()), 1, false); paint(P); bar(); closePanel(true); next(); });
   if (!isText) chip(l.asText, () => { dropAnn(t); openPanel(t); paint(P); });
   ta.hidden = !isText;
-  if (isText) { ta.value = a.text || ''; ta.placeholder = l.ph; ta.dir = 'auto'; ta.inputMode = kd === 'id' || kd === 'phone' ? 'numeric' : kd === 'date' ? 'text' : 'text'; }
+  if (isText) { ta.value = a.text || ''; ta.placeholder = l.ph; ta.dir = 'auto'; ta.inputMode = kd === 'id' ? 'numeric' : kd === 'phone' ? 'tel' : kd === 'email' ? 'email' : 'text'; }
+  memShow(isText ? kd : null);
+  checkNow();
   count(); pnl.hidden = false; document.body.classList.add('fz-filling'); paint(P); place(); bar();
   if (isText) { ta.focus({ preventScroll: true }); grow(); try { ta.setSelectionRange(ta.value.length, ta.value.length); } catch (_) {} }
   lensOpen(t);
@@ -478,16 +535,34 @@ function openPanel(t) {
 function sync() {
   const t = F.cur, a = t && annOf(t); if (!a || a.type !== 'text') return;
   a.text = ta.value; setDirty(true); fit(a);
-  const tx = document.querySelector(`.tw[data-id="${a.id}"] .tx`); if (tx && tx.textContent !== a.text) tx.textContent = a.text;
-  grow(); pnl.querySelector('[data-a=del]').hidden = !a.text; lensDraw();
+  const tx = (S.pages[a.page] ? S.pages[a.page].tl : document).querySelector(`.tw[data-id="${a.id}"] .tx`); if (tx && tx.textContent !== a.text) tx.textContent = a.text;
+  grow(); pnl.querySelector('[data-a=del]').hidden = !a.text; lensDraw(); checkNow(); memShow(kindOfCur());
 }
+const kindOfCur = () => { const t = F.cur; return t ? (t.kind === 'cell' ? t.sub : t.kind) : null; };
+// a gentle note under the box (an ID whose check digit is wrong, a short phone number); it never blocks
+function checkNow() { const w = pnl.querySelector('.warn'), m = warnFor(kindOfCur(), ta.value); w.textContent = m; w.hidden = !m || ta.hidden; }
+// what was typed in this kind of place before (only on this device): one tap fills it
+function memShow(kd) {
+  const box = pnl.querySelector('.mem'); box.innerHTML = '';
+  const list = kd && MEM_KINDS.includes(kd) ? (memGet()[kd] || []).filter(v => v !== ta.value.trim()).slice(0, 3) : [];
+  box.hidden = !list.length;
+  for (const v of list) { const b = document.createElement('button'); b.type = 'button'; b.textContent = v; b.title = v;
+    b.onclick = () => { ta.value = v; sync(); ta.focus(); }; box.append(b); }
+}
+// the value is remembered when the place is left
+function remember(t) { const a = t && annOf(t); if (!a || a.type !== 'text') return; const kd = t.kind === 'cell' ? t.sub : t.kind; memPut(kd, a.text); }
 ta.addEventListener('input', sync);
 ta.addEventListener('keydown', e => {
   if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); next(); }
+  else if (e.key === 'Tab' && !e.isComposing) { e.preventDefault(); if (e.shiftKey) prev(); else next(); }
   else if (e.key === 'Escape') { e.preventDefault(); closePanel(); }
 });
+function prev() {
+  const cur = F.cur, i = cur ? F.list.indexOf(cur) : -1; if (i <= 0) return;
+  closePanel(true); act(F.list[i - 1]);
+}
 function closePanel(keepCur) {
-  const t = F.cur; pnl.hidden = true; F.cur = null; document.body.classList.remove('fz-filling');
+  const t = F.cur; remember(t); pnl.hidden = true; F.cur = null; document.body.classList.remove('fz-filling');
   if (t) { const a = annOf(t); if (a && a.type === 'text' && !String(a.text || '').trim()) { const k = S.anns.indexOf(a); if (k >= 0) { S.anns.splice(k, 1); if (S.hist.length === t.hist + 1) S.hist.pop(); } t.ann = null; drawAnns(S.pages[t.page]); } paint(S.pages[t.page]); }
   if (!keepCur && document.activeElement === ta) ta.blur();
   bar();
@@ -496,10 +571,11 @@ function next() {
   const cur = F.cur, list = F.list, i = cur ? list.indexOf(cur) : -1;
   closePanel(true);
   const rest = [...list.slice(i + 1), ...list.slice(0, Math.max(0, i))].filter(t => !annOf(t));
-  if (!rest.length) { pnl.hidden = true; toast(L().all); ta.blur(); return; }
+  if (!rest.length) { pnl.hidden = true; toast(L().all); ta.blur(); bar(); const g = bar.el.querySelector('.go'); if (g && !bar.el.hidden) g.focus({ preventScroll: true }); return; }
   act(rest[0]);
 }
 pnl.querySelector('[data-a=next]').onclick = () => next();
+pnl.querySelector('[data-a=prev]').onclick = () => prev();
 pnl.querySelector('[data-a=done]').onclick = () => closePanel();
 pnl.querySelector('[data-a=del]').onclick = () => { const t = F.cur; if (!t) return; ta.value = ''; dropAnn(t); closePanel(); };
 function count() { const n = open().length; pnl.querySelector('.cnt').textContent = n ? L().left(n) : L().all; }
@@ -525,21 +601,25 @@ if (window.visualViewport) { visualViewport.addEventListener('resize', place); v
 /* ---------------------------------------------------------------- הפס "מקומות למילוי" */
 function bar() {
   const n = open().length, b = bar.el;
-  b.hidden = !F.list.length || !pnl.hidden || !S.doc || !!S.office;
-  b.querySelector('.go').textContent = n ? L().show(n) + ' ›' : L().all;
-  b.querySelector('.go').disabled = !n;
+  b.hidden = !F.list.length || !pnl.hidden || !S.doc || !!S.office || F.doc !== S.doc;
+  b.querySelector('.go').textContent = n ? L().show(n) + ' ›' : LX().save;
+  b.querySelector('.go').classList.toggle('fin', !n);
   b.querySelector('.x').title = L().hide; b.querySelector('.x').setAttribute('aria-label', L().hide);
   b.querySelector('.x').textContent = document.body.classList.contains('fz-off') ? '👁' : '×';
 }
 bar.el = document.createElement('div'); bar.el.className = 'fzbar'; bar.el.hidden = true;
 bar.el.innerHTML = '<button type="button" class="go"></button><button type="button" class="x"></button>';
 document.body.append(bar.el);
-bar.el.querySelector('.go').onclick = () => { document.body.classList.remove('fz-off'); if (typeof setTool === 'function' && S.tool !== 'select' && S.tool !== 'text') setTool('select'); const r = open(); if (r.length) act(r[0]); };
+bar.el.querySelector('.go').onclick = () => {
+  // everything is filled: the same button saves the form
+  if (!open().length) { const sb = document.getElementById('saveBtn'); if (sb && !sb.disabled) sb.click(); return; }
+  document.body.classList.remove('fz-off'); if (typeof setTool === 'function' && S.tool !== 'select' && S.tool !== 'text') setTool('select'); const r = open(); if (r.length) act(r[0]); };
 bar.el.querySelector('.x').onclick = () => { document.body.classList.toggle('fz-off'); bar(); };
 
 /* ---------------------------------------------------------------- חיבור לאפליקציה */
 async function run() {
-  const my = ++F.run; F.list = []; F.cur = null; pnl.hidden = true; document.body.classList.remove("fz-filling"); bar();
+  const my = ++F.run; F.list = []; F.cur = null; pnl.hidden = true; document.body.classList.remove("fz-filling");
+  F.doc = S.doc; if (S.doc) FOUND.set(S.doc, F.list); bar();
   S.pages.forEach(P => { if (P.fzl) P.fzl.innerHTML = ''; });
   if (!S.doc || S.office || !S.pages.length) return;
   await sleep(400);                                      // the first page is drawn first
