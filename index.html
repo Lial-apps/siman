@@ -1348,7 +1348,7 @@ body:has(#wed) .busy,body:has(#xed) .busy,body:has(#ped) .busy{z-index:1000}body
 </dialog>
 
 <header class="bar">
-  <div class="brand"><b title="גרסה 5.9.6">סימן</b><span class="ver">5.9.6</span><span class="fname" id="fname"></span></div>
+  <div class="brand"><b title="גרסה 5.10.0">סימן</b><span class="ver">5.10.0</span><span class="fname" id="fname"></span></div>
 
   <nav class="tools" id="tools" aria-label="כלים">
     <button class="tool" data-tool="select" aria-pressed="true" title="בחירה וגלילה (V)">
@@ -2834,7 +2834,7 @@ async function pageLines(P){
     });
     if(rtl){ // English words / numbers inside a Hebrew line read left-to-right
       for(let a=0;a<seq.length;a+=2){
-        if(!seq[a].ltr)continue;let b=a;while(b+2<seq.length&&seq[b+2].ltr)b+=2;
+        if(!seq[a].ltr)continue;let b=a;while(b+2<seq.length&&(seq[b+2].ltr||(/^[-–\/.:,+×]{1,2}$/.test(seq[b+2].tok||'')&&!seq[b+1].sep&&b+4<seq.length&&!seq[b+3].sep&&seq[b+4].ltr)))b+=2; // 5.10.0: "1-9", "12/5", "3.5" stay one number (they came out as "9-1")
         if(b>a){const part=seq.slice(a,b+1).reverse();seq.splice(a,part.length,...part);}a=b;
       }
     }
@@ -5325,7 +5325,7 @@ if('launchQueue' in window){
    ===================================================================== */
 (function(){
   const STATUS_URL=(typeof REGISTER_URL!=='undefined'&&REGISTER_URL)?REGISTER_URL.replace(/\/register$/,'/status'):'';
-  const U_KEY='siman.usage', T_KEY='siman.trial', APP_VER='5.9.4';
+  const U_KEY='siman.usage', T_KEY='siman.trial', APP_VER='5.10.0';
   const today=()=>new Date().toISOString().slice(0,10);
   const rd=k=>{try{return JSON.parse(localStorage.getItem(k)||'null');}catch(_){return null;}};
   const wr=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch(_){}};
@@ -5423,6 +5423,7 @@ if('launchQueue' in window){
 <script src="siman-merge.js?v=5.9.6" defer></script>
 <script src="siman-ux.js?v=5.9.5" defer></script>
 <script src="siman-fill.js?v=5.9.6" defer></script>
+<script src="siman-convert.js?v=5.10.0" defer></script>
 <link rel="stylesheet" href="siman-nb.css?v=5.9.5">
 <script src="siman-nb.js?v=5.9.5" defer></script>
 </body>
