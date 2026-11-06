@@ -1348,7 +1348,7 @@ body:has(#wed) .busy,body:has(#xed) .busy,body:has(#ped) .busy{z-index:1000}body
 </dialog>
 
 <header class="bar">
-  <div class="brand"><b title="גרסה 5.10.1">סימן</b><span class="ver">5.10.1</span><span class="fname" id="fname"></span></div>
+  <div class="brand"><b title="גרסה 5.10.2">סימן</b><span class="ver">5.10.2</span><span class="fname" id="fname"></span></div>
 
   <nav class="tools" id="tools" aria-label="כלים">
     <button class="tool" data-tool="select" aria-pressed="true" title="בחירה וגלילה (V)">
@@ -5329,7 +5329,7 @@ if('launchQueue' in window){
    ===================================================================== */
 (function(){
   const STATUS_URL=(typeof REGISTER_URL!=='undefined'&&REGISTER_URL)?REGISTER_URL.replace(/\/register$/,'/status'):'';
-  const U_KEY='siman.usage', T_KEY='siman.trial', APP_VER='5.10.1';
+  const U_KEY='siman.usage', T_KEY='siman.trial', APP_VER='5.10.2';
   const today=()=>new Date().toISOString().slice(0,10);
   const rd=k=>{try{return JSON.parse(localStorage.getItem(k)||'null');}catch(_){return null;}};
   const wr=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch(_){}};
@@ -5426,7 +5426,7 @@ if('launchQueue' in window){
 <script src="siman-scan.js?v=5.9.6" defer></script>
 <script src="siman-merge.js?v=5.9.6" defer></script>
 <script src="siman-ux.js?v=5.9.5" defer></script>
-<script src="siman-fill.js?v=5.9.6" defer></script>
+<script src="siman-fill.js?v=5.10.2" defer></script>
 <script src="siman-convert.js?v=5.10.1" defer></script>
 <link rel="stylesheet" href="siman-nb.css?v=5.9.5">
 <script src="siman-nb.js?v=5.9.5" defer></script>

@@ -332,7 +332,7 @@ async function detectPage(P, widgets) {
 }
 
 /* ---------------------------------------------------------------- המצב */
-const F = { list: [], cur: null, run: 0, busy: false, doc: null };
+const F = { list: [], cur: null, run: 0, busy: false, doc: null, quiet: true, force: false };
 // each open file has its own places (switching between files in tabs brings back that file's places and what was filled)
 const FOUND = new WeakMap();
 let ensureT = 0;
@@ -342,7 +342,7 @@ function ensure() {
   ensureT = setTimeout(() => {
     if (!S.doc || F.doc === S.doc) return;
     if (F.cur) { pnl.hidden = true; F.cur = null; document.body.classList.remove('fz-filling'); }
-    if (FOUND.has(S.doc)) { F.doc = S.doc; F.list = FOUND.get(S.doc); paintAll(); bar(); }
+    if (FOUND.has(S.doc)) { F.doc = S.doc; F.list = FOUND.get(S.doc); F.quiet = F.list.quiet !== false; paintAll(); bar(); }
     else run().catch(e => console.warn('fill', e));
   }, 0);
   return false;
@@ -356,6 +356,7 @@ function layerOf(P) {
 }
 function paint(P) {
   if (!P || !P.ann) return;
+  if (F.quiet) { if (P.fzl) P.fzl.innerHTML = ''; return; }   // 5.10.2: found, but not offered
   if (!ensure()) { if (P.fzl) P.fzl.innerHTML = ''; return; }
   const ly = layerOf(P); ly.innerHTML = '';
   const vp1 = P.page.getViewport({ scale: 1 });
@@ -603,7 +604,7 @@ if (window.visualViewport) { visualViewport.addEventListener('resize', place); v
 /* ---------------------------------------------------------------- הפס "מקומות למילוי" */
 function bar() {
   const n = open().length, b = bar.el;
-  b.hidden = !F.list.length || !pnl.hidden || !S.doc || !!S.office || F.doc !== S.doc;
+  b.hidden = F.quiet || !F.list.length || !pnl.hidden || !S.doc || !!S.office || F.doc !== S.doc;
   b.querySelector('.go').textContent = n ? L().show(n) + ' ›' : LX().save;
   b.querySelector('.go').classList.toggle('fin', !n);
   b.querySelector('.x').title = L().hide; b.querySelector('.x').setAttribute('aria-label', L().hide);
@@ -616,11 +617,31 @@ bar.el.querySelector('.go').onclick = () => {
   // everything is filled: the same button saves the form
   if (!open().length) { const sb = document.getElementById('saveBtn'); if (sb && !sb.disabled) sb.click(); return; }
   document.body.classList.remove('fz-off'); if (typeof setTool === 'function' && S.tool !== 'select' && S.tool !== 'text') setTool('select'); const r = open(); if (r.length) act(r[0]); };
-bar.el.querySelector('.x').onclick = () => { document.body.classList.toggle('fz-off'); bar(); };
+bar.el.querySelector('.x').onclick = () => { hidePlaces(true); };
+const AUTO_KEY = 'siman.fill.auto';
+const autoOn = () => { try { return localStorage.getItem(AUTO_KEY) !== 'off'; } catch (_) { return true; } };
+function hidePlaces(say) { F.quiet = F.list.quiet = true; document.body.classList.remove('fz-off'); pnl.hidden = true; F.cur = null; document.body.classList.remove('fz-filling'); S.pages.forEach(paint); bar();
+  if (say) toast('המקומות למילוי הוסתרו. כדי להחזיר: חיפוש פקודות (Ctrl+K) ← "מקומות למילוי"'); }
+function showPlaces() {
+  if (!S.doc || S.office) return;
+  if (!F.list.length) { toast(F.doc === S.doc ? 'לא נמצאו בקובץ הזה מקומות למילוי' : 'מחפש מקומות למילוי…'); if (F.doc !== S.doc) { F.force = true; run(); } return; }
+  F.quiet = F.list.quiet = false; S.pages.forEach(paint); bar(); const g = bar.el.querySelector('.go'); if (g) g.focus({ preventScroll: true });
+}
+// the command search: show the places now, or turn the automatic offer on / off
+try {
+  if (typeof CMDS !== 'undefined') {
+    CMDS.push({ l: 'מקומות למילוי', k: 'מילוי טופס מקומות למילוי שדות למלא קווים fill form fields', doc: 1, run: () => showPlaces() });
+    CMDS.push({ l: 'הצעה אוטומטית של מקומות למילוי: הפעלה / כיבוי', k: 'מילוי טופס הצעה אוטומטית להפסיק לא להציע הודעה מקומות למילוי כיבוי fill auto off', run: () => {
+      const on = !autoOn(); try { localStorage.setItem(AUTO_KEY, on ? 'on' : 'off'); } catch (_) {}
+      if (!on) hidePlaces(false);
+      toast(on ? 'סימן יציע שוב מקומות למילוי בטפסים' : 'סימן לא יציע יותר מקומות למילוי מעצמו. אפשר תמיד לבקש: Ctrl+K ← "מקומות למילוי"'); } });
+  }
+} catch (_) {}
 
 /* ---------------------------------------------------------------- חיבור לאפליקציה */
 async function run() {
-  const my = ++F.run; F.list = []; F.cur = null; pnl.hidden = true; document.body.classList.remove("fz-filling");
+  const force = !!F.force; F.force = false;
+  const my = ++F.run; F.list = []; F.cur = null; F.quiet = F.list.quiet = !force; pnl.hidden = true; document.body.classList.remove("fz-filling");
   F.doc = S.doc; if (S.doc) FOUND.set(S.doc, F.list); bar();
   S.pages.forEach(P => { if (P.fzl) P.fzl.innerHTML = ''; });
   if (!S.doc || S.office || !S.pages.length) return;
@@ -641,7 +662,14 @@ async function run() {
     await sleep(0);
   }
   const n = F.list.length;
-  if (n && !S.hasForm) toast(L().found(n));
+  // 5.10.2: offered on its own only when the file really is a form: fields built into the PDF, or places
+  // with a label beside them ("שם:", "תאריך:", "חתימה"). A summary, an article or a worksheet with a few
+  // lines stays as it is, and the places can still be asked for in the command search.
+  const typed = F.list.filter(t => t.kind && t.kind !== 'text' && t.label && !/^[(\[]/.test(String(t.label).trim())).length;
+  const perPage = new Map(); F.list.forEach(t => perPage.set(t.page, (perPage.get(t.page) || 0) + 1));
+  const dense = S.pages.length <= 4 && Math.max(0, ...perPage.values()) >= 3;
+  const formLike = S.hasForm || typed >= 2 || dense;
+  if (force || (autoOn() && formLike)) { F.quiet = F.list.quiet = false; S.pages.forEach(paint); bar(); if (n && !S.hasForm && !force) toast(L().found(n)); }
 }
 
 // the marks follow the page: drawn again whenever the page's notes are drawn (zoom, undo)
