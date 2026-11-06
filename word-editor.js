@@ -1376,6 +1376,7 @@ const CMD={
     if(!navigator.clipboard||!navigator.clipboard.read){hint('הדבקה: Ctrl+V');return;}
     try{const items=await navigator.clipboard.read();liveRange();
       for(const it of items){
+        if(it.types.includes('text/html')){const hh=await (await it.getType('text/html')).text();if(/data-siman=/.test(hh)){pasteHtml(hh);return;}}
         const img=it.types.find(t=>t.startsWith('image/'));if(img){await insertImageFile(new File([await it.getType(img)],'image',{type:img}));return;}
         if(it.types.includes('text/html')){pasteHtml(await (await it.getType('text/html')).text());return;}
         if(it.types.includes('text/plain')){insertText(await (await it.getType('text/plain')).text());return;}
@@ -1448,7 +1449,7 @@ function sanitize(html){
   for(const el of [...d.body.querySelectorAll('*')]){
     if(/^O:P$/i.test(el.tagName)||el.tagName.includes(':')){el.replaceWith(...el.childNodes);continue;}
     for(const a of [...el.attributes]){const n=a.name.toLowerCase();
-      if(!['style','href','src','colspan','rowspan','dir','width','height'].includes(n))el.removeAttribute(a.name);
+      if(!['style','href','src','colspan','rowspan','dir','width','height','start'].includes(n))el.removeAttribute(a.name);
       else if(n==='href'&&/^\s*javascript:/i.test(a.value))el.removeAttribute(a.name);}
     if(el.style){for(const pr of ['position','left','top','right','bottom','z-index','float','display','visibility','opacity','transform','content'])el.style.removeProperty(pr);
       [...el.style].filter(x=>x.startsWith('mso-')).forEach(x=>el.style.removeProperty(x));}
@@ -1506,8 +1507,11 @@ function wire(){
   E.onKey=onKey;window.addEventListener('keydown',E.onKey,true);
   E.onPaste=e=>{if(!E)return;if(!E.root.contains(e.target)){e.stopImmediatePropagation();return;}
     if(!E.body.contains(e.target))return;e.stopImmediatePropagation();e.preventDefault();const dt=e.clipboardData;if(!dt)return;
+    // 5.10.1: text copied from a PDF in סימן (also with the "copy area" tool) comes in as editable text, not as a picture
+    const h=dt.getData('text/html');if(h&&/data-siman=/.test(h)){pasteHtml(h);return;}
     const f=[...dt.files].find(x=>/^image\//.test(x.type));if(f){insertImageFile(f);return;}
-    const h=dt.getData('text/html');if(h){pasteHtml(h);return;}
+    if(h&&/--scale-factor|scaleX\(/.test(h)){const t=dt.getData('text/plain');if(t){insertText(t);return;}}
+    if(h){pasteHtml(h);return;}
     const t=dt.getData('text/plain');if(t)insertText(t);};
   window.addEventListener('paste',E.onPaste,true);
   E.onCopy=e=>{if(E&&!E.root.contains(e.target))e.stopImmediatePropagation();};window.addEventListener('copy',E.onCopy,true);window.addEventListener('cut',E.onCopy,true);

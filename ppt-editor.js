@@ -1786,8 +1786,11 @@ function wire() {
     if (e.target.closest && e.target.closest('input,textarea')) return;
     const dt = e.clipboardData; if (!dt) return;
     if (X.editing) { e.preventDefault(); const t = dt.getData('text/plain'); if (t) document.execCommand('insertText', false, t.replace(/\r\n/g, '\n')); return; }
-    const img = [...dt.files].find(f => /^image\//.test(f.type)); if (img) { e.preventDefault(); insertImage(img); return; }
-    if (X.clip && dt.getData('text/plain') === X.clip.text) { e.preventDefault(); pasteShape(); }
+    const img = [...dt.files].find(f => /^image\//.test(f.type)), h = dt.getData('text/html') || '', t = dt.getData('text/plain') || '';
+    if (X.clip && t === X.clip.text) { e.preventDefault(); pasteShape(); return; }
+    // 5.10.1: text (also lines copied from a PDF in סימן) becomes a text box on the slide, not a picture
+    if (t.trim() && (!img || /data-siman=/.test(h))) { e.preventDefault(); pasteTextBox(t); return; }
+    if (img) { e.preventDefault(); insertImage(img); return; }
   };
   addEventListener('paste', X.onPaste, true);
   X.onCopy = e => {
@@ -1798,6 +1801,17 @@ function wire() {
     if (e.type === 'cut') deleteSel();
   };
   addEventListener('copy', X.onCopy, true); addEventListener('cut', X.onCopy, true);
+}
+function pasteTextBox(text) {
+  const lines = String(text).replace(/\r\n?/g, '\n').replace(/\t/g, '    ').split('\n').map(x => x.replace(/\s+$/, '')).filter((x, i, a) => x || (i && a[i - 1]));
+  if (!lines.length) return;
+  const w = X.size.w * .8;
+  // a size that keeps the text on the slide: long text gets smaller letters (12–24 pt)
+  const chars = lines.join(' ').length, pt = Math.max(12, Math.min(24, Math.round(Math.sqrt((X.size.w * .8) * (X.size.h * .75) / Math.max(1, chars) / 0.55) * 0.75)));
+  const hh = Math.min(X.size.h * .85, (pt / 0.75) * 1.25 * Math.max(lines.length, Math.ceil(chars * pt * 0.55 / 0.75 / w)) + 16);
+  insertCentered(b => { const n = addTextBox(X.doc, b, lines[0]); aiSetText(n, lines);
+    for (const tag of ['rPr', 'endParaRPr']) for (const r of [...n.getElementsByTagNameNS(NS.a, tag)]) r.setAttribute('sz', String(pt * 100));
+    return n; }, w, hh);
 }
 function pasteShape() {
   const c = X.clip; if (!c) return;

@@ -56,7 +56,14 @@ body.ed-live #aiPanel{position:fixed;z-index:960;top:40px;bottom:0;inset-inline-
 .tab .aiw.ready{color:#1E9E5A;animation:none}
 @keyframes aiwP{50%{opacity:.35}}
 @media (prefers-reduced-motion:reduce){.tab .aiw{animation:none}}
-.tab-menu{position:fixed;z-index:60;min-width:230px;background:var(--bar);border:1px solid var(--line);border-radius:12px;box-shadow:0 18px 40px -16px rgba(0,0,0,.45);padding:6px}
+.tab-home{flex:none;align-self:center;display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 11px;margin-inline-end:6px;border:1px solid var(--line);border-radius:8px;background:var(--bar);color:var(--ink);font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+.tab-home svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.tab-home[aria-pressed=true]{background:color-mix(in srgb,var(--marker) 45%,var(--bar));border-color:transparent}
+.tab-home:hover{border-color:var(--ink)}
+.tab-menu-sep{height:1px;background:var(--line);margin:5px 8px}
+.tab-menu .tm-ic{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:6px;color:#fff;font-size:12px;font-weight:800;margin-inline-end:9px;vertical-align:middle}
+.tm-ic.w{background:#2b5797}.tm-ic.x{background:#1e7145}.tm-ic.p{background:#c4472b}
+.tab-menu{position:fixed;z-index:2147482400;min-width:230px;background:var(--bar);border:1px solid var(--line);border-radius:12px;box-shadow:0 18px 40px -16px rgba(0,0,0,.45);padding:6px}
 .tab-menu button{display:block;width:100%;text-align:start;border:0;background:none;font:inherit;font-size:14px;color:var(--ink);padding:9px 12px;border-radius:8px;cursor:pointer}
 .tab-menu button:hover,.tab-menu button:focus-visible{background:color-mix(in srgb,var(--marker) 45%,var(--bar));outline:none}
 .tab-menu small{display:block;color:var(--muted);font-size:12px}
@@ -454,6 +461,10 @@ function renderTabs() {
     strip.classList.toggle('hidden', !TB.list.length);
     document.body.classList.toggle('ed-live', TB.list.some(edLive));
     strip.innerHTML = '';
+    // 5.10.1: back to סימן's opening screen, without closing the files (they stay in their tabs)
+    const home = h(`<button class="tab-home" type="button" aria-pressed="${!TB.cur}" title="מסך הבית של סימן (הקבצים נשארים פתוחים)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg><span>בית</span></button>`);
+    home.onclick = () => goHome();
+    strip.append(home);
     for (const t of TB.list) {
       const on = t === TB.cur, d = tabInfo(t);
       const b = h(`<div class="tab${d.edit ? ' ed ' + t.ed : ''}" role="tab" tabindex="${on ? 0 : -1}" aria-selected="${on}" draggable="true"><span class="kd">${d.kind}</span><span class="nm"></span>${AS.busySet.has(t.id) ? '<span class="aiw" title="העוזר עובד על הקובץ הזה">✦</span>' : t.aiQueue && t.aiQueue.some(x => x.plan && x.plan.actions.length) ? '<span class="aiw ready" title="העוזר סיים. השינויים ייכנסו כשתחזרו לקובץ">✦</span>' : ''}${d.dirty ? '<span class="dot" title="יש שינויים שלא נשמרו"></span>' : ''}<span class="x" role="button" aria-label="סגירת הקובץ" title="סגירה">×</span></div>`);
@@ -473,8 +484,8 @@ function renderTabs() {
       b.ondrop = e => { if (!TB.drag) return; e.preventDefault(); const from = TB.list.indexOf(TB.drag); TB.list.splice(from, 1); TB.list.splice(TB.list.indexOf(t), 0, TB.drag); TB.drag = null; renderTabs(); };
       strip.append(b);
     }
-    const add = h(`<button class="tab-add" type="button" title="פתיחת עוד קבצים (אפשר לבחור כמה יחד)">${ICON.plus}<span>עוד קובץ</span></button>`);
-    add.onclick = () => pickFile();
+    const add = h(`<button class="tab-add" type="button" aria-haspopup="menu" title="פתיחת קובץ קיים או יצירת מסמך חדש">${ICON.plus}<span>עוד קובץ</span></button>`);
+    add.onclick = e => { e.stopPropagation(); addMenu(add); };
     strip.append(add);
     if (TB.list.length > 1) {
       const all = h(`<button class="tab-all" type="button" aria-haspopup="menu">כל הקבצים (${TB.list.length}) ▾</button>`);
@@ -490,6 +501,48 @@ setDirty = function (v) { setDirtyOne(v); if (TB.list.length) renderTabs(); };
 // tabs dragged inside the strip are not files
 ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(ev => addEventListener(ev, e => { if (TB.drag) e.stopPropagation(); }, true));
 
+async function goHome() {
+  if (!TB.cur) return;
+  if (isBusy() || switching || TR.running) { toast('רגע, פעולה עדיין רצה'); return; }
+  switching = true;
+  try { await leave(); TB.cur = null; toEmpty(); } finally { switching = false; renderTabs(); }
+}
+window.simanHome = goHome;
+// the name "סימן" at the top (of the desk and of each editor) also leads home
+const HOME_SEL = '.we-brand,.xe-brand,.pe-brand,header.bar .brand';
+function markHome(root) { (root || document).querySelectorAll(HOME_SEL).forEach(b => { if (b.dataset.home) return; b.dataset.home = '1'; b.setAttribute('role', 'button'); b.tabIndex = 0; b.title = 'מסך הבית של סימן (הקבצים נשארים פתוחים)'; b.style.cursor = 'pointer'; }); }
+document.addEventListener('click', e => { const b = e.target.closest && e.target.closest(HOME_SEL); if (b && TB.cur) { e.preventDefault(); goHome(); } }, true);
+document.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.closest && e.target.closest(HOME_SEL) && TB.cur) { e.preventDefault(); goHome(); } }, true);
+new MutationObserver(() => markHome()).observe(document.body, { childList: true });
+markHome();
+// "עוד קובץ": a file from the device, or a new empty document of each kind
+function addMenu(anchor) {
+  document.querySelector('.tab-menu')?.remove();
+  const m = h(`<div class="tab-menu tab-menu-add" role="menu" aria-label="עוד קובץ">
+    <button role="menuitem" data-a="open">פתיחת קובץ קיים<small>PDF, Word, Excel, PowerPoint, תמונה או הקלטה</small></button>
+    <div class="tab-menu-sep" role="separator"></div>
+    <button role="menuitem" data-a="docx"><span class="tm-ic w">W</span>מסמך Word חדש</button>
+    <button role="menuitem" data-a="xlsx"><span class="tm-ic x">X</span>גיליון Excel חדש</button>
+    <button role="menuitem" data-a="pptx"><span class="tm-ic p">P</span>מצגת PowerPoint חדשה</button></div>`);
+  document.body.append(m);
+  const r = anchor.getBoundingClientRect();
+  m.style.top = (r.bottom + 6) + 'px';
+  m.style.left = Math.max(8, Math.min(innerWidth - m.offsetWidth - 8, r.left + r.width - m.offsetWidth)) + 'px';
+  const close = () => { m.remove(); removeEventListener('pointerdown', out, true); };
+  const out = e => { if (!m.contains(e.target)) close(); };
+  setTimeout(() => addEventListener('pointerdown', out, true), 0);
+  const items = [...m.querySelectorAll('button')];
+  m.onkeydown = e => {
+    if (e.key === 'Escape') { close(); anchor.focus(); return; }
+    const i = items.indexOf(document.activeElement); if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); items[(i + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length].focus(); }
+  };
+  items.forEach(b => b.onclick = () => {
+    close();
+    if (TB.list.length >= MAX_TABS && b.dataset.a !== 'open') { toast(`אפשר לפתוח עד ${MAX_TABS} קבצים יחד. סגרו אחד מהם כדי לפתוח עוד`); return; }
+    ({ open: () => pickFile(), docx: () => newWordDoc(), xlsx: () => newExcel(), pptx: () => newPpt() })[b.dataset.a]();
+  });
+  items[0].focus();
+}
 function allMenu(anchor) {
   document.querySelector('.tab-menu')?.remove();
   const m = h(`<div class="tab-menu" role="menu">

@@ -222,7 +222,8 @@ async function dzWindow(audio, offset, first, last) {
     else { cur = { k, s: offset + f * fd, e: offset + (f + 1) * fd }; w.runs.push(cur); }
   }
   w.runs = w.runs.filter(r => r.k >= 0);
-  DS.windows.push(w);
+  if (DS) DS.windows.push(w);
+  return w;
 }
 const dot = (a, b) => { let s = 0; for (let i = 0; i < a.length; i++) s += a[i] * b[i]; return s; };
 /* 5.9.6 — better speaker counting:
@@ -253,7 +254,9 @@ function clusterAll(K, opt) {
   }
   // 2. then the most alike groups are joined, until the number of speakers asked for — or, when not given,
   //    until the closest two are clearly different voices (pyannote's threshold for this voiceprint model)
-  const T = call ? 0.25 : 0.30;
+  // 5.10.1: in a call every voice comes through the same phone, so different people sound more alike:
+  // the groups stop joining earlier (a higher likeness is needed to call two voices one person)
+  const T = call ? 0.38 : 0.30;
   const norm = a => { let nn = 0; for (const x of a.sum) nn += x * x; nn = Math.sqrt(nn) || 1; a.n = a.sum.map(x => x / nn); };
   const merge = (a, b) => { for (let i = 0; i < a.sum.length; i++) a.sum[i] += b.sum[i]; a.sec += b.sec; a.items.push(...b.items); norm(a); };
   const total0 = C.reduce((a, c) => a + c.sec, 0);
@@ -282,22 +285,26 @@ function clusterAll(K, opt) {
     for (let i = 0; i < N; i++) if (alive[i]) for (let j = i + 1; j < N; j++) if (alive[j] && S[i * N + j] > bs) { bs = S[i * N + j]; bi = i; bj = j; }
     if (K) { if (left <= K) break; }
     else {
-      if (left <= 10) levels.set(left, snap(live()));
+      if (left <= 8) levels.set(left, snap(live()));
       if (!atT && bs < T) atT = left;
-      // keep going a little past the threshold, to compare one speaker fewer
-      if (atT && left < atT - 1) break;
+      // 5.10.1: keep joining down to one group, so every count from 1 to 8 can be compared below
       if (left <= floorK) break;
     }
     merge(C[bi], C[bj]); alive[bj] = 0; left--;
     for (let j = 0; j < N; j++) if (alive[j] && j !== bi) S[bi * N + j] = S[j * N + bi] = dot(C[bi].n, C[j].n);
   }
   if (!K) {
-    if (left <= 10) levels.set(left, snap(live()));
-    const kT = Math.max(floorK, atT || left);
+    if (left <= 8) levels.set(left, snap(live()));
+    const kT = Math.max(floorK, Math.min(8, atT || left));
+    // the threshold gives a first answer; another count wins when its voices are clearly better apart.
+    // An answer of one speaker is not trusted when two or more groups separate well (3 people in a call came out as 1)
     let pick = kT, best = levels.has(kT) ? sil(levels.get(kT)) : -1;
-    for (const k of kT > 1 ? [kT - 1, kT + 1] : []) {
-      if (k < Math.max(2, floorK) || !levels.has(k)) continue;
-      const s = sil(levels.get(k)); if (s > best + 0.05) { best = s; pick = k; }
+    for (const k of [...levels.keys()].sort((a, b) => a - b)) {
+      if (k === kT || k < Math.max(2, floorK)) continue;
+      const g = levels.get(k); const total = g.reduce((a, c) => a + c.sec, 0);
+      if (g.some(c => c.sec < Math.max(4, total * 0.04))) continue;            // a "speaker" of a cough or a laugh
+      const s = sil(g), ok = kT === 1 ? s > Math.max(best, 0.10) : s > best + (Math.abs(k - kT) === 1 ? 0.04 : 0.08);
+      if (ok) { best = s; pick = k; }
     }
     C = levels.get(pick) || live();
   } else C = live();
@@ -310,7 +317,7 @@ function clusterAll(K, opt) {
     C.sort((a, b) => b.sec - a.sec);
     for (let i = C.length - 1; i > 0 && C.length > floorK; i--) {
       let bj = 0, bs = -2; for (let j = 0; j < i; j++) { const s = dot(C[i].n, C[j].n); if (s > bs) { bs = s; bj = j; } }
-      const tiny = C[i].sec < Math.max(3, total * 0.015), small = C[i].sec < total * 0.03 && bs > 0.15;
+      const tiny = C[i].sec < Math.max(3, total * 0.015), small = C[i].sec < total * 0.03 && bs > (call ? 0.4 : 0.3);
       if (tiny || small) { merge(C[bj], C[i]); C.splice(i, 1); }
     }
   }
@@ -363,6 +370,9 @@ async function dzHandle(m) {
   if (m.type === 'dz-load') { await dzLoad(); return {}; }
   if (m.type === 'dz-begin') { await dzLoad(); DS = { windows: [] }; return {}; }
   if (m.type === 'dz-win') { await dzWindow(m.audio, m.offset, !!m.first, !!m.last); return {}; }
+  // 5.10.1: windows worked out in other workers, joined here
+  if (m.type === 'dz-win1') { await dzLoad(); const saved = DS; DS = null; try { return { win: await dzWindow(m.audio, m.offset, !!m.first, !!m.last) }; } finally { DS = saved; } }
+  if (m.type === 'dz-end2') { DS = { windows: (m.windows || []).filter(Boolean) }; return dzEnd(m.speakers ? +m.speakers : 0, { minK: m.minSpeakers || 0, kind: m.kind || '' }); }
   if (m.type === 'dz-end') return dzEnd(m.speakers ? +m.speakers : 0, { minK: m.minSpeakers || 0, kind: m.kind || '' });
   return null;
 }

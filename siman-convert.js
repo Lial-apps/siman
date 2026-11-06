@@ -1096,5 +1096,130 @@ function setView(v) { ui.q('cvxCmp').dataset.v = v; ui.root.querySelectorAll('.c
 function hook() { const b = $id('convBtn'); if (!b) return; b.onclick = () => { if (!S.doc || S.office) return; open(); }; }
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', hook); else hook();
 
-window.SIMAN_CONV = { VER, convertWord, build, collect, analyse, writeDocx, niceColor, open, close };
+/* =====================================================================
+   5. COPY — lines copied from a PDF paste as real, editable text
+   (Word, Excel, PowerPoint, Gmail, סימן's own editors): whole paragraphs instead of broken lines,
+   the spaces between words, bold, colour, marker, underline, lists, tables as tab-separated cells.
+   ===================================================================== */
+function runLooks(P, L) {
+  const c = P.canvas; const ok = c && c.width > 4 && P.vp && P.vp.width;
+  let ctx = null; try { if (ok) ctx = c.getContext('2d', { willReadFrequently: true }); } catch (_) {}
+  const k = ok ? c.width / P.vp.width : 1;
+  const area = (x0, y0, x1, y1) => { const [a, b] = toCss(P, x0, y1), [cc, d] = toCss(P, x1, y0);
+    const X = clamp(Math.floor(Math.min(a, cc) * k), 0, c.width - 1), Y = clamp(Math.floor(Math.min(b, d) * k), 0, c.height - 1);
+    const W = clamp(Math.ceil(Math.abs(cc - a) * k), 1, c.width - X), H = clamp(Math.ceil(Math.abs(d - b) * k), 1, c.height - Y);
+    return { X, Y, W, H, data: ctx.getImageData(X, Y, W, H).data }; };
+  for (const r of L.runs) {
+    const it = r.it; r.size = r.size || (it && it.h) || L.size;
+    if (it) { const fn = fontNameOf(P, it.font); r.bold = r.bold || fn.bold || /bold|black|heavy|semibold/i.test(fn.name) || !!it.dbl; r.ital = /italic|oblique/i.test(fn.name); r.face = r.face || safeFace(fontFace(fn.name)); r.x0 = it.x; r.x1 = it.x + it.w; r.raw = it.s; }
+    else { r.face = r.face || 'Arial'; r.bold = r.bold || !!L.bold; }
+    if (!ctx) { r.color = '#000000'; continue; }
+    const x0 = r.x0 != null ? r.x0 : L.x0, x1 = r.x1 != null ? r.x1 : L.x1;
+    try {
+      const A = area(x0, L.base - L.size * .25, x1, L.base + L.size * .85), d = A.data;
+      const hist = new Map();
+      for (let i = 0; i < d.length; i += 8) { const q = (d[i] >> 4) * 256 + (d[i + 1] >> 4) * 16 + (d[i + 2] >> 4); const e = hist.get(q) || [0, 0, 0, 0]; e[0]++; e[1] += d[i]; e[2] += d[i + 1]; e[3] += d[i + 2]; hist.set(q, e); }
+      const tot = d.length / 8, top = [...hist.values()].sort((a, b) => b[0] - a[0])[0]; const bg = [top[1] / top[0], top[2] / top[0], top[3] / top[0]];
+      if (cdist(bg, [255, 255, 255]) > 60 && top[0] / tot > .35) r.hl = bg;
+      let best = 0; for (let i = 0; i < d.length; i += 4) best = Math.max(best, Math.abs(d[i] - bg[0]) + Math.abs(d[i + 1] - bg[1]) + Math.abs(d[i + 2] - bg[2]));
+      const acc = [0, 0, 0]; let n = 0; for (let i = 0; i < d.length; i += 4) if (Math.abs(d[i] - bg[0]) + Math.abs(d[i + 1] - bg[1]) + Math.abs(d[i + 2] - bg[2]) > best * .7) { acc[0] += d[i]; acc[1] += d[i + 1]; acc[2] += d[i + 2]; n++; }
+      r.color = n ? '#' + rgb2hex(acc.map(v => v / n)) : '#000000';
+      // underline: a row under the baseline that is ink almost all along
+      const U = area(x0, L.base - L.size * .3, x1, L.base - L.size * .03), u = U.data; const fg = n ? acc.map(v => v / n) : [0, 0, 0];
+      for (let y = 0; y < U.H && !r.u; y++) { let c2 = 0; for (let x = 0; x < U.W; x++) { const i = (y * U.W + x) * 4; if (cdist([u[i], u[i + 1], u[i + 2]], fg) < 120 && cdist([u[i], u[i + 1], u[i + 2]], bg) > 90) c2++; } if (U.W > 4 && c2 >= U.W * .78) r.u = true; }
+    } catch (_) { r.color = '#000000'; }
+  }
+}
+// the lines (with their runs) → { html, text }
+function richFromLines(P, picked) {
+  if (!picked.length) return null;
+  const all = (P.lines || []);
+  const sizes = new Map(); for (const l of all) { const z = Math.round(l.size * 2) / 2; sizes.set(z, (sizes.get(z) || 0) + l.text.length); }
+  const bodySize = [...sizes.entries()].sort((a, b) => b[1] - a[1])[0][0];
+  const long = all.filter(l => (l.x1 - l.x0) > (P.page.view[2] - P.page.view[0]) * .45);
+  const A = { bodySize, colL: long.length ? pct(long.map(l => l.x0), .1) : Math.min(...picked.map(l => l.x0)), colR: long.length ? pct(long.map(l => l.x1), .9) : Math.max(...picked.map(l => l.x1)) };
+  const pg = { lines: picked };
+  const rows = rowLines(pg);
+  for (const L of rows) { L.mk = takeMarker(L); L.head = headish(L, A); }
+  const paras = []; let cur = null;
+  for (const L of rows) { if (cur && joins(cur, L, A)) { cur.lines.push(L); if (cur.lines.length === 2) cur.lh = cur.lines[0].base - L.base; continue; } cur = { lines: [L], mk: L.mk, head: L.head, dir: L.dir }; paras.push(cur); }
+  const css = r => { const o = []; if (r.face) o.push(`font-family:'${r.face.replace(/'/g, '')}'`); o.push(`font-size:${Math.round((r.size || bodySize) * 2) / 2}pt`); if (r.bold) o.push('font-weight:bold'); if (r.ital) o.push('font-style:italic');
+    const c = niceColor(r.color); if (c !== '000000') o.push('color:#' + c); if (r.hl) o.push('background-color:#' + rgb2hex(r.hl)); if (r.u) o.push('text-decoration:underline'); return o.join(';'); };
+  const spans = (P_) => { const runs = []; P_.lines.forEach((l, k) => { const rs = l.runs.map(r => ({ ...r })); if (k && rs.length && runs.length && !/[\s\-־]$/.test(runs[runs.length - 1].t)) rs[0].t = ' ' + rs[0].t.replace(/^\s+/, ''); runs.push(...rs); });
+    return mergeRuns(runs).map(r => `<span style="${css(r)}">${esc(r.t).replace(/\t/g, '&emsp;&emsp;')}</span>`).join(''); };
+  const textOf = P_ => P_.lines.map(l => l.runs.map(r => r.t).join('')).reduce((a, t) => a ? (/[\s\-־]$/.test(a) ? a + t.replace(/^\s+/, '') : a + ' ' + t.replace(/^\s+/, '')) : t, '');
+  const html = [], text = []; let list = null;
+  const endList = () => { if (list) { html.push(`</${list.tag}>`); list = null; } };
+  for (const p of paras) {
+    if (/^[\s•·▪◦●■□○◆◇❖❑❒➢➤➔►▶✓✔✗✘☐☑\uE000-\uF8FF\-–—*.,:;]*$/.test(textOf(p))) continue;
+    const rtl = p.dir === 'R', dir = rtl ? 'rtl' : 'ltr';
+    const al = p.lines.every(l => isCentered(l, A)) && !p.mk ? 'center' : (p.lines.length > 2 ? 'justify' : (rtl ? 'right' : 'left'));
+    if (p.mk) {
+      const tag = p.mk.kind === 'bullet' ? 'ul' : 'ol';
+      if (!list || list.tag !== tag || list.glyph !== p.mk.glyph) { endList(); list = { tag, glyph: p.mk.glyph };
+        html.push(tag === 'ol' ? `<ol dir="${dir}" start="${p.mk.n || 1}" style="margin:0 0 4pt;${p.mk.fmt === 'hebrew1' ? 'list-style-type:hebrew;' : ''}">` : `<ul dir="${dir}" style="margin:0 0 4pt;${p.mk.glyph && p.mk.glyph !== '•' ? `list-style-type:'${p.mk.glyph} ';` : ''}">`); }
+      html.push(`<li dir="${dir}" style="text-align:${rtl ? 'right' : 'left'};margin:0 0 2pt">${spans(p)}</li>`);
+      text.push((p.mk.kind === 'bullet' ? (p.mk.glyph || '•') + ' ' : (p.mk.fmt === 'hebrew1' ? HEB_ORD[(p.mk.n || 1) - 1] : p.mk.n) + '. ') + textOf(p));
+      continue;
+    }
+    endList();
+    const size = median(p.lines.map(l => l.size));
+    const tag = p.head && p.lines.length <= 3 ? (size >= bodySize * 1.25 ? 'h1' : size >= bodySize * 1.1 ? 'h2' : 'h3') : 'p';
+    html.push(`<${tag} dir="${dir}" style="text-align:${al};margin:${tag === 'p' ? '0 0 6pt' : '6pt 0 4pt'};line-height:1.3">${spans(p)}</${tag}>`);
+    text.push(textOf(p));
+  }
+  endList();
+  return { html: `<meta charset="utf-8"><div data-siman="1" dir="${paras[0] && paras[0].dir === 'L' ? 'ltr' : 'rtl'}">${html.join('')}</div>`, text: text.join('\n') };
+}
+const lineCopy = (L, runs) => { const c = { ...L, runs: runs.map(r => ({ ...r })) }; c.text = c.runs.map(r => r.t).join('').trim(); return c; };
+// lines (whole, or the part that was marked) under the selection on each page
+function selectionRich(sel) {
+  if (!sel || sel.isCollapsed || !sel.rangeCount) return null;
+  const rects = []; for (let i = 0; i < sel.rangeCount; i++) rects.push(...sel.getRangeAt(i).getClientRects());
+  const out = { html: [], text: [] }; let any = false;
+  for (const P of S.pages) {
+    if (!P.el || !P.lines || !P.lines.length) continue;
+    const pr = P.el.getBoundingClientRect(); const rs = rects.filter(r => r.width > 0 && r.bottom > pr.top && r.top < pr.bottom && r.right > pr.left && r.left < pr.right).map(r => ({ l: r.left - pr.left, r: r.right - pr.left, t: r.top - pr.top, b: r.bottom - pr.top }));
+    if (!rs.length) continue;
+    const picked = [];
+    for (const L of P.lines) {
+      const [a, b] = toCss(P, L.x0, L.y1), [c, d] = toCss(P, L.x1, L.y0); const l = Math.min(a, c), r = Math.max(a, c), t = Math.min(b, d), bt = Math.max(b, d), h = bt - t;
+      const hit = rs.filter(q => Math.min(q.b, bt) - Math.max(q.t, t) > h * .35 && Math.min(q.r, r) - Math.max(q.l, l) > 0); if (!hit.length) continue;
+      const sl = Math.min(...hit.map(q => q.l)), sr = Math.max(...hit.map(q => q.r));
+      let runs = L.runs && L.runs.length ? L.runs : [{ t: L.text, it: null }];
+      if (sr - sl < (r - l) * .92) runs = runs.filter(x => { if (!x.it) return true; const [xa] = toCss(P, x.it.x + x.it.w / 2, L.base); return xa >= sl - 2 && xa <= sr + 2; });
+      if (!runs.length) continue;
+      const c2 = lineCopy(L, runs); runLooks(P, c2); picked.push(c2);
+    }
+    const r = richFromLines(P, picked); if (r) { any = true; out.html.push(r.html); out.text.push(r.text); }
+  }
+  return any ? { html: out.html.join(''), text: out.text.join('\n') } : null;
+}
+// lines inside an area of a page (the "copy area" tool), in page CSS pixels
+async function areaRich(P, x, y, w, h) {
+  try {
+    if (!P.lines) await pageLines(P); if (!P.lines || !P.lines.length) return null;
+    const picked = [];
+    for (const L of P.lines) { const [a, b] = toCss(P, L.x0, L.y1), [c, d] = toCss(P, L.x1, L.y0); const cx = (a + c) / 2, cy = (b + d) / 2;
+      if (cx >= x && cx <= x + w && cy >= y && cy <= y + h) { const c2 = lineCopy(L, L.runs && L.runs.length ? L.runs : [{ t: L.text, it: null }]); runLooks(P, c2); picked.push(c2); } }
+    return richFromLines(P, picked);
+  } catch (e) { console.warn('areaRich', e); return null; }
+}
+// copying from the page: our own clipboard content instead of the browser's broken lines
+document.addEventListener('copy', e => {
+  try {
+    if (typeof S === 'undefined' || !S.doc) return; const pages = $id('pages'); const sel = getSelection();
+    if (!pages || !sel || sel.isCollapsed || !pages.contains(sel.anchorNode)) return;
+    const r = selectionRich(sel); if (!r || !r.text.trim()) return;
+    e.clipboardData.setData('text/plain', r.text); e.clipboardData.setData('text/html', r.html); e.preventDefault(); e.stopPropagation();
+    S.copied = 'text'; S.copiedText = r.text; try { updatePaste(true); } catch (_) {}
+  } catch (err) { console.warn('copy', err); }
+}, true);
+// the lines of a page are read as soon as someone starts marking text on it, so the copy is ready at once
+const warm = node => { const pg = node && (node.nodeType === 1 ? node : node.parentElement); const el = pg && pg.closest && pg.closest('.page'); if (!el || typeof S === 'undefined') return;
+  const P = S.pages.find(p => p.el === el); if (P && !P.lines && !P.warming) { P.warming = true; pageLines(P).catch(() => {}).finally(() => { P.warming = false; }); } };
+document.addEventListener('selectionchange', () => { const s = getSelection(); if (s && s.anchorNode) { warm(s.anchorNode); warm(s.focusNode); } });
+document.addEventListener('pointerdown', e => { if (e.target && e.target.closest && e.target.closest('.textLayer')) warm(e.target); }, true);
+
+window.SIMAN_CONV = { VER, convertWord, build, collect, analyse, writeDocx, niceColor, open, close, areaRich, selectionRich };
 })();
