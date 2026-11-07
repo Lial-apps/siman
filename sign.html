@@ -215,9 +215,20 @@ function showMine(){
 }
 function dockDone(me){
   $('dock').hidden=false;const signed=M.signers.filter(s=>s.status==='signed').length;
-  $('dockIn').innerHTML=`<div class="row"><button class="btn dark grow" id="dl">${M.mode==='view'?'הורדת המסמך':signed===M.signers.length?'הורדת המסמך החתום':'הורדת עותק'}</button>${navigator.canShare?'<button class="btn" id="shr">שיתוף</button>':''}</div>`;
+  // 5.9.6: a view link with the original Word / Excel / PowerPoint: the one who opened it chooses the format
+  const O=M.mode==='view'&&M.orig?{docx:'Word',xlsx:'Excel',pptx:'PowerPoint'}[M.orig.ext]:null;
+  $('dockIn').innerHTML=O?`<div class="row"><button class="btn dark grow" id="dlo">הורדה כ-${O}</button><button class="btn dark grow" id="dl">הורדה כ-PDF</button>${navigator.canShare?'<button class="btn" id="shr">שיתוף</button>':''}</div>`
+    :`<div class="row"><button class="btn dark grow" id="dl">${M.mode==='view'?'הורדת המסמך':signed===M.signers.length?'הורדת המסמך החתום':'הורדת עותק'}</button>${navigator.canShare?'<button class="btn" id="shr">שיתוף</button>':''}</div>`;
   $('dl').onclick=()=>download(false);if($('shr'))$('shr').onclick=()=>download(true);
+  if(O)$('dlo').onclick=()=>downloadOrig();
   $('after').innerHTML=cta(me&&me.status==='signed')+`<p class="foot">המסמך יימחק מהשרת ב-${fmt(M.expires).split(',')[0]}. <a href="${APP}" target="_blank" rel="noopener">סימן</a> · <a href="privacy.html" target="_blank" rel="noopener">פרטיות</a></p>`;
+}
+async function downloadOrig(){
+  const b=$('dlo');const t=b.textContent;b.disabled=true;b.textContent='מכין…';
+  try{const bytes=await SS.getOrig(ID,AUTH);
+    const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([bytes]));a.download=M.orig.name||`${M.title}.${M.orig.ext}`;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000);}
+  catch(e){alert('ההורדה נכשלה: '+(e.message||e));}
+  finally{b.disabled=false;b.textContent=t;}
 }
 async function download(share){
   const b=$('dl');const t=b.textContent;b.disabled=true;b.textContent='מכין…';

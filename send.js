@@ -27,6 +27,7 @@ async function api(path,opt={},ms=90000){
 const qs=a=>a.k?`?k=${encodeURIComponent(a.k)}`:a.t?`?t=${encodeURIComponent(a.t)}`:a.g?`?g=${encodeURIComponent(a.g)}${a.r?`&r=${encodeURIComponent(a.r)}`:''}`:`?v=${encodeURIComponent(a.v)}`;
 const getMeta=(id,a)=>api(`/${id}${qs(a)}`);
 const getPdf=(id,a)=>api(`/${id}/pdf${qs(a)}`);
+const getOrig=(id,a)=>api(`/${id}/orig${qs(a)}`); // 5.9.6: the original Word / Excel / PowerPoint of a view link
 const signLink=(id,t)=>`${HOST}/s/${id}/${t}`;
 const viewLink=(id,v)=>`${HOST}/v/${id}/${v}`;
 const groupLink=(id,t)=>`${HOST}/g/${id}/${t}`; // one link for a whole group: everyone writes their own name
@@ -575,6 +576,7 @@ async function upload(u,meta){
   try{
     const fd=new FormData();fd.append('meta',JSON.stringify({...meta,from:{name:o.sender&&o.sender.name||'',mail:o.sender&&o.sender.mail||''}}));
     fd.append('pdf',new Blob([o.bytes],{type:'application/pdf'}),'doc.pdf');
+    if(meta.mode==='view'&&o.orig)fd.append('orig',o.orig,o.orig.name); // 5.9.6: the Word / Excel / PowerPoint too: the one who opens the link chooses
     const r=await api('',{method:'POST',body:fd});
     const rec={id:r.id,k:r.owner,v:r.view,title:meta.title,mode:meta.mode,created:new Date().toISOString(),expires:r.expires,signers:(r.signers||[]).map(s=>({n:s.n,name:s.name,t:s.token})),note:meta.note||'',ask:meta.ask||''};
     listSet([rec,...listGet()]);u.dirty=false;busy(false);links(rec,o);
@@ -673,11 +675,12 @@ async function makeViewLink(o){
   const meta={mode:'view',title,signers:[],fields:[],pages:1,from:{name:o.sender&&o.sender.name||'',mail:o.sender&&o.sender.mail||''}};
   const fd=new FormData();fd.append('meta',JSON.stringify(meta));
   fd.append('pdf',new Blob([o.bytes],{type:'application/pdf'}),'doc.pdf');
+  if(o.orig)fd.append('orig',o.orig,o.orig.name);
   const r=await api('',{method:'POST',body:fd});
   const rec={id:r.id,k:r.owner,v:r.view,title,mode:'view',created:new Date().toISOString(),expires:r.expires,signers:[],note:'',ask:''};
   listSet([rec,...listGet()]);
   return {url:viewLink(rec.id,rec.v),text:msgFor(rec,null,o)};
 }
 
-window.SIMAN_SEND={open,openView,makeViewLink,list,links,close,buildSigned,getMeta,getPdf,api,signLink,viewLink,groupLink,ownerLink,findTargets,scanTargets,findBlanks,findBoxes,boxTargets,labelKind,hook:HOOK,HOST,devName,COLORS,TYPES,isOpen:()=>!!U};
+window.SIMAN_SEND={open,openView,makeViewLink,list,links,close,buildSigned,getMeta,getPdf,getOrig,api,signLink,viewLink,groupLink,ownerLink,findTargets,scanTargets,findBlanks,findBoxes,boxTargets,labelKind,hook:HOOK,HOST,devName,COLORS,TYPES,isOpen:()=>!!U};
 })();

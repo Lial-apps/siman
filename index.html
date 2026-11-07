@@ -1348,7 +1348,7 @@ body:has(#wed) .busy,body:has(#xed) .busy,body:has(#ped) .busy{z-index:1000}body
 </dialog>
 
 <header class="bar">
-  <div class="brand"><b title="גרסה 5.10.2">סימן</b><span class="ver">5.10.2</span><span class="fname" id="fname"></span></div>
+  <div class="brand"><b title="גרסה 5.9.6">סימן</b><span class="ver">5.9.6</span><span class="fname" id="fname"></span></div>
 
   <nav class="tools" id="tools" aria-label="כלים">
     <button class="tool" data-tool="select" aria-pressed="true" title="בחירה וגלילה (V)">
@@ -2834,7 +2834,7 @@ async function pageLines(P){
     });
     if(rtl){ // English words / numbers inside a Hebrew line read left-to-right
       for(let a=0;a<seq.length;a+=2){
-        if(!seq[a].ltr)continue;let b=a;while(b+2<seq.length&&(seq[b+2].ltr||(/^[-–\/.:,+×]{1,2}$/.test(seq[b+2].tok||'')&&!seq[b+1].sep&&b+4<seq.length&&!seq[b+3].sep&&seq[b+4].ltr)))b+=2; // 5.10.0: "1-9", "12/5", "3.5" stay one number (they came out as "9-1")
+        if(!seq[a].ltr)continue;let b=a;while(b+2<seq.length&&seq[b+2].ltr)b+=2;
         if(b>a){const part=seq.slice(a,b+1).reverse();seq.splice(a,part.length,...part);}a=b;
       }
     }
@@ -3726,11 +3726,7 @@ async function snipRegion(P,x,y,w,h){
     c.getContext('2d').drawImage(full,Math.round(x*k),Math.round(y*k),c.width,c.height,0,0,c.width,c.height);
     const blob=await new Promise(r=>c.toBlob(r,'image/png'));
     S.clip={src:c.toDataURL('image/png'),ratio:c.height/c.width,wPt:w/S.zoom};S.copied='image';updatePaste(true);
-    // 5.10.1: an area with lines of text goes to the clipboard also as text (Word / Excel / PowerPoint paste it as editable text)
-    let rich=null;try{rich=window.SIMAN_CONV&&await SIMAN_CONV.areaRich(P,x,y,w,h);}catch(_){}
-    if(rich&&rich.text.trim()){S.copiedText=rich.text;S.copiedHtml=rich.html;}else{S.copiedText='';S.copiedHtml='';}
-    const types={'image/png':blob};if(rich&&rich.text.trim()){types['text/html']=new Blob([rich.html],{type:'text/html'});types['text/plain']=new Blob([rich.text],{type:'text/plain'});}
-    try{try{await navigator.clipboard.write([new ClipboardItem(types)]);}catch(e1){if(Object.keys(types).length>1)await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]);else throw e1;}toast(IS_TOUCH?'האזור הועתק. לוחצים "הדבקה" כדי לשים אותו בדף, או מדביקים באפליקציה אחרת':'האזור הועתק. אפשר להדביק עם Ctrl+V או בכפתור "הדבקה"');}
+    try{await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]);toast(IS_TOUCH?'האזור הועתק. לוחצים "הדבקה" כדי לשים אותו בדף, או מדביקים באפליקציה אחרת':'האזור הועתק. אפשר להדביק עם Ctrl+V או בכפתור "הדבקה"');}
     catch(_){toast('האזור הועתק. לוחצים "הדבקה" כדי לשים אותו בדף');}
   }catch(e){console.error(e);toast('ההעתקה נכשלה');}
 }
@@ -5066,6 +5062,17 @@ function shareableFile(){const f=SH.file;if(!f)return null;if(canShareFile(f)||!
 $('shareBtn').onclick=()=>openShare();
 /* SEND FOR SIGNING / SHARE BY LINK — see send.js */
 const loadSend=()=>window.SIMAN_SEND?Promise.resolve():loadScript('send.js');
+// 5.9.6: a view link of a Word / Excel / PowerPoint file shared "as Word" keeps that file too, and the one who opens
+// the link chooses Word or PDF. Shared as PDF: only the PDF goes up (in Word, blacking out only covers the text).
+async function linkOrig(f){
+  if(SH.fmt!=='office'||!(S.office||SH.ext))return null;
+  try{
+    if(f&&/\.(docx|xlsx|pptx)$/i.test(f.name))return f;
+    const name=defaultShareName();if(!/\.(docx|xlsx|pptx)$/i.test(name))return null;
+    if(SH.ext)return new File([await SH.ext.api.share.file('office')],name);
+    return (await buildOfficeFile()).file;
+  }catch(e){console.warn('link orig',e);return null;}
+}
 async function sendLink(kind){
   const ext=SH.ext;
   if(!S.bytes&&!ext){toast('קודם פותחים מסמך');return;}
@@ -5073,6 +5080,7 @@ async function sendLink(kind){
   busy(true,kind==='sign'?'מכין את המסמך לחתימה…':'מכין קישור…');
   try{await loadSend();const bytes=ext?new Uint8Array(await (await ext.api.share.file('pdf')).arrayBuffer()):await buildPdf();busy(false);
     const o={bytes,name:fileName(),sender:{name:USER.name||'',mail:USER.mail||''},toast,save:(n,b,k)=>saveBytes(n,b,k)};
+    if(kind!=='sign')o.orig=await linkOrig(SH.file);
     if(kind==='sign')await SIMAN_SEND.open(o);else await SIMAN_SEND.openView(o);}
   catch(e){console.error(e);toast(e.message||String(e));}
   finally{busy(false);}
@@ -5163,10 +5171,10 @@ const ACTIONS={
       const w=window.open('about:blank','siman_wa'); // opened on the click itself, so it isn't blocked
       $('shareDlg').classList.add('wait');shStatus('מכין קישור לקובץ…');
       try{
-        // the link always opens a PDF (the server keeps PDF only): a Word / Excel / PowerPoint file is sent as its PDF
+        // the link always opens a PDF; a Word / Excel / PowerPoint file goes up too, and the one who opens it chooses (5.9.6)
         const bytes=f.type==='application/pdf'?new Uint8Array(await f.arrayBuffer())
           :SH.ext?new Uint8Array(await (await SH.ext.api.share.file('pdf')).arrayBuffer()):await buildPdf();
-        const r=await window.SIMAN_SEND.makeViewLink({bytes,name:f.name,sender:{name:USER.name||'',mail:USER.mail||''}});
+        const r=await window.SIMAN_SEND.makeViewLink({bytes,name:f.name,orig:await linkOrig(f),sender:{name:USER.name||'',mail:USER.mail||''}});
         const wa='https://wa.me/?text='+encodeURIComponent(r.text||(f.name+'\n'+r.url));
         if(w&&!w.closed)w.location.href=wa;else{S.noWarn=true;location.href=wa;setTimeout(()=>{S.noWarn=false;},2000);}
         $('shareDlg').classList.remove('wait');done('בוחרים שיחה בוואטסאפ ושולחים');return;
@@ -5320,7 +5328,7 @@ if('launchQueue' in window){
   launchQueue.setConsumer(async p=>{if(p.files&&p.files.length){for(const h of p.files){try{await openFile(await h.getFile(),h);}catch(e){console.error(e);}}}});
 }
 </script>
-<script src="siman-plus.js?v=5.10.1"></script>
+<script src="siman-plus.js?v=5.9.6"></script>
 <script>
 /* =====================================================================
    4.7 — launch period (4 months per user) + feature-use counting
@@ -5329,7 +5337,7 @@ if('launchQueue' in window){
    ===================================================================== */
 (function(){
   const STATUS_URL=(typeof REGISTER_URL!=='undefined'&&REGISTER_URL)?REGISTER_URL.replace(/\/register$/,'/status'):'';
-  const U_KEY='siman.usage', T_KEY='siman.trial', APP_VER='5.10.2';
+  const U_KEY='siman.usage', T_KEY='siman.trial', APP_VER='5.9.4';
   const today=()=>new Date().toISOString().slice(0,10);
   const rd=k=>{try{return JSON.parse(localStorage.getItem(k)||'null');}catch(_){return null;}};
   const wr=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch(_){}};
@@ -5417,7 +5425,7 @@ if('launchQueue' in window){
 <link rel="stylesheet" href="siman-phone.css?v=5.9.3">
 <script src="siman-phone.js?v=5.9.3" defer></script>
 <script src="a11y.js?v=5.9.3" defer></script>
-<script src="siman-voice.js?v=5.10.1" defer></script>
+<script src="siman-voice.js?v=5.9.6" defer></script>
 <script src="siman-back.js?v=5.9.3" defer></script>
 <!-- 5.9.3: one design for everyone (the ?beta=1 shell and the classic design were removed) -->
 <link rel="stylesheet" href="siman-v7.css?v=5.9.6">
@@ -5426,8 +5434,7 @@ if('launchQueue' in window){
 <script src="siman-scan.js?v=5.9.6" defer></script>
 <script src="siman-merge.js?v=5.9.6" defer></script>
 <script src="siman-ux.js?v=5.9.5" defer></script>
-<script src="siman-fill.js?v=5.10.2" defer></script>
-<script src="siman-convert.js?v=5.10.1" defer></script>
+<script src="siman-fill.js?v=5.9.6" defer></script>
 <link rel="stylesheet" href="siman-nb.css?v=5.9.5">
 <script src="siman-nb.js?v=5.9.5" defer></script>
 </body>
