@@ -93,7 +93,7 @@ html,body{margin:0;background:var(--bg);color:var(--n);font:15px/1.45 "Heebo",sy
 </div></div>
 <script src="pdf.min.js"></script>
 <script src="pdf-lib.min.js"></script>
-<script src="send.js"></script>
+<script src="send.js?v=596b"></script><!-- the version makes a browser that saved an older send.js take the new one -->
 <script>
 'use strict';
 const $=id=>document.getElementById(id);
@@ -225,7 +225,8 @@ function dockDone(me){
 }
 async function downloadOrig(){
   const b=$('dlo');const t=b.textContent;b.disabled=true;b.textContent='מכין…';
-  try{const bytes=await SS.getOrig(ID,AUTH);
+  try{// an older send.js (saved by the browser) has no getOrig: the same request directly
+    const bytes=SS.getOrig?await SS.getOrig(ID,AUTH):await SS.api(`/${ID}/orig?${AUTH.k?'k='+encodeURIComponent(AUTH.k):'v='+encodeURIComponent(AUTH.v)}`);
     const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([bytes]));a.download=M.orig.name||`${M.title}.${M.orig.ext}`;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000);}
   catch(e){alert('ההורדה נכשלה: '+(e.message||e));}
   finally{b.disabled=false;b.textContent=t;}
