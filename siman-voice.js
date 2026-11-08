@@ -96,6 +96,8 @@ const DB = (() => {
 
 /* ---------------- smart features (text only, only when asked) ---------------- */
 async function call(op, body, tries = 2) {
+  // 6.2: summaries, questions and translation of a transcript run on our server: an email first
+  if (window.cloudGate && !cloudGate('voice')) throw new Error(window.CLOUD_REG_MSG || 'צריך להירשם עם מייל');
   let last;
   for (let k = 0; k < tries; k++) {
     try {

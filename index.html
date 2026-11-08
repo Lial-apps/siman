@@ -1349,7 +1349,7 @@ body:has(#wed) .busy,body:has(#xed) .busy,body:has(#ped) .busy{z-index:1000}body
 </dialog>
 
 <header class="bar">
-  <div class="brand"><b title="גרסה 6.1">סימן</b><span class="ver">6.1</span><span class="fname" id="fname"></span></div>
+  <div class="brand"><b title="גרסה 6.2">סימן</b><span class="ver">6.2</span><span class="fname" id="fname"></span></div>
 
   <nav class="tools" id="tools" aria-label="כלים">
     <button class="tool" data-tool="select" aria-pressed="true" title="בחירה וגלילה (V)">
@@ -1546,6 +1546,9 @@ body:has(#wed) .busy,body:has(#xed) .busy,body:has(#ped) .busy{z-index:1000}body
       <select id="tpMode"><option value="inplace">בתוך המסמך: שומר על העיצוב המקורי</option><option value="text">כטקסט נפרד (לעריכה ולעיצוב)</option></select></label>
     <label class="field">היקף
       <select id="tpScope"><option value="all">כל המסמך</option><option value="cur">העמוד הנוכחי</option></select></label>
+    <label class="field">פנייה לקורא
+      <select id="tpAddress"><option value="auto">כמו במקור</option><option value="formal">רשמית ומנומסת</option><option value="m">לשון זכר</option><option value="f">לשון נקבה</option><option value="neutral">ניטרלית (פונה לכולם)</option></select></label>
+    <button type="button" class="btn tp-gl" id="tpGloss">📘 המילון שלי <span id="tpGlossN"></span></button>
     <div class="tp-actions">
       <button class="btn primary" id="tpGo">תרגום</button>
       <button class="btn hidden" id="tpStop">עצירה</button>
@@ -1690,7 +1693,7 @@ body:has(#wed) .busy,body:has(#xed) .busy,body:has(#ped) .busy{z-index:1000}body
     <p class="sh-status" id="regStatus" role="status"></p>
     <button type="submit" class="btn primary big" id="regGo">כניסה לסימן</button>
     <button type="button" class="btn big reg-later hidden" id="regLater">אולי אחר כך</button>
-    <p class="fmt-note">המייל משמש לשליחת קבצים אליך ולחשבון שלך בסימן. הקבצים עצמם נשארים במכשיר, חוץ ממסמך שבוחרים לשלוח בקישור (לחתימה או לצפייה), שנשמר אצלנו 30 יום ונמחק. נעדכן אותך במייל על שינויים חשובים בשירות, כמו מסלולים ומחירים. השימוש בכפוף ל<a href="terms.html" target="_blank" rel="noopener">תנאי השימוש</a> ול<a href="privacy.html" target="_blank" rel="noopener">מדיניות הפרטיות</a>.</p>
+    <p class="fmt-note">אין חובה חוקית למסור מייל, וגם בלעדיו כל הכלים שבמכשיר עובדים. המייל משמש לשליחת קבצים אליך, לחשבון שלך בסימן ולשירותים החכמים (העוזר, תרגום ושליחה לחתימה, שעוברים ל-Google Gemini רק כשמבקשים). הקבצים עצמם נשארים במכשיר, חוץ ממסמך שבוחרים לשלוח בקישור (לחתימה או לצפייה), שנשמר אצלנו 30 יום ונמחק. נעדכן אותך במייל על שינויים חשובים בשירות, כמו מסלולים ומחירים. השימוש בכפוף ל<a href="terms.html" target="_blank" rel="noopener">תנאי השימוש</a> ול<a href="privacy.html" target="_blank" rel="noopener">מדיניות הפרטיות</a>.</p>
   </form>
 </dialog>
 <dialog class="sig conv" id="fmtDlg" aria-labelledby="fmtTitle">
@@ -2923,7 +2926,7 @@ function currentPageIndex(){const m=/(\d+)/.exec($('pageInfo').textContent);retu
 
 function trSystem(target){
   const t=(TR_LANG[target]||TR_LANG.he).n;
-  return `You are a professional document translator. Translate the page the user sends into ${t}.\nOutput format, exactly:\nLANG: <ISO 639-1 code of the source text's main language>\n---\n<the translation>\nKeep paragraph breaks, headings, list numbering, numbers, names and line structure. Output only the translation, with no notes or explanations. If the text is already in ${t}, return it unchanged.`;
+  return `You are a professional document translator. Translate the page the user sends into ${t}.\nOutput format, exactly:\nLANG: <ISO 639-1 code of the source text's main language>\n---\n<the translation>\nKeep paragraph breaks, headings, list numbering, numbers, names and line structure. Output only the translation, with no notes or explanations. If the text is already in ${t}, return it unchanged.`+(trExtra(target)?'\n'+trExtra(target):'');
 }
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 // a translation must be all in the target language: words left in another alphabet (Russian, Arabic…)
@@ -3030,7 +3033,55 @@ async function trLines(items,target,o={}){
   if(err&&!res.some(Boolean))return{error:err};
   return{res,error:err||null};
 }
+/* 6.2: MY GLOSSARY and THE FORM OF ADDRESS. Terms in the glossary (names, brands, professional words) are swapped
+   for markers ⟦G1⟧ before the page is sent and put back after, so they always come out exactly as chosen —
+   with every service. The form of address (formal / masculine / feminine / neutral) is asked of the model. */
+const TRP_KEY='siman.tr.prefs';
+const trPrefs=()=>{try{const p=JSON.parse(localStorage.getItem(TRP_KEY)||'{}');return{address:p.address||'auto',glossary:Array.isArray(p.glossary)?p.glossary.filter(g=>g&&g.from):[]};}catch(_){return{address:'auto',glossary:[]};}};
+const ADDRESS_TXT={formal:'Address the reader formally and politely (in Hebrew: polite formal register, avoid slang).',m:'When the text addresses the reader, use the masculine singular forms (in Hebrew: לשון זכר).',f:'When the text addresses the reader, use the feminine singular forms (in Hebrew: לשון נקבה).',neutral:'When the text addresses the reader, use gender-neutral wording (in Hebrew: plural forms such as "אתם/ן" or infinitives like "יש למלא", never only masculine or only feminine).'};
+function trExtra(target){
+  const p=trPrefs();const out=[];
+  if(p.address!=='auto'&&ADDRESS_TXT[p.address])out.push(ADDRESS_TXT[p.address]);
+  if(p.glossary.length)out.push('Tokens like ⟦G1⟧ are fixed terms: copy them unchanged, exactly where they belong in the translated sentence.');
+  return out.join('\n');
+}
+function trMask(text){
+  const g=trPrefs().glossary;if(!g.length)return{text,un:t=>t};
+  const map=[];let out=text;
+  g.slice().sort((a,b)=>b.from.length-a.from.length).forEach((x,k)=>{
+    const tok='⟦G'+(k+1)+'⟧';const re=new RegExp('(^|[^\\p{L}\\p{N}])'+x.from.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'(?=$|[^\\p{L}\\p{N}])','gu');
+    const before=out;out=out.replace(re,(m,pre)=>pre+tok);if(out!==before)map.push([tok,x.to||x.from]);});
+  return{text:out,un:t=>{for(const[tok,to]of map)t=t.split(tok).join(to);return t.replace(/⟦G\d+⟧/g,'');}};
+}
+const trSavePrefs=p=>{try{localStorage.setItem(TRP_KEY,JSON.stringify(p));}catch(_){}};
+function trGlossUI(){
+  const p=trPrefs();$('tpAddress').value=p.address;$('tpGlossN').textContent=p.glossary.length?'('+p.glossary.length+')':'';
+}
+$('tpAddress').onchange=()=>{const p=trPrefs();p.address=$('tpAddress').value;trSavePrefs(p);};
+$('tpGloss').onclick=()=>{
+  const p=trPrefs();
+  const d=document.createElement('dialog');d.className='sig';d.setAttribute('aria-labelledby','glT');
+  d.innerHTML=`<div class="sig-in"><h2 id="glT">המילון שלי לתרגום</h2>
+    <p class="fmt-note">מונחים שתמיד יתורגמו בדיוק כמו שכתוב כאן: שמות, מותגים, מונחים מקצועיים. להשאיר בלי תרגום? כותבים אותו דבר בשני הצדדים. נשמר במכשיר.</p>
+    <div class="gl-rows"></div><button type="button" class="btn" data-a="add">+ עוד מונח</button>
+    <div class="sig-row"><span class="grow"></span><button class="btn" data-a="no" type="button">ביטול</button><button class="btn primary" data-a="ok" type="button">שמירה</button></div></div>`;
+  const rows=d.querySelector('.gl-rows');
+  const row=(a='',b='')=>{const r=document.createElement('div');r.className='gl-row';r.innerHTML=`<input placeholder="במקור (למשל: סימן)" aria-label="במקור" dir="auto"><span>←</span><input placeholder="בתרגום (למשל: Siman)" aria-label="בתרגום" dir="auto"><button type="button" class="btn" aria-label="הסרה" title="הסרה">×</button>`;
+    r.children[0].value=a;r.children[2].value=b;r.children[3].onclick=()=>r.remove();rows.append(r);};
+  (p.glossary.length?p.glossary:[{from:'',to:''}]).forEach(g=>row(g.from,g.to));
+  d.querySelector('[data-a=add]').onclick=()=>{row();rows.lastChild.children[0].focus();};
+  d.querySelector('[data-a=no]').onclick=()=>d.close();
+  d.querySelector('[data-a=ok]').onclick=()=>{p.glossary=[...rows.children].map(r=>({from:r.children[0].value.trim(),to:r.children[2].value.trim()})).filter(g=>g.from).slice(0,100);trSavePrefs(p);trGlossUI();d.close();toast(p.glossary.length?`נשמרו ${p.glossary.length} מונחים במילון`:'המילון ריק');};
+  d.addEventListener('close',()=>d.remove());document.body.append(d);d.showModal();
+};
+trGlossUI();
 async function callTranslate(text,target){
+  if(window.cloudGate&&!cloudGate('tr'))throw new Error(CLOUD_REG_MSG);
+  const mk=trMask(text);text=mk.text;
+  const r0=await callTranslate0(text,target);
+  return r0&&r0.raw?{...r0,raw:mk.un(r0.raw)}:r0;
+}
+async function callTranslate0(text,target){
   const sourceForeign=foreignWords(text,target).length; // the original's own words in that alphabet don't count
   let r=await callTranslateOnce(text,target,false);
   if(r.error||!r.raw)return r;
@@ -3063,9 +3114,10 @@ async function callTranslateOnce(text,target,second){
     const body=JSON.stringify({systemInstruction:{parts:[{text:trSystem(target)}]},contents:[{role:'user',parts:[{text:`<page>\n${text}\n</page>`}]}],generationConfig:{temperature:0.2,maxOutputTokens:16384}});
     for(let attempt=0;attempt<5;attempt++){
       const r=st.provider==='builtin'
-        ?((target==='he'||target==='en')&&!second
+        // 6.2: a chosen form of address goes with the request (the siman-ai service reads it as "style")
+        ?((target==='he'||target==='en')&&!second&&trPrefs().address==='auto'
           ?await fetchT(TRANSLATE_URL,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({text,target})})
-          :await fetchT(AI_URL,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({mode:'translate',text,target})}))
+          :await fetchT(AI_URL,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({mode:'translate',text,target,style:trExtra(target)})}))
         :await fetchT(url,{method:'POST',headers:{'content-type':'application/json','x-goog-api-key':key},body});
       const d=await r.json().catch(()=>({}));
       if(r.status===429||r.status===503){
@@ -4419,6 +4471,7 @@ async function convertTo(kind){
     await loadOfficeLibs();
     if(kind==='docxsmart'){
       if(!TRANSLATE_URL)throw new Error('שרת התרגום לא מוגדר');
+      if(!cloudGate('ai')){busy(false);return;}
       const res=await convertSmart(idx);const bytes=res.bytes;busy(false);
       const part=idx.length===S.pages.length?'':` - ${idx.length===1?'עמוד':'עמודים'} ${rangeLabel(idx)}`;
       const name=`${S.name.replace(/\.pdf$/i,'')}${part}.docx`;
@@ -4879,7 +4932,7 @@ $('setBtn').onclick=()=>openSettings();
 $('setCancel').onclick=()=>{setAfter=null;$('setDlg').close();};
 $('setForm').addEventListener('submit',e=>{
   const mail=$('setMail').value.trim(),name=$('setName').value.trim();
-  if(!validMail(mail)&&!(typeof IN_APPLE_STORE!=='undefined'&&IN_APPLE_STORE&&!mail)){e.preventDefault();$('setStatus').textContent=mail?'כתובת המייל לא תקינה. בדקו שיש בה @ ונקודה.':'צריך מייל כדי להשתמש בסימן.';$('setMail').focus();return;}
+  if(!validMail(mail)&&mail){e.preventDefault();$('setStatus').textContent=mail?'כתובת המייל לא תקינה. בדקו שיש בה @ ונקודה.':'צריך מייל כדי להשתמש בסימן.';$('setMail').focus();return;}
   const changed=mail!==USER.mail;
   USER={...USER,name,mail,cc:$('setCc').checked};
   try{localStorage.setItem(USER_KEY,JSON.stringify(USER));}catch(_){}
@@ -4902,13 +4955,34 @@ function registerUser(kind){
 const IN_APPLE_STORE=/(^|;\s*)app-platform=iOS(%20| )App(%20| )Store/i.test(document.cookie)||new URLSearchParams(location.search).get('store')==='apple';
 if(IN_APPLE_STORE){$('regLater').classList.remove('hidden');$('regNews').checked=false;
   $('regTitle').nextElementSibling.textContent='אפשר להירשם עם מייל כדי לקבל קבצים ועדכונים. זה לא חובה.';}
-function needReg(){return !IN_APPLE_STORE&&!validMail(USER.mail||'');}
-function showReg(){
+// 6.2: everything that runs on the device is open to everyone, without signing up (opening, marking, filling,
+// signing, scanning, converting, transcribing). An email is asked only for the services that run on our servers
+// and cost money (the AI assistant, translation, sending for signature, smart summaries) — and once, gently,
+// after the first file is saved.
+function needReg(){return false;}
+function needRegCloud(){return !IN_APPLE_STORE&&!validMail(USER.mail||'');}
+const REG_WHY={
+  ai:['העוזר החכם','שאלות, סיכומים וכתב יד רצים על שרת, אז לשירות הזה נרשמים עם מייל. זה חינם.'],
+  tr:['תרגום','התרגום רץ על שרת, אז לשירות הזה נרשמים עם מייל. זה חינם.'],
+  send:['שליחה לחתימה','המסמך נשמר אצלנו כדי שהחותמים יוכלו לפתוח אותו, אז נרשמים עם מייל. זה חינם.'],
+  voice:['סיכום התמליל','הסיכום והשאלות רצים על שרת, אז לשירות הזה נרשמים עם מייל. התמלול עצמו נשאר במכשיר.'],
+  soft:['שמרתם את הקובץ הראשון 🎉','רוצים להירשם? כך נשלח אליכם קבצים, ונפתח את העוזר החכם, התרגום והשליחה לחתימה. כל הכלים במכשיר נשארים פתוחים גם בלי.'],
+};
+const REG_SUB=$('regTitle').nextElementSibling.textContent;
+function showReg(why){
   const d=$('regDlg');if(d.open)return;
+  const w=REG_WHY[why];
+  $('regTitle').textContent=w?w[0]:'ברוכים הבאים לסימן';
+  $('regTitle').nextElementSibling.textContent=w?w[1]:REG_SUB;
+  $('regLater').classList.remove('hidden');$('regLater').textContent=why==='soft'?'אולי אחר כך':'לא עכשיו';
+  $('regGo').textContent=w&&why!=='soft'?'הרשמה והמשך':'כניסה לסימן';
   $('regMail').value=USER.mail||'';$('regName').value=USER.name||'';$('regStatus').textContent='';
   d.showModal();setTimeout(()=>$('regMail').focus(),50);
 }
-$('regDlg').addEventListener('cancel',e=>{if(IN_APPLE_STORE){regSkip();}else e.preventDefault();}); // Esc skips only where sign-up is optional
+// a service on our servers: true = go on; false = the sign-up window was opened instead
+window.cloudGate=why=>{if(!needRegCloud())return true;showReg(why);return false;};
+window.CLOUD_REG_MSG='כדי להשתמש בשירות הזה נרשמים עם מייל (חינם). אחרי ההרשמה נסו שוב';
+$('regDlg').addEventListener('cancel',e=>{e.preventDefault();regSkip();}); // Esc = "not now"
 function regSkip(){USER={...USER,skipped:true};try{localStorage.setItem(USER_KEY,JSON.stringify(USER));}catch(_){}
   $('regDlg').close();if(pendingOpen){const p=pendingOpen;pendingOpen=null;setTimeout(()=>openFile(p.f,p.h),0);}}
 $('regLater').onclick=regSkip;
@@ -4933,9 +5007,12 @@ $('setDelete').onclick=async()=>{
   if(needReg())setTimeout(showReg,300);
 };
 let pendingOpen=null;
-if(needReg()||(IN_APPLE_STORE&&!validMail(USER.mail||'')&&!USER.skipped))setTimeout(showReg,document.getElementById('intro')?1150:0);
-// people who signed up before the sign-up list existed are added once
-else if(!USER.sent&&validMail(USER.mail||'')){registerUser('existing');}
+// 6.2: no sign-up window on opening the app. People who signed up before the sign-up list existed are added once
+if(!USER.sent&&validMail(USER.mail||'')){registerUser('existing');}
+// …and once, gently, after the first file is saved (only if the person never said "later")
+{const _save=saveBytes;window.saveBytes=saveBytes=async function(...a){const r=await _save.apply(this,a);
+  try{if(r&&!validMail(USER.mail||'')&&!USER.skipped&&!USER.softAsked){USER={...USER,softAsked:true};localStorage.setItem(USER_KEY,JSON.stringify(USER));setTimeout(()=>showReg('soft'),1200);}}catch(_){}
+  return r;};}
 
 /* =====================================================================
    COMMAND BAR (Ctrl+K) — write what you want to do, in your own words
@@ -4973,6 +5050,9 @@ const CMDS=[
   {l:'הדפסה',k:'הדפס הדפסה מדפסת print',key:'Ctrl P',doc:1,run:()=>printDoc()},
   {l:'השחרה של מידע רגיש',k:'השחר השחרה הסתר הסתרה צנזור מחק פרטים redact',key:'D',doc:1,run:()=>setTool('redact')},
   {l:'חיפוש והשחרה אוטומטית של מידע רגיש (ת.ז, טלפון, מייל, אשראי)',k:'השחרה אוטומטית מידע רגיש תעודת זהות ת.ז טלפון מייל אשראי פרטיות auto redact',doc:1,run:()=>{setTool('redact');window.SIMAN_PRO&&SIMAN_PRO.autoRedact();}},
+  {l:'חתימה פנים מול פנים (מעבירים את המכשיר לחותם)',k:'חתימה פנים מול פנים לקוח חותם במקום טאבלט קיוסק העבר מכשיר in person kiosk sign',doc:1,run:()=>window.SIMAN_PRO&&SIMAN_PRO.inPerson()},
+  {l:'חותמת עסק (ח.פ, עמותה)',k:'חותמת חותמות עסק חברה עמותה ח.פ חפ ע.מ stamp seal',doc:1,run:()=>window.SIMAN_PRO&&SIMAN_PRO.stampDialog()},
+  {l:'העתקת התאריך העברי של היום',k:'תאריך עברי לועזי היום עברית יום חודש שנה hebrew date',run:async()=>{const d=window.SIMAN_HEBDATE&&SIMAN_HEBDATE();if(!d)return;try{await navigator.clipboard.writeText(d);toast('הועתק: '+d);}catch(_){toast(d);}}},
   {l:'דחיסת PDF (קובץ קטן יותר)',k:'דחוס דחיסה כווץ הקטן גודל קובץ קטן compress reduce size',doc:1,run:()=>window.SIMAN_PRO&&SIMAN_PRO.compressDialog()},
   {l:'מחק',k:'מחק מחיקה מחקן eraser',key:'E',doc:1,run:()=>setTool('eraser')},
   {l:'העתקת אזור כתמונה',k:'העתק העתקה גזור צילום מסך snip copy',key:'C',doc:1,run:()=>setTool('snip')},
@@ -5518,8 +5598,8 @@ if('launchQueue' in window){
 <script src="siman-scan.js?v=5.9.6" defer></script>
 <script src="siman-merge.js?v=5.9.6" defer></script>
 <script src="siman-ux.js?v=5.9.5" defer></script>
-<script src="siman-fill.js?v=5.9.6" defer></script>
-<script src="siman-pro.js?v=6.1" defer></script>
+<script src="siman-fill.js?v=6.2" defer></script>
+<script src="siman-pro.js?v=6.2" defer></script>
 <link rel="stylesheet" href="siman-nb.css?v=5.9.5">
 <script src="siman-nb.js?v=5.9.5" defer></script>
 </body>

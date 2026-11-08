@@ -623,6 +623,8 @@ window.SIMAN_TABS = { TB, switchTo, closeTab, mergeAll, zipAll, openMany, tabInf
    2. AI — the smart server (siman-ai)
    ===================================================================== */
 async function ai(payload, { onWait, signal, timeout = 300000 } = {}) {
+  // 6.2: the smart services run on our server: they ask for an email first (the tools on the device do not)
+  if (window.cloudGate && !cloudGate('ai')) throw new Error(window.CLOUD_REG_MSG || 'צריך להירשם עם מייל');
   for (let attempt = 0; attempt < 4; attempt++) {
     // 5.9.6: with no internet at all there is nothing to wait for (before: three retries, 30 seconds of "working")
     if (navigator.onLine === false) throw new Error('אין חיבור לאינטרנט');

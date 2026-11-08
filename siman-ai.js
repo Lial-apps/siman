@@ -197,8 +197,10 @@ function build(body) {
     const text = String(body.text || '');
     if (!LANGS[t]) return { err: 'unknown target language' };
     if (!text.trim() || text.length > 60000) return { err: 'text missing or too long' };
+    // 6.2: the app may add the form of address (formal / masculine / feminine / neutral) and the glossary rule
+    const style = String(body.style || '').slice(0, 1500).replace(/[<>]/g, '');
     return {
-      systemInstruction: { parts: [{ text: PROMPTS.translate(t) }] },
+      systemInstruction: { parts: [{ text: PROMPTS.translate(t) + (style ? '\n' + style : '') }] },
       contents: [{ role: 'user', parts: [{ text: `<page>\n${text}\n</page>` }] }],
       generationConfig: { temperature: 0.2, maxOutputTokens: 16384 },
     };

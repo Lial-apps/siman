@@ -18,6 +18,8 @@ const today=()=>new Date().toLocaleDateString('he-IL',{day:'2-digit',month:'2-di
 
 /* ------------------------------------------------------------ server */
 async function api(path,opt={},ms=90000){
+  // 6.2: sending a document (it is kept on our server for the signers) asks for an email first; opening a link does not
+  if(opt.method==='POST'&&path===''&&window.cloudGate&&!cloudGate('send'))throw new Error(window.CLOUD_REG_MSG||'צריך להירשם עם מייל');
   // 5.9.6: a request that hangs ends after a minute and a half with a clear message (before: "מעלה…" forever)
   const c=new AbortController(),tm=setTimeout(()=>c.abort(),ms);
   let r;try{r=await fetch(API+path,{...opt,signal:c.signal});}catch(e){throw new Error(e&&e.name==='AbortError'?'השרת לא ענה בזמן. בדקו את האינטרנט ונסו שוב':'אין חיבור לאינטרנט, או שהשירות לא זמין כרגע');}finally{clearTimeout(tm);}
