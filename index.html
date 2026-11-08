@@ -5441,8 +5441,10 @@ function waPhoneChoice(f,err){
     :`הטלפון לא מעביר קובץ ${kind||'מהסוג הזה'} ישירות לוואטסאפ. איך לשלוח?`;
   const bLink=link?`<button class="btn${pdfOk?'':' primary'}" type="button" data-w="link">🔗 ${pdfOk?'קישור'+(kind?' שפותח גם את קובץ ה-'+kind:' לקובץ'):'שליחה בוואטסאפ, כקישור לקובץ'}</button>`:'';
   const bPdf=pdfOk?`<button class="btn primary" type="button" data-w="pdf">📄 ${f.type==='application/pdf'?'שוב לוואטסאפ':'כ-PDF, ישר לוואטסאפ'}</button>`:'';
+  // Samsung Internet: Chrome on the same phone hands the file itself to WhatsApp
+  const tip=!files&&/SamsungBrowser/i.test(navigator.userAgent)?'<small class="wa-tip">טיפ: בדפדפן Chrome הטלפון מעביר לוואטסאפ את הקובץ עצמו. אפשר לפתוח שם את סימן ולהתקין אותו ממנו.</small>':'';
   shStatus(`<div class="wa-choice"><b>${head}</b>${pdfOk?bPdf+bLink:bLink+bPdf}
-    <button class="btn" type="button" data-w="dl">⬇ הורדה לטלפון</button></div>`,true);
+    <button class="btn" type="button" data-w="dl">⬇ הורדה לטלפון</button>${tip}</div>`,true);
   const box=$('shareStatus');
   const bp=box.querySelector('[data-w=pdf]');if(bp)bp.onclick=async()=>{
     $('shareDlg').classList.add('wait');shStatus('מכין גרסת PDF…');
