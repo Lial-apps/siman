@@ -56,6 +56,23 @@ async function pagesToPdf(pages){
 
 /* ---------- Word ---------- */
 // the top and bottom of every line of text, picture and short table row, in px from the top of the section
+/* 6.2.1: the blanks of a paragraph — runs of underscores or dots, the lines of a form ("שם: ______").
+   Their place on the shown page is kept, in the order they appear in the text, so a value written on one
+   of them can be put back into the Word file on that very line (and Word lays it out itself). */
+const BLANK_RE=/_{3,}|\.{5,}|…{2,}/g;
+function blanksOf(p,R){
+  const walker=document.createTreeWalker(p,NodeFilter.SHOW_TEXT);const nodes=[];let all='',n;
+  while((n=walker.nextNode())){nodes.push([n,all.length]);all+=n.data;}
+  const out=[];BLANK_RE.lastIndex=0;let m;
+  while((m=BLANK_RE.exec(all))){
+    const s=m.index,e=s+m[0].length;let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
+    for(const[node,o]of nodes){const a=Math.max(s,o),b=Math.min(e,o+node.data.length);if(a>=b)continue;
+      const rg=document.createRange();rg.setStart(node,a-o);rg.setEnd(node,b-o);
+      for(const r of rg.getClientRects()){if(!r.width)continue;x0=Math.min(x0,r.left-R.left);x1=Math.max(x1,r.right-R.left);y0=Math.min(y0,r.top-R.top);y1=Math.max(y1,r.bottom-R.top);}}
+    out.push(x1>x0?{x0,x1,y0,y1}:null);
+  }
+  return out;
+}
 function lineBoxes(sec,R,H){
   const out=[],rg=document.createRange(),tw=document.createTreeWalker(sec,NodeFilter.SHOW_TEXT);
   for(let t=tw.nextNode();t;t=tw.nextNode()){
@@ -93,7 +110,7 @@ async function docxToPages(bytes,progress){
       const total=Math.max(sec.scrollHeight,H);
       // body-level paragraphs (for anchoring marks back into the file)
       const art=sec.querySelector(':scope>article')||sec;
-      for(const p of art.children)if(p.tagName==='P')paras.push({sec:si,top:p.getBoundingClientRect().top-R.top});
+      for(const p of art.children)if(p.tagName==='P')paras.push({sec:si,top:p.getBoundingClientRect().top-R.top,blanks:blanksOf(p,R)});
       // safe places to cut a page that runs longer than one sheet
       const cuts=[...art.querySelectorAll('p,tr,li,img,h1,h2,h3,h4,h5,h6')].map(e=>e.getBoundingClientRect().bottom-R.top).filter(b=>b>0).sort((a,b)=>a-b);
       // every line of text and every picture: a page is never cut through one of them (a cut through a line
@@ -296,10 +313,12 @@ async function exportDocx(src,map,items){
   let z=251700000;
   await ensurePng(zip);
   const relsPath='word/_rels/document.xml.rels';
-  let placed=0;
+  let placed=0,inline=0;
   for(const it of items){
     const pm=map.pages[it.page];if(!pm)continue;
     const yy=pm.top+(it.y-pm.pad);       // y inside the rendered section
+    // 6.2.1: on a blank line of the form → written into the text there, so Word places it itself
+    if(same&&(await intoBlank(zip,relsPath,R,bodyP,pm,it,yy,id))){id++;placed++;inline++;continue;}
     // last body paragraph at or above the mark, in the same section
     let pi=-1;for(let i=0;i<R.length;i++){if(R[i].sec!==pm.sec)continue;if(R[i].top<=yy+1)pi=i;else if(pi>=0)break;}
     if(pi<0)pi=R.findIndex(p=>p.sec===pm.sec);
@@ -315,7 +334,87 @@ async function exportDocx(src,map,items){
     id++;z+=2;placed++;
   }
   zip.file(docPath,ser(dom));
-  return{bytes:await zip.generateAsync({type:'uint8array',compression:'DEFLATE'}),placed,exact:same};
+  return{bytes:await zip.generateAsync({type:'uint8array',compression:'DEFLATE'}),placed,inline,exact:same};
+}
+/* 6.2.1: a value or a signature that sits on a blank line ("שם: ______") goes into the Word text in place of
+   the underscores: text as an underlined run in the same font, a signature as a picture inside the line.
+   (Floating boxes placed by their spot on the shown page landed elsewhere in Word: Word lays the line out with
+   its own fonts and tab widths, so the blank is not where it was on the screen.) */
+const W_NS='http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+function findBlank(R,pm,it,yy){
+  const ix0=it.x,ix1=it.x+Math.max(1,it.w),iy0=yy,iy1=yy+Math.max(1,it.h);
+  let best=null,score=0;
+  R.forEach((p,pi)=>{if(p.sec!==pm.sec||!p.blanks)return;
+    p.blanks.forEach((b,k)=>{if(!b)return;
+      const ox=Math.min(ix1,b.x1)-Math.max(ix0,b.x0);if(ox<=0)return;
+      // the value sits on the line: its bottom near the line, or the line inside it (a signature goes a little above)
+      const lineH=b.y1-b.y0,near=iy1>=b.y0-lineH*.6&&iy0<=b.y1+lineH*.4;if(!near)return;
+      const s=ox/Math.min(ix1-ix0,b.x1-b.x0)-Math.abs((iy0+iy1)/2-(b.y0+b.y1)/2)/(lineH*4+1);
+      if(s>score){score=s;best={pi,k};}});});
+  return score>.25?best:null;
+}
+async function intoBlank(zip,relsPath,R,bodyP,pm,it,yy,id){
+  const hit=findBlank(R,pm,it,yy);if(!hit)return false;
+  const para=bodyP[hit.pi];if(!para)return false;
+  // the text of the paragraph's own runs, in order (not inside text boxes or drawings)
+  const inside=t=>{for(let n=t.parentNode;n&&n!==para;n=n.parentNode)if(/^(txbxContent|drawing|pict|AlternateContent)$/.test(n.localName))return true;return false;};
+  const ts=[...para.getElementsByTagNameNS(W_NS,'t')].filter(t=>!inside(t));
+  let all='';const at=[];for(const t of ts){at.push(all.length);all+=t.textContent;}
+  // blanks already filled in this paragraph are gone from the text: the wanted one moved up by that many
+  const used=para.__simanUsed||(para.__simanUsed=new Set());if(used.has(hit.k))return false;
+  const want=hit.k-[...used].filter(u=>u<hit.k).length;
+  const re=new RegExp(BLANK_RE.source,'g');let m,k=-1;while((m=re.exec(all))){if(++k===want)break;}
+  if(!m||k!==want)return false;
+  used.add(hit.k);
+  const s=m.index,e=s+m[0].length;
+  const a=ts.findIndex((t,i)=>s>=at[i]&&s<at[i]+t.textContent.length),b=ts.findIndex((t,i)=>e-1>=at[i]&&e-1<at[i]+t.textContent.length);
+  if(a<0||b<0)return false;
+  const doc=para.ownerDocument,tA=ts[a],runA=tA.parentNode,txtA=tA.textContent,txtB=ts[b].textContent;
+  const before=txtA.slice(0,s-at[a]),after=txtB.slice(e-at[b]);
+  const rPrA=[...runA.childNodes].find(c=>c.localName==='rPr');
+  const mk=tag=>doc.createElementNS(W_NS,'w:'+tag);
+  const newRun=()=>{const r=mk('r');if(rPrA)r.appendChild(rPrA.cloneNode(true));return r;};
+  // the value's run
+  const vr=newRun();
+  if(it.type==='text'){
+    let rPr=[...vr.childNodes].find(c=>c.localName==='rPr');if(!rPr){rPr=mk('rPr');vr.insertBefore(rPr,vr.firstChild);}
+    for(const c of [...rPr.childNodes])if(c.localName==='u'||c.localName==='rtl')rPr.removeChild(c);
+    const u=mk('u');u.setAttributeNS(W_NS,'w:val','single');rPr.appendChild(u);
+    if(HEB.test(it.text))rPr.appendChild(mk('rtl'));
+    lines(it.text).forEach((l,i)=>{if(i)vr.appendChild(mk('br'));const t=mk('t');t.setAttribute('xml:space','preserve');t.textContent=' '+l.trim()+' ';vr.appendChild(t);});
+  }else{
+    // a signature (or a check mark): a picture tied to this spot in the text, so it moves with the line in Word,
+    // lying over the line, which stays. (A picture inside the line was cut to the height of the text when Word
+    // saves as PDF.) It sits on the line, a little above it, and runs along the blank.
+    const ext=it.ext||'png',name=freeName(zip,'word/media','siman',ext);zip.file(name,it.bytes);
+    const rid=await relsAdd(zip,relsPath,REL_IMG,name.replace('word/',''));
+    const bl=R[hit.pi].blanks[hit.k],blankW=Math.max(1,bl.x1-bl.x0);
+    const sc=Math.min(1,blankW*1.15/Math.max(1,it.w),48/Math.max(1,it.h)),cx=Math.round(Math.max(1,it.w)*sc*EMU),cy=Math.round(Math.max(1,it.h)*sc*EMU);
+    const szEl=rPrA&&[...rPrA.childNodes].find(c=>c.localName==='sz'),fontPt=szEl?(+szEl.getAttributeNS(W_NS,'val')||24)/2:12;
+    const voff=Math.round(-(cy-fontPt*12700));
+    const xml=`<w:r><w:drawing><wp:anchor distT="0" distB="0" distL="0" distR="0" simplePos="0" relativeHeight="${251700000+id}" behindDoc="0" locked="0" layoutInCell="1" allowOverlap="1"><wp:simplePos x="0" y="0"/><wp:positionH relativeFrom="character"><wp:posOffset>${-cx}</wp:posOffset></wp:positionH><wp:positionV relativeFrom="line"><wp:posOffset>${voff}</wp:posOffset></wp:positionV><wp:extent cx="${cx}" cy="${cy}"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:wrapNone/><wp:docPr id="${id}" name="סימן ${id}"/><wp:cNvGraphicFramePr/><a:graphic><a:graphicData uri="${NS.pic}"><pic:pic><pic:nvPicPr><pic:cNvPr id="${id}" name="סימן ${id}"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="${rid}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:anchor></w:drawing></w:r>`;
+    const imported=doc.importNode(parse(`<x ${FRAG_NS}>${xml}</x>`).documentElement.firstElementChild,true);
+    if(rPrA)imported.insertBefore(rPrA.cloneNode(true),imported.firstChild);
+    // the run is split just before the blank: [before] [the picture] [the blank and what follows in that run]
+    tA.textContent=before;tA.setAttribute('xml:space','preserve');
+    const rest=newRun(),rt=mk('t');rt.setAttribute('xml:space','preserve');rt.textContent=txtA.slice(s-at[a]);rest.appendChild(rt);
+    runA.parentNode.insertBefore(imported,runA.nextSibling);
+    imported.parentNode.insertBefore(rest,imported.nextSibling);
+    used.delete(hit.k); // the blank is still there (the picture lies over it): the count of blanks does not change
+    return true;
+  }
+  return place(vr);
+  function place(run){
+    // the blank's underscores leave; what was before and after them in the same runs stays
+    tA.textContent=before;tA.setAttribute('xml:space','preserve');
+    for(let i=a+1;i<b;i++)ts[i].textContent='';
+    let tail=null;
+    if(a===b){if(after){tail=newRun();const t=mk('t');t.setAttribute('xml:space','preserve');t.textContent=after;tail.appendChild(t);}}
+    else{ts[b].textContent=after;ts[b].setAttribute('xml:space','preserve');}
+    runA.parentNode.insertBefore(run,runA.nextSibling);
+    if(tail)run.parentNode.insertBefore(tail,run.nextSibling);
+    return true;
+  }
 }
 
 /* ------------------------------------------------------------ Excel export */
