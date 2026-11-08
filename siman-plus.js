@@ -85,6 +85,10 @@ body.ed-live #aiPanel{position:fixed;z-index:960;top:40px;bottom:0;inset-inline-
 .ai-wait::before{content:"";width:10px;height:10px;border-radius:50%;background:var(--marker);animation:aiPulse 1s ease-in-out infinite alternate}
 @keyframes aiPulse{to{transform:scale(.5);opacity:.5}}
 .ai-err{color:var(--danger,#C2362B);font-size:13.5px}
+.ai-multi{display:flex;gap:9px;align-items:flex-start;border:1px dashed var(--blue);border-radius:12px;padding:8px 10px;cursor:pointer;font-size:13.5px}
+.ai-multi:has(input:checked){border-style:solid;background:color-mix(in srgb,var(--blue) 8%,transparent)}
+.ai-multi input{margin-top:3px;width:16px;height:16px;flex:none}
+.ai-multi small{display:block;color:var(--muted);font-size:12px}
 .ai-chip.follow{border-style:dashed;border-color:var(--blue);color:var(--blue);text-align:start}
 .ai-chip.follow::before{content:"↳ ";opacity:.7}
 .ai-chips.study{align-items:center;padding-top:6px;border-top:1px dashed var(--line)}
@@ -752,6 +756,38 @@ const ED_CHIPS = {
   pptx: [['שקף פתיחה', 'הכן שקף פתיחה בתחילת המצגת, עם כותרת וכותרת משנה מתאימות לתוכן.'], ['שקף סיכום', 'הוסף בסוף המצגת שקף סיכום עם 3 עד 5 נקודות עיקריות מהמצגת.'], ['עיצוב אחיד', 'עצב את המצגת בצורה אחידה: כל הכותרות מודגשות באותו גופן ובאותו צבע.'], ['רקע לשקפים', 'שנה את הרקע של כל השקפים לכחול כהה, ואת כל הטקסט ללבן.'], ['תוכן עניינים', 'הוסף אחרי השקף הראשון שקף תוכן עניינים עם הכותרות של השקפים.']],
 };
 const edKind = () => onEditor() ? TB.cur.ed : null;
+/* 6.1: one question about all the PDF files open in tabs (compare two contracts, find a detail in one of five files) */
+const pdfTabs = () => TB.list.filter(t => !t.ed && tabData(t).doc && tabData(t).pages && tabData(t).pages.length);
+const MULTI = { on: false };
+const MULTI_TAIL = '\n\n(Several documents are given, each starting with a line like "##### קובץ 2: name #####". Use all of them; when they differ, say how. Cite every fact as [קובץ 2, עמ\' 3] — the file number and the page — instead of a page alone.)';
+async function pagesText(pages, cap) {
+  const parts = []; let total = 0;
+  for (let i = 0; i < pages.length && total < cap; i++) {
+    let t = '';
+    try {
+      const P = pages[i], lines = await pageLines(P);
+      if (lines) { const out = []; let prev = null; for (const L of lines) { if (prev && prev.y - L.y > Math.max(prev.h, L.h) * 1.9) out.push(''); out.push(L.text); prev = L; } t = out.join('\n'); }
+      else if (P.tilted) { for (const it of P.tilted) { t += it.str; if (it.hasEOL) t += '\n'; } }
+    } catch (_) {}
+    const part = `===== עמוד ${i + 1} =====\n${t.trim()}`; parts.push(part); total += part.length;
+  }
+  return parts.join('\n\n');
+}
+async function allText() {
+  const tabs = pdfTabs(), cap = Math.floor(380000 / Math.max(1, tabs.length));
+  const out = [];
+  for (const [k, t] of tabs.entries()) {
+    const body = t === TB.cur ? (await docText()).slice(0, cap) : await pagesText(tabData(t).pages, cap);
+    out.push(`##### קובץ ${k + 1}: ${dispName(tabName(t))} #####\n${body}`);
+  }
+  return { text: out.join('\n\n'), tabs };
+}
+async function citeFile(f, p) {
+  const t = MULTI.tabs && MULTI.tabs[f - 1];
+  if (!t || !TB.list.includes(t)) { toast('הקובץ הזה כבר לא פתוח'); return; }
+  if (TB.cur !== t) { await switchTo(t); await new Promise(r => setTimeout(r, 400)); }
+  citeJump(p, MULTI.line || '');
+}
 const chipsNow = () => { const k = edKind(); return k && ED_CHIPS[k] && window.OFFICE_AI ? ED_CHIPS[k] : CHIPS; };
 const AS = {
   hist: new Map(),           // tab id -> [{q,a}] or {err}
@@ -782,7 +818,8 @@ $('trBtn').addEventListener('click', () => { if (!$('tpanel').classList.contains
 
 function citeHtml(text) {
   // [עמ' 3] / [עמ׳ 3-4] / [p. 3] / [pp. 3, 5] → buttons that jump to the page
-  return esc(text).replace(/\[(?:עמ['׳]?|עמוד|עמודים|p\.|pp\.|page|стр\.|ص)\s*([\d\s,–-]+)\]/gi, (m, nums) => {
+  // 6.1: [קובץ 2, עמ' 3] / [file 2, p. 3] → a button that opens that file at that page
+  return esc(text).replace(/\[(?:קובץ|file)\s*(\d+)\s*[,،]\s*(?:עמ['׳]?|עמוד|p\.|page)\s*(\d+)[^\]]*\]/gi, (m, f, p) => `<button class="cite" type="button" data-f="${f}" data-p="${p}" title="פתיחת קובץ ${f} בעמוד ${p}">${esc(m.slice(1, -1))}</button>`).replace(/\[(?:עמ['׳]?|עמוד|עמודים|p\.|pp\.|page|стр\.|ص)\s*([\d\s,–-]+)\]/gi, (m, nums) => {
     const first = parseInt(nums, 10);
     return Number.isFinite(first) ? `<button class="cite" type="button" data-p="${first}" title="מעבר לעמוד ${first}">${esc(m.slice(1, -1))}</button>` : m;
   });
@@ -797,7 +834,12 @@ function answerEl(a, q, plain, it) {
   acts.querySelector('[data-a=read]').onclick = () => RA.speakText(a.replace(/\[[^\]]*\]/g, ''));
   el.append(acts);
   if (it && it.res && (it.res.asked || it.res.done)) el.append(resultEl(it));
-  el.addEventListener('click', e => { const b = e.target.closest('.cite'); if (b) citeJump(+b.dataset.p, (b.closest('p,.an,.leaf,summary') || el).textContent); });
+  el.addEventListener('click', e => {
+    const b = e.target.closest('.cite'); if (!b) return;
+    const line = (b.closest('p,.an,.leaf,summary') || el).textContent;
+    if (b.dataset.f) { MULTI.tabs = it && it.tabs; MULTI.line = line; citeFile(+b.dataset.f, +b.dataset.p); return; }
+    citeJump(+b.dataset.p, line);
+  });
   if (it && it.kind) { el.innerHTML = ''; el.append(studyEl(it, a)); el.append(acts); }
   return el;
 }
@@ -936,6 +978,14 @@ function renderLog() {
   }
   $('aiQ').disabled = $('aiSend').disabled = AS.isBusy(); $('aiRead').disabled = false;
   $('aiQ').placeholder = edKind() && window.OFFICE_AI ? 'מה לעשות בקובץ?' : 'שאלו כל דבר על המסמך…';
+  // 6.1: two PDF files or more open: one switch asks about all of them together
+  const nPdf = !edKind() ? pdfTabs().length : 0;
+  if (nPdf > 1) {
+    const sw = h(`<label class="ai-multi"><input type="checkbox"${MULTI.on ? ' checked' : ''}><span><b>לשאול על כל ${nPdf} הקבצים הפתוחים</b><small>להשוואה בין חוזים, הצעות מחיר או גרסאות, ולמציאת פרט באחד מהם</small></span></label>`);
+    sw.querySelector('input').onchange = e => { MULTI.on = e.target.checked; $('aiQ').placeholder = MULTI.on ? `שאלו על כל ${nPdf} הקבצים… (למשל: מה ההבדלים ביניהם?)` : 'שאלו כל דבר על המסמך…'; };
+    log.append(sw);
+    if (MULTI.on) $('aiQ').placeholder = `שאלו על כל ${nPdf} הקבצים… (למשל: מה ההבדלים ביניהם?)`;
+  }
   const items = AS.list();
   if (!items.length) {
     if (edKind() && window.OFFICE_AI) log.append(h(`<div class="ai-hello">כתבו או אמרו מה לעשות ב-<b></b>, ואני אבצע: כותרת, עיצוב, טבלאות, תוכן חדש ועוד. אפשר גם לשאול שאלות על הקובץ.</div>`));
@@ -1005,13 +1055,17 @@ async function askQ(q, label, kind) {
       }
       return;
     }
-    const text = await docText();
     it.plain = onEditor();
+    // 6.1: all the open PDF files together
+    const multi = !it.plain && MULTI.on && pdfTabs().length > 1;
+    let text;
+    if (multi) { it.wait = 'קורא את כל הקבצים הפתוחים…'; renderLog(); const r = await allText(); text = r.text; it.tabs = r.tabs; it.label = (it.label || q) + ` · ${r.tabs.length} קבצים`; }
+    else text = await docText();
     const empty = it.plain ? !text.replace(/=====.*?=====/g, '').replace(/שורה \d+:/g, '').trim() : !hasRealText(text);
     if (empty) { if (it.plain) { it.err = 'הקובץ ריק, אין עדיין על מה לשאול'; return; } it.err = 'לא מצאתי טקסט במסמך. כנראה שהוא סרוק או מצולם — אפשר לזהות בו את הטקסט קודם:'; it.scanned = true; return; }
     const history = list.filter(x => x.a && x !== it).slice(-4).map(x => ({ q: x.q, a: x.a }));
     const followOk = !kind && !it.plain;
-    it.a = await ai({ mode: 'ask', text, question: followOk ? q + FOLLOW_TAIL : q, history: history.map(x => ({ q: x.q, a: x.a.replace(/^❓.*$/gm, '').trim() })) }, { onWait: s => { it.wait = `השירות עמוס, מנסה שוב בעוד ${s} שניות…`; const w = document.getElementById('aiWait'); if (w && AS.key() === tabKey) w.textContent = it.wait; } });
+    it.a = await ai({ mode: 'ask', text, question: (multi ? q + MULTI_TAIL : q) + (followOk ? FOLLOW_TAIL : ''), history: history.map(x => ({ q: x.q, a: x.a.replace(/^❓.*$/gm, '').trim() })) }, { onWait: s => { it.wait = `השירות עמוס, מנסה שוב בעוד ${s} שניות…`; const w = document.getElementById('aiWait'); if (w && AS.key() === tabKey) w.textContent = it.wait; } });
     if (followOk) { const f = splitFollow(it.a); it.a = f.a; it.follow = f.follow; }
   } catch (e) { it.err = e.message || String(e); }
   finally { AS.busySet.delete(tabKey); renderTabs(); if (AS.key() === tabKey) renderLog(); }

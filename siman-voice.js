@@ -301,11 +301,18 @@ function partsFromTurns(pcm, turns) {
   }
   return out;
 }
+const HALLU = '(?:תודה (?:רבה )?(?:שצפיתם|על הצפייה|שהאזנתם|על ההאזנה)|(?:אל תשכחו )?(?:להירשם|הירשמו) (?:ל|א)ערוץ[^.!?]*|כתוביות(?: ותרגום)?(?: על ידי| ע"י| :|:)[^.!?]*|תורגם (?:על ידי|ע"י)[^.!?]*|תרגום:[^.!?]*|thanks? (?:you )?for watching|subtitles? by[^.!?]*|subscribe to (?:the|my|our) channel|amara\\.org[^.!?]*|transcribed by[^.!?]*)[.!?…]*';
+const HALLU_ALL = new RegExp('^[\\s.,!?…-]*' + HALLU + '[\\s.,!?…-]*$', 'i');
+const HALLU_END = new RegExp('[\\s.,]+' + HALLU + '[\\s.!?…]*$', 'i');
 // what the engine wrote: loops of the same words (a known Whisper habit) are cut down
 function clean(t, kind) {
   t = String(t || '').replace(/\s+/g, ' ').trim();
   for (let k = 0; k < 3; k++) t = t.replace(/(\S+(?:\s+\S+){0,6}?)(?:[\s,.]+\1){3,}/g, '$1');
   if (kind === 'dictation') t = t.replace(/(^|\s)(אה+|אממ+|אמ+|אהה+)(?=[\s,.]|$)/g, '$1').replace(/\s{2,}/g, ' ').trim();
+  // 6.1: sentences Whisper is known to invent on noise, music or silence (it learned them from subtitle files).
+  // They are removed when they are the whole piece or are tacked on its end; real speech around them stays.
+  t = t.replace(HALLU_END, '').trim();
+  if (HALLU_ALL.test(t)) return '';
   return /^[\s.,!?…-]*$/.test(t) ? '' : t;
 }
 

@@ -1349,7 +1349,7 @@ body:has(#wed) .busy,body:has(#xed) .busy,body:has(#ped) .busy{z-index:1000}body
 </dialog>
 
 <header class="bar">
-  <div class="brand"><b title="גרסה 6.0">סימן</b><span class="ver">6.0</span><span class="fname" id="fname"></span></div>
+  <div class="brand"><b title="גרסה 6.1">סימן</b><span class="ver">6.1</span><span class="fname" id="fname"></span></div>
 
   <nav class="tools" id="tools" aria-label="כלים">
     <button class="tool" data-tool="select" aria-pressed="true" title="בחירה וגלילה (V)">
@@ -1411,6 +1411,7 @@ body:has(#wed) .busy,body:has(#xed) .busy,body:has(#ped) .busy{z-index:1000}body
   <label class="hidden chk" id="boldWrap"><input type="checkbox" id="boldChk"> מודגש</label>
   <label class="hidden chk" id="paraWrap" title="כבוי: כל לחיצה עורכת שורה אחת בלבד, בלי לשנות שום דבר אחר"><input type="checkbox" id="paraChk"> פסקה שלמה</label>
   <button class="btn hidden" id="ocrBtn" title="זיהוי טקסט בעמוד סרוק כדי לערוך ולתרגם אותו">זיהוי טקסט (OCR)</button>
+  <button class="btn hidden" id="autoRedBtn" title="מוצא לבד מספרי זהות, טלפונים, מיילים וכרטיסי אשראי בכל הקובץ" onclick="window.SIMAN_PRO&&SIMAN_PRO.autoRedact()">חיפוש מידע רגיש</button>
   <button class="btn paste hidden" id="pasteBtn" title="הדבקה (Ctrl+V)"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 11h6M9 15h4"/></svg><span id="pasteLbl">הדבקה</span></button>
   <button class="btn del hidden" id="delSelBtn" title="מחיקת הפריט המסומן (Delete)"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg>מחיקה</button>
   <span class="pageinfo" id="pageInfo"></span>
@@ -1625,6 +1626,7 @@ body:has(#wed) .busy,body:has(#xed) .busy,body:has(#ped) .busy{z-index:1000}body
     <details class="conv-more">
       <summary>עוד סוגים: Word חכם, תמונות, טקסט, Markdown</summary>
       <div class="conv-opts">
+        <button class="conv-card" data-to="compress"><span class="of-ico">ZIP</span><span><b>PDF קטן יותר (דחיסה)</b><small>למייל ולטפסים באתרים שמגבילים גודל. כולל הסימונים והחתימות.</small></span></button>
         <button class="conv-card" data-to="jpg"><span class="of-ico img">JPG</span><span><b>תמונות (JPG)</b><small>כל עמוד הופך לתמונה חדה. כמה עמודים יוצאים בקובץ ZIP אחד. נוח לוואטסאפ ולמצגות.</small></span></button>
         <button class="conv-card" data-to="png"><span class="of-ico img">PNG</span><span><b>תמונות באיכות מלאה (PNG)</b><small>בלי דחיסה, לשרטוטים, טבלאות וטקסט קטן.</small></span></button>
         <button class="conv-card" data-to="md"><span class="of-ico md">MD</span><span><b>Markdown</b><small>טקסט עם כותרות, מוכן לנושן, אובסידיאן, ChatGPT ואתרים. הכותרות מזוהות לפי גודל האותיות.</small></span></button>
@@ -2488,6 +2490,27 @@ function removeTextInRects(L,doc,pageIndex,rects){
     return{adv:tx,hit:inside(mid[0],mid[1]),ok:true};
   }
   const moveTJ=adv=>gs.fs?`[${fmt(-adv*1000/(gs.fs*gs.Tz/100))}] TJ`:'';
+  // 6.1: letter by letter. A whole line is often one string in the file: only the letters under the black box are
+  // taken out (their place kept as empty space), and the rest of the line stays. Before, the whole string was kept
+  // or removed by its middle point, so a covered number could stay inside the file, or uncovered words disappear.
+  const hex=b=>'<'+b.map(x=>x.toString(16).padStart(2,'0')).join('')+'>';
+  function showSplit(bytes){
+    const fi=fontInfo(gs.font);
+    if(!fi){const r=show(bytes);return{ok:false,hit:r.hit};}
+    const th=gs.Tz/100,step=fi.two?2:1,parts=[];let hit=false;
+    for(let k=0;k+step-1<bytes.length;k+=step){
+      const c=fi.two?(bytes[k]<<8)|bytes[k+1]:bytes[k];
+      const tx=(fi.w(c)/1000*gs.fs+gs.Tc+(!fi.two&&c===32?gs.Tw:0))*th;
+      const s=pt(mul(mul([1,0,0,1,0,gs.Ts],Tm),gs.ctm),0,0),e=pt(mul(mul([1,0,0,1,tx,gs.Ts],Tm),gs.ctm),0,0);
+      const h=inside((s[0]+e[0])/2,(s[1]+e[1])/2);
+      Tm=mul([1,0,0,1,tx,0],Tm);
+      const last=parts[parts.length-1];
+      if(h){hit=true;if(last&&!last.keep)last.adv+=tx;else parts.push({keep:false,adv:tx});}
+      else{const b=Array.from(bytes.slice(k,k+step));if(last&&last.keep)last.b.push(...b);else parts.push({keep:true,b});}
+    }
+    const unit=gs.fs*th||1;
+    return{ok:true,hit,toks:parts.map(p=>p.keep?hex(p.b):fmt(-p.adv*1000/unit))};
+  }
   let ops=[];let tok;
   while((tok=next())){
     if(tok.k==='[' ){ // array operand
@@ -2517,9 +2540,9 @@ function removeTextInRects(L,doc,pageIndex,rects){
         let pre='';
         if(op!=='Tj'){if(op==='"'){gs.Tw=nums[0]||0;gs.Tc=nums[1]||0;pre=`${fmt(gs.Tw)} Tw ${fmt(gs.Tc)} Tc `;}Tlm=mul([1,0,0,1,0,-gs.TL],Tlm);Tm=Tlm;pre+='T* ';}
         const str=a.find(x=>x.k==='str');if(!str)break;
-        const r=show(str.v);
+        const r=showSplit(str.v);
         if(r.hit){
-          if(r.ok){edits.push({s:s0,e:tok.e,txt:pre+moveTJ(r.adv)});res.removed++;}
+          if(r.ok){edits.push({s:s0,e:tok.e,txt:pre+(gs.fs?`[${r.toks.join(' ')}] TJ`:'')});res.removed++;}
           else{edits.push({s:s0,e:tok.e,txt:pre+`3 Tr ${String.fromCharCode(...src.subarray(str.s,str.e))} Tj ${fmt(gs.Tr)} Tr`});res.hidden++;}
         }
         break;}
@@ -2529,8 +2552,8 @@ function removeTextInRects(L,doc,pageIndex,rects){
         for(const it of arr.items){
           if(it.k==='num'){Tm=mul([1,0,0,1,-it.v/1000*gs.fs*gs.Tz/100,0],Tm);out.push(fmt(it.v));continue;}
           if(it.k!=='str'){out.push(String.fromCharCode(...src.subarray(it.s,it.e)));continue;}
-          const r=show(it.v);
-          if(r.hit&&r.ok){changed=true;res.removed++;out.push(fmt(-r.adv*1000/(gs.fs*gs.Tz/100||1)));}
+          const r=showSplit(it.v);
+          if(r.hit&&r.ok){changed=true;res.removed++;out.push(...r.toks);}
           else{if(r.hit&&!r.ok)hiddenAll=true;out.push(String.fromCharCode(...src.subarray(it.s,it.e)));}
         }
         if(hiddenAll){edits.push({s:s0,e:tok.e,txt:`3 Tr ${String.fromCharCode(...src.subarray(arr.s,arr.e))} TJ ${fmt(gs.Tr)} Tr`});res.hidden++;}
@@ -3522,7 +3545,7 @@ function setTool(t){
   if(PALETTE[t]){sw.innerHTML='';PALETTE[t].forEach(c=>{const b=document.createElement('button');b.className='sw';b.style.background=c;b.title=SW_NAME(c);b.setAttribute('aria-label','צבע: '+SW_NAME(c));
     b.setAttribute('aria-pressed',S.color[t]===c);b.onclick=()=>{S.color[t]=c;setTool(t);};sw.append(b);});}
   $('fontWrap').classList.toggle('hidden',!(t==='text'||t==='edit'));$('boldWrap').classList.toggle('hidden',!(t==='text'||t==='edit'));
-  $('ocrBtn').classList.toggle('hidden',t!=='edit');$('paraWrap').classList.toggle('hidden',t!=='edit');
+  $('ocrBtn').classList.toggle('hidden',t!=='edit');$('autoRedBtn').classList.toggle('hidden',t!=='redact');$('paraWrap').classList.toggle('hidden',t!=='edit');
   syncFontUI();
   if(SIZES[t]){const r=$('size');r.min=SIZES[t].min;r.max=SIZES[t].max;r.value=S.size[t];$('sizeLabel').textContent=SIZES[t].label+' ';$('sizeVal').textContent=S.size[t];}
 }
@@ -4386,6 +4409,7 @@ async function convertLight(kind,idx){
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['﻿'+text],{type:'text/markdown'}));a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),30000);toast('נשמר: '+name);
 }
 async function convertTo(kind){
+  if(kind==='compress'){$('convDlg').close();if(window.SIMAN_PRO)SIMAN_PRO.compressDialog();return;}
   const keep=$('convKeepDeco').checked;
   const idx=convIndices();
   if(!idx){$('convStatus').textContent=$('convScope').value==='sel'?'לא סומנו עמודים. סמנו בחלונית "עמודים", או בחרו "עמודים לבחירה".':'כתבו מספרי עמודים, למשל 1-3, 5';return;}
@@ -4948,6 +4972,8 @@ const CMDS=[
   {l:'שיתוף ושליחה',k:'שתף שיתוף שלח שליחה מייל וואטסאפ ווצאפ share whatsapp mail email',doc:1,run:()=>openShare()},
   {l:'הדפסה',k:'הדפס הדפסה מדפסת print',key:'Ctrl P',doc:1,run:()=>printDoc()},
   {l:'השחרה של מידע רגיש',k:'השחר השחרה הסתר הסתרה צנזור מחק פרטים redact',key:'D',doc:1,run:()=>setTool('redact')},
+  {l:'חיפוש והשחרה אוטומטית של מידע רגיש (ת.ז, טלפון, מייל, אשראי)',k:'השחרה אוטומטית מידע רגיש תעודת זהות ת.ז טלפון מייל אשראי פרטיות auto redact',doc:1,run:()=>{setTool('redact');window.SIMAN_PRO&&SIMAN_PRO.autoRedact();}},
+  {l:'דחיסת PDF (קובץ קטן יותר)',k:'דחוס דחיסה כווץ הקטן גודל קובץ קטן compress reduce size',doc:1,run:()=>window.SIMAN_PRO&&SIMAN_PRO.compressDialog()},
   {l:'מחק',k:'מחק מחיקה מחקן eraser',key:'E',doc:1,run:()=>setTool('eraser')},
   {l:'העתקת אזור כתמונה',k:'העתק העתקה גזור צילום מסך snip copy',key:'C',doc:1,run:()=>setTool('snip')},
   {l:'הוספת תמונה',k:'תמונה צרף הוסף לוגו image picture',doc:1,run:()=>document.querySelector('.tool[data-action="image"]').click()},
@@ -5493,6 +5519,7 @@ if('launchQueue' in window){
 <script src="siman-merge.js?v=5.9.6" defer></script>
 <script src="siman-ux.js?v=5.9.5" defer></script>
 <script src="siman-fill.js?v=5.9.6" defer></script>
+<script src="siman-pro.js?v=6.1" defer></script>
 <link rel="stylesheet" href="siman-nb.css?v=5.9.5">
 <script src="siman-nb.js?v=5.9.5" defer></script>
 </body>
