@@ -473,5 +473,33 @@ async function compress(lv) {
   if (row && go) { const b = h('<button class="btn" id="stampBtn" type="button" title="חותמת עגולה או מלבנית עם שם העסק ומספר ח.פ">🔵 חותמת עסק</button>'); b.onclick = () => { document.getElementById('sigDlg').close(); stampDialog(); }; row.querySelector('.grow').after(b);
     const k = h('<button class="btn" id="kioskBtn" type="button" title="מעבירים את המכשיר לחותם: הוא רואה את העמוד, כותב שם וחותם">🤝 החותם לידי</button>'); k.onclick = () => { document.getElementById('sigDlg').close(); inPerson(); }; b.after(k); } }
 
+/* ---------------- 6.2: anonymous count of devices ----------------
+   So it is known how many use סימן, and in which version, also without signing up. Once a day: a random number of
+   the device (made here, not linked to the email or name), the version, the kind of device, the language, installed
+   or in a browser, and signed up yes / no. Can be turned off in the settings. (siman-stats.js) */
+const STATS_URL = 'https://siman-stats.siman-app.workers.dev/ping';
+const ANON_KEY = 'siman.anon', ANON_OFF = 'siman.anon.off', ANON_DAY = 'siman.anon.day';
+const LS2 = { get: k => { try { return localStorage.getItem(k); } catch (_) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (_) {} }, del: k => { try { localStorage.removeItem(k); } catch (_) {} } };
+function anonPing() {
+  if (LS2.get(ANON_OFF) === '1' || !/^https:/.test(location.protocol) || /localhost|127\.0\.0\.1/.test(location.hostname)) return;
+  const d = new Date().toISOString().slice(0, 10); if (LS2.get(ANON_DAY) === d) return;
+  let id = LS2.get(ANON_KEY);
+  if (!id) { id = (crypto.randomUUID ? crypto.randomUUID() : Array.from(crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2, '0')).join('')); LS2.set(ANON_KEY, id); }
+  const ua = navigator.userAgent;
+  const platform = /iphone|ipad|ipod/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) ? 'ios' : /android/i.test(ua) ? 'android' : /windows/i.test(ua) ? 'windows' : /macintosh/i.test(ua) ? 'mac' : /linux/i.test(ua) ? 'linux' : 'other';
+  const body = JSON.stringify({ id, ver: ((document.querySelector('.brand .ver') || {}).textContent || '').trim(), platform,
+    lang: (document.documentElement.lang || navigator.language || '').slice(0, 5),
+    installed: matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: window-controls-overlay)').matches || navigator.standalone === true,
+    reg: typeof USER !== 'undefined' && /@/.test((USER && USER.mail) || '') });
+  fetch(STATS_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body, keepalive: true }).then(r => { if (r.ok) LS2.set(ANON_DAY, d); }).catch(() => {});
+}
+setTimeout(anonPing, 4000);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') setTimeout(anonPing, 2000); });
+// the choice in the settings
+{ const after = document.querySelector('#setDlg .pro-link') || document.querySelector('#setDlg .fmt-note');
+  if (after) { const l = h(`<label class="chk"><input type="checkbox" id="anonChk"${LS2.get(ANON_OFF) === '1' ? '' : ' checked'}> שליחת נתוני שימוש אנונימיים (כמה מכשירים ובאיזו גרסה, בלי מייל ובלי קבצים)</label>`);
+    l.querySelector('input').onchange = e => { if (e.target.checked) { LS2.del(ANON_OFF); } else { LS2.set(ANON_OFF, '1'); } };
+    after.after(l); } }
+
 window.SIMAN_PRO = { autoRedact, compressDialog, stampDialog, inPerson, _test: { pageHits, validId, luhn, compress, LEVELS } };
 })();

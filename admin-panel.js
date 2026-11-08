@@ -232,6 +232,8 @@
       || '<tr><td colspan="3" class="a-mu">עוד אין נתוני שימוש.</td></tr>';
 
     el('admBody').innerHTML = `
+      <div id="admAnon">${anonHtml()}</div>
+      <h3 class="a-sec" style="margin:18px 0 8px">נרשמים עם מייל</h3>
       <div class="a-kpis">
         <div class="a-card a-hl"><div class="a-n">${users.length}</div><div class="a-l">משתמשים רשומים</div></div>
         <div class="a-card"><div class="a-n">${users.filter((u) => D(u.first) && dk(D(u.first)) === today).length}</div><div class="a-l">נרשמו היום</div></div>
@@ -272,6 +274,51 @@
       const k = th.dataset.s; if (sortK === k) sortD *= -1; else { sortK = k; sortD = -1; } rows();
     });
     rows();
+    loadAnon();
+  }
+
+  /* 6.2: all the devices, also without signing up — anonymous, from the siman-stats worker */
+  const STATS = 'https://siman-stats.siman-app.workers.dev/summary';
+  let anon = null, anonErr = '', anonAt = 0;
+  const PLAT = { android: 'אנדרואיד', ios: 'אייפון / אייפד', windows: 'Windows', mac: 'Mac', linux: 'Linux', other: 'אחר' };
+  async function loadAnon() {
+    if (Date.now() - anonAt < 50000 && (anon || anonErr)) return;
+    anonAt = Date.now();
+    try {
+      const r = await fetch(STATS, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ key: getKey() }), cache: 'no-store' });
+      if (r.status === 403) throw new Error('המפתח לא מתאים ל־siman-stats. צריך להגדיר שם את אותו ADMIN_KEY');
+      if (!r.ok) throw new Error('השרת siman-stats החזיר שגיאה ' + r.status);
+      anon = await r.json(); anonErr = '';
+    } catch (e) { anonErr = e && /siman-stats/.test(e.message) ? e.message : 'השרת siman-stats עוד לא מחובר (ההוראות בראש הקובץ siman-stats.js)'; }
+    const box = el('admAnon'); if (box) box.innerHTML = anonHtml();
+  }
+  function anonHtml() {
+    if (!anon) return `<div class="a-card"><h3>כל המכשירים (גם בלי הרשמה)</h3><p class="a-mu" style="margin:0">${esc(anonErr || 'טוען…')}</p></div>`;
+    const a = anon, now = Date.now(), by = {}, nb = {};
+    (a.daily || []).forEach((x) => { by[x.day] = x.n; }); (a.newDaily || []).forEach((x) => { nb[x.day] = x.n; });
+    const days = []; for (let i = 29; i >= 0; i--) { const d = new Date(now - i * DAY), k = d.toISOString().slice(0, 10); days.push({ d, n: by[k] || 0, nw: nb[k] || 0 }); }
+    const max = Math.max(1, ...days.map((x) => x.n));
+    const chart = days.map((x, i) => `<div class="a-bar${i === 29 ? ' t' : ''}" style="height:${x.n / max * 100}%" title="${x.d.toLocaleDateString('he-IL')}: ${x.n} מכשירים פעילים, ${x.nw} חדשים">${x.n ? `<span>${x.n}</span>` : ''}</div>`).join('');
+    const vmap = {}, pmap = {}; let wk = 0;
+    (a.versions || []).forEach((v) => { vmap[v.ver || 'לא ידוע'] = v.n; wk += v.n; });
+    (a.platforms || []).forEach((p) => { pmap[PLAT[p.platform] || p.platform] = p.n; });
+    const pct = (n) => wk ? Math.round(n / wk * 100) + '%' : '–';
+    return `<div class="a-kpis">
+        <div class="a-card a-hl"><div class="a-n">${a.total}</div><div class="a-l">מכשירים מאז ההתחלה</div></div>
+        <div class="a-card"><div class="a-n">${a.active.day}</div><div class="a-l">פעילים היום</div></div>
+        <div class="a-card"><div class="a-n">${a.active.week}</div><div class="a-l">פעילים ב־7 ימים</div></div>
+        <div class="a-card"><div class="a-n">${a.active.month}</div><div class="a-l">פעילים ב־30 ימים</div></div>
+        <div class="a-card"><div class="a-n">${a.newToday}</div><div class="a-l">מכשירים חדשים היום</div></div>
+        <div class="a-card"><div class="a-n">${pct(a.installedWeek)}</div><div class="a-l">התקינו את סימן (מהפעילים)</div></div>
+        <div class="a-card"><div class="a-n">${pct(a.registeredWeek)}</div><div class="a-l">נרשמו עם מייל (מהפעילים)</div></div>
+      </div>
+      <div class="a-g2">
+        <div class="a-card"><h3>מכשירים פעילים בכל יום (30 ימים)</h3><div class="a-chart">${chart}</div>
+          <div class="a-axis"><span>${days[0].d.toLocaleDateString('he-IL', { day: 'numeric', month: 'numeric' })}</span><span>היום</span></div></div>
+        <div class="a-card"><h3>באיזו גרסה (פעילים ב־7 ימים)</h3>${bars(vmap, wk)}</div>
+        <div class="a-card"><h3>לפי מכשיר (פעילים ב־7 ימים)</h3>${bars(pmap, wk)}</div>
+      </div>
+      <p class="a-mu" style="font-size:12.5px;margin:6px 2px 0">אנונימי: מספר אקראי לכל מכשיר, בלי מייל ובלי שם. מכשיר נספר פעם ביום. מי שכיבה את זה בהגדרות לא נספר.</p>`;
   }
 
   function list() {
