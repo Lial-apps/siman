@@ -617,7 +617,23 @@ addEventListener('drop', async e => {
   const got = await Promise.all(hs.map(p => p || Promise.resolve(null)));
   openMany(files.map((f, k) => ({ f, h: got[k] && got[k].kind === 'file' ? got[k] : null })));
 }, true);
-window.SIMAN_TABS = { TB, switchTo, closeTab, mergeAll, zipAll, openMany, tabInfo };
+/* 6.3: the home screen, without closing anything. The file in front is put aside exactly like when switching tabs
+   (its pages, place on the page, marks, undo, translation and unsaved changes stay with its tab; an editor is
+   kept as its file), and the home screen shows. "Back" returns to the same file at the same place. */
+let homeFrom = null;
+async function goHome() {
+  if (!TB.cur) return false;
+  if (isBusy() || TR.running) { toast('רגע, פעולה עדיין רצה'); return false; }
+  const t = TB.cur;
+  await leave(); toEmpty(); homeFrom = t; renderTabs();
+  return true;
+}
+async function backFromHome(t) {
+  t = t || homeFrom; if (!t || !TB.list.includes(t)) t = TB.list[TB.list.length - 1];
+  if (!t) return false;
+  homeFrom = null; await switchTo(t); return true;
+}
+window.SIMAN_TABS = { TB, switchTo, closeTab, mergeAll, zipAll, openMany, tabInfo, goHome, backFromHome, homeFrom: () => (homeFrom && TB.list.includes(homeFrom) ? homeFrom : null) };
 
 /* =====================================================================
    2. AI — the smart server (siman-ai)

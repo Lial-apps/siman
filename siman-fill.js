@@ -122,6 +122,43 @@ body.fz-filling .a11y-fab,body.fz-filling .sb-back{visibility:hidden}
 [data-theme=dark] .fzp .lens{border-color:#4B3F86}
 `;
 document.head.append(css);
+// 6.3: autofill, progress, "הפרטים שלי"
+css.textContent += `
+.fzbar .auto{background:#6B2BD9;color:#fff;font-weight:700}
+.fzbar .auto[hidden]{display:none}
+.fzbar .me{width:38px;padding:0;font-size:17px}
+.fzbar .prog{width:54px;height:6px;border-radius:3px;background:#E7E0F7;overflow:hidden;flex:none}
+.fzbar .prog i{display:block;height:100%;width:0;background:#2ED3A0;border-radius:3px;transition:width .3s}
+@media (max-width:520px){.fzbar .auto span{display:none}.fzbar .prog{width:34px}}
+.fzp .pbar{height:4px;border-radius:2px;background:#EDE7FA;margin:-2px 0 8px;overflow:hidden}
+.fzp .pbar i{display:block;height:100%;width:0;background:#6B2BD9;transition:width .3s}
+.fzundo{position:fixed;z-index:2147483001;left:50%;transform:translateX(-50%);bottom:calc(76px + env(safe-area-inset-bottom,0px));display:flex;gap:10px;align-items:center;background:#2B1660;color:#fff;border-radius:14px;padding:10px 12px 10px 14px;font:600 14px "Varela Round",Rubik,Arial,sans-serif;direction:rtl;box-shadow:0 8px 24px rgba(0,0,0,.25);max-width:calc(100vw - 24px)}
+.fzundo[hidden]{display:none}
+.fzundo button{font:inherit;border:0;border-radius:10px;padding:7px 12px;background:#FFD84D;color:#2B1660;cursor:pointer;flex:none}
+@media (max-width:720px){.fzundo{bottom:calc(140px + env(safe-area-inset-bottom,0px))}}
+.fzdlg{border:2px solid #2B1660;border-radius:18px;box-shadow:4px 4px 0 #2B1660;padding:16px;max-width:min(560px,calc(100vw - 20px));width:100%;font-family:"Varela Round",Rubik,Arial,sans-serif;direction:rtl;color:#2B1660;background:#fff}
+.fzdlg::backdrop{background:rgba(20,10,50,.45)}
+.fzdlg h3{margin:0 0 8px;font-size:18px}
+.fzdlg .note{font-size:13px;color:#6B5A92;margin:6px 0}
+.fzdlg .ppl{display:grid;gap:8px;margin:10px 0}
+.fzdlg .ppl button,.fzdlg .acts button,.fzdlg .cancel{font:inherit;font-size:15px;border:1.5px solid #CFC4EA;border-radius:12px;background:#fff;color:#2B1660;padding:10px 14px;cursor:pointer}
+.fzdlg .ppl button{background:#F4EEFF;font-weight:700}
+.fzdlg .tabs{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 10px}
+.fzdlg .tabs button{font:inherit;font-size:13.5px;border:1.5px solid #CFC4EA;border-radius:999px;background:#fff;color:#2B1660;padding:6px 12px;cursor:pointer}
+.fzdlg .tabs button[aria-pressed=true]{background:#6B2BD9;border-color:#6B2BD9;color:#fff}
+.fzdlg .tabs .add{border-style:dashed}
+.fzdlg .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.fzdlg .fld{display:grid;gap:3px;font-size:12.5px;color:#6B5A92}
+.fzdlg .fld input,.fzdlg .fld select{font:inherit;font-size:15px;color:#1C2333;border:1.5px solid #CFC4EA;border-radius:10px;padding:8px 10px;background:#FBFAFF;min-width:0}
+.fzdlg{max-height:calc(100dvh - 24px);overflow:auto;overscroll-behavior:contain}
+.fzdlg .acts{display:flex;gap:8px;align-items:center;margin-top:10px;position:sticky;bottom:-16px;background:inherit;padding:10px 0 12px;border-top:1px solid #EDE7FA}
+.fzdlg .acts .ok{background:#6B2BD9;border-color:#6B2BD9;color:#fff;font-weight:700}
+.fzdlg .acts .del{color:#B3232A;border-color:#F0C4C4}
+@media (max-width:520px){.fzdlg .grid{grid-template-columns:1fr}}
+[data-theme=dark] .fzdlg{background:#1B1638;color:#EDE9F7;border-color:#C9B6FA}
+[data-theme=dark] .fzdlg .fld input,[data-theme=dark] .fzdlg .fld select{background:#120E28;color:#F4F1FF;border-color:#4B3F86}
+[data-theme=dark] .fzdlg .ppl button,[data-theme=dark] .fzdlg .tabs button,[data-theme=dark] .fzdlg .acts button,[data-theme=dark] .fzdlg .cancel{background:#241D48;color:#EDE9F7;border-color:#4B3F86}
+`;
 
 /* ---------------------------------------------------------------- זיהוי */
 // what a label next to a blank asks for
@@ -331,13 +368,40 @@ async function detectPage(P, widgets) {
     .sort((a, b) => Math.abs(a.y1 - b.y1) < 6 ? (pageRtl ? b.x1 - a.x1 : a.x0 - b.x0) : a.y1 - b.y1);
 }
 
+/* 6.3: a Word file — its blank lines were found while its pages were drawn (office-edit.js), together with the
+   words before each one. They become places to fill exactly like in a PDF, and on saving as Word the value goes
+   into the text on that line. */
+function fromDocxMap() {
+  const map = S.office && S.office.map; if (!map || !map.paras) return [];
+  const out = [];
+  map.paras.forEach((p, pIdx) => (p.blanks || []).forEach(b => {
+    if (!b) return;
+    const pi = map.pages.findIndex(pm => pm.sec === p.sec && b.y1 > pm.top - 2 && b.y1 <= pm.top + (pm.h - pm.pad) + 2);
+    const P = S.pages[pi]; if (!P) return;
+    const pm = map.pages[pi], vp1 = P.page.getViewport({ scale: 1 }), k = vp1.width / pm.w;
+    const X = v => v * k, Y = v => (v - pm.top + pm.pad) * k;
+    const lineH = (b.y1 - b.y0) * k, fh = lineH * .78, rtl = RTL_CH.test(b.lab || '') || !LTR_CH.test(b.lab || '');
+    const t = { x0: X(b.x0), x1: X(b.x1), y0: Y(b.y1) - Math.max(14, fh * 1.5), y1: Y(b.y1) - lineH * .12, kind: kindOf(b.lab) || 'text', label: b.lab || '', fh, rtl, page: pi, docx: true, para: pIdx, lr: b.lr ? [X(b.lr.x0), X(b.lr.x1), Y(b.lr.y0), Y(b.lr.y1)] : null };
+    out.push(t);
+  }));
+  // how far a box may grow on its line: up to the words of the next place on the same line
+  out.forEach(t => {
+    const W1 = S.pages[t.page].page.getViewport({ scale: 1 }).width, same = out.filter(o => o !== t && o.page === t.page && Math.abs(o.y1 - t.y1) < 6);
+    const obst = same.flatMap(o => [[o.x0, o.x1], o.lr ? [o.lr[0], o.lr[1]] : null]).filter(Boolean);
+    t.limL = obst.filter(b => b[1] <= t.x0 + 2).reduce((m, b) => Math.max(m, b[1] + 4), 14);
+    t.limR = obst.filter(b => b[0] >= t.x1 - 2).reduce((m, b) => Math.min(m, b[0] - 4), W1 - 14);
+  });
+  return out.sort((a, b) => a.page - b.page || (Math.abs(a.y1 - b.y1) < 6 ? (b.rtl ? b.x1 - a.x1 : a.x0 - b.x0) : a.y1 - b.y1));
+}
+
 /* ---------------------------------------------------------------- המצב */
 const F = { list: [], cur: null, run: 0, busy: false, doc: null };
 // each open file has its own places (switching between files in tabs brings back that file's places and what was filled)
 const FOUND = new WeakMap();
 let ensureT = 0;
+const officeNoFill = () => !!(S.office && !(S.office.kind === 'docx' && S.office.map));
 function ensure() {
-  if (!S.doc || F.doc === S.doc || S.office) return true;
+  if (!S.doc || F.doc === S.doc || officeNoFill()) return true;
   clearTimeout(ensureT);
   ensureT = setTimeout(() => {
     if (!S.doc || F.doc === S.doc) return;
@@ -450,7 +514,7 @@ function act(t) {
 
 /* ---------------------------------------------------------------- חלונית המילוי */
 const pnl = document.createElement('div'); pnl.className = 'fzp'; pnl.hidden = true; pnl.setAttribute('role', 'dialog');
-pnl.innerHTML = `<div class="hd"><b class="ttl"></b><span class="lab"></span><span class="cnt"></span></div>
+pnl.innerHTML = `<div class="pbar" aria-hidden="true"><i></i></div><div class="hd"><b class="ttl"></b><span class="lab"></span><span class="cnt"></span></div>
 <div class="lens" aria-hidden="true"><canvas></canvas></div>
 <textarea rows="1" dir="auto" enterkeyhint="next" autocomplete="on"></textarea>
 <div class="warn" role="status" hidden></div>
@@ -548,7 +612,11 @@ function checkNow() { const w = pnl.querySelector('.warn'), m = warnFor(kindOfCu
 // what was typed in this kind of place before (only on this device): one tap fills it
 function memShow(kd) {
   const box = pnl.querySelector('.mem'); box.innerHTML = '';
-  const list = kd && MEM_KINDS.includes(kd) ? (memGet()[kd] || []).filter(v => v !== ta.value.trim()).slice(0, 3) : [];
+  // 6.3: the details of the people in "הפרטים שלי" first (the child first on a "שם התלמיד" line), then earlier forms
+  const t = F.cur, ppl = peopleGet(), lb = t ? t.label || '' : '';
+  const order = CHILD_RE.test(lb) ? [...ppl.filter(p => p.role === 'child'), ...ppl.filter(p => p.role !== 'child')] : [...ppl.filter(p => p.role === 'me'), ...ppl.filter(p => p.role !== 'me')];
+  const fromPeople = t && kd ? order.map(p => valueFor(p, { ...t, kind: kd })).filter(Boolean) : [];
+  const list = kd ? [...new Set([...fromPeople, ...(MEM_KINDS.includes(kd) ? memGet()[kd] || [] : [])])].filter(v => v !== ta.value.trim()).slice(0, 4) : [];
   box.hidden = !list.length;
   for (const v of list) { const b = document.createElement('button'); b.type = 'button'; b.textContent = v; b.title = v;
     b.onclick = () => { ta.value = v; sync(); ta.focus(); }; box.append(b); }
@@ -582,7 +650,11 @@ pnl.querySelector('[data-a=next]').onclick = () => next();
 pnl.querySelector('[data-a=prev]').onclick = () => prev();
 pnl.querySelector('[data-a=done]').onclick = () => closePanel();
 pnl.querySelector('[data-a=del]').onclick = () => { const t = F.cur; if (!t) return; ta.value = ''; dropAnn(t); closePanel(); };
-function count() { const n = open().length; pnl.querySelector('.cnt').textContent = n ? L().left(n) : L().all; }
+function count() {
+  const n = open().length, all = F.list.length, i = F.cur ? F.list.indexOf(F.cur) + 1 : 0;
+  pnl.querySelector('.cnt').textContent = (i ? `${i} מתוך ${all}` : '') + (n ? ' · ' + L().left(n) : ' · ' + L().all);
+  const pr = pnl.querySelector('.pbar i'); if (pr) pr.style.width = (all ? (all - n) / all * 100 : 0) + '%';
+}
 function show(t) {
   const P = S.pages[t.page]; if (!P) return; const d = $('desk'); if (!d) return;
   const vp1 = P.page.getViewport({ scale: 1 }), k = S.zoom;
@@ -602,18 +674,147 @@ function place() {
 }
 if (window.visualViewport) { visualViewport.addEventListener('resize', place); visualViewport.addEventListener('scroll', place); }
 
+/* ---------------------------------------------------------------- 6.3: הפרטים שלי ומילוי אוטומטי
+   "הפרטים שלי": אני, ובני משפחה (ילד, בן/בת זוג) — שם, ת"ז, תאריך לידה, טלפון, מייל וכתובת. נשמר רק במכשיר.
+   "מילוי אוטומטי": בלחיצה אחת כל מקום שמזוהה מתמלא. לפי הכיתוב ליד הקו נבחר של מי הפרט: "שם התלמיד/ה"
+   מקבל את הילד, "שם ההורה" אותי (וההורה השני את בן/בת הזוג). תאריך: היום. חתימה וסימון לא מתמלאים לבד.
+   הכול מסומן לבדיקה, ואפשר לבטל את כל המילוי בלחיצה. */
+const PEOPLE_KEY = 'siman.fill.people';
+const ROLES = { me: 'אני', partner: 'בן/בת זוג', child: 'ילד/ה', other: 'אחר' };
+const PF = [['first', 'שם פרטי'], ['last', 'שם משפחה'], ['idn', 'מספר זהות', 'numeric'], ['birth', 'תאריך לידה'], ['phone', 'טלפון', 'tel'], ['email', 'מייל', 'email'], ['addr', 'כתובת (רחוב ומספר)'], ['city', 'יישוב']];
+const peopleGet = () => { try { const p = JSON.parse(localStorage.getItem(PEOPLE_KEY) || '[]'); return Array.isArray(p) ? p : []; } catch (_) { return []; } };
+const peoplePut = p => { try { localStorage.setItem(PEOPLE_KEY, JSON.stringify(p)); } catch (_) {} };
+const fullName = p => [p.first, p.last].filter(Boolean).join(' ').trim();
+// the details of "me" when nothing was saved yet: what was typed in earlier forms
+function meOrMemory() {
+  const ppl = peopleGet(), me = ppl.find(p => p.role === 'me');
+  if (me) return me;
+  const m = memGet(), nm = (m.name || [])[0] || '';
+  if (!nm && !(m.id || []).length && !(m.phone || []).length) return null;
+  const [first, ...rest] = nm.split(' ');
+  return { role: 'me', first: first || '', last: rest.join(' '), idn: (m.id || [])[0] || '', phone: (m.phone || [])[0] || '', email: (m.email || [])[0] || '', addr: (m.addr || [])[0] || '', memory: true };
+}
+// whose detail a place asks for, by the words beside it
+const CHILD_RE = /תלמיד|תלמידה|ילד|הילד|הילדה|בנ?\/?בת|בנך|בתך|קטין|חניך|נער|student|pupil|child|minor|ученик|ребен|طالب|الطفل/i;
+const ADULT_RE = /הורה|אב|אם|האב|האם|מבקש|החתום|המבקש|העובד|parent|father|mother|applicant|родител|ولي/i;
+function valueFor(p, t) {
+  const lb = String(t.label || ''), kd = t.kind === 'cell' ? t.sub : t.kind;
+  if (!p) return '';
+  if (kd === 'name') return /פרטי|first/i.test(lb) ? p.first || '' : /משפחה|last|surname/i.test(lb) ? p.last || '' : fullName(p);
+  if (kd === 'id') return p.idn || '';
+  if (kd === 'phone') return p.phone || '';
+  if (kd === 'email') return p.email || '';
+  if (kd === 'addr') return /יישוב|עיר|city/i.test(lb) ? p.city || '' : [p.addr, p.city].filter(Boolean).join(', ');
+  if (kd === 'date' && /לידה|birth/i.test(lb)) return p.birth || '';
+  return '';
+}
+let AUTO = null; // what the last autofill wrote, so it can be taken back as one
+async function autoFill() {
+  if (!F.list.length) return;
+  const ppl = peopleGet(), me = meOrMemory();
+  const kids = ppl.filter(p => p.role === 'child'), partner = ppl.find(p => p.role === 'partner');
+  const empty = F.list.filter(t => !annOf(t) && ['name', 'id', 'phone', 'email', 'addr', 'date'].includes(t.kind === 'cell' ? t.sub : t.kind));
+  if (!me && !kids.length) { profileDialog(() => autoFill(), 'כדי למלא אוטומטית, ממלאים פעם אחת את הפרטים. הם נשמרים רק במכשיר הזה.'); return; }
+  // a form about a child: whose? (asked only when there is more than one child)
+  let kid = kids[0] || null;
+  if (kids.length > 1 && empty.some(t => CHILD_RE.test(t.label || ''))) { kid = await pickKid(kids); if (kid === undefined) return; }
+  if (F.cur) closePanel(true);
+  const ids = [], adultSeen = {}; let n = 0;
+  // a place whose words do not say whose it is ("מספר ת"ז:") belongs to the person its line is about
+  // ("שם התלמיד/ה: ____ מספר ת"ז: ____" — both the child's)
+  const lineAbout = t => { const same = F.list.filter(o => t.para != null ? o.para === t.para : o.page === t.page && Math.abs(o.y1 - t.y1) < 6);
+    return same.some(o => CHILD_RE.test(o.label || '')) && !same.some(o => ADULT_RE.test(o.label || '')) ? 'child' : null; };
+  for (const t of empty) {
+    const kd = t.kind === 'cell' ? t.sub : t.kind, lb = t.label || '';
+    let p = CHILD_RE.test(lb) || (!ADULT_RE.test(lb) && lineAbout(t) === 'child') ? kid : me;
+    // the second "שם ההורה" line on the form: the other parent
+    if (p === me && ADULT_RE.test(lb)) { const key = kd + '|' + lb.replace(/\s+/g, ''); if (adultSeen[key]) p = partner || null; adultSeen[key] = 1; }
+    let v = kd === 'date' && !/לידה|birth/i.test(lb) ? new Date().toLocaleDateString('he-IL') : valueFor(p, t);
+    if (!v) continue;
+    const a = textAt(t, v); ids.push(a.id); n++;
+  }
+  S.pages.forEach(P => { drawAnns(P); paint(P); }); bar();
+  if (!n) { toast('לא נמצאו מקומות שאפשר למלא מהפרטים שלך. אפשר להוסיף פרטים ב"👤 הפרטים שלי"'); return; }
+  AUTO = { ids, doc: S.doc };
+  showUndo(n);
+}
+function undoAuto() {
+  if (!AUTO || AUTO.doc !== S.doc) return;
+  const set = new Set(AUTO.ids);
+  S.anns = S.anns.filter(a => !set.has(a.id));
+  F.list.forEach(t => { if (set.has(t.ann)) t.ann = null; });
+  AUTO = null; S.pages.forEach(P => { drawAnns(P); paint(P); }); bar(); hideUndo();
+  toast('המילוי האוטומטי בוטל');
+}
+const undoEl = document.createElement('div'); undoEl.className = 'fzundo'; undoEl.hidden = true; document.body.append(undoEl);
+let undoT = 0;
+function showUndo(n) {
+  undoEl.innerHTML = `<span>✨ מולאו ${n} מקומות. בדקו, ולתיקון לוחצים על מקום</span><button type="button">ביטול</button>`;
+  undoEl.querySelector('button').onclick = undoAuto; undoEl.hidden = false;
+  clearTimeout(undoT); undoT = setTimeout(hideUndo, 9000);
+}
+function hideUndo() { undoEl.hidden = true; }
+function pickKid(kids) {
+  return new Promise(res => {
+    const d = document.createElement('dialog'); d.className = 'fzdlg';
+    d.innerHTML = `<h3>על מי הטופס?</h3><div class="ppl">${kids.map((k, i) => `<button type="button" data-i="${i}">${esc2(fullName(k) || 'ילד/ה')}</button>`).join('')}</div><button type="button" class="cancel">ביטול</button>`;
+    document.body.append(d);
+    d.querySelectorAll('[data-i]').forEach(b => b.onclick = () => { d.close(); res(kids[+b.dataset.i]); });
+    d.querySelector('.cancel').onclick = () => { d.close(); res(undefined); };
+    d.addEventListener('close', () => { d.remove(); res(undefined); });
+    d.showModal();
+  });
+}
+const esc2 = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+// "הפרטים שלי": people and their details, only on this device
+function profileDialog(after, note) {
+  let ppl = peopleGet();
+  if (!ppl.length) { const m = meOrMemory(); ppl = [m && m.memory ? { ...m, memory: undefined } : { role: 'me' }]; }
+  let cur = 0;
+  const d = document.createElement('dialog'); d.className = 'fzdlg fzppl'; document.body.append(d);
+  const draw = () => {
+    const p = ppl[cur];
+    d.innerHTML = `<h3>👤 הפרטים שלי</h3>${note ? `<p class="note">${esc2(note)}</p>` : ''}
+      <div class="tabs">${ppl.map((x, i) => `<button type="button" data-p="${i}" aria-pressed="${i === cur}">${esc2(fullName(x) || ROLES[x.role] || 'אדם')}</button>`).join('')}<button type="button" class="add">+ בן משפחה</button></div>
+      <label class="fld">מי זה<select data-k="role">${Object.entries(ROLES).map(([k, v]) => `<option value="${k}"${p.role === k ? ' selected' : ''}>${v}</option>`).join('')}</select></label>
+      <div class="grid">${PF.map(([k, l, im]) => `<label class="fld">${l}<input data-k="${k}" value="${esc2(p[k] || '')}"${im ? ` inputmode="${im}"` : ''}${k === 'email' ? ' dir="ltr"' : ''} autocomplete="off"></label>`).join('')}</div>
+      <p class="note">נשמר רק במכשיר הזה. משמש למילוי אוטומטי של טפסים.</p>
+      <div class="acts">${ppl.length > 1 ? '<button type="button" class="del">מחיקת האדם הזה</button>' : ''}<span style="flex:1"></span><button type="button" class="cancel">ביטול</button><button type="button" class="ok">שמירה${after ? ' ומילוי' : ''}</button></div>`;
+    d.querySelectorAll('[data-k]').forEach(i => i.oninput = i.onchange = () => { ppl[cur][i.dataset.k] = i.value.trim(); });
+    d.querySelectorAll('[data-p]').forEach(b => b.onclick = () => { cur = +b.dataset.p; draw(); });
+    d.querySelector('.add').onclick = () => { ppl.push({ role: ppl.some(x => x.role === 'me') ? 'child' : 'me', last: (ppl.find(x => x.role === 'me') || {}).last || '', addr: (ppl.find(x => x.role === 'me') || {}).addr || '', city: (ppl.find(x => x.role === 'me') || {}).city || '' }); cur = ppl.length - 1; draw(); d.querySelector('[data-k=first]').focus(); };
+    const del = d.querySelector('.del'); if (del) del.onclick = () => { ppl.splice(cur, 1); cur = 0; draw(); };
+    d.querySelector('.cancel').onclick = () => d.close();
+    d.querySelector('.ok').onclick = () => {
+      const keep = ppl.filter(x => fullName(x) || x.idn || x.phone || x.email);
+      peoplePut(keep); d.close(); toast('הפרטים נשמרו במכשיר');
+      if (after) setTimeout(after, 50);
+    };
+  };
+  d.addEventListener('close', () => d.remove());
+  draw(); d.showModal();
+  setTimeout(() => { const f = d.querySelector('[data-k=first]'); if (f && !f.value) f.focus(); }, 60);
+}
+
 /* ---------------------------------------------------------------- הפס "מקומות למילוי" */
 function bar() {
-  const n = open().length, b = bar.el;
-  b.hidden = !F.list.length || !pnl.hidden || !S.doc || !!S.office || F.doc !== S.doc;
+  const n = open().length, b = bar.el, all = F.list.length;
+  b.hidden = !F.list.length || !pnl.hidden || !S.doc || officeNoFill() || F.doc !== S.doc;
   b.querySelector('.go').textContent = n ? L().show(n) + ' ›' : LX().save;
   b.querySelector('.go').classList.toggle('fin', !n);
   b.querySelector('.x').title = L().hide; b.querySelector('.x').setAttribute('aria-label', L().hide);
   b.querySelector('.x').textContent = document.body.classList.contains('fz-off') ? '👁' : '×';
+  // 6.3: progress, and autofill while there is something it can fill
+  const done = all - n; b.querySelector('.prog i').style.width = (all ? done / all * 100 : 0) + '%';
+  b.querySelector('.prog').title = `${done} מתוך ${all} מולאו`;
+  const can = F.list.some(t => !annOf(t) && ['name', 'id', 'phone', 'email', 'addr', 'date'].includes(t.kind === 'cell' ? t.sub : t.kind));
+  b.querySelector('.auto').hidden = !can;
 }
 bar.el = document.createElement('div'); bar.el.className = 'fzbar'; bar.el.hidden = true;
-bar.el.innerHTML = '<button type="button" class="go"></button><button type="button" class="x"></button>';
+bar.el.innerHTML = '<button type="button" class="auto" title="ממלא בלחיצה את השם, מספר הזהות, הטלפון, הכתובת והתאריך מהפרטים שלך">✨ <span>מילוי אוטומטי</span></button><span class="prog" aria-hidden="true"><i></i></span><button type="button" class="go"></button><button type="button" class="me" title="הפרטים שלי (נשמרים רק במכשיר)" aria-label="הפרטים שלי">👤</button><button type="button" class="x"></button>';
 document.body.append(bar.el);
+bar.el.querySelector('.auto').onclick = () => autoFill();
+bar.el.querySelector('.me').onclick = () => profileDialog();
 bar.el.querySelector('.go').onclick = () => {
   // everything is filled: the same button saves the form
   if (!open().length) { const sb = document.getElementById('saveBtn'); if (sb && !sb.disabled) sb.click(); return; }
@@ -625,7 +826,14 @@ async function run() {
   const my = ++F.run; F.list = []; F.cur = null; pnl.hidden = true; document.body.classList.remove("fz-filling");
   F.doc = S.doc; if (S.doc) FOUND.set(S.doc, F.list); bar();
   S.pages.forEach(P => { if (P.fzl) P.fzl.innerHTML = ''; });
-  if (!S.doc || S.office || !S.pages.length) return;
+  if (!S.doc || officeNoFill() || !S.pages.length) return;
+  // 6.3: a Word file: its blank lines are already known
+  if (S.office) {
+    await sleep(300); if (my !== F.run) return;
+    F.list.push(...fromDocxMap().slice(0, 120)); paintAll(); bar();
+    if (F.list.length && !S.hasForm) toast(L().found(F.list.length));
+    return;
+  }
   await sleep(400);                                      // the first page is drawn first
   if (my !== F.run) return;
   try { if (typeof loadSend === 'function') await loadSend(); } catch (_) {}
@@ -667,5 +875,5 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape' && !pnl.hidde
 // the signature window closed without signing: the marked place is not kept for a later signature
 { const sd = document.getElementById('sigDlg'); if (sd) sd.addEventListener('close', () => setTimeout(() => { F.sigFor = null; }, 0)); }
 
-window.SIMAN_FILL = { run, list: () => F.list, next, close: closePanel, detectPage, _t: { inkOf, strokes, pieces, cellTop, inkIn } };
+window.SIMAN_FILL = { run, list: () => F.list, next, close: closePanel, detectPage, autoFill, profile: profileDialog, people: peopleGet, _t: { inkOf, strokes, pieces, cellTop, inkIn } };
 })();

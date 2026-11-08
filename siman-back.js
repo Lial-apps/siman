@@ -156,6 +156,8 @@
       if (S.tool && S.tool !== 'select' && typeof setTool === 'function') { setTool('select'); return true; }
     }
     if (cur && typeof T.closeTab === 'function') { T.closeTab(cur); return true; }
+    // 6.3: on the home screen after "בית" — back to the file that was left, at the same place
+    if (!cur && window.SIMAN_HOME && SIMAN_HOME.canBack()) { SIMAN_HOME.back(); return true; }
     return false;
   }
   // the same checks, without doing anything: is there a step to go back to?
@@ -166,7 +168,7 @@
     const T = window.SIMAN_TABS, cur = T && T.TB && T.TB.cur;
     const hasS = typeof S !== 'undefined' && S;
     if (hasS && S.doc && !(cur && cur.ed) && (S.picked || (S.tool && S.tool !== 'select'))) return true;
-    return !!cur;
+    return !!cur || !!(window.SIMAN_HOME && SIMAN_HOME.canBack());
   }
 
   /* ---------- the round back button on the screen (phones only) ---------- */

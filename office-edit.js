@@ -63,13 +63,19 @@ const BLANK_RE=/_{3,}|\.{5,}|…{2,}/g;
 function blanksOf(p,R){
   const walker=document.createTreeWalker(p,NodeFilter.SHOW_TEXT);const nodes=[];let all='',n;
   while((n=walker.nextNode())){nodes.push([n,all.length]);all+=n.data;}
-  const out=[];BLANK_RE.lastIndex=0;let m;
-  while((m=BLANK_RE.exec(all))){
-    const s=m.index,e=s+m[0].length;let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
+  const out=[];BLANK_RE.lastIndex=0;let m,prevEnd=0;
+  // where a range of the paragraph's text sits on the page
+  const rectOf=(s,e)=>{let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
     for(const[node,o]of nodes){const a=Math.max(s,o),b=Math.min(e,o+node.data.length);if(a>=b)continue;
       const rg=document.createRange();rg.setStart(node,a-o);rg.setEnd(node,b-o);
       for(const r of rg.getClientRects()){if(!r.width)continue;x0=Math.min(x0,r.left-R.left);x1=Math.max(x1,r.right-R.left);y0=Math.min(y0,r.top-R.top);y1=Math.max(y1,r.bottom-R.top);}}
-    out.push(x1>x0?{x0,x1,y0,y1}:null);
+    return x1>x0?{x0,x1,y0,y1}:null;};
+  while((m=BLANK_RE.exec(all))){
+    const s=m.index,e=s+m[0].length,r=rectOf(s,e);
+    // 6.3: the words before the blank on its line ("שם התלמיד/ה:") — what it asks for, and where they stand
+    const raw=all.slice(prevEnd,s),lab=raw.replace(/\s+/g,' ').trim().slice(-40),ls=prevEnd+raw.search(/\S|$/);
+    const lr=lab?rectOf(ls,s):null;
+    out.push(r?{...r,lab,lr:lr&&r&&Math.abs(lr.y1-r.y1)<(r.y1-r.y0)?lr:null}:null);prevEnd=e;
   }
   return out;
 }

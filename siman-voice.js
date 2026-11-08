@@ -705,12 +705,37 @@ function show(name) {
 }
 function open(screen) {
   if (typeof needReg === 'function' && needReg()) { try { showReg(); } catch (_) {} return false; }
+  // put aside a moment ago (a recording running): it comes back as it was, not to a new screen
+  if (parked && root && root.hidden && !screen) { unpark(); return true; }
+  if (parked && root && root.hidden && (REC.mr && REC.mr.state !== 'inactive')) { unpark(); show('rec'); return true; }
   ensure(); root.hidden = false; document.body.style.overflow = 'hidden';
   show(screen || 'new'); refreshCount();
   return true;
 }
+/* 6.3: going to the home screen while recording or transcribing: the screen is put aside, the work goes on.
+   A bar at the top of סימן shows it ("● מקליט 3:12 · חזרה") and brings this screen back as it was. */
+let parked = false;
+function park() {
+  if (!root || root.hidden) return false;
+  closeMenu(); if (audioEl && !audioEl.paused) audioEl.pause();
+  root.hidden = true; document.body.style.overflow = ''; parked = true;
+  try { dispatchEvent(new CustomEvent('siman:voice', { detail: 'park' })); } catch (_) {}
+  return true;
+}
+function unpark() {
+  if (!root) return false;
+  root.hidden = false; document.body.style.overflow = 'hidden'; parked = false;
+  try { dispatchEvent(new CustomEvent('siman:voice', { detail: 'unpark' })); } catch (_) {}
+  return true;
+}
+function vstate() {
+  const rec = !!(REC.mr && REC.mr.state !== 'inactive');
+  return { open: !!root && !root.hidden, parked: parked && !!root && root.hidden, rec, paused: rec && REC.mr.state === 'paused',
+    recT: rec ? (REC.acc + (REC.mr.state === 'recording' ? Date.now() - REC.t0 : 0)) / 1000 : 0, job: !!JOB.busy, title: V ? V.title : '' };
+}
 function close() {
-  if (REC.mr && REC.mr.state !== 'inactive') { if (!confirm('ההקלטה עוד פועלת. לעצור ולשמור אותה?')) return; stopRec(); return; }
+  // a recording that runs is not stopped by leaving: it goes on in the background (6.3)
+  if (REC.mr && REC.mr.state !== 'inactive') { park(); say('ההקלטה ממשיכה. חוזרים אליה מהפס למעלה'); return; }
   if (JOB.busy && !confirm('התמלול עוד בעבודה. הוא ימשיך ברקע וישמר בספרייה. לחזור לסימן?')) return;
   stopAudio(); closeMenu();
   if (root) root.hidden = true; document.body.style.overflow = '';
@@ -2189,6 +2214,6 @@ async function fromUrl() {
 }
 setTimeout(fromUrl, 600);
 
-window.SIMAN_VOICE = { open: () => open('new'), openFile: f => enqueue(f), library: () => open('lib') };
+window.SIMAN_VOICE = { open: () => open('new'), openFile: f => enqueue(f), library: () => open('lib'), park, unpark, state: vstate, stopRec: () => stopRec() };
 })();
 
