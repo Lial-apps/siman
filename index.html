@@ -5296,13 +5296,13 @@ async function nativeShare(f,extra){
     if(!live&&needsGesture(e)&&await askToSave(f.name,'שיתוף')){
       try{await navigator.share(data);return true;}catch(e2){if(e2&&e2.name==='AbortError')return false;e=e2;}}
     console.warn('share',e);
-    throw Object.assign(new Error('תפריט השיתוף של המכשיר לא קיבל את הקובץ'),{shareFail:true});
+    throw Object.assign(new Error('תפריט השיתוף של המכשיר לא קיבל את הקובץ'),{shareFail:true,why:(e&&(e.name+(e.message?': '+e.message:'')))||''});
   }
 }
 // share through the system menu, or run the fallback when the menu refuses the file
 async function shareOr(f,extra,fallback){
   try{return await nativeShare(f,extra);}
-  catch(e){if(!e.shareFail)throw e;await fallback();return null;}
+  catch(e){if(!e.shareFail)throw e;await fallback(e);return null;}
 }
 const mailBody=()=>`מצורף הקובץ ${fileName()}.\n\n${USER.name?USER.name+'\n':''}נשלח מסימן · siman.siman-app.workers.dev`;
 function mailto(to){
@@ -5327,7 +5327,8 @@ const ACTIONS={
     done(`נפתח מייל אל ${USER.mail}. גררו אליו את הקובץ שירד לתיקיית ההורדות`);
   },
   async whatsapp(f){
-    const fbTouch=()=>{downloadFile(f);done('הקובץ ירד למכשיר. בוואטסאפ לוחצים על אטב ← מסמך, ובוחרים אותו מההורדות');};
+    // 6.2: when the phone's share menu refuses the file, the choices are shown (with the reason) instead of a download
+    const fbTouch=e=>waPhoneChoice(f,e);
     if(IS_TOUCH&&canShareFile(f)){if(await shareOr(f,null,fbTouch))done('בוחרים וואטסאפ ואת השיחה');return;}
     // 6.2: a phone that will not hand this file to WhatsApp (phones share Word / Excel / PowerPoint files only as PDF):
     // instead of quietly downloading it, the person chooses — a PDF copy straight to WhatsApp, a link that keeps the
@@ -5415,8 +5416,8 @@ async function waViaLink(f,desk){
     const r=await window.SIMAN_SEND.makeViewLink({bytes,name:f.name,orig:await linkOrig(f),sender:{name:USER.name||'',mail:USER.mail||''}});
     const wa='https://wa.me/?text='+encodeURIComponent(r.text||(f.name+'\n'+r.url));
     $('shareDlg').classList.remove('wait');
-    // a phone opens the WhatsApp app from the wa.me address; a computer opens it in a new tab
-    const go=()=>{const w=IS_TOUCH?null:window.open(wa,'_blank');if(!w){S.noWarn=true;location.href=wa;setTimeout(()=>{S.noWarn=false;},2000);}done('בוחרים שיחה בוואטסאפ ושולחים');};
+    // a new tab: on a phone wa.me opens the WhatsApp app, and the file stays open here in סימן
+    const go=()=>{const w=window.open(wa,'_blank');if(!w){S.noWarn=true;location.href=wa;setTimeout(()=>{S.noWarn=false;},2000);}done('בוחרים שיחה בוואטסאפ ושולחים');};
     // still within the tap (a small file): WhatsApp opens at once; otherwise one more tap, so it is not blocked
     if(navigator.userActivation&&navigator.userActivation.isActive){go();return;}
     shStatus('הקישור מוכן. <button class="btn primary" id="waOpen" type="button">פתיחת וואטסאפ ›</button>',true);
@@ -5427,15 +5428,23 @@ async function waViaLink(f,desk){
     else shStatus(`לא הצלחתי להכין קישור (${esc(e&&e.message||'שגיאה')}). אפשר לנסות שוב, או לשלוח כ-PDF.`);
   }
 }
-// a phone that refuses this kind of file in its share menu
-function waPhoneChoice(f){
+// a phone that refuses this file in its share menu. err = why the share menu failed (when it was tried)
+function waPhoneChoice(f,err){
   const kind=/\.docx$/i.test(f.name)?'Word':/\.xlsx$/i.test(f.name)?'Excel':/\.pptx$/i.test(f.name)?'PowerPoint':'';
-  shStatus(`<div class="wa-choice"><b>הטלפון לא מעביר קובץ ${kind||'מהסוג הזה'} ישירות לוואטסאפ. איך לשלוח?</b>
-    <button class="btn primary" type="button" data-w="pdf">📄 כ-PDF, ישר לוואטסאפ</button>
-    ${waLinkReady()?`<button class="btn" type="button" data-w="link">🔗 קישור${kind?' שפותח גם את קובץ ה-'+kind:' לקובץ'}</button>`:''}
+  // can this browser hand files to other apps at all? (Samsung Internet and some in-app browsers cannot:
+  // there every file ends up as a download, so the link — which opens WhatsApp directly — comes first)
+  let files=false;try{files=!!(navigator.share&&navigator.canShare&&navigator.canShare({files:[new File([new Uint8Array(8)],'x.pdf',{type:'application/pdf'})]}));}catch(_){}
+  const pdfOk=files&&!(err&&f.type==='application/pdf');
+  const link=waLinkReady();
+  const head=err?`תפריט השיתוף של הטלפון לא קיבל את הקובץ${err.why?` <small dir="ltr">(${esc(err.why).slice(0,120)})</small>`:''}. איך לשלוח?`
+    :!files?'הדפדפן הזה לא מעביר קבצים לאפליקציות אחרות. איך לשלוח?'
+    :`הטלפון לא מעביר קובץ ${kind||'מהסוג הזה'} ישירות לוואטסאפ. איך לשלוח?`;
+  const bLink=link?`<button class="btn${pdfOk?'':' primary'}" type="button" data-w="link">🔗 ${pdfOk?'קישור'+(kind?' שפותח גם את קובץ ה-'+kind:' לקובץ'):'שליחה בוואטסאפ, כקישור לקובץ'}</button>`:'';
+  const bPdf=pdfOk?`<button class="btn primary" type="button" data-w="pdf">📄 ${f.type==='application/pdf'?'שוב לוואטסאפ':'כ-PDF, ישר לוואטסאפ'}</button>`:'';
+  shStatus(`<div class="wa-choice"><b>${head}</b>${pdfOk?bPdf+bLink:bLink+bPdf}
     <button class="btn" type="button" data-w="dl">⬇ הורדה לטלפון</button></div>`,true);
   const box=$('shareStatus');
-  box.querySelector('[data-w=pdf]').onclick=async()=>{
+  const bp=box.querySelector('[data-w=pdf]');if(bp)bp.onclick=async()=>{
     $('shareDlg').classList.add('wait');shStatus('מכין גרסת PDF…');
     try{
       if(SH.altJob&&!SH.pdfAlt){try{await SH.altJob;}catch(_){}}
@@ -5444,7 +5453,7 @@ function waPhoneChoice(f){
         pdf=SH.pdfAlt=new File([bytes],f.name.replace(/\.[a-z0-9]{2,5}$/i,'')+'.pdf',{type:'application/pdf'});}
       $('shareDlg').classList.remove('wait');shStatus('');
       // (if the PDF took a while the tap has run out: nativeShare asks for one more tap by itself)
-      if(await shareOr(pdf,null,()=>{downloadFile(pdf);done('הטלפון לא פתח את תפריט השיתוף, אז ה-PDF ירד למכשיר. בוואטסאפ: אטב ← מסמך');}))done('בוחרים וואטסאפ ואת השיחה. נשלחה גרסת PDF של הקובץ');
+      if(await shareOr(pdf,null,e=>waPhoneChoice(pdf,e)))done('בוחרים וואטסאפ ואת השיחה. נשלחה גרסת PDF של הקובץ');
     }catch(e){console.error(e);$('shareDlg').classList.remove('wait');shStatus('הכנת ה-PDF נכשלה: '+(e.message||e));}
   };
   const ln=box.querySelector('[data-w=link]');if(ln)ln.onclick=()=>waViaLink(f,false);
