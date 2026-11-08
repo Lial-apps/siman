@@ -5600,13 +5600,14 @@ if('launchQueue' in window){
   // at most once a day: status check + the counts collected so far (one small request)
   function sync(beacon){
     if(!STATUS_URL||typeof USER==='undefined'||!validMail(USER.mail||''))return;
-    if(usage.sent===today())return;
+    // once a day — and at once after an update, so the list shows the version people really use (6.2.1)
+    if(usage.sent===today()&&usage.ver===APP_VER)return;
     const counts={...usage.c};const body=JSON.stringify({mail:USER.mail,counts,ver:APP_VER,day:today()});
-    if(beacon){if(navigator.sendBeacon&&navigator.sendBeacon(STATUS_URL,new Blob([body],{type:'text/plain'}))){usage={c:{},sent:today()};wr(U_KEY,usage);}return;}
+    if(beacon){if(navigator.sendBeacon&&navigator.sendBeacon(STATUS_URL,new Blob([body],{type:'text/plain'}))){usage={c:{},sent:today(),ver:APP_VER};wr(U_KEY,usage);}return;}
     fetch(STATUS_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body}).then(r=>r.ok?r.json():null).then(j=>{
       if(!j)return;
       const extra={};for(const k in usage.c){const v=usage.c[k]-(counts[k]||0);if(v>0)extra[k]=v;} // counts made while waiting
-      usage={c:extra,sent:today()};wr(U_KEY,usage);
+      usage={c:extra,sent:today(),ver:APP_VER};wr(U_KEY,usage);
       wr(T_KEY,{plan:j.plan||'free'});showTrial(); // launch-period dates from the server are no longer shown
     }).catch(()=>{});
   }
