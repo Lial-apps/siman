@@ -72,12 +72,22 @@ html,body{margin:0;background:var(--bg);color:var(--n);font:15px/1.45 "Heebo",sy
 .who{display:grid;gap:10px;margin-top:12px}.who label{display:grid;gap:5px;font-size:13.5px;font-weight:600;color:#5D6982}
 .gin{font:inherit;font-size:16px;padding:11px 12px;border:1.5px solid #C7D0DE;border-radius:10px;background:#fff;color:#16213A;width:100%}
 .gin:focus{outline:3px solid #FFD43B;border-color:#16213A}.gin.bad{border-color:#C2362B;box-shadow:0 0 0 3px rgba(194,54,43,.15)}
+/* 6.2: the round accessibility button (a11y.js, bottom left) sits above the bar at the bottom, not on its buttons */
+body.dock-on .a11y-fab{bottom:calc(var(--dock-h,76px) + 10px)!important;transition:bottom .2s}
 </style>
 </head>
 <body>
 <header class="top"><a class="brand" href="./?ref=sign" target="_blank" rel="noopener"><span class="mark">ס</span><b>סימן</b></a><span class="ttl" id="ttl"></span></header>
 <main class="wrap" id="main"><div class="load">טוען את המסמך…</div></main>
 <div class="dock" id="dock" hidden><div class="in" id="dockIn"></div></div>
+<script>
+// 6.2: while the bar at the bottom shows, the accessibility button moves up by the bar's height (which changes:
+// one row of buttons to download, or the signing buttons)
+(()=>{const d=document.getElementById('dock');if(!d)return;
+  const upd=()=>{const on=!d.hidden;document.body.classList.toggle('dock-on',on);if(on)document.documentElement.style.setProperty('--dock-h',Math.ceil(d.getBoundingClientRect().height)+'px');};
+  new MutationObserver(upd).observe(d,{attributes:true,attributeFilter:['hidden'],childList:true,subtree:true});
+  if(window.ResizeObserver)new ResizeObserver(upd).observe(d);addEventListener('resize',upd);upd();})();
+</script>
 <div class="dlg" id="sigDlg" hidden><div class="box" role="dialog" aria-modal="true" aria-labelledby="sigT">
   <div class="row" style="justify-content:space-between"><b id="sigT" style="font-size:17px">החתימה שלך</b><button class="btn link" id="sigX">ביטול</button></div>
   <div class="tabs"><button id="tDraw" aria-pressed="true">ציור</button><button id="tType" aria-pressed="false">הקלדה</button></div>
