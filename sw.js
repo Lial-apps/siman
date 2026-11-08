@@ -1,5 +1,5 @@
 // סימן — service worker: works offline, picks up new versions automatically
-const CACHE = 'siman-v98'; // 5.9.6 — a view link of a Word file keeps the Word too (Word / PDF download)
+const CACHE = 'siman-v99'; // 6.0 — karaoke transcript, stars, chapters, study tools, cite highlight, JPG/PNG/Markdown
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './pdf.min.js', './pdf.worker.min.js',
   './pdf-lib.min.js', './fontkit.umd.min.js', './icon-192.png', './icon-512.png', './icon-maskable-512.png', './jszip.min.js', './pptxgen.min.js', './office.js', './office-edit.js', './word-editor.js', './excel-editor.js', './docx-preview.min.js', './html2canvas.min.js', './xlsx.mini.min.js', './font-secular-he.woff2', './font-secular-lat.woff2', './send.js', './siman-plus.js', './siman-media.js', './ppt-editor.js', './office-ai.js', './office-translate.js', './a11y.js', './admin-panel.js', './font-rubik-400.ttf', './font-rubik-700.ttf', './siman-phone.css', './siman-phone.js', './siman-voice.js', './siman-asr-worker.js', './transformers.min.js', './siman-back.js', './siman-v7.css', './siman-v7.js', './siman-scan.js', './siman-merge.js', './siman-ux.js', './siman-nb.css', './siman-nb.js', './siman-fill.js'];
 

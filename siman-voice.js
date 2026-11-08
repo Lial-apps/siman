@@ -235,39 +235,7 @@ function level(a) {
   return a;
 }
 // who spoke when (in the engine worker): 10-second windows, 5 seconds apart
-/* 5.10.1: more than one engine at a time on a strong computer (each worker uses its own processor core) */
-function lanes() {
-  const c = navigator.hardwareConcurrency || 2, mem = navigator.deviceMemory || 8;
-  const mob = (navigator.userAgentData && navigator.userAgentData.mobile) || /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent || '');
-  if (mob || mem < 4) return 1; return c >= 8 ? 3 : c >= 4 ? 2 : 1;
-}
-function sideWorker() {
-  const w = new Worker(new URL('siman-asr-worker.js', location.href), { type: 'module' }); let seq = 0; const wait = new Map();
-  w.onmessage = e => { const d = e.data; if (d.type === 'progress') return; const p = wait.get(d.id); if (!p) return; wait.delete(d.id); if (d.error) p.rej(new Error(d.error)); else p.res(d); };
-  w.onerror = e => { const err = new Error((e && e.message) || 'Worker failed'); for (const p of wait.values()) p.rej(err); wait.clear(); };
-  return { ask: (m, tr) => new Promise((res, rej) => { const id = ++seq; wait.set(id, { res, rej }); w.postMessage(Object.assign({ id }, m), tr || []); }), end: () => { try { w.terminate(); } catch (_) {} for (const p of wait.values()) p.rej(abortErr()); wait.clear(); } };
-}
 async function diarize(pcm, K, onProg, opt) {
-  const n = lanes(), W0 = 10 * SR, H0 = 5 * SR;
-  const offs = []; for (let o = 0; ; o += H0) { const last = o + W0 >= pcm.length; offs.push({ o, first: o === 0, last }); if (last) break; }
-  if (n > 1 && offs.length > 4) {
-    // the 10-second windows are shared between a few workers; the voices are then joined in one place
-    const side = [];
-    for (let i = 0; i < n - 1; i++) { const sw = sideWorker(); try { await sw.ask({ type: 'dz-load' }); side.push(sw); } catch (e) { console.warn('dz lane', e); sw.end(); break; } }
-    try {
-      const L = [{ main: true, ask: (m, tr) => ASR.call(m, tr) }, ...side.map(sw => ({ ask: sw.ask }))];
-      const wins = new Array(offs.length), queue = offs.map((_, i) => i); let done = 0;
-      await Promise.all(L.map(async lane => {
-        while (queue.length) {
-          const k = queue.shift(), f = offs[k]; const win = pcm.slice(f.o, Math.min(pcm.length, f.o + W0));
-          try { const r = await lane.ask({ type: 'dz-win1', audio: win, offset: f.o / SR, first: f.first, last: f.last }, [win.buffer]); wins[k] = r.win; }
-          catch (e) { if (lane.main) throw e; queue.push(k); return; }
-          done++; if (onProg) onProg(done / offs.length);
-        }
-      }));
-      return await ASR.call({ type: 'dz-end2', windows: wins, speakers: K || 0, minSpeakers: (opt && opt.minK) || 0, kind: (opt && opt.kind) || '' });
-    } finally { side.forEach(sw => sw.end()); }
-  }
   await ASR.call({ type: 'dz-begin' });
   const W = 10 * SR, H = 5 * SR;
   for (let o = 0, first = true; o < pcm.length; o += H, first = false) {
@@ -550,6 +518,35 @@ const CSS = `
 .vx-ln .vx-tx mark.cur{outline:2px solid var(--ink,#16213A)}
 .vx-ln.uncertain .vx-tx{}
 .vx-u{border-bottom:2px dotted #C2410C}
+/* 6.0 */
+.vx-ln .vx-tx .w{border-radius:3px;transition:background-color .12s}
+.vx-ln .who .st{margin-inline-start:auto;color:var(--line,#C9D1DE)!important;font-size:15px;line-height:1;padding:2px 4px!important;opacity:0;transition:opacity .15s}
+.vx-ln:hover .who .st,.vx-ln .who .st:focus-visible,.vx-ln.starred .who .st{opacity:1}
+.vx-ln.starred .who .st{color:#E0A100!important}
+.vx-ln.starred{background:rgba(255,212,59,.13)}
+.vx-ln.flash{animation:vxflash 1.2s ease}
+@keyframes vxflash{0%,40%{background:rgba(255,212,59,.55)}100%{background:transparent}}
+@media (hover:none){.vx-ln .who .st{opacity:.55}}
+.vx-starnav{color:#8A6A00!important;font-weight:700}
+.vx-recstar{margin:4px auto 10px;display:inline-flex;gap:4px;font-weight:700;border-color:#E0A100!important}
+.vx-chk{display:flex;gap:6px;align-items:center;font-size:13.5px;padding:4px 2px}
+.vx-dict{display:flex;flex-wrap:wrap;gap:4px;max-width:300px;padding:2px 0 6px}
+.vx-dict span{display:inline-flex;align-items:center;gap:2px;background:var(--desk,#E2E7EE);border-radius:999px;padding:1px 4px 1px 9px;font-size:13px}
+.vx-dict span button{padding:0 6px!important;width:auto!important;min-height:0!important}
+.vx-chap{margin:0;padding:0;list-style:none;display:grid;gap:2px}
+.vx-chap li{display:grid}
+.vx-chap button{display:flex;gap:9px;align-items:baseline;background:none;border:0;padding:5px 4px;border-radius:8px;text-align:start;font:inherit;color:inherit;cursor:pointer}
+.vx-chap button:hover{background:var(--desk,#E2E7EE)}
+.vx-chap b{font-variant-numeric:tabular-nums;color:var(--blue,#2E58CC);font-size:13px;flex:none}
+.vx-chap small{color:var(--muted,#5D6982);padding-inline-start:52px;margin-top:-3px;font-size:13px}
+.vx-cards{display:grid;gap:8px}
+.vx-fc{display:grid;gap:6px;text-align:start;font:inherit;color:inherit;background:var(--bar,#fff);border:1px solid var(--line,#D4DBE5);border-radius:12px;padding:10px 12px;cursor:pointer;box-shadow:0 1px 0 var(--line,#D4DBE5)}
+.vx-fc .q{font-weight:700;unicode-bidi:plaintext}
+.vx-fc .a{display:none;color:var(--ink,#16213A);border-top:1px dashed var(--line,#D4DBE5);padding-top:6px;unicode-bidi:plaintext}
+.vx-fc[aria-expanded=true] .a{display:block}
+.vx-fc .a i{font-style:normal;color:var(--blue,#2E58CC);font-size:12.5px;text-decoration:underline}
+.vx-player .skp[aria-pressed=true],.vx-player .fol[aria-pressed=true]{background:rgba(255,255,255,.16)}
+@media (max-width:560px){.vx-player .skp{font-size:12px;padding:4px 6px}}
 /* side */
 .vx-tabs{display:flex;gap:4px;margin-bottom:14px;border-bottom:1px solid var(--line,#D4DBE5)}
 .vx-tabs button{background:none;border:0;border-bottom:3px solid transparent;padding:8px 10px;font-weight:600;color:var(--muted,#5D6982)!important}
@@ -893,7 +890,9 @@ async function transcribeFile(file, opts) {
   const item = {
     id, title: (file.name || 'הקלטה').replace(/\.[a-z0-9]+$/i, ''), fileName: file.name || '', created: opts.created || Date.now(), updated: Date.now(),
     kind, lang, spk: spkMode, quality, duration: opts.duration || null, segments: [], speakers: {}, analysis: null, tr: {}, chat: [], tasksDone: {}, status: 'working', engine: 'local',
+    marks: opts.marks || [],
   };
+  if (!item.marks.length && opts.id) { try { const old = await DB.get(opts.id); if (old && old.marks) item.marks = old.marks; } catch (_) {} }
   const sig = JOB.ctl.signal;
   const awake = keepAwake();
   try {
@@ -952,43 +951,24 @@ async function transcribeFile(file, opts) {
     if (!parts || !parts.length) parts = plan(pcm);
     if (!parts.length) throw new Error('לא נשמע דיבור בהקלטה');
     // 3. part by part; the text shows up as it is written
-    // 5.10.1: on a computer without a graphics card the parts are written two at a time (a second engine in parallel)
     step('tx', 'now', '0%');
     const total = parts.reduce((a, p) => a + p.e - p.s, 0) / SR;
     let done = 0; const t0 = Date.now();
-    const runners = [{ text: (a, l) => ASR.text(a, l) }];
-    let side = null;
-    if (parts.length > 6 && ASR.device === 'wasm' && spec.key !== 'acc' && lanes() >= 2) {
-      try { side = sideWorker(); await side.ask({ type: 'load', engine: spec.key }); runners.push({ side: true, text: (a, l) => side.ask({ type: 'run', audio: a, lang: l || 'he', engine: spec.key }, [a.buffer]) }); }
-      catch (e) { console.warn('second engine', e); if (side) side.end(); side = null; }
+    for (let k = 0; k < parts.length; k++) {
+      if (sig.aborted) throw abortErr();
+      const p = parts[k];
+      const r = await ASR.text(level(pcm.slice(p.s, p.e)), lang);
+      const text = clean(r.text, kind);
+      if (text) { item.segments.push({ spk: p.spk || 'spk_1', start: p.s / SR, end: p.e / SR, text }); liveLine(text); }
+      done += (p.e - p.s) / SR;
+      const spent = (Date.now() - t0) / 1000;
+      bar('tx', done / total);
+      step('tx', 'now', Math.round(done / total * 100) + '%' + (k >= 1 && done < total ? ' · ' + eta(spent / done * (total - done)) : ''));
+      if (k % 8 === 7) await DB.put(stripForDb(item));
     }
-    const res = new Array(parts.length); let nextK = 0, emit = 0, flushing = false;
-    const flush = async () => {
-      if (flushing) return; flushing = true;
-      try { while (emit < parts.length && res[emit] !== undefined) { const k = emit++, p = parts[k], text = res[k];
-        if (text) { item.segments.push({ spk: p.spk || 'spk_1', start: p.s / SR, end: p.e / SR, text }); liveLine(text); }
-        if (k % 8 === 7) await DB.put(stripForDb(item)); } } finally { flushing = false; }
-    };
-    try {
-      await Promise.all(runners.map(async R => {
-        while (nextK < parts.length) {
-          if (sig.aborted) throw abortErr();
-          const k = nextK++, p = parts[k];
-          let r;
-          try { r = await R.text(level(pcm.slice(p.s, p.e)), lang); }
-          catch (e) { if (!R.side) throw e; console.warn('second engine stopped', e); r = await ASR.text(level(pcm.slice(p.s, p.e)), lang); res[k] = clean(r.text, kind) || ''; done += (p.e - p.s) / SR; await flush(); return; }
-          res[k] = clean(r.text, kind) || '';
-          done += (p.e - p.s) / SR;
-          const spent = (Date.now() - t0) / 1000;
-          bar('tx', done / total);
-          step('tx', 'now', Math.round(done / total * 100) + '%' + (done > 2 && done < total ? ' · ' + eta(spent / done * (total - done)) : ''));
-          await flush();
-        }
-      }));
-      await flush();
-    } finally { if (side) side.end(); }
     item.segments = normalize(item.segments);
     if (!item.segments.length) throw new Error('לא נשמע דיבור בהקלטה');
+    starMarks(item);
     step('tx', 'done', clock((Date.now() - t0) / 1000));
     item.speakers = speakersOf(item.segments, item.speakers);
     item.status = 'ready';
@@ -1036,12 +1016,91 @@ async function retry(id) {
   JOB.queue.push({ file: f, opts: { id, kind: it && it.kind, lang: it && it.lang, created: it && it.created, spk: it && it.spk, quality: it && it.quality } });
   if (!JOB.busy) run();
 }
+/* 6.0: a personal dictionary — words the engine keeps getting wrong (names, terms, the company's name).
+   Every rule is applied on the device to each new transcript, and can be applied now to the open one. */
+const DICT_KEY = 'siman.voice.dict';
+const dictAll = () => { try { const d = JSON.parse(localStorage.getItem(DICT_KEY) || '[]'); return Array.isArray(d) ? d.filter(r => r && r.from) : []; } catch (_) { return []; } };
+const reEsc = x => String(x).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+// whole words only; a Hebrew prefix (ו, ה, ב, ל, מ, ש, כ) before the word is kept
+// ("אורית" → "אורית כהן" does not turn an existing "אורית כהן" into "אורית כהן כהן")
+const wordRe = (from, to) => new RegExp('(^|[\\s"\'(\\[׳״\\-]|(?:^|\\s)[והבלמשכ]{1,2})' + reEsc(from) + (to && to.length > from.length && to.startsWith(from) ? '(?!' + reEsc(to.slice(from.length)) + ')' : '') + '(?=$|[\\s.,!?;:)"\'\\]׳״\\-])', 'g');
+function applyDict(text, rules) {
+  for (const r of rules || dictAll()) { try { text = text.replace(wordRe(r.from, r.to), (m, pre) => pre + r.to); } catch (_) {} }
+  return text;
+}
+// 6.0: the moments marked with ★ while recording become starred lines in the transcript
+function starMarks(it) {
+  for (const t of it.marks || []) {
+    let best = -1, d = 1e9;
+    it.segments.forEach((s, i) => { if (s.start == null) return; const e = s.end != null ? s.end : s.start + 5; const dd = t < s.start ? s.start - t : t > e ? t - e : 0; if (dd < d) { d = dd; best = i; } });
+    // the moment is pressed a little after the words were said: the line said just before it counts too
+    if (best >= 0) { it.segments[best].star = true; if (d === 0 && it.segments[best].start > t - 4 && best > 0) it.segments[best - 1].star = true; }
+  }
+}
+function toggleStar(i) {
+  const s = V.segments[i]; if (!s) return;
+  if (s.star) delete s.star; else s.star = true;
+  const row = root.querySelector(`.vx-ln[data-i="${i}"]`);
+  if (row) { row.classList.toggle('starred', !!s.star); const b = row.querySelector('.st'); if (b) b.setAttribute('aria-pressed', String(!!s.star)); }
+  save(); drawLine(); updStarBtn();
+}
+const updStarBtn = () => { const b = root && root.querySelector('#vxStarNav'); if (!b) return; const n = V.segments.filter(s => s.star).length; b.hidden = !n; b.textContent = '★ ' + n; };
+let starAt = -1;
+function nextStar() {
+  const idx = V.segments.map((s, i) => s.star ? i : -1).filter(i => i >= 0); if (!idx.length) return;
+  starAt = idx.find(i => i > starAt); if (starAt == null) starAt = idx[0];
+  const row = root.querySelector(`.vx-ln[data-i="${starAt}"]`); if (row) { row.scrollIntoView({ block: 'center', behavior: 'smooth' }); row.classList.add('flash'); setTimeout(() => row.classList.remove('flash'), 1200); }
+  const s = V.segments[starAt]; if (audioEl && s.start != null) seek(Math.max(0, s.start - 0.3));
+}
+// 6.0: filler words ("אממ", "אהה", "um"): removed in one click, and the removal can be taken back
+const FILLER = /(^|\s)(?:א+מ+|א+ה+|אה|א+ממ+|ממ+|המ+|אמ+|אההה*|uh+|um+|uhm+|erm+|hmm+|ah+)(?=[\s,.!?]|$)[,]?/gi;
+function fillerCount() { let n = 0; for (const s of V.segments) n += (s.text.match(FILLER) || []).length; return n; }
+function dropFillers() {
+  const n = fillerCount();
+  if (!n) { say('לא נמצאו מילות מילוי (אממ, אהה…)'); return; }
+  if (!confirm(`נמצאו ${n} מילות מילוי (אממ, אהה וכדומה). להסיר אותן מהתמליל?`)) return;
+  V.undoSegs = JSON.stringify(V.segments);
+  V.segments = V.segments.map(s => { const t = s.text.replace(FILLER, '$1').replace(/\s{2,}/g, ' ').replace(/^\s*[,.]\s*/, '').trim(); if (t === s.text) return s; const c = { ...s, text: t }; delete c.words; return c; }).filter(s => s.text);
+  save(); renderLines(); drawLine(); say(`הוסרו ${n} מילות מילוי. אפשר לבטל בתפריט "כלים"`);
+}
+function undoTools() {
+  if (!V.undoSegs) return;
+  V.segments = JSON.parse(V.undoSegs); delete V.undoSegs; save(); renderLines(); drawLine(); renderSpeakers(); say('השינוי האחרון בוטל');
+}
+// 6.0: find & replace in the whole transcript, and remembering the fix for the next transcripts
+function replaceMenu(anchor) {
+  const m = menu(anchor);
+  const rules = dictAll();
+  m.innerHTML = `<div class="cap">החלפה בכל התמליל</div>
+    <input type="text" id="vxRepA" placeholder="מה כתוב (למשל: אורית)" aria-label="מה כתוב"><input type="text" id="vxRepB" placeholder="מה צריך להיות (למשל: אורית כהן)" aria-label="מה צריך להיות">
+    <label class="vx-chk"><input type="checkbox" id="vxRepKeep" checked> לזכור ולתקן לבד בתמלילים הבאים</label>
+    <button data-x="go">החלפה</button>
+    ${rules.length ? `<hr><div class="cap">המילון שלי (${rules.length})</div><div class="vx-dict">${rules.map((r, k) => `<span>${esc(r.from)} ← ${esc(r.to)}<button data-d="${k}" title="הסרה" aria-label="הסרה">×</button></span>`).join('')}</div><button data-x="all">להחיל את כל המילון על התמליל הזה</button>` : ''}
+    <hr><button data-x="fill">ניקוי מילות מילוי (אממ, אהה)</button>${V.undoSegs ? '<button data-x="undo">ביטול השינוי האחרון</button>' : ''}`;
+  const a = m.querySelector('#vxRepA'), b = m.querySelector('#vxRepB');
+  const sel = getSelection && String(getSelection()).trim(); if (sel && sel.length < 40) a.value = sel;
+  setTimeout(() => (a.value ? b : a).focus(), 30);
+  const go = () => {
+    const from = a.value.trim(), to = b.value.trim(); if (!from) { a.focus(); return; }
+    V.undoSegs = JSON.stringify(V.segments);
+    let n = 0; const re = wordRe(from, to);
+    V.segments = V.segments.map(s => { const t = s.text.replace(re, (x, pre) => { n++; return pre + to; }); if (t === s.text) return s; const c = { ...s, text: t }; delete c.words; return c; });
+    if (m.querySelector('#vxRepKeep').checked && to) { const d = dictAll().filter(r => r.from !== from); d.push({ from, to }); try { localStorage.setItem(DICT_KEY, JSON.stringify(d.slice(-200))); } catch (_) {} }
+    closeMenu(); save(); renderLines(); say(n ? `הוחלפו ${n} מקומות` + (m.querySelector('#vxRepKeep').checked && to ? '. נשמר במילון לתמלילים הבאים' : '') : 'לא נמצא בתמליל' + (m.querySelector('#vxRepKeep').checked && to ? ', אבל נשמר במילון' : ''));
+  };
+  b.onkeydown = e => { if (e.key === 'Enter') go(); };
+  m.querySelector('[data-x=go]').onclick = go;
+  m.querySelectorAll('[data-d]').forEach(x => x.onclick = () => { const d = dictAll(); d.splice(+x.dataset.d, 1); try { localStorage.setItem(DICT_KEY, JSON.stringify(d)); } catch (_) {} replaceMenu(anchor); });
+  const all = m.querySelector('[data-x=all]'); if (all) all.onclick = () => { V.undoSegs = JSON.stringify(V.segments); const r = dictAll(); V.segments = V.segments.map(s => { const t = applyDict(s.text, r); if (t === s.text) return s; const c = { ...s, text: t }; delete c.words; return c; }); closeMenu(); save(); renderLines(); say('המילון הוחל על התמליל'); };
+  m.querySelector('[data-x=fill]').onclick = () => { closeMenu(); dropFillers(); };
+  const u = m.querySelector('[data-x=undo]'); if (u) u.onclick = () => { closeMenu(); undoTools(); };
+}
 // labels in order of appearance: spk_1, spk_2…
 function normalize(segs) {
   const map = {}; let n = 0;
   const out = [];
   for (const s of segs) {
-    const text = String(s.text || '').replace(/\s+/g, ' ').trim(); if (!text) continue;
+    const text = applyDict(String(s.text || '').replace(/\s+/g, ' ').trim()); if (!text) continue;
     const raw = String(s.spk || 'spk_1');
     if (!map[raw]) map[raw] = 'spk_' + (++n);
     out.push({ spk: map[raw], start: s.start == null ? null : +s.start, end: s.end == null ? null : +s.end, text });
@@ -1092,7 +1151,7 @@ async function openItem(id) {
   show('doc');
   if (V.namedNote) { say(V.namedNote); delete V.namedNote; save(); }
 }
-let SHOW_TR = '', FIND = { q: '', hits: [], cur: -1 }, FOLLOW = true, activeIdx = -1;
+let SHOW_TR = '', FIND = { q: '', hits: [], cur: -1 }, FOLLOW = true, activeIdx = -1, SKIP = !!prefs.skip;
 function renderDoc() {
   const s = root.querySelector('#vxDoc');
   const rtl = isRtl(V.lang) || (!V.lang && guessRtl(plain(V.segments)));
@@ -1110,6 +1169,8 @@ function renderDoc() {
         <label class="vx-find">${ico.search}<input id="vxFindIn" type="search" placeholder="חיפוש בתמליל" aria-label="חיפוש בתמליל"><small id="vxFindN"></small></label>
         <button class="vx-btn sm" id="vxFindPrev" hidden title="הקודם">▲</button><button class="vx-btn sm" id="vxFindNext" hidden title="הבא">▼</button>
         ${SMART_CLOUD ? '<button class="vx-btn sm" id="vxTrBtn">תרגום</button>' : ''}
+        <button class="vx-btn sm" id="vxToolsBtn" title="החלפה בכל התמליל, המילון שלי, ניקוי מילות מילוי">כלים</button>
+        <button class="vx-btn sm vx-starnav" id="vxStarNav" hidden title="מעבר לרגע החשוב הבא"></button>
       </div>
       <div class="vx-spk" id="vxSpk"></div>
       <div class="vx-lines" id="vxLines" dir="${rtl ? 'rtl' : 'ltr'}"></div>
@@ -1131,12 +1192,14 @@ function renderDoc() {
   ti.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); ti.blur(); } };
   s.querySelector('#vxExport').onclick = e => exportMenu(e.currentTarget);
   const trb = s.querySelector('#vxTrBtn'); if (trb) trb.onclick = e => trMenu(e.currentTarget);
+  s.querySelector('#vxToolsBtn').onclick = e => replaceMenu(e.currentTarget);
+  s.querySelector('#vxStarNav').onclick = nextStar; starAt = -1;
   const fi = s.querySelector('#vxFindIn');
   fi.oninput = () => find(fi.value);
   fi.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); findStep(e.shiftKey ? -1 : 1); } };
   s.querySelector('#vxFindNext').onclick = () => findStep(1);
   s.querySelector('#vxFindPrev').onclick = () => findStep(-1);
-  renderSpeakers(); renderLines(); renderIns(); renderAsk();
+  renderSpeakers(); renderLines(); renderIns(); renderAsk(); updStarBtn();
   setupPlayer(s);
 }
 function sideTab(t) {
@@ -1191,18 +1254,37 @@ function lineHtml(s, i) {
     const q = FIND.q.toLowerCase(), t = s.text, lo = t.toLowerCase(); let k = 0, out = '', p;
     while ((p = lo.indexOf(q, k)) >= 0) { out += esc(t.slice(k, p)) + `<mark data-h>${esc(t.slice(p, p + q.length))}</mark>`; k = p + q.length; }
     html = out + esc(t.slice(k));
-  } else html = esc(s.text);
+  } else {
+    // 6.0: every word is its own piece, so the word being said lights up (karaoke) and Ctrl/Alt+click plays from it
+    const ws = wordsOf(s);
+    if (ws) return ws.map((w, k) => { const u = /^\[\[(.*)\]\]$/.exec(w[0]); return u ? `<span class="w vx-u" data-k="${k}" title="לא בטוח שזו המילה">${esc(u[1])}</span>` : `<span class="w" data-k="${k}">${esc(w[0])}</span>`; }).join(' ');
+    html = esc(s.text);
+  }
   return html.replace(/\[\[([^\]]*)\]\]/g, (m, x) => `<span class="vx-u" title="לא בטוח שזו המילה">${x}</span>`);
+}
+// 6.0: the engine gives a time for every line; the time of each word inside it is estimated by its length
+// (a long word takes longer to say). Real word times, when there are, are used as they are.
+const WCACHE = new WeakMap();
+function wordsOf(s) {
+  if (s.words && s.words.length) return s.words;
+  if (s.start == null || s.end == null || !(s.end > s.start)) return null;
+  const hit = WCACHE.get(s); if (hit && hit.t === s.text) return hit.w;
+  const toks = s.text.split(/\s+/).filter(Boolean);
+  if (!toks.length || toks.some(t => /\[\[/.test(t) !== /\]\]/.test(t))) return null; // a doubtful part of several words: kept whole
+  const weight = toks.map(t => t.replace(/[^\p{L}\p{N}]/gu, '').length + 1.2 + (/[.,!?;:]$/.test(t) ? 1.5 : 0));
+  const total = weight.reduce((a, b) => a + b, 0), span = s.end - s.start; let t = s.start;
+  const w = toks.map((x, k) => { const a = t; t += span * weight[k] / total; return [x, a, t]; });
+  WCACHE.set(s, { t: s.text, w }); return w;
 }
 function renderLines() {
   const box = root.querySelector('#vxLines'); if (!box) return;
   const frag = document.createDocumentFragment();
   V.segments.forEach((s, i) => {
     const sp = V.speakers[s.spk] || { color: '#888' };
-    const row = el('div', 'vx-ln');
+    const row = el('div', 'vx-ln' + (s.star ? ' starred' : ''));
     row.dataset.i = i;
     const tr = SHOW_TR && V.tr[SHOW_TR] && V.tr[SHOW_TR][i];
-    row.innerHTML = `<div class="who"><button class="nm" style="color:${sp.color}" title="שינוי הדובר של השורה">${esc(spkName(V, s.spk))}</button>${s.start != null ? `<button class="tm" title="השמעה מכאן">${clock(s.start)}</button>` : ''}</div>
+    row.innerHTML = `<div class="who"><button class="nm" style="color:${sp.color}" title="שינוי הדובר של השורה">${esc(spkName(V, s.spk))}</button>${s.start != null ? `<button class="tm" title="השמעה מכאן">${clock(s.start)}</button>` : ''}<button class="st" aria-pressed="${!!s.star}" title="סימון כרגע חשוב" aria-label="סימון כרגע חשוב">★</button></div>
       <span class="vx-sb" style="background:${sp.color}"></span><div class="vx-tx" ${FIND.q ? '' : 'contenteditable="' + CE + '"'} spellcheck="false">${lineHtml(s, i)}</div>${tr ? `<div class="trl" dir="auto">${esc(tr)}</div>` : ''}`;
     frag.append(row);
   });
@@ -1217,7 +1299,8 @@ function wireLines() {
     if (e.target.closest('.tm')) { playFrom(V.segments[i].start); return; }
     if (e.target.closest('.nm')) { lineSpeakerMenu(e.target.closest('.nm'), i); return; }
     const w = e.target.closest('.w');
-    if (w && audioEl && e.altKey) { const ws = V.segments[i].words[+w.dataset.k]; if (ws && ws[1] != null) playFrom(ws[1]); }
+    if (e.target.closest('.st')) { toggleStar(i); return; }
+    if (w && audioEl && (e.altKey || e.ctrlKey || e.metaKey)) { const all = wordsOf(V.segments[i]); const ws = all && all[+w.dataset.k]; if (ws && ws[1] != null) { e.preventDefault(); playFrom(ws[1] + 0.3); } }
   });
   box.addEventListener('dblclick', e => { const row = e.target.closest('.vx-ln'); if (!row || !audioEl) return; const s = V.segments[+row.dataset.i]; if (s.start != null) playFrom(s.start); });
   box.addEventListener('focusout', e => {
@@ -1265,7 +1348,77 @@ function findStep(d) {
 }
 
 /* ---------------- insights ---------------- */
+// 6.0: chapters (jump to each topic) and study cards — built with the same "ask" service, so nothing new on the server
 function renderIns() {
+  renderIns0();
+  const box = root.querySelector('#vxIns'); if (!box || !SMART_CLOUD) return;
+  const ex = el('div', 'vx-extra');
+  const ch = V.chapters && V.chapters.length ? V.chapters : null;
+  ex.innerHTML = `<div class="vx-card"><h3>${ico.spark}פרקים</h3>${ch ? `<ol class="vx-chap">${ch.map((c, k) => `<li><button data-c="${k}"><b dir="ltr">${clock(c.t)}</b><span>${esc(c.title)}</span></button>${c.desc ? `<small>${esc(c.desc)}</small>` : ''}</li>`).join('')}</ol>` : '<p class="vx-hint">חלוקה לפי נושאים, עם קפיצה לכל פרק בלחיצה.</p>'}
+      <div class="vx-acts"><button class="vx-btn sm" id="vxChapGo">${ch ? 'לחלק מחדש' : 'חלוקה לפרקים'}</button></div></div>
+    <div class="vx-card"><h3>${ico.spark}כרטיסיות לחזרה</h3>${V.cards && V.cards.length ? `<div class="vx-cards" id="vxCards"></div>` : '<p class="vx-hint">שאלות ותשובות מתוך ההקלטה, לחזרה לפני מבחן או פגישה. לוחצים על כרטיס כדי לראות את התשובה.</p>'}
+      <div class="vx-acts"><button class="vx-btn sm" id="vxCardsGo">${V.cards && V.cards.length ? 'כרטיסיות חדשות' : 'הכנת כרטיסיות'}</button></div></div>`;
+  box.append(ex);
+  ex.querySelectorAll('[data-c]').forEach(b => b.onclick = () => { const c = V.chapters[+b.dataset.c]; if (audioEl) playFrom(c.t + 0.3); jumpToTime(c.t); });
+  ex.querySelector('#vxChapGo').onclick = makeChapters;
+  ex.querySelector('#vxCardsGo').onclick = makeCards;
+  if (V.cards && V.cards.length) drawCards(ex.querySelector('#vxCards'));
+}
+const tsec = x => x.split(':').map(Number).reduce((s, v) => s * 60 + v, 0);
+function jumpToTime(t) {
+  let k = 0; V.segments.forEach((s, i) => { if (s.start != null && s.start <= t + 0.5) k = i; });
+  const row = root.querySelector(`.vx-ln[data-i="${k}"]`); if (!row) return;
+  if (innerWidth <= 860) { const b = root.querySelector('.vx-mtabs [data-m="tr"]'); if (b) b.click(); }
+  row.scrollIntoView({ block: 'start', behavior: 'smooth' }); row.classList.add('flash'); setTimeout(() => row.classList.remove('flash'), 1200);
+}
+async function askRaw(what, question) {
+  if (!cloudOk(what)) return null;
+  const r = await call('ask', { transcript: forAi(V), question, history: [] });
+  return String((r && r.answer) || '');
+}
+async function makeChapters() {
+  const b = root.querySelector('#vxChapGo'); if (b) { b.disabled = true; b.textContent = 'מחלק לפרקים…'; }
+  try {
+    const a = await askRaw('חלוקה לפרקים', 'Split the conversation into 3 to 12 chapters by topic, in order. Output ONLY lines, one per chapter, exactly in this format:\n[mm:ss] short title | one sentence about what is said\nThe time is the start of the chapter, taken from the transcript. Write the titles in the language of the transcript. No other text.');
+    if (a == null) return;
+    const out = [];
+    for (const line of a.split(/\n+/)) {
+      const m = /\[?(\d{1,2}:\d{2}(?::\d{2})?)\]?\s*[-–—:.]?\s*(.+)/.exec(line.replace(/^[\s•*\d.)-]+(?=\[)/, '').trim()); if (!m) continue;
+      const [title, desc] = m[2].split(/\s*\|\s*/);
+      const t = tsec(m[1]); if (!isFinite(t)) continue;
+      out.push({ t, title: title.replace(/^[*\s]+|[*\s]+$/g, '').slice(0, 90), desc: (desc || '').slice(0, 200) });
+    }
+    if (!out.length) { say('לא הצלחתי לחלק לפרקים. נסו שוב'); return; }
+    out.sort((x, y) => x.t - y.t); V.chapters = out; save(); count('voice_chapters');
+  } catch (e) { say(friendly(e)); }
+  renderIns(); drawLine();
+}
+async function makeCards() {
+  const b = root.querySelector('#vxCardsGo'); if (b) { b.disabled = true; b.textContent = 'מכין כרטיסיות…'; }
+  try {
+    const a = await askRaw('כרטיסיות לחזרה', 'Make 8 to 15 study flashcards from the most important content of the transcript. Output ONLY lines, one per card, exactly in this format:\nQ: question || A: short answer [mm:ss]\nThe time is where the answer is said. Write in the language of the transcript. No other text.');
+    if (a == null) return;
+    const cards = [];
+    for (const line of a.split(/\n+/)) {
+      const m = /(?:Q|ש)\s*[:：]\s*(.+?)\s*\|\|\s*(?:A|ת)\s*[:：]\s*(.+)/i.exec(line); if (!m) continue;
+      const tm = /\[(\d{1,2}:\d{2}(?::\d{2})?)\]\s*$/.exec(m[2]);
+      cards.push({ q: m[1].trim().slice(0, 300), a: m[2].replace(/\s*\[[\d:]+\]\s*$/, '').trim().slice(0, 500), t: tm ? tsec(tm[1]) : null });
+    }
+    if (!cards.length) { say('לא הצלחתי להכין כרטיסיות. נסו שוב'); return; }
+    V.cards = cards; save(); count('voice_cards');
+  } catch (e) { say(friendly(e)); }
+  renderIns();
+}
+function drawCards(box) {
+  box.innerHTML = '';
+  V.cards.forEach(c => {
+    const d = el('button', 'vx-fc', `<span class="q">${esc(c.q)}</span><span class="a">${esc(c.a)}${c.t != null ? ` <i dir="ltr">${clock(c.t)}</i>` : ''}</span>`);
+    d.setAttribute('aria-expanded', 'false');
+    d.onclick = e => { if (e.target.closest('i') && c.t != null) { playFrom(c.t); return; } const o = d.getAttribute('aria-expanded') === 'true'; d.setAttribute('aria-expanded', String(!o)); };
+    box.append(d);
+  });
+}
+function renderIns0() {
   const box = root.querySelector('#vxIns'); if (!box) return;
   const a = V.analysis;
   if (!a) {
@@ -1273,7 +1426,7 @@ function renderIns() {
       <div class="vx-card"><h3>${ico.lock}מה נשאר במכשיר</h3><p class="vx-hint">השמע, התמלול והעריכה נעשים כאן בלבד. אפשר לייצא ל-Word, ל-PDF או לכתוביות בלי שום שליחה.</p></div>`
       : `<div class="vx-card"><h3>${ico.lock}הכול במכשיר</h3><p class="vx-hint">השמע, התמלול והעריכה נעשים כאן בלבד. הייצוא ל-Word, ל-PDF ולכתוביות בתפריט ״ייצוא ושיתוף״.</p></div>`;
     const b = box.querySelector('#vxAnalyze'); if (b) b.onclick = reanalyze;
-    return;
+    return; // (chapters and study cards are added below by renderIns)
   }
   const list = (arr, cls) => arr && arr.length ? `<ul${cls ? ` class="${cls}"` : ''}>${arr.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : '';
   const tasks = (a.tasks || []).map((t, k) => `<div class="vx-task${V.tasksDone[k] ? ' done' : ''}"><input type="checkbox" data-k="${k}"${V.tasksDone[k] ? ' checked' : ''} aria-label="בוצע"><div class="d"><span>${esc(t.what)}</span>${t.who || t.when ? `<small>${esc([nameFor(t.who), t.when].filter(Boolean).join(' · '))}</small>` : ''}</div>${t.date ? `<button class="vx-ic" data-cal="t${k}" title="הוספה ליומן">${ico.cal}</button>` : ''}</div>`).join('');
@@ -1393,7 +1546,7 @@ function setupPlayer(s) {
   const p = el('div', 'vx-player');
   p.innerHTML = `<div class="vx-pl-ctl"><button class="bw" title="10 שניות אחורה" aria-label="10 שניות אחורה">${ico.bwd}</button><button class="pp" title="השמעה (רווח)" aria-label="השמעה">${ico.play}</button><button class="fw" title="10 שניות קדימה" aria-label="10 שניות קדימה">${ico.fwd}</button></div>
     <div class="vx-pl-line"><canvas aria-label="ציר הזמן לפי דוברים"></canvas><div class="vx-pl-time"><span class="cur">0:00</span><span class="dur">${clock(V.duration)}</span></div></div>
-    <div class="vx-pl-end"><button class="spd" title="מהירות">1×</button><button class="fol" aria-pressed="true" title="גלילה אחרי ההשמעה">עוקב</button></div>`;
+    <div class="vx-pl-end"><button class="spd" title="מהירות">1×</button><button class="skp" aria-pressed="false" title="דילוג על שתיקות ארוכות בזמן ההשמעה">דילוג על שקט</button><button class="fol" aria-pressed="true" title="גלילה אחרי ההשמעה">עוקב</button></div>`;
   s.append(p);
   cv = p.querySelector('canvas');
   p.querySelector('.pp').onclick = togglePlay;
@@ -1401,6 +1554,8 @@ function setupPlayer(s) {
   p.querySelector('.fw').onclick = () => seek(audioEl.currentTime + 10);
   const sp = p.querySelector('.spd'), speeds = [1, 1.25, 1.5, 1.75, 2, 0.75];
   sp.onclick = () => { const k = (speeds.indexOf(audioEl.playbackRate) + 1) % speeds.length; audioEl.playbackRate = speeds[k]; sp.textContent = speeds[k] + '×'; };
+  const skp = p.querySelector('.skp'); skp.setAttribute('aria-pressed', String(SKIP));
+  skp.onclick = () => { SKIP = !SKIP; skp.setAttribute('aria-pressed', String(SKIP)); try { prefs.skip = SKIP; wr(PREF_KEY, prefs); } catch (_) {} say(SKIP ? 'שתיקות של יותר משנייה וחצי ידולגו' : 'ההשמעה רצה כרגיל'); };
   const fol = p.querySelector('.fol'); fol.setAttribute('aria-pressed', String(FOLLOW));
   fol.onclick = () => { FOLLOW = !FOLLOW; fol.setAttribute('aria-pressed', String(FOLLOW)); };
   audioEl.onplay = () => { p.querySelector('.pp').innerHTML = ico.pause; loop(); };
@@ -1429,6 +1584,11 @@ function drawLine() {
     g.fillStyle = (V.speakers[s.spk] || {}).color || '#888';
     g.fillRect(W - b * W, H * .3, Math.max(1.5 * dpr, (b - a) * W), H * .4);
   }
+  // 6.0: starred moments (a small star mark above the line) and the chapters (thin white ticks)
+  g.fillStyle = '#FFD43B';
+  for (const s of V.segments) if (s.star && s.start != null) { const x = W - (s.start / D) * W; g.beginPath(); g.moveTo(x, H * .28); g.lineTo(x - 4 * dpr, 0); g.lineTo(x + 4 * dpr, 0); g.closePath(); g.fill(); }
+  g.fillStyle = 'rgba(255,255,255,.75)';
+  for (const c of V.chapters || []) if (c.t > 0) g.fillRect(W - (c.t / D) * W - 0.5 * dpr, H * .72, 1.5 * dpr, H * .28);
   if (audioEl) {
     const x = W - (audioEl.currentTime / D) * W;
     g.fillStyle = '#FFD43B'; g.fillRect(x - 1.5 * dpr, 0, 3 * dpr, H);
@@ -1445,11 +1605,18 @@ function tick() {
   const segs = V.segments; let lo = 0, hi = segs.length - 1, k = -1;
   while (lo <= hi) { const m = (lo + hi) >> 1; if (segs[m].start != null && segs[m].start <= t + 0.15) { k = m; lo = m + 1; } else hi = m - 1; }
   if (k !== activeIdx) markActive(k);
+  // 6.0: skipping silence — between the end of one line and the start of the next, more than 1.5 s of nothing is jumped over
+  if (SKIP && !audioEl.paused && k >= -1) {
+    const cur = segs[k], nx = segs[k + 1];
+    const endCur = cur ? (cur.end != null ? cur.end : cur.start + 2) : 0;
+    if (nx && nx.start != null && t > endCur + 0.25 && nx.start - t > 1.5) { audioEl.currentTime = nx.start - 0.25; return; }
+  }
   // the word being said now
   if (lastWord) { lastWord.classList.remove('on'); lastWord = null; }
   const s = segs[k];
-  if (s && s.words && !FIND.q) {
-    let wi = -1; for (let j = 0; j < s.words.length; j++) { if (s.words[j][1] != null && s.words[j][1] <= t) wi = j; else if (s.words[j][1] != null) break; }
+  const sw = s && !FIND.q ? wordsOf(s) : null;
+  if (sw) {
+    let wi = -1; for (let j = 0; j < sw.length; j++) { if (sw[j][1] != null && sw[j][1] <= t) wi = j; else if (sw[j][1] != null) break; }
     if (wi >= 0) { const w = root.querySelector(`.vx-ln[data-i="${k}"] .w[data-k="${wi}"]`); if (w) { w.classList.add('on'); lastWord = w; } }
   }
 }
@@ -1495,7 +1662,7 @@ async function startRec() {
   const types = ['audio/webm;codecs=opus', 'audio/ogg;codecs=opus', 'audio/mp4', 'audio/webm'];
   REC.mime = types.find(t => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)) || '';
   REC.mr = new MediaRecorder(REC.stream, REC.mime ? { mimeType: REC.mime, audioBitsPerSecond: 48000 } : undefined);
-  Object.assign(REC, { chunks: [], acc: 0, pend: [], pendLen: 0, off: 0, floor: [], segs: [], chain: Promise.resolve(), engineOk: false, cancel: false, abandon: false, lang: prefs.lang || 'he', kind: prefs.kind, spk: String(prefs.spk || 'auto') });
+  Object.assign(REC, { chunks: [], acc: 0, pend: [], pendLen: 0, off: 0, floor: [], segs: [], chain: Promise.resolve(), engineOk: false, cancel: false, abandon: false, marks: [], lang: prefs.lang || 'he', kind: prefs.kind, spk: String(prefs.spk || 'auto') });
   REC.mr.ondataavailable = e => { if (e.data && e.data.size) REC.chunks.push(e.data); };
   REC.mr.onstop = finishRec;
   // 5.9.6: the microphone cut off (a phone call came in, the earphones were taken out): what was recorded is kept
@@ -1506,11 +1673,19 @@ async function startRec() {
   const s = root.querySelector('#vxRec');
   s.innerHTML = `<div class="vx-rec"><div class="tm" id="vxRecT">0:00</div><div class="st" id="vxRecS">מקליט</div><canvas id="vxRecC"></canvas>
     <div class="ctl"><button class="vx-btn" id="vxRecP">השהיה</button><button class="big" id="vxRecStop" title="סיום" aria-label="סיום ההקלטה">${ico.stop}</button><button class="vx-btn" id="vxRecX">ביטול</button></div>
+    <button class="vx-btn vx-recstar" id="vxRecStar" title="מסמן את הרגע הזה. בתמליל השורה תסומן בכוכב">★ רגע חשוב<span id="vxRecStarN"></span></button>
     <div class="vx-live" id="vxLive" dir="auto" data-empty="הטקסט נכתב כאן תוך כדי ההקלטה, בתוך המכשיר."></div>
     ${String(prefs.spk) !== '1' ? '<p class="vx-hint">הטקסט כאן הוא טיוטה מהירה. בסוף ההקלטה נכתב התמליל המלא, עם הפרדה בין הדוברים.</p>' : ''}
     <p class="vx-hint" id="vxRecE"></p>
     <p class="vx-hint">${ico.lock} ההקלטה והתמלול נשארים במכשיר. המסך יישאר דלוק בזמן ההקלטה. כדאי להניח את הטלפון קרוב למי שמדבר.</p></div>`;
   s.querySelector('#vxRecStop').onclick = stopRec;
+  // 6.0: one tap marks the moment (like a bookmark); the transcript shows that line with a star
+  s.querySelector('#vxRecStar').onclick = () => {
+    const t = (REC.acc + (REC.mr && REC.mr.state === 'recording' ? Date.now() - REC.t0 : 0)) / 1000;
+    REC.marks.push(Math.round(t * 10) / 10);
+    const n = s.querySelector('#vxRecStarN'); n.textContent = ' · ' + REC.marks.length;
+    say('סומן ב-' + clock(t)); try { navigator.vibrate && navigator.vibrate(30); } catch (_) {}
+  };
   lawNote(s.querySelector('.vx-rec'));
   s.querySelector('#vxRecX').onclick = () => { if (confirm('למחוק את ההקלטה?')) { REC.cancel = true; stopRec(); } };
   s.querySelector('#vxRecP').onclick = e => {
@@ -1606,17 +1781,18 @@ async function finishRec() {
   const f = new File(chunks, name, { type: mime.split(';')[0] });
   count('voice_record');
   // the engine never loaded (e.g. no internet the first time): the file is transcribed later, like any file
-  if (!REC.engineOk || REC.spk !== '1') { REC.abandon = true; REC.pend = []; REC.pendLen = 0; JOB.queue.push({ file: f, opts: { duration: REC.dur || null, kind: REC.kind, lang: REC.lang, spk: REC.spk } }); if (!JOB.busy) run(); return; }
+  if (!REC.engineOk || REC.spk !== '1') { REC.abandon = true; REC.pend = []; REC.pendLen = 0; JOB.queue.push({ file: f, opts: { duration: REC.dur || null, kind: REC.kind, lang: REC.lang, spk: REC.spk, marks: REC.marks.slice() } }); if (!JOB.busy) run(); return; }
   liveCut(true);
   show('work');
   const w = root.querySelector('#vxWork');
   w.innerHTML = `<div class="vx-work"><h2>מסיים לתמלל</h2><div class="f">${esc(name)}</div><div class="vx-wait" style="justify-content:center"><i></i>כותב את המשפטים האחרונים…</div></div>`;
   await REC.chain;
-  if (!REC.segs.length && (REC.dur || 0) > 3) { JOB.queue.push({ file: f, opts: { duration: REC.dur || null, kind: REC.kind, lang: REC.lang, spk: REC.spk } }); if (!JOB.busy) run(); return; }
+  if (!REC.segs.length && (REC.dur || 0) > 3) { JOB.queue.push({ file: f, opts: { duration: REC.dur || null, kind: REC.kind, lang: REC.lang, spk: REC.spk, marks: REC.marks.slice() } }); if (!JOB.busy) run(); return; }
   const id = uid();
   const segs = normalize(REC.segs.sort((a, b) => a.start - b.start));
   const item = { id, title: name.replace(/\.[a-z0-9]+$/i, ''), fileName: name, created: Date.now(), updated: Date.now(), kind: REC.kind, lang: REC.lang, duration: REC.dur || null,
-    segments: segs, speakers: speakersOf(segs, {}), analysis: null, tr: {}, chat: [], tasksDone: {}, status: segs.length ? 'ready' : 'failed', error: segs.length ? '' : 'לא נשמע דיבור בהקלטה', engine: 'local' };
+    segments: segs, speakers: speakersOf(segs, {}), analysis: null, tr: {}, chat: [], tasksDone: {}, status: segs.length ? 'ready' : 'failed', error: segs.length ? '' : 'לא נשמע דיבור בהקלטה', engine: 'local', marks: REC.marks.slice() };
+  starMarks(item);
   await DB.putAudio(id, f); await DB.put(item); refreshCount();
   await openItem(id);
 }
@@ -1684,6 +1860,8 @@ function exportMenu(anchor) {
     <button data-x="srt">כתוביות לסרטון (SRT)</button>
     <button data-x="vtt">כתוביות לאתר (VTT)</button>
     <button data-x="txt">טקסט פשוט</button>
+    <button data-x="md">Markdown (לנושן, אובסידיאן וכו')</button>
+    ${V.segments.some(s => s.star) ? '<button data-x="stars">★ רק הרגעים החשובים</button>' : ''}
     <button data-x="copy">${ico.copy}העתקת התמליל</button>
     ${canShare ? `<button data-x="share">שיתוף…</button>` : ''}
     <hr>
@@ -1707,13 +1885,32 @@ function textExport() {
   });
   return lines.join('\n').replace(/\[\[([^\]]*)\]\]/g, '$1');
 }
+// 6.0: Markdown — summary, chapters, tasks and the transcript, ready for Notion / Obsidian / any notes app
+function mdExport() {
+  const a = V.analysis || {}, L = [`# ${V.title}`, '', `*${dayStr(V.created)}${V.duration ? ' · ' + longDur(V.duration) : ''}*`, ''];
+  const plainT = t => String(t || '').replace(/\[\[([^\]]*)\]\]/g, '$1');
+  if (a.summary) L.push('## סיכום', '', a.summary, '');
+  if (a.points && a.points.length) L.push('## נקודות עיקריות', '', ...a.points.map(p => '- ' + p), '');
+  if (a.decisions && a.decisions.length) L.push('## מה סוכם', '', ...a.decisions.map(p => '- ' + p), '');
+  if (a.tasks && a.tasks.length) L.push('## משימות', '', ...a.tasks.map((t, k) => `- [${V.tasksDone[k] ? 'x' : ' '}] ${t.what}${t.who || t.when ? ' (' + [nameFor(t.who), t.when].filter(Boolean).join(', ') + ')' : ''}`), '');
+  if (V.chapters && V.chapters.length) L.push('## פרקים', '', ...V.chapters.map(c => `- **${clock2(c.t)}** ${c.title}${c.desc ? ' — ' + c.desc : ''}`), '');
+  L.push('## תמליל', '');
+  let prev = null;
+  for (const s of V.segments) {
+    const head = spkName(V, s.spk);
+    L.push(`${head !== prev ? `**${head}**${s.start != null ? ' `' + clock2(s.start) + '`' : ''}: ` : ''}${s.star ? '⭐ ' : ''}${plainT(s.text)}`, '');
+    prev = head;
+  }
+  return L.join('\n');
+}
 function subs(kind) {
   const ts = (s, sep) => { s = Math.max(0, s); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = Math.floor(s % 60), ms = Math.round((s % 1) * 1000); return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(x).padStart(2, '0')}${sep}${String(ms).padStart(3, '0')}`; };
   const cues = [];
   V.segments.forEach((s, i) => {
     if (s.start == null) return;
     const end = s.end != null ? s.end : (V.segments[i + 1] && V.segments[i + 1].start) || s.start + 4;
-    const words = s.words && s.words.length ? s.words : null;
+    // 6.0: the subtitles are cut by word times (estimated when the engine gave none), so each one appears on time
+    const w0 = wordsOf(s), words = w0 ? w0.map(w => [w[0].replace(/\[\[|\]\]/g, ''), w[1], w[2]]) : null;
     // long lines are cut into short subtitles of up to ~7 seconds / 84 letters
     const txt = (SHOW_TR && V.tr[SHOW_TR] && V.tr[SHOW_TR][i]) || s.text.replace(/\[\[([^\]]*)\]\]/g, '$1');
     if (words && !SHOW_TR) {
@@ -1742,6 +1939,11 @@ async function doExport(x) {
   try {
     if (x === 'txt') { const b = new TextEncoder().encode(textExport()); if (typeof saveBytes === 'function') await saveBytes(name + '.txt', b, 'txt'); else download(name + '.txt', b, 'text/plain'); }
     else if (x === 'copy') copy(textExport());
+    else if (x === 'md') download(name + '.md', '﻿' + mdExport(), 'text/markdown');
+    else if (x === 'stars') {
+      const t = [V.title + ' · רגעים חשובים', ''].concat(V.segments.filter(s => s.star).map(s => `${s.start != null ? '[' + clock2(s.start) + '] ' : ''}${spkName(V, s.spk)}: ${s.text.replace(/\[\[([^\]]*)\]\]/g, '$1')}`)).join('\n');
+      const b = new TextEncoder().encode(t); if (typeof saveBytes === 'function') await saveBytes(name + ' - רגעים חשובים.txt', b, 'txt'); else download(name + ' - רגעים חשובים.txt', b, 'text/plain');
+    }
     else if (x === 'srt') download(name + '.srt', '\ufeff' + subs('srt'), 'application/x-subrip');
     else if (x === 'vtt') download(name + '.vtt', subs('vtt'), 'text/vtt');
     else if (x === 'audio') { if (!V.blob) { say('השמע לא שמור במכשיר'); return; } download(V.fileName || name + '.' + (ext(V.blob.name) || 'webm'), V.blob); }

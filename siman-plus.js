@@ -56,14 +56,7 @@ body.ed-live #aiPanel{position:fixed;z-index:960;top:40px;bottom:0;inset-inline-
 .tab .aiw.ready{color:#1E9E5A;animation:none}
 @keyframes aiwP{50%{opacity:.35}}
 @media (prefers-reduced-motion:reduce){.tab .aiw{animation:none}}
-.tab-home{flex:none;align-self:center;display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 11px;margin-inline-end:6px;border:1px solid var(--line);border-radius:8px;background:var(--bar);color:var(--ink);font:inherit;font-size:13px;font-weight:600;cursor:pointer}
-.tab-home svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
-.tab-home[aria-pressed=true]{background:color-mix(in srgb,var(--marker) 45%,var(--bar));border-color:transparent}
-.tab-home:hover{border-color:var(--ink)}
-.tab-menu-sep{height:1px;background:var(--line);margin:5px 8px}
-.tab-menu .tm-ic{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:6px;color:#fff;font-size:12px;font-weight:800;margin-inline-end:9px;vertical-align:middle}
-.tm-ic.w{background:#2b5797}.tm-ic.x{background:#1e7145}.tm-ic.p{background:#c4472b}
-.tab-menu{position:fixed;z-index:2147482400;min-width:230px;background:var(--bar);border:1px solid var(--line);border-radius:12px;box-shadow:0 18px 40px -16px rgba(0,0,0,.45);padding:6px}
+.tab-menu{position:fixed;z-index:60;min-width:230px;background:var(--bar);border:1px solid var(--line);border-radius:12px;box-shadow:0 18px 40px -16px rgba(0,0,0,.45);padding:6px}
 .tab-menu button{display:block;width:100%;text-align:start;border:0;background:none;font:inherit;font-size:14px;color:var(--ink);padding:9px 12px;border-radius:8px;cursor:pointer}
 .tab-menu button:hover,.tab-menu button:focus-visible{background:color-mix(in srgb,var(--marker) 45%,var(--bar));outline:none}
 .tab-menu small{display:block;color:var(--muted);font-size:12px}
@@ -92,6 +85,36 @@ body.ed-live #aiPanel{position:fixed;z-index:960;top:40px;bottom:0;inset-inline-
 .ai-wait::before{content:"";width:10px;height:10px;border-radius:50%;background:var(--marker);animation:aiPulse 1s ease-in-out infinite alternate}
 @keyframes aiPulse{to{transform:scale(.5);opacity:.5}}
 .ai-err{color:var(--danger,#C2362B);font-size:13.5px}
+.ai-chip.follow{border-style:dashed;border-color:var(--blue);color:var(--blue);text-align:start}
+.ai-chip.follow::before{content:"↳ ";opacity:.7}
+.ai-chips.study{align-items:center;padding-top:6px;border-top:1px dashed var(--line)}
+.ai-st-l{font-size:12.5px;color:var(--muted);margin-inline-end:2px}
+.ai-export{align-self:flex-start;border:0;background:none;color:var(--muted);font:inherit;font-size:12.5px;text-decoration:underline;cursor:pointer;padding:0}
+.ai-study{display:grid;gap:8px}
+.ai-st-h{font-size:12.5px;color:var(--muted);font-weight:600}
+.ai-st-h b{color:var(--ink)}
+.ai-fc{display:grid;gap:6px;text-align:start;font:inherit;color:var(--ink);background:var(--bar);border:1px solid var(--line);border-radius:12px;padding:10px 12px;cursor:pointer;box-shadow:0 2px 0 var(--line)}
+.ai-fc .q{font-weight:700}
+.ai-fc .an{display:none;border-top:1px dashed var(--line);padding-top:6px}
+.ai-fc[aria-expanded=true] .an{display:block}
+.ai-fc[aria-expanded=true]{border-color:var(--ink)}
+.ai-qz{border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:grid;gap:6px;background:var(--bar)}
+.ai-qz .q{margin:0;font-weight:700}
+.ai-qz button{text-align:start;font:inherit;font-size:14px;color:var(--ink);background:none;border:1px solid var(--line);border-radius:9px;padding:7px 10px;cursor:pointer}
+.ai-qz button:not(:disabled):hover{border-color:var(--ink)}
+.ai-qz button.right{background:color-mix(in srgb,#1F9D55 18%,transparent);border-color:#1F9D55;font-weight:700}
+.ai-qz button.wrong{background:color-mix(in srgb,#C2362B 15%,transparent);border-color:#C2362B;text-decoration:line-through}
+.ai-qz button:disabled{cursor:default;opacity:1}
+.ai-qz .why{margin:0;font-size:13.5px;color:var(--muted)}
+.ai-map details{margin-inline-start:4px}
+.ai-map summary{cursor:pointer;font-weight:700;padding:3px 0}
+.ai-map .kids{border-inline-start:2px solid color-mix(in srgb,var(--marker) 70%,var(--line));margin-inline-start:6px;padding-inline-start:12px;display:grid;gap:2px}
+.ai-map .leaf{padding:2px 0;position:relative}
+.ai-map .leaf::before{content:"";position:absolute;inset-inline-start:-12px;top:50%;width:9px;border-top:2px solid color-mix(in srgb,var(--marker) 70%,var(--line))}
+.ai-map>details>summary{font-size:15.5px;background:color-mix(in srgb,var(--marker) 45%,transparent);border-radius:8px;padding:4px 8px;display:inline-block}
+.page .ai-src{position:absolute;z-index:3;pointer-events:none;border-radius:4px;background:rgba(255,212,59,.42);box-shadow:0 0 0 2px rgba(224,161,0,.9),0 0 14px rgba(255,212,59,.8);animation:aiSrc .5s ease;transition:opacity 1.2s}
+.page .ai-src.out{opacity:0}
+@keyframes aiSrc{from{transform:scale(1.2)}}
 .ai-err .btn{margin-top:8px}
 .ai-ask{display:flex;gap:8px;align-items:flex-end;padding:10px 14px;border-top:1px solid var(--line)}
 .ai-ask textarea{flex:1;resize:none;min-height:40px;max-height:140px;border:1px solid var(--line);border-radius:12px;padding:9px 12px;font:inherit;font-size:14.5px;background:var(--bar);color:var(--ink);direction:rtl;unicode-bidi:plaintext}
@@ -461,10 +484,6 @@ function renderTabs() {
     strip.classList.toggle('hidden', !TB.list.length);
     document.body.classList.toggle('ed-live', TB.list.some(edLive));
     strip.innerHTML = '';
-    // 5.10.1: back to סימן's opening screen, without closing the files (they stay in their tabs)
-    const home = h(`<button class="tab-home" type="button" aria-pressed="${!TB.cur}" title="מסך הבית של סימן (הקבצים נשארים פתוחים)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg><span>בית</span></button>`);
-    home.onclick = () => goHome();
-    strip.append(home);
     for (const t of TB.list) {
       const on = t === TB.cur, d = tabInfo(t);
       const b = h(`<div class="tab${d.edit ? ' ed ' + t.ed : ''}" role="tab" tabindex="${on ? 0 : -1}" aria-selected="${on}" draggable="true"><span class="kd">${d.kind}</span><span class="nm"></span>${AS.busySet.has(t.id) ? '<span class="aiw" title="העוזר עובד על הקובץ הזה">✦</span>' : t.aiQueue && t.aiQueue.some(x => x.plan && x.plan.actions.length) ? '<span class="aiw ready" title="העוזר סיים. השינויים ייכנסו כשתחזרו לקובץ">✦</span>' : ''}${d.dirty ? '<span class="dot" title="יש שינויים שלא נשמרו"></span>' : ''}<span class="x" role="button" aria-label="סגירת הקובץ" title="סגירה">×</span></div>`);
@@ -484,8 +503,8 @@ function renderTabs() {
       b.ondrop = e => { if (!TB.drag) return; e.preventDefault(); const from = TB.list.indexOf(TB.drag); TB.list.splice(from, 1); TB.list.splice(TB.list.indexOf(t), 0, TB.drag); TB.drag = null; renderTabs(); };
       strip.append(b);
     }
-    const add = h(`<button class="tab-add" type="button" aria-haspopup="menu" title="פתיחת קובץ קיים או יצירת מסמך חדש">${ICON.plus}<span>עוד קובץ</span></button>`);
-    add.onclick = e => { e.stopPropagation(); addMenu(add); };
+    const add = h(`<button class="tab-add" type="button" title="פתיחת עוד קבצים (אפשר לבחור כמה יחד)">${ICON.plus}<span>עוד קובץ</span></button>`);
+    add.onclick = () => pickFile();
     strip.append(add);
     if (TB.list.length > 1) {
       const all = h(`<button class="tab-all" type="button" aria-haspopup="menu">כל הקבצים (${TB.list.length}) ▾</button>`);
@@ -501,48 +520,6 @@ setDirty = function (v) { setDirtyOne(v); if (TB.list.length) renderTabs(); };
 // tabs dragged inside the strip are not files
 ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(ev => addEventListener(ev, e => { if (TB.drag) e.stopPropagation(); }, true));
 
-async function goHome() {
-  if (!TB.cur) return;
-  if (isBusy() || switching || TR.running) { toast('רגע, פעולה עדיין רצה'); return; }
-  switching = true;
-  try { await leave(); TB.cur = null; toEmpty(); } finally { switching = false; renderTabs(); }
-}
-window.simanHome = goHome;
-// the name "סימן" at the top (of the desk and of each editor) also leads home
-const HOME_SEL = '.we-brand,.xe-brand,.pe-brand,header.bar .brand';
-function markHome(root) { (root || document).querySelectorAll(HOME_SEL).forEach(b => { if (b.dataset.home) return; b.dataset.home = '1'; b.setAttribute('role', 'button'); b.tabIndex = 0; b.title = 'מסך הבית של סימן (הקבצים נשארים פתוחים)'; b.style.cursor = 'pointer'; }); }
-document.addEventListener('click', e => { const b = e.target.closest && e.target.closest(HOME_SEL); if (b && TB.cur) { e.preventDefault(); goHome(); } }, true);
-document.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.closest && e.target.closest(HOME_SEL) && TB.cur) { e.preventDefault(); goHome(); } }, true);
-new MutationObserver(() => markHome()).observe(document.body, { childList: true });
-markHome();
-// "עוד קובץ": a file from the device, or a new empty document of each kind
-function addMenu(anchor) {
-  document.querySelector('.tab-menu')?.remove();
-  const m = h(`<div class="tab-menu tab-menu-add" role="menu" aria-label="עוד קובץ">
-    <button role="menuitem" data-a="open">פתיחת קובץ קיים<small>PDF, Word, Excel, PowerPoint, תמונה או הקלטה</small></button>
-    <div class="tab-menu-sep" role="separator"></div>
-    <button role="menuitem" data-a="docx"><span class="tm-ic w">W</span>מסמך Word חדש</button>
-    <button role="menuitem" data-a="xlsx"><span class="tm-ic x">X</span>גיליון Excel חדש</button>
-    <button role="menuitem" data-a="pptx"><span class="tm-ic p">P</span>מצגת PowerPoint חדשה</button></div>`);
-  document.body.append(m);
-  const r = anchor.getBoundingClientRect();
-  m.style.top = (r.bottom + 6) + 'px';
-  m.style.left = Math.max(8, Math.min(innerWidth - m.offsetWidth - 8, r.left + r.width - m.offsetWidth)) + 'px';
-  const close = () => { m.remove(); removeEventListener('pointerdown', out, true); };
-  const out = e => { if (!m.contains(e.target)) close(); };
-  setTimeout(() => addEventListener('pointerdown', out, true), 0);
-  const items = [...m.querySelectorAll('button')];
-  m.onkeydown = e => {
-    if (e.key === 'Escape') { close(); anchor.focus(); return; }
-    const i = items.indexOf(document.activeElement); if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); items[(i + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length].focus(); }
-  };
-  items.forEach(b => b.onclick = () => {
-    close();
-    if (TB.list.length >= MAX_TABS && b.dataset.a !== 'open') { toast(`אפשר לפתוח עד ${MAX_TABS} קבצים יחד. סגרו אחד מהם כדי לפתוח עוד`); return; }
-    ({ open: () => pickFile(), docx: () => newWordDoc(), xlsx: () => newExcel(), pptx: () => newPpt() })[b.dataset.a]();
-  });
-  items[0].focus();
-}
 function allMenu(anchor) {
   document.querySelector('.tab-menu')?.remove();
   const m = h(`<div class="tab-menu" role="menu">
@@ -761,6 +738,14 @@ const CHIPS = [
   ['הסבר בשפה פשוטה', 'הסבר את המסמך בשפה פשוטה, כמו לאדם שאינו מכיר את התחום.'],
   ['מה צריך לעשות?', 'מה המסמך מבקש ממני לעשות, למלא או לחתום, ועד מתי?'],
 ];
+// 6.0: study tools (shown under the questions, on any PDF or document)
+const STUDY_CHIPS = [['🗂 כרטיסיות לחזרה', 'cards'], ['✅ בוחן אמריקאי', 'quiz'], ['🧠 מפת חשיבה', 'map']];
+const FOLLOW_TAIL = '\n\n(After the answer, add one last line that starts with "❓" and holds 3 short follow-up questions the user may want to ask next about this document, separated by " | ", in the language of the question.)';
+function splitFollow(a) {
+  const m = /^\s*❓\s*(.+)$/m.exec(a || '');
+  if (!m) return { a, follow: [] };
+  return { a: a.replace(m[0], '').trim(), follow: m[1].split(/\s*\|\s*/).map(x => x.replace(/^[\d.)\s-]+/, '').trim()).filter(x => x && x.length < 140).slice(0, 3) };
+}
 const ED_CHIPS = {
   docx: [['כותרת לקובץ', 'הכן לי כותרת מתאימה לקובץ, בתחילת המסמך.'], ['עיצוב הכותרות', 'עצב את כל הכותרות במסמך בצורה אחידה ומקצועית: מודגש, צבע כחול כהה וגודל מתאים.'], ['סידור המסמך', 'סדר את עיצוב המסמך: יישור לשני הצדדים, רווח שורה 1.5 ורווח קטן אחרי כל פסקה.'], ['טבלה מעוצבת', 'עצב את הטבלאות במסמך: שורת כותרת צבועה עם טקסט לבן מודגש ופסים בשורות.'], ['מספרי עמודים', 'הוסף מספרי עמודים במרכז הכותרת התחתונה, בתבנית עמוד X מתוך Y.'], ['סיכום קצר', 'סכם את המסמך בקצרה, ב-3 עד 5 משפטים. אל תשנה את הקובץ.']],
   xlsx: [['כותרת לטבלה', 'עצב את השורה הראשונה ככותרת: מודגש, רקע כחול כהה, טקסט לבן וממורכז, והקפא אותה.'], ['טבלה מעוצבת', 'הפוך את הנתונים לטבלה מעוצבת: שורת כותרת צבועה, גבולות ופסים, והתאם את רוחב העמודות.'], ['שורת סיכום', 'הוסף מתחת לנתונים שורת סה"כ עם סכום לכל עמודה מספרית, מודגשת.'], ['עיצוב מספרים', 'עצב את העמודות המספריות: מחירים וסכומים כשקלים, כמויות עם מפריד אלפים.'], ['מה בגיליון?', 'הסבר בקצרה מה יש בגיליון ומה הנתונים החשובים. אל תשנה את הקובץ.']],
@@ -812,8 +797,108 @@ function answerEl(a, q, plain, it) {
   acts.querySelector('[data-a=read]').onclick = () => RA.speakText(a.replace(/\[[^\]]*\]/g, ''));
   el.append(acts);
   if (it && it.res && (it.res.asked || it.res.done)) el.append(resultEl(it));
-  el.addEventListener('click', e => { const b = e.target.closest('.cite'); if (b) goPage(+b.dataset.p); });
+  el.addEventListener('click', e => { const b = e.target.closest('.cite'); if (b) citeJump(+b.dataset.p, (b.closest('p,.an,.leaf,summary') || el).textContent); });
+  if (it && it.kind) { el.innerHTML = ''; el.append(studyEl(it, a)); el.append(acts); }
   return el;
+}
+/* 6.0: a citation jumps to its page AND lights up the sentence it came from, so the answer can be checked at a glance */
+const normHe = s => String(s || '').normalize('NFKD').replace(/[֑-ׇ]/g, '').replace(/ך/g, 'כ').replace(/ם/g, 'מ').replace(/ן/g, 'נ').replace(/ף/g, 'פ').replace(/ץ/g, 'צ').toLowerCase();
+const toks = s => (normHe(s).match(/[\p{L}\p{N}]{2,}/gu) || []).map(w => w.length > 3 && /^[והבלמשכ]/.test(w) && /[א-ת]/.test(w) ? w.slice(1) : w);
+async function citeJump(n, line) {
+  goPage(n);
+  const P = S.pages[n - 1]; if (!P) return;
+  const want = new Set(toks(String(line || '').replace(/\[[^\]]*\]/g, ''))); if (want.size < 2) return;
+  // the words on the page appear once the page is drawn
+  let spans = [];
+  for (let k = 0; k < 30; k++) { spans = [...(P.txl ? P.txl.querySelectorAll('span') : [])].filter(s => s.textContent.trim()); if (spans.length) break; await new Promise(r => setTimeout(r, 100)); }
+  if (!spans.length) return;
+  const score = spans.map(sp => {
+    const ws = toks(sp.textContent); if (!ws.length) return 0;
+    // some PDFs keep Hebrew backwards: each word is also tried reversed
+    let hit = 0; for (const w of ws) if (want.has(w) || want.has([...w].reverse().join(''))) hit++;
+    return hit < 2 && ws.length > 2 ? 0 : hit / Math.sqrt(ws.length + 1);
+  });
+  let best = 0; score.forEach((v, i) => { if (v > score[best]) best = i; });
+  if (!score[best]) return;
+  const pick = []; for (let i = Math.max(0, best - 6); i <= Math.min(spans.length - 1, best + 6); i++) if (score[i] >= score[best] * 0.45) pick.push(spans[i]);
+  P.el.querySelectorAll('.ai-src').forEach(x => x.remove());
+  const base = P.el.getBoundingClientRect();
+  for (const sp of pick) {
+    const r = sp.getBoundingClientRect(); if (!r.width) continue;
+    const box = document.createElement('div'); box.className = 'ai-src';
+    Object.assign(box.style, { left: (r.left - base.left - 2) + 'px', top: (r.top - base.top - 2) + 'px', width: (r.width + 4) + 'px', height: (r.height + 4) + 'px' });
+    P.el.append(box);
+  }
+  const first = P.el.querySelector('.ai-src');
+  if (first) setTimeout(() => first.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion:reduce)').matches ? 'auto' : 'smooth', block: 'center' }), 250);
+  setTimeout(() => P.el.querySelectorAll('.ai-src').forEach(x => x.classList.add('out')), 5000);
+  setTimeout(() => P.el.querySelectorAll('.ai-src').forEach(x => x.remove()), 6200);
+}
+/* 6.0: study tools — flashcards, a quiz with a score, and a mind map — all from the open document */
+const STUDY = {
+  cards: 'Make 10 to 15 study flashcards from the most important content of the document. Output ONLY lines, one per card, exactly in this format:\nQ: question || A: short answer [page cite]\nWrite in the language of the document. No other text.',
+  quiz: 'Make a quiz of 6 multiple-choice questions that check understanding of the document. Output ONLY blocks separated by an empty line, each exactly in this format:\nQ: question\nA) option\nB) option\nC) option\nD) option\nANSWER: the correct letter | one short sentence why [page cite]\nWrite in the language of the document. No other text.',
+  map: 'Make a mind map of the document as an indented outline. The first line is the main subject. Every other line starts with "- " and is indented with 2 spaces per level (up to 3 levels under the subject). Short phrases, not sentences. Write in the language of the document. Output ONLY the outline.',
+};
+function studyEl(it, a) {
+  const w = h('<div class="ai-study"></div>');
+  const cite = s => citeHtml(s);
+  if (it.kind === 'cards') {
+    const cards = a.split(/\n+/).map(l => /(?:Q|ש)\s*[:：]\s*(.+?)\s*\|\|\s*(?:A|ת)\s*[:：]\s*(.+)/i.exec(l)).filter(Boolean);
+    if (!cards.length) { w.innerHTML = a.split(/\n+/).map(l => `<p dir="auto">${cite(l)}</p>`).join(''); return w; }
+    w.innerHTML = `<div class="ai-st-h">${cards.length} כרטיסיות · לוחצים על כרטיס כדי לראות את התשובה</div>` + cards.map(m => `<button type="button" class="ai-fc" aria-expanded="false"><span class="q" dir="auto">${esc(m[1])}</span><span class="an" dir="auto">${cite(m[2])}</span></button>`).join('');
+    w.addEventListener('click', e => { if (e.target.closest('.cite')) return; const c = e.target.closest('.ai-fc'); if (c) c.setAttribute('aria-expanded', String(c.getAttribute('aria-expanded') !== 'true')); });
+    return w;
+  }
+  if (it.kind === 'quiz') {
+    const qs = [];
+    for (const block of a.split(/\n\s*\n/)) {
+      const q = /(?:Q|ש)\s*[:：]\s*(.+)/i.exec(block); if (!q) continue;
+      const opts = [...block.matchAll(/^\s*([A-Dא-ד])[).]\s*(.+)$/gm)].map(m => ({ k: m[1], t: m[2] }));
+      const ans = /(?:ANSWER|תשובה)\s*[:：]\s*([A-Dא-ד])\s*\|?\s*(.*)/i.exec(block);
+      if (opts.length >= 2 && ans) qs.push({ q: q[1].trim(), opts, right: ans[1].toUpperCase(), why: ans[2] || '' });
+    }
+    if (!qs.length) { w.innerHTML = a.split(/\n+/).map(l => `<p dir="auto">${cite(l)}</p>`).join(''); return w; }
+    let got = 0, done = 0;
+    w.innerHTML = `<div class="ai-st-h">בוחן · ${qs.length} שאלות <b class="ai-score"></b></div>` + qs.map((x, i) => `<div class="ai-qz" data-i="${i}"><p class="q" dir="auto">${i + 1}. ${esc(x.q)}</p>${x.opts.map(o => `<button type="button" data-k="${esc(o.k)}" dir="auto">${esc(o.t)}</button>`).join('')}<p class="why" dir="auto" hidden></p></div>`).join('');
+    // the answers are kept on the item, so the quiz stays answered when the panel is drawn again
+    it.picks = it.picks || {};
+    const pick = (b, keep) => {
+      const box = b.closest('.ai-qz'); if (box.dataset.done) return; box.dataset.done = 1;
+      if (keep) it.picks[box.dataset.i] = b.dataset.k;
+      const x = qs[+box.dataset.i], ok = b.dataset.k.toUpperCase() === x.right; done++; if (ok) got++;
+      box.querySelectorAll('button').forEach(o => { o.disabled = true; if (o.dataset.k.toUpperCase() === x.right) o.classList.add('right'); });
+      if (!ok) b.classList.add('wrong');
+      const why = box.querySelector('.why'); why.hidden = false; why.innerHTML = (ok ? '✓ נכון. ' : '✗ לא נכון. ') + cite(x.why);
+      w.querySelector('.ai-score').textContent = `${got} מתוך ${done}` + (done === qs.length ? (got === qs.length ? ' · מושלם!' : got >= qs.length * 0.7 ? ' · יפה מאוד' : ' · כדאי לעבור שוב על החומר') : '');
+    };
+    w.addEventListener('click', e => { const b = e.target.closest('.ai-qz button'); if (b) pick(b, true); });
+    for (const [i, k] of Object.entries(it.picks)) { const b = [...w.querySelectorAll(`.ai-qz[data-i="${i}"] button`)].find(o => o.dataset.k === k); if (b) pick(b, false); }
+    return w;
+  }
+  // the mind map: an outline that opens and closes, branch by branch
+  const lines = a.split(/\n/).filter(l => l.trim());
+  if (!lines.length) return w;
+  const root = { t: lines[0].replace(/^[\s\-•*#]+/, '').trim(), kids: [] }, stack = [{ lvl: -1, node: root }];
+  for (const l of lines.slice(1)) {
+    const lvl = Math.floor((l.match(/^\s*/)[0].replace(/\t/g, '  ').length) / 2);
+    const node = { t: l.replace(/^[\s\-•*]+/, '').trim(), kids: [] }; if (!node.t) continue;
+    while (stack.length > 1 && stack[stack.length - 1].lvl >= lvl) stack.pop();
+    stack[stack.length - 1].node.kids.push(node); stack.push({ lvl, node });
+  }
+  const draw = (n, d) => n.kids.length ? `<details${d < 2 ? ' open' : ''}><summary dir="auto">${cite(n.t)}</summary><div class="kids">${n.kids.map(k => draw(k, d + 1)).join('')}</div></details>` : `<div class="leaf" dir="auto">${cite(n.t)}</div>`;
+  w.innerHTML = `<div class="ai-st-h">מפת חשיבה · לוחצים על ענף כדי לפתוח או לסגור</div><div class="ai-map">${draw(root, 0)}</div>`;
+  w.addEventListener('click', e => { if (e.target.closest('.cite')) e.preventDefault(); }); // a page mark inside a branch title jumps, without folding the branch
+  return w;
+}
+// 6.0: the whole conversation about the file, as a text file
+async function exportChat() {
+  const items = AS.list().filter(x => x.a);
+  if (!items.length) return;
+  const t = [dispName(docTitle()), ''].concat(...items.map(x => ['שאלה: ' + (x.label || x.q), x.a.replace(/^❓.*$/gm, '').trim(), ''])).join('\n');
+  const name = dispName(docTitle()).replace(/\.[a-z0-9]+$/i, '') + ' - שאלות ותשובות.txt';
+  try { if (typeof saveBytes === 'function') { if (await saveBytes(name, new TextEncoder().encode('﻿' + t), 'txt')) toast('נשמר: ' + name); } else { await navigator.clipboard.writeText(t); toast('השיחה הועתקה'); } }
+  catch (e) { toast('השמירה לא הצליחה'); }
 }
 // what the assistant changed in the file, and taking it back
 function resultEl(it) {
@@ -859,6 +944,7 @@ function renderLog() {
     const chips = h('<div class="ai-chips"></div>');
     for (const [l, q] of chipsNow()) { const b = h(`<button class="ai-chip" type="button">${esc(l)}</button>`); b.onclick = () => askQ(q, l); chips.append(b); }
     log.append(chips);
+    if (!edKind()) log.append(studyChips());
   }
   for (const it of items) {
     const q = h('<div class="ai-q" dir="auto"></div>'); q.textContent = it.label || it.q; log.append(q);
@@ -868,10 +954,22 @@ function renderLog() {
   }
   if (items.length) {
     const chips = h('<div class="ai-chips"></div>');
-    for (const [l, q] of chipsNow().filter(c => !items.some(i => i.q === c[1])).slice(0, 3)) { const b = h(`<button class="ai-chip" type="button">${esc(l)}</button>`); b.onclick = () => askQ(q, l); chips.append(b); }
+    // 6.0: the follow-up questions the assistant suggested after its last answer come first
+    const last = items[items.length - 1];
+    for (const f of (last && last.follow) || []) { const b = h(`<button class="ai-chip follow" type="button" dir="auto"></button>`); b.textContent = f; b.onclick = () => askQ(f); chips.append(b); }
+    for (const [l, q] of chipsNow().filter(c => !items.some(i => i.q === c[1])).slice(0, last && last.follow && last.follow.length ? 1 : 3)) { const b = h(`<button class="ai-chip" type="button">${esc(l)}</button>`); b.onclick = () => askQ(q, l); chips.append(b); }
     if (!AS.isBusy() && chips.childElementCount) log.append(chips);
+    if (!AS.isBusy() && !edKind()) {
+      log.append(studyChips());
+      if (items.some(x => x.a)) { const x = h('<button class="ai-export" type="button">שמירת כל השיחה כקובץ טקסט</button>'); x.onclick = exportChat; log.append(x); }
+    }
   }
   log.scrollTop = log.scrollHeight;
+}
+function studyChips() {
+  const w = h('<div class="ai-chips study"><span class="ai-st-l">ללמוד מהמסמך:</span></div>');
+  for (const [l, k] of STUDY_CHIPS) { const b = h(`<button class="ai-chip" type="button">${esc(l)}</button>`); b.onclick = () => askQ(STUDY[k], l.replace(/^\S+\s/, ''), k); w.append(b); }
+  return w;
 }
 function scannedHelp() {
   const w = h('<div><button class="btn" type="button">זיהוי טקסט בכל העמודים</button> <button class="btn" type="button">מדף למסמך</button></div>');
@@ -879,13 +977,13 @@ function scannedHelp() {
   w.children[1].onclick = () => SC.open('doc');
   return w;
 }
-async function askQ(q, label) {
+async function askQ(q, label, kind) {
   q = String(q || '').trim();
   const tabKey = AS.key();
   if (!q || AS.busySet.has(tabKey) || !hasDoc()) return;
   if (panel.classList.contains('hidden')) showAI();
   const list = AS.list();
-  const it = { q, label }; list.push(it);
+  const it = { q, label }; if (kind) { it.kind = kind; it.wait = kind === 'quiz' ? 'מכין בוחן מהמסמך…' : kind === 'map' ? 'מצייר מפת חשיבה…' : 'מכין כרטיסיות…'; } list.push(it);
   AS.busySet.add(tabKey); renderLog(); renderTabs();
   try {
     if (onEditor() && window.OFFICE_AI && OFFICE_AI.available()) {
@@ -912,7 +1010,9 @@ async function askQ(q, label) {
     const empty = it.plain ? !text.replace(/=====.*?=====/g, '').replace(/שורה \d+:/g, '').trim() : !hasRealText(text);
     if (empty) { if (it.plain) { it.err = 'הקובץ ריק, אין עדיין על מה לשאול'; return; } it.err = 'לא מצאתי טקסט במסמך. כנראה שהוא סרוק או מצולם — אפשר לזהות בו את הטקסט קודם:'; it.scanned = true; return; }
     const history = list.filter(x => x.a && x !== it).slice(-4).map(x => ({ q: x.q, a: x.a }));
-    it.a = await ai({ mode: 'ask', text, question: q, history }, { onWait: s => { it.wait = `השירות עמוס, מנסה שוב בעוד ${s} שניות…`; const w = document.getElementById('aiWait'); if (w && AS.key() === tabKey) w.textContent = it.wait; } });
+    const followOk = !kind && !it.plain;
+    it.a = await ai({ mode: 'ask', text, question: followOk ? q + FOLLOW_TAIL : q, history: history.map(x => ({ q: x.q, a: x.a.replace(/^❓.*$/gm, '').trim() })) }, { onWait: s => { it.wait = `השירות עמוס, מנסה שוב בעוד ${s} שניות…`; const w = document.getElementById('aiWait'); if (w && AS.key() === tabKey) w.textContent = it.wait; } });
+    if (followOk) { const f = splitFollow(it.a); it.a = f.a; it.follow = f.follow; }
   } catch (e) { it.err = e.message || String(e); }
   finally { AS.busySet.delete(tabKey); renderTabs(); if (AS.key() === tabKey) renderLog(); }
 }
