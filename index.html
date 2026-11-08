@@ -5329,21 +5329,12 @@ const ACTIONS={
   async whatsapp(f){
     const fbTouch=()=>{downloadFile(f);done('הקובץ ירד למכשיר. בוואטסאפ לוחצים על אטב ← מסמך, ובוחרים אותו מההורדות');};
     if(IS_TOUCH&&canShareFile(f)){if(await shareOr(f,null,fbTouch))done('בוחרים וואטסאפ ואת השיחה');return;}
-    if(IS_TOUCH){downloadFile(f);done('הקובץ ירד למכשיר. בוואטסאפ לוחצים על אטב ← מסמך, ובוחרים אותו מההורדות');return;}
+    // 6.2: a phone that will not hand this file to WhatsApp (phones share Word / Excel / PowerPoint files only as PDF):
+    // instead of quietly downloading it, the person chooses — a PDF copy straight to WhatsApp, a link that keeps the
+    // Word file, or downloading it
+    if(IS_TOUCH)return waPhoneChoice(f);
     // computer, 1: a link to the file, and WhatsApp opens with the message ready
-    if(waLinkReady()){
-      const w=window.open('about:blank','siman_wa'); // opened on the click itself, so it isn't blocked
-      $('shareDlg').classList.add('wait');shStatus('מכין קישור לקובץ…');
-      try{
-        // the link always opens a PDF; a Word / Excel / PowerPoint file goes up too, and the one who opens it chooses (5.9.6)
-        const bytes=f.type==='application/pdf'?new Uint8Array(await f.arrayBuffer())
-          :SH.ext?new Uint8Array(await (await SH.ext.api.share.file('pdf')).arrayBuffer()):await buildPdf();
-        const r=await window.SIMAN_SEND.makeViewLink({bytes,name:f.name,orig:await linkOrig(f),sender:{name:USER.name||'',mail:USER.mail||''}});
-        const wa='https://wa.me/?text='+encodeURIComponent(r.text||(f.name+'\n'+r.url));
-        if(w&&!w.closed)w.location.href=wa;else{S.noWarn=true;location.href=wa;setTimeout(()=>{S.noWarn=false;},2000);}
-        $('shareDlg').classList.remove('wait');done('בוחרים שיחה בוואטסאפ ושולחים');return;
-      }catch(e){console.warn('wa link',e);if(w&&!w.closed)w.close();$('shareDlg').classList.remove('wait');shStatus('');}
-    }
+    if(waLinkReady())return waViaLink(f,true);
     // computer, 2: the computer's share menu (WhatsApp for Windows / Mac is listed there), no download
     return ACTIONS.wadesk(f);
   },
@@ -5405,6 +5396,59 @@ function waDeskOpen(f){
 function refused(f){
   shStatus(`תפריט השיתוף של המכשיר לא מקבל קובץ ${f.name.split('.').pop().toUpperCase()}. <a href="#" id="shDl">הורדת הקובץ</a> ושליחה מהאפליקציה${(S.office||SH.ext||pptSrc())&&SH.fmt==='office'?', או בחירה ב-"PDF" למעלה':''}.`,true);
   const a=document.getElementById('shDl');if(a)a.onclick=e=>{e.preventDefault();downloadFile(f);done('הקובץ ירד לתיקיית ההורדות');};
+}
+// 6.2: WhatsApp with a link to the file. The link is made first, here in front of the user, and WhatsApp opens
+// only when it is ready. (Before, on a computer an empty window was opened at once so the browser would not block it.
+// That window covered סימן, the "preparing" note was hidden behind it, and a covered window is slowed down or paused
+// by the browser, so preparing a Word / Excel file could stall and the empty about:blank window stayed.)
+// desk = on a computer, offer the computer's share menu if the link fails
+async function waViaLink(f,desk){
+  if(!waLinkReady()){shStatus('שליחה בקישור לא זמינה כרגע');return;}
+  if(window.cloudGate&&!cloudGate('send'))return; // the link is kept on our server: an email first
+  $('shareDlg').classList.add('wait');shStatus('מכין קישור לקובץ…');
+  try{
+    // the link always opens a PDF; a Word / Excel / PowerPoint file goes up too, and the one who opens it chooses (5.9.6)
+    const bytes=f.type==='application/pdf'?new Uint8Array(await f.arrayBuffer())
+      :SH.pdfAlt?new Uint8Array(await SH.pdfAlt.arrayBuffer())
+      :SH.ext?new Uint8Array(await (await SH.ext.api.share.file('pdf')).arrayBuffer()):await buildPdf();
+    shStatus('מעלה את הקובץ ומכין קישור…');
+    const r=await window.SIMAN_SEND.makeViewLink({bytes,name:f.name,orig:await linkOrig(f),sender:{name:USER.name||'',mail:USER.mail||''}});
+    const wa='https://wa.me/?text='+encodeURIComponent(r.text||(f.name+'\n'+r.url));
+    $('shareDlg').classList.remove('wait');
+    // a phone opens the WhatsApp app from the wa.me address; a computer opens it in a new tab
+    const go=()=>{const w=IS_TOUCH?null:window.open(wa,'_blank');if(!w){S.noWarn=true;location.href=wa;setTimeout(()=>{S.noWarn=false;},2000);}done('בוחרים שיחה בוואטסאפ ושולחים');};
+    // still within the tap (a small file): WhatsApp opens at once; otherwise one more tap, so it is not blocked
+    if(navigator.userActivation&&navigator.userActivation.isActive){go();return;}
+    shStatus('הקישור מוכן. <button class="btn primary" id="waOpen" type="button">פתיחת וואטסאפ ›</button>',true);
+    $('waOpen').onclick=go;$('waOpen').focus();
+  }catch(e){console.warn('wa link',e);$('shareDlg').classList.remove('wait');
+    // a clear message instead of a silent switch to another way
+    if(desk){shStatus(`לא הצלחתי להכין קישור (${esc(e&&e.message||'שגיאה')}). <button class="btn" id="waOther" type="button">לשלוח את הקובץ עצמו</button>`,true);$('waOther').onclick=()=>ACTIONS.wadesk(f);}
+    else shStatus(`לא הצלחתי להכין קישור (${esc(e&&e.message||'שגיאה')}). אפשר לנסות שוב, או לשלוח כ-PDF.`);
+  }
+}
+// a phone that refuses this kind of file in its share menu
+function waPhoneChoice(f){
+  const kind=/\.docx$/i.test(f.name)?'Word':/\.xlsx$/i.test(f.name)?'Excel':/\.pptx$/i.test(f.name)?'PowerPoint':'';
+  shStatus(`<div class="wa-choice"><b>הטלפון לא מעביר קובץ ${kind||'מהסוג הזה'} ישירות לוואטסאפ. איך לשלוח?</b>
+    <button class="btn primary" type="button" data-w="pdf">📄 כ-PDF, ישר לוואטסאפ</button>
+    ${waLinkReady()?`<button class="btn" type="button" data-w="link">🔗 קישור${kind?' שפותח גם את קובץ ה-'+kind:' לקובץ'}</button>`:''}
+    <button class="btn" type="button" data-w="dl">⬇ הורדה לטלפון</button></div>`,true);
+  const box=$('shareStatus');
+  box.querySelector('[data-w=pdf]').onclick=async()=>{
+    $('shareDlg').classList.add('wait');shStatus('מכין גרסת PDF…');
+    try{
+      if(SH.altJob&&!SH.pdfAlt){try{await SH.altJob;}catch(_){}}
+      let pdf=SH.pdfAlt;
+      if(!pdf){const bytes=SH.ext?new Uint8Array(await (await SH.ext.api.share.file('pdf')).arrayBuffer()):f.type==='application/pdf'?new Uint8Array(await f.arrayBuffer()):await buildPdf();
+        pdf=SH.pdfAlt=new File([bytes],f.name.replace(/\.[a-z0-9]{2,5}$/i,'')+'.pdf',{type:'application/pdf'});}
+      $('shareDlg').classList.remove('wait');shStatus('');
+      // (if the PDF took a while the tap has run out: nativeShare asks for one more tap by itself)
+      if(await shareOr(pdf,null,()=>{downloadFile(pdf);done('הטלפון לא פתח את תפריט השיתוף, אז ה-PDF ירד למכשיר. בוואטסאפ: אטב ← מסמך');}))done('בוחרים וואטסאפ ואת השיחה. נשלחה גרסת PDF של הקובץ');
+    }catch(e){console.error(e);$('shareDlg').classList.remove('wait');shStatus('הכנת ה-PDF נכשלה: '+(e.message||e));}
+  };
+  const ln=box.querySelector('[data-w=link]');if(ln)ln.onclick=()=>waViaLink(f,false);
+  box.querySelector('[data-w=dl]').onclick=()=>{downloadFile(f);done('הקובץ ירד למכשיר. בוואטסאפ לוחצים על אטב ← מסמך, ובוחרים אותו מההורדות');};
 }
 function done(msg){$('shareDlg').close();if(SH.altUsed){msg=(msg?msg+'. ':'')+'נשלחה גרסת PDF של הקובץ, כי הטלפון משתף רק PDF';SH.altUsed=false;}if(msg)toast(msg);}
 document.querySelectorAll('.sh[data-share]').forEach(b=>b.addEventListener('click',async()=>{

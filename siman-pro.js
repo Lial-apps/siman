@@ -38,6 +38,9 @@ document.head.append(h(`<style>
 .pro-st-seg i{width:11px;height:11px;border-radius:50%}
 .pro-st-prev{background:#fff;border:1px dashed var(--line);border-radius:12px;padding:10px;display:grid;place-items:center;min-height:200px}
 .pro-st-prev img{max-width:100%;max-height:220px}
+.wa-choice{display:grid;gap:8px;margin-top:4px;text-align:start}
+.wa-choice b{font-size:14px;line-height:1.4}
+.wa-choice .btn{justify-content:flex-start;width:100%}
 .tp-gl{justify-self:start;margin:2px 0 6px}
 .gl-rows{display:grid;gap:6px;margin:10px 0;max-height:48vh;overflow:auto}
 .gl-row{display:grid;grid-template-columns:1fr auto 1fr auto;gap:6px;align-items:center}
