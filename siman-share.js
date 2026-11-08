@@ -281,6 +281,22 @@ async function signPage(req) {
   if (!r.ok) return new Response('דף החתימה לא זמין כרגע. נסו שוב בעוד דקה.', { status: 502, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
   let html = await r.text();
   html = html.replace(/<head([^>]*)>/i, '<head$1><base href="/">');
+  // 6.2: the preview WhatsApp / mail show for the link matches what the link is. A view link is not "a document
+  // to sign": it gets its own title, text and picture. (Link previews read these tags without running the page.)
+  const kind = new URL(req.url).pathname.split('/')[1];
+  const OG = {
+    v: ['שיתפו איתך מסמך', 'פותחים בלחיצה וקוראים, גם מהטלפון. בלי להירשם ובלי להתקין.', 'og-view.jpg'],
+    g: ['יש לך מסמך לחתימה', 'כותבים את השם וחותמים, גם מהטלפון. בלי להירשם ובלי להתקין.', 'og-sign.png'],
+    o: ['המסמך ששלחת · מי כבר חתם', 'רואים מי פתח ומי חתם, ומורידים את המסמך החתום.', 'og-sign.png'],
+  }[kind];
+  if (OG) {
+    const [t, d, img] = OG;
+    html = html.replace(/(<meta property="og:title" content=")[^"]*/, '$1' + t)
+      .replace(/(<meta property="og:description" content=")[^"]*/, '$1' + d)
+      .replace(/(<meta property="og:image" content="[^"]*\/)og-sign\.png/, '$1' + img)
+      .replace(/(<meta name="description" content=")[^"]*/, '$1' + d)
+      .replace(/<title>[^<]*<\/title>/, `<title>${t} · סימן</title>`);
+  }
   return new Response(req.method === 'HEAD' ? null : html, { headers: {
     'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store',
     'Referrer-Policy': 'no-referrer', 'X-Robots-Tag': 'noindex', 'X-Content-Type-Options': 'nosniff' } });
