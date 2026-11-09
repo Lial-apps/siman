@@ -678,6 +678,8 @@ async function ai(payload, { onWait, signal, timeout = 300000 } = {}) {
     if (r.status === 429 && /per ?day|PerDay/i.test(all)) throw new Error('נגמרה המכסה היומית החינמית. היא מתאפסת מחר בבוקר');
     if (r.status === 403) throw new Error('השרת החכם חוסם את הכתובת הזו של האפליקציה');
     if (r.status === 404) throw new Error('השרת החכם (siman-ai) עוד לא הוקם');
+    // 6.3.1: one more try at once: the server now remembers a model that hung and starts with the other one
+    if ((r.status === 504 || r.status === 524) && attempt === 0) { onWait && onWait(1); continue; }
     if (r.status === 504 || r.status === 524) throw new Error('הקריאה לקחה יותר מדי זמן. נסו שוב בעוד רגע');
     if ([429, 500, 502, 503].includes(r.status)) {
       const wait = 8 * (attempt + 1);

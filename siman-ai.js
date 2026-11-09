@@ -397,41 +397,86 @@ async function proofread(g, first, env, deadline) {
   return r;
 }
 
-// the main model, then the lighter one (it has its own free quota and is faster)
-async function callGemini(g, mode, env, deadline = Date.now() + 90000) {
+// 6.3.1: a model that hangs (it happens: "gemini-flash-latest" stopped answering at all for a while, and every
+// question waited 80 seconds for nothing) must not hold the user. So:
+// · HEDGE: if the first model has not answered after this many ms, the next one starts too, at the same time,
+//   and the first good answer wins (the other is cancelled). Short where any good model will do (a question,
+//   a translation), long where the main model reads much better (handwriting), so it normally gets its chance.
+// · a model that just hung or failed is remembered for a few minutes (in this worker copy): the next requests
+//   start with the other model at once, and the sick one only joins after the hedge time.
+const HEDGE = { ask: 9000, translate: 8000, corners: 6000, orient: 6000, scan: 15000, linesFast: 15000, scanAccurate: 50000, lines: 45000, table: 50000 };
+const SICK_MS = 4 * 60 * 1000;
+const sick = new Map();   // model → time until which it is skipped first
+const isSick = m => (sick.get(m) || 0) > Date.now();
+
+// one model, with its thinking settings tried in turn (a model that does not take one answers 400)
+async function runModel(model, g, mode, env, deadline, stop) {
   let last = null;
-  for (const model of MODELS_FOR[mode] || MODELS) {
-    const options = THINKING[mode] || [null];
-    for (let k = 0; k < options.length; k++) {
-      const thinking = options[k];
-      const left = deadline - Date.now();
-      if (left < 8000) return last || { status: 504, d: { error: { message: 'took too long' } } };
-      const body = thinking ? { ...g, generationConfig: { ...g.generationConfig, thinkingConfig: thinking } } : g;
-      const ctl = new AbortController();
-      const timer = setTimeout(() => ctl.abort(), Math.min(MODEL_TIMEOUT[mode] || 90000, left));
-      let r, d;
-      try {
-        r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json', 'x-goog-api-key': env.GEMINI_KEY },
-          body: JSON.stringify(body),
-          signal: ctl.signal,
-        });
-        d = await r.json().catch(() => ({}));
-      } catch (e) {
-        clearTimeout(timer);
-        last = { status: 504, d: { error: { message: ctl.signal.aborted ? `${model} took too long` : 'Gemini not reachable' } } };
-        break; // next model
-      }
-      clearTimeout(timer);
-      if (r.ok) return { status: 200, d };
-      last = { status: r.status, d };
-      // a setting this model does not take: the same request with the next setting
-      if (r.status === 400 && thinking) continue;
-      break;
+  const t0 = Date.now();
+  const options = THINKING[mode] || [null];
+  for (let k = 0; k < options.length; k++) {
+    const thinking = options[k];
+    const left = deadline - Date.now();
+    if (left < 6000 || stop.signal.aborted) return last || { status: 504, d: { error: { message: 'took too long' } } };
+    const body = thinking ? { ...g, generationConfig: { ...g.generationConfig, thinkingConfig: thinking } } : g;
+    const ctl = new AbortController();
+    const onStop = () => ctl.abort();
+    stop.signal.addEventListener('abort', onStop, { once: true });
+    const timer = setTimeout(() => ctl.abort(), Math.min(MODEL_TIMEOUT[mode] || 90000, left));
+    let r, d;
+    try {
+      r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-goog-api-key': env.GEMINI_KEY },
+        body: JSON.stringify(body),
+        signal: ctl.signal,
+      });
+      d = await r.json().catch(() => ({}));
+    } catch (e) {
+      clearTimeout(timer); stop.signal.removeEventListener('abort', onStop);
+      // hung, or still silent when the other model had already answered: next time it goes second
+      if (!stop.signal.aborted || Date.now() - t0 > (HEDGE[mode] || 0)) sick.set(model, Date.now() + SICK_MS);
+      return { status: 504, d: { error: { message: ctl.signal.aborted ? `${model} took too long` : 'Gemini not reachable' } } };
     }
-    // 400 here = this model refused the request itself; the other model may still take it
-    if (last && ![400, 429, 500, 503, 504, 404].includes(last.status)) break;
+    clearTimeout(timer); stop.signal.removeEventListener('abort', onStop);
+    if (r.ok) { sick.delete(model); return { status: 200, d }; }
+    last = { status: r.status, d };
+    if (r.status === 400 && thinking) continue;   // a setting this model does not take: the next setting
+    if ([429, 500, 503, 504].includes(r.status)) sick.set(model, Date.now() + SICK_MS);
+    return last;
   }
-  return last && last.d && last.d.error ? last : { status: 502, d: { error: { message: 'Gemini error' } } };
+  return last;
+}
+
+// the main model, then the lighter one (it has its own free quota and is faster) — see HEDGE above
+async function callGemini(g, mode, env, deadline = Date.now() + 90000) {
+  let models = (MODELS_FOR[mode] || MODELS).slice();
+  // a model that hung a moment ago goes after the healthy one (not where the main model reads much better:
+  // handwriting keeps its order and the long hedge)
+  if (models.length > 1 && (HEDGE[mode] || 0) <= 15000 && isSick(models[0]) && !isSick(models[1])) models = [models[1], models[0], ...models.slice(2)];
+  const hedge = HEDGE[mode];
+  const stop = new AbortController();
+  return await new Promise(resolve => {
+    let next = 0, running = 0, done = false, last = null, timer = null;
+    const finish = res => { if (done) return; done = true; clearTimeout(timer); stop.abort(); resolve(res); };
+    const failOut = () => finish(last && last.d && last.d.error ? last : { status: 502, d: { error: { message: 'Gemini error' } } });
+    const launch = () => {
+      if (done || next >= models.length) return;
+      const model = models[next++]; running++;
+      // the next model joins after the hedge time if this one is still working
+      clearTimeout(timer);
+      if (hedge != null && next < models.length) timer = setTimeout(launch, hedge);
+      runModel(model, g, mode, env, deadline, stop).then(res => {
+        running--;
+        if (done) return;
+        if (res && res.status === 200) return finish(res);
+        if (res) last = res;
+        // 400 = this model refused the request itself; the other model may still take it. Other errors (403 key…): stop.
+        if (res && ![400, 429, 500, 503, 504, 404].includes(res.status) && !running) return failOut();
+        if (next < models.length) launch();          // failed early: the next model starts now, not after the hedge
+        else if (!running) failOut();
+      });
+    };
+    launch();
+  });
 }
