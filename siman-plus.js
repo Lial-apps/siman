@@ -405,12 +405,15 @@ async function switchTo(t) {
   switching = true; switchingAt = Date.now();
   try { await leave(); await enter(t); } finally { switching = false; renderTabs(); }
 }
-async function closeTab(t) {
+// o.force: the question about unsaved changes was already asked (the home card asks inside the app)
+async function closeTab(t, o = {}) {
   if (switching && Date.now() - switchingAt > 15000) switching = false;
-  if (isBusy() || switching) return;
+  if (isBusy() || switching) return false;
   const info = tabInfo(t);
-  if (info.dirty && !confirm(`ב"${info.name}" יש שינויים שלא נשמרו. לסגור בכל זאת?`)) return;
-  const i = TB.list.indexOf(t); TB.list.splice(i, 1);
+  if (info.dirty && !o.force && !confirm(`ב"${info.name}" יש שינויים שלא נשמרו. לסגור בכל זאת?`)) return false;
+  const i = TB.list.indexOf(t); if (i < 0) { renderTabs(); return true; }
+  TB.list.splice(i, 1);
+  if (homeFrom === t) homeFrom = null;
   AS.forget(t);
   if (t.ed) { if (edLive(t)) { t.closing = true; try { await edApi(t.ed).close(); } catch (_) {} } }
   else if (t !== TB.cur) { try { t.data.doc && t.data.doc.destroy(); } catch (_) {} }
@@ -427,6 +430,7 @@ async function closeTab(t) {
     if (next) await enter(next); else toEmpty();
   }
   renderTabs();
+  return true;
 }
 async function closeAll() {
   const dirty = TB.list.filter(t => tabInfo(t).dirty).length;

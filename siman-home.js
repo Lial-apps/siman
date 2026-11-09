@@ -57,6 +57,12 @@ header.bar .brand b{cursor:pointer}
 .sh-resume .sh-chip>button[data-t]{border:0!important;background:transparent!important}
 .sh-resume .sh-more .sh-x.s{flex:none;display:grid;place-items:center;width:26px;height:26px;padding:0;font-size:17px;line-height:1;overflow:visible;text-overflow:clip;border:0;border-radius:50%;background:transparent;margin-inline-end:3px;opacity:.7}
 .sh-resume .sh-more .sh-x.s:hover{opacity:1}
+.sh-resume .sh-ask{border:2px solid #B3232A;background:#FDE2E2;color:#1B1C1F;border-radius:14px;padding:10px 12px;display:grid;gap:8px}
+.sh-resume .sh-ask p{margin:0;font-size:14px;line-height:1.4}
+.sh-resume .sh-ask b{font-weight:800;overflow-wrap:anywhere}
+.sh-resume .sh-ask div{display:flex;gap:8px;flex-wrap:wrap}
+.sh-resume .sh-ask button{font:inherit;font-size:14px;font-weight:700;border-radius:999px;padding:7px 14px;cursor:pointer;border:2px solid var(--ink,#2B1660);background:#fff;color:var(--ink,#2B1660)}
+.sh-resume .sh-ask .sh-ask-yes{background:#B3232A;border-color:#B3232A;color:#fff}
 .sh-resume .sh-more button{font:inherit;font-size:13px;border:1px solid var(--line,#D4DBE5);background:var(--desk,#F4F6FA);color:inherit;border-radius:999px;padding:5px 12px;cursor:pointer;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sh-resume .sh-more button:hover,.sh-resume .sh-main:hover{filter:brightness(.97)}
 .sh-live{position:fixed;z-index:2147482990;top:calc(8px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);display:none;align-items:center;gap:8px;font:600 14px/1 "SF-rubik","Rubik","Segoe UI",Arial,sans-serif;direction:rtl;background:#B3232A;color:#fff;border:0;border-radius:999px;padding:9px 16px;box-shadow:0 6px 20px rgba(0,0,0,.25);cursor:pointer}
@@ -93,12 +99,30 @@ async function back(t) {
   catch (e) { console.error(e); if (typeof toast === 'function') toast('לא הצלחתי לחזור לקובץ: ' + (e && e.message || e)); }
   refresh(true); return ok;
 }
-// × on the card: the file is closed (with the usual question if it has unsaved changes)
-async function closeFromCard(t) {
+// × on the card: the file is closed. With unsaved changes the card itself asks (not the browser's own
+// window: on some browsers it did not close the file after "אישור")
+let asking = null;
+async function closeFromCard(t, sure) {
   const tabs = T(); if (!tabs) return;
-  try { await tabs.closeTab(t); } catch (e) { console.error(e); }
-  // closing the last tab from the home screen: nothing else needs to open
+  let info = {}; try { info = tabs.tabInfo(t); } catch (_) {}
+  if (info.dirty && !sure) { asking = t.id; askClose(t, info); return; }
+  asking = null;
+  let ok = false;
+  try { ok = await tabs.closeTab(t, { force: true }); } catch (e) { console.error(e); }
+  if (ok === false && typeof toast === 'function') toast('רגע, פעולה עדיין רצה. נסו שוב בעוד רגע');
   refresh(true);
+}
+function askClose(t, info) {
+  const box = h(`<div class="sh-ask" role="alertdialog" aria-label="סגירת קובץ">
+    <p>ב"<b>${esc(info.name)}</b>" יש שינויים שעוד לא נשמרו. לסגור בלי לשמור?</p>
+    <div><button type="button" class="sh-ask-no">ביטול</button><button type="button" class="sh-ask-yes">סגירה בלי לשמור</button></div></div>`);
+  const row = card.querySelector(`[data-x="${t.id}"]`);
+  const at = row && (row.closest('.sh-row') || row.closest('.sh-chip'));
+  card.querySelectorAll('.sh-ask').forEach(x => x.remove());
+  if (at) at.after(box); else card.append(box);
+  box.querySelector('.sh-ask-yes').onclick = () => closeFromCard(t, true);
+  box.querySelector('.sh-ask-no').onclick = () => { asking = null; refresh(true); };
+  box.querySelector('.sh-ask-no').focus();
 }
 const canBack = () => { const tabs = T(); return !!(tabs && !tabs.TB.cur && tabs.homeFrom && tabs.homeFrom()); };
 
@@ -216,6 +240,8 @@ function refresh(force) {
   const from = tabs && tabs.homeFrom ? tabs.homeFrom() : null;
   const main = from || list[list.length - 1];
   const sig = [list.map(t => t.id + (tabs.tabInfo(t).name)).join(','), main && main.id, v && v.parked, lastPage].join('|');
+  if (asking != null && list.some(t => t.id === asking) && !card.hidden) return;   // the card is asking: leave it
+  asking = null;
   if (!force && sig === lastSig && !card.hidden) return;
   lastSig = sig; card.hidden = false;
   const info = t => tabs.tabInfo(t);
