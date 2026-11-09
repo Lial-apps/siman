@@ -971,7 +971,11 @@ body:has(.tpanel:not(.hidden)) .a11y-fab{left:auto!important;right:14px!importan
   #printArea{display:block}
   #printArea .pp{break-after:page;page-break-after:always;margin:0;height:100vh;width:100vw;display:flex;align-items:center;justify-content:center;overflow:hidden}
   #printArea .pp:last-child{break-after:auto;page-break-after:auto}
-  #printArea img{max-width:100%;max-height:100%;width:auto;height:auto;display:block}
+  #printArea>.pp>img{max-width:100%;max-height:100%;width:auto;height:auto;display:block}
+  #printArea .page{position:relative;flex:none}
+  #printArea .page *{outline:none!important}
+  #printArea .grip,#printArea .rs{display:none!important}
+  #printArea .pp-miss{font:18px/1.6 Arial,sans-serif;color:#333;text-align:center;direction:rtl;padding:40px}
   @page{size:auto;margin:0}
 }
 /* ============ Siman design: ink-navy chrome, a light-table desk, one highlighter accent ============ */
@@ -1349,7 +1353,7 @@ body:has(#wed) .busy,body:has(#xed) .busy,body:has(#ped) .busy{z-index:1000}body
 </dialog>
 
 <header class="bar">
-  <div class="brand"><b title="גרסה 6.3.6">סימן</b><span class="ver">6.3.6</span><span class="fname" id="fname"></span></div>
+  <div class="brand"><b title="גרסה 6.3.7">סימן</b><span class="ver">6.3.7</span><span class="fname" id="fname"></span></div>
 
   <nav class="tools" id="tools" aria-label="כלים">
     <button class="tool" data-tool="select" aria-pressed="true" title="בחירה וגלילה (V)">
@@ -1915,6 +1919,20 @@ function layout(){
   }
   $('zoomVal').textContent=Math.round(S.zoom*100)+'%';
   updatePageInfo();
+  prerenderSoon();
+}
+// 6.3.7: a short file (up to 6 pages — these are never dropped from memory anyway) draws all its pages quietly
+// after it opens, so a print from the browser's own menu has every page ready (see 'beforeprint')
+let preT=0;
+function prerenderSoon(){
+  clearTimeout(preT);
+  preT=setTimeout(async()=>{
+    const doc=S.doc;if(!doc||S.pages.length>6)return;
+    for(const P of S.pages){
+      if(S.doc!==doc)return;
+      if(!P.renderedAt){await renderPage(P);await new Promise(r=>(window.requestIdleCallback||setTimeout)(r,{timeout:400}));}
+    }
+  },1200);
 }
 async function renderPage(P){
   if(!P||P.renderedAt===S.zoom)return;
@@ -4889,7 +4907,40 @@ async function printDoc(){
     setTimeout(()=>window.print(),50);
   }catch(e){console.error(e);busy(false);toast('ההדפסה נכשלה: '+(e.message||e));}
 }
-addEventListener('afterprint',()=>{$('printArea').innerHTML='';});
+/* 6.3.7: printing that does not come through Siman (Edge's own menu ⋯ → Print, right-click → Print, the app
+   window's menu) found the print area empty and printed one blank page. The print can't wait for drawing, so here,
+   in that moment, each page is copied as it is on the screen: its picture and its layers (marker, ink,
+   signatures, text). A page not drawn yet (far down a long file) prints a short note instead. */
+let printFallback=false;
+addEventListener('beforeprint',()=>{
+  const area=$('printArea');
+  if(area.childElementCount||!S.doc||!S.pages.length)return;
+  printFallback=true;let missing=0;
+  const PW=794,PH=1123; // A4 at 96 dpi: the copies are fitted into it
+  for(const P of S.pages){
+    const div=document.createElement('div');div.className='pp';
+    const el=P.el||(P.canvas&&P.canvas.closest('.page'));
+    if(!el||!P.canvas||!P.renderedAt||P.canvas.width<4){
+      missing++;div.innerHTML=`<p class="pp-miss">עמוד ${P.i||''}: העמוד הזה עוד לא הוכן להדפסה.<br>כדי להדפיס את כל המסמך, לוחצים על "הדפסה" בסימן (או Ctrl+P).</p>`;area.append(div);continue;
+    }
+    const w=el.offsetWidth||P.canvas.offsetWidth,h=el.offsetHeight||P.canvas.offsetHeight;
+    const copy=el.cloneNode(true);
+    // a copied canvas is empty: its picture goes in as an image
+    const src=el.querySelectorAll('canvas'),dst=copy.querySelectorAll('canvas');
+    dst.forEach((c,k)=>{const o=src[k];const img=new Image();try{img.src=o.toDataURL('image/png');}catch(_){}img.style.cssText=o.style.cssText;img.className=o.className;img.style.width=img.style.width||(o.offsetWidth+'px');img.style.height=img.style.height||(o.offsetHeight+'px');c.replaceWith(img);});
+    // the editing handles of the marks ("⠿ גרירה", the resize corner) and the fill highlights are not printed
+    copy.querySelectorAll('.grip,.rs,.fzl').forEach(x=>x.remove());
+    copy.querySelectorAll('[contenteditable]').forEach(x=>x.removeAttribute('contenteditable'));
+    copy.style.margin='0';copy.style.boxShadow='none';copy.style.zoom=Math.min(PW/w,PH/h).toFixed(4);
+    div.append(copy);area.append(div);
+  }
+  if(missing)printFallback='missing';
+});
+addEventListener('afterprint',()=>{
+  $('printArea').innerHTML='';
+  if(printFallback==='missing')toast('חלק מהעמודים לא הודפסו. כדי להדפיס את כל המסמך לוחצים על "הדפסה" בסימן (או Ctrl+P)');
+  printFallback=false;
+});
 window.__printDoc=printDoc;
 $('printBtn').onclick=printDoc;
 
