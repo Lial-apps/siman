@@ -1349,7 +1349,7 @@ body:has(#wed) .busy,body:has(#xed) .busy,body:has(#ped) .busy{z-index:1000}body
 </dialog>
 
 <header class="bar">
-  <div class="brand"><b title="גרסה 6.3.4">סימן</b><span class="ver">6.3.4</span><span class="fname" id="fname"></span></div>
+  <div class="brand"><b title="גרסה 6.3.5">סימן</b><span class="ver">6.3.5</span><span class="fname" id="fname"></span></div>
 
   <nav class="tools" id="tools" aria-label="כלים">
     <button class="tool" data-tool="select" aria-pressed="true" title="בחירה וגלילה (V)">
@@ -5050,6 +5050,7 @@ const CMDS=[
   {l:'הדפסה',k:'הדפס הדפסה מדפסת print',key:'Ctrl P',doc:1,run:()=>printDoc()},
   {l:'השחרה של מידע רגיש',k:'השחר השחרה הסתר הסתרה צנזור מחק פרטים redact',key:'D',doc:1,run:()=>setTool('redact')},
   {l:'חיפוש והשחרה אוטומטית של מידע רגיש (ת.ז, טלפון, מייל, אשראי)',k:'השחרה אוטומטית מידע רגיש תעודת זהות ת.ז טלפון מייל אשראי פרטיות auto redact',doc:1,run:()=>{setTool('redact');window.SIMAN_PRO&&SIMAN_PRO.autoRedact();}},
+  {l:'דוח בדיקה (לשליחה כשמשהו לא עובד)',k:'דוח בדיקה תקלה באג לא עובד תמיכה עזרה debug report',run:()=>window.SIMAN_HOME&&SIMAN_HOME.report()},
   {l:'מסך הבית (הקובץ נשאר פתוח, חוזרים לאותו מקום)',k:'בית מסך הבית ראשי מסך ראשי התחלה חזרה הביתה home start main',run:()=>window.SIMAN_HOME&&SIMAN_HOME.go()},
   {l:'הפרטים שלי (למילוי אוטומטי של טפסים)',k:'הפרטים שלי פרופיל פרטים אישיים ילד ילדים תעודת זהות מילוי אוטומטי טפסים profile autofill my details',run:()=>window.SIMAN_FILL&&SIMAN_FILL.profile()},
   {l:'מילוי אוטומטי של הטופס',k:'מילוי אוטומטי מלא טופס אוטומטית autofill fill form',doc:1,run:()=>window.SIMAN_FILL&&SIMAN_FILL.autoFill()},
@@ -5660,7 +5661,7 @@ if('launchQueue' in window){
 <script src="siman-ux.js?v=5.9.5" defer></script>
 <script src="siman-fill.js?v=6.3" defer></script>
 <script src="siman-pro.js?v=6.3" defer></script>
-<script src="siman-home.js?v=6.3.4" defer></script>
+<script src="siman-home.js?v=6.3.5" defer></script>
 <link rel="stylesheet" href="siman-nb.css?v=5.9.5">
 <script src="siman-nb.js?v=5.9.5" defer></script>
 </body>

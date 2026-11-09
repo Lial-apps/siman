@@ -105,10 +105,11 @@ let asking = null;
 async function closeFromCard(t, sure) {
   const tabs = T(); if (!tabs) return;
   let info = {}; try { info = tabs.tabInfo(t); } catch (_) {}
-  if (info.dirty && !sure) { asking = t.id; askClose(t, info); return; }
+  if (info.dirty && !sure) { asking = t.id; askClose(t, info); note('שאלה הוצגה בכרטיס · בתוך המסמך=' + !!card.querySelector('.sh-ask')); return; }
   asking = null;
   let ok = false;
-  try { ok = await tabs.closeTab(t, { force: true }); } catch (e) { console.error(e); }
+  try { ok = await tabs.closeTab(t, { force: true }); } catch (e) { console.error(e); note('שגיאה בסגירה: ' + (e && e.message)); }
+  note('סגירה: ' + ok + ' · עדיין ברשימה=' + tabs.TB.list.includes(t));
   if (ok === false && typeof toast === 'function') toast('רגע, פעולה עדיין רצה. נסו שוב בעוד רגע');
   refresh(true);
 }
@@ -224,6 +225,7 @@ card.addEventListener('click', e => {
   const b = e.target.closest && e.target.closest('[data-t],[data-x]'); if (!b || !card.contains(b)) return;
   const tabs = T(), id = b.dataset.x || b.dataset.t;
   const t = tabs && tabs.TB.list.find(x => String(x.id) === id);
+  note(`הכרטיס קיבל ${b.dataset.x ? '×' : 'חזרה'} של #${id} · ${t ? 'הקובץ נמצא' : 'הקובץ לא ברשימה'}`);
   if (!t) { asking = null; lastSig = ''; refresh(true); return; }
   if (b.dataset.x) closeFromCard(t); else back(t);
 });
@@ -289,6 +291,52 @@ addEventListener('keydown', e => {
   if (note) { const b = h('<button type="button" class="pro-link" style="display:block;margin:6px 0">👤 הפרטים שלי ושל המשפחה (למילוי אוטומטי של טפסים)</button>');
     b.onclick = () => { const d = $('setDlg'); if (d && d.open) d.close(); if (window.SIMAN_FILL && SIMAN_FILL.profile) SIMAN_FILL.profile(); }; note.after(b); } }
 
-window.SIMAN_HOME = { go, back, canBack, refresh };
+/* ---------------- 6.3.5: a check report, without the browser's developer tools ----------------
+   Ctrl K → "דוח בדיקה": what the home card shows, the open files as the app sees them, what lies over the ×,
+   and the last clicks (where they landed and whether the card received them). Nothing is sent anywhere. */
+const CLICKS = [];
+const desc = el => { if (!el || el.nodeType !== 1) return String(el && el.nodeName); const c = typeof el.className === 'string' ? el.className.trim().split(/\s+/).slice(0, 2).join('.') : ''; return el.tagName.toLowerCase() + (el.id ? '#' + el.id : '') + (c ? '.' + c : ''); };
+for (const ev of ['pointerdown', 'click']) addEventListener(ev, e => {
+  const t = e.target, inCard = !!(t && t.closest && t.closest('.sh-resume'));
+  CLICKS.push(`${new Date().toLocaleTimeString('he-IL')} ${ev} ${Math.round(e.clientX)},${Math.round(e.clientY)} → ${desc(t)}${inCard ? ' [בכרטיס]' : ''}`);
+  if (CLICKS.length > 14) CLICKS.shift();
+}, true);
+const NOTES = [];
+const note = s => { NOTES.push(new Date().toLocaleTimeString('he-IL') + ' ' + s); if (NOTES.length > 14) NOTES.shift(); };
+function reportText() {
+  const tabs = T(), out = [];
+  out.push('גרסה: ' + ((document.querySelector('.brand .ver') || {}).textContent || '?') + ' · ' + navigator.userAgent.replace(/^.*?\) /, ''));
+  out.push('חלון: ' + innerWidth + '×' + innerHeight + (matchMedia('(display-mode: standalone)').matches ? ' · מותקנת' : ' · דפדפן'));
+  try {
+    out.push('קבצים פתוחים: ' + (tabs ? tabs.TB.list.length : 'אין') + (tabs && tabs.TB.cur ? ' · בחזית: ' + tabs.TB.cur.id : ' · בחזית: אין'));
+    if (tabs) for (const t of tabs.TB.list) { const i = safeInfo(t); out.push(`  #${t.id} ${t.ed || 'desk'} ${i.name} · שינויים=${!!i.dirty} · פתוח=${!!(t.liveEl && document.body.contains(t.liveEl))} · שמור בצד=${!!t.data}`); }
+  } catch (e) { out.push('שגיאה בקבצים: ' + e.message); }
+  const cards = document.querySelectorAll('.sh-resume');
+  out.push('כרטיסים: ' + cards.length + ' · מוסתר=' + card.hidden + ' · במסמך=' + document.body.contains(card) + ' · שאלה פתוחה=' + !!card.querySelector('.sh-ask') + ' · asking=' + asking);
+  for (const x of card.querySelectorAll('[data-x],[data-t]')) {
+    const r = x.getBoundingClientRect(), top = r.width ? document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2) : null;
+    out.push(`  ${x.dataset.x ? '×' : 'חזרה'} של #${x.dataset.x || x.dataset.t} · מקום ${Math.round(r.x)},${Math.round(r.y)} ${Math.round(r.width)}×${Math.round(r.height)} · מעליו: ${desc(top)}${top && (top === x || x.contains(top)) ? ' (הכפתור עצמו)' : ' ⚠'}`);
+  }
+  try { out.push('עסוק: ' + !$('busy').classList.contains('hidden') + ' · מסך הבית מוצג: ' + homeShown()); } catch (_) {}
+  out.push('לחיצות אחרונות:'); for (const c of CLICKS) out.push('  ' + c);
+  out.push('פעולות הכרטיס:'); for (const n of NOTES) out.push('  ' + n);
+  return out.join('\n');
+}
+function report() {
+  const text = reportText();
+  const d = h(`<dialog class="sh-rep" dir="rtl"><h3>דוח בדיקה</h3><p>מצלמים את החלון הזה ושולחים. לא נשלח שום דבר לשום מקום.</p><pre></pre><div><button type="button" data-copy>העתקה</button><button type="button" data-close>סגירה</button></div></dialog>`);
+  d.querySelector('pre').textContent = text;
+  d.querySelector('[data-close]').onclick = () => { d.close(); d.remove(); };
+  d.querySelector('[data-copy]').onclick = async () => { try { await navigator.clipboard.writeText(text); d.querySelector('[data-copy]').textContent = 'הועתק ✓'; } catch (_) {} };
+  d.addEventListener('close', () => d.remove());
+  document.body.append(d); d.showModal();
+}
+document.head.append(h(`<style>.sh-rep{max-width:min(860px,94vw);width:100%;border:2px solid #2B1660;border-radius:16px;padding:16px 18px;font:14px/1.45 "SF-rubik","Rubik","Segoe UI",Arial,sans-serif;color:#16213A}
+.sh-rep h3{margin:0 0 4px}.sh-rep p{margin:0 0 8px;opacity:.75}
+.sh-rep pre{unicode-bidi:plaintext;white-space:pre-wrap;word-break:break-word;font:12px/1.5 Consolas,monospace;background:#F4F6FA;border:1px solid #D4DBE5;border-radius:10px;padding:10px;max-height:60vh;overflow:auto;margin:0 0 10px}
+.sh-rep pre{direction:rtl;text-align:right}
+.sh-rep div{display:flex;gap:8px}.sh-rep button{font:inherit;font-weight:700;border:2px solid #2B1660;background:#fff;border-radius:999px;padding:6px 16px;cursor:pointer}</style>`));
+
+window.SIMAN_HOME = { go, back, canBack, refresh, report, reportText };
 refresh();
 })();
