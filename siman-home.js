@@ -218,20 +218,40 @@ addEventListener('keydown', e => {
 
 /* ---------------- "continue where you stopped" on the home screen ---------------- */
 const card = h('<section class="sh-resume" aria-label="ממשיכים מאיפה שעצרת" hidden></section>');
+// one listener for the whole card: the file is looked up in the tabs as they are NOW (not as they were when
+// the card was drawn). A file that is no longer open: the card is simply drawn again without it.
+card.addEventListener('click', e => {
+  const b = e.target.closest && e.target.closest('[data-t],[data-x]'); if (!b || !card.contains(b)) return;
+  const tabs = T(), id = b.dataset.x || b.dataset.t;
+  const t = tabs && tabs.TB.list.find(x => String(x.id) === id);
+  if (!t) { asking = null; lastSig = ''; refresh(true); return; }
+  if (b.dataset.x) closeFromCard(t); else back(t);
+});
 const live = h('<button type="button" class="sh-live" aria-live="polite"><i></i><span></span></button>');
 document.body.append(live);
 live.onclick = () => { if (window.SIMAN_VOICE) SIMAN_VOICE.unpark(); refresh(); };
 function homeShown() { const e = $('empty'); return !!e && !e.classList.contains('hidden') && getComputedStyle(e).display !== 'none'; }
 let lastSig = '';
+// 6.3.4: the card must never freeze. Before, one error inside refresh (every second) left the card as it was:
+// a file already closed stayed on it, and its × / "חזרה" found nothing to act on
 function refresh(force) {
-  addHeaderButton(); addEditorButtons();
-  const tabs = T(), v = window.SIMAN_VOICE && SIMAN_VOICE.state ? SIMAN_VOICE.state() : null;
+  try { refresh1(force); }
+  catch (e) {
+    console.error('siman-home', e);
+    try { const tabs = T(); if (!tabs || !tabs.TB.list.length || !homeShown()) card.hidden = true; } catch (_) { card.hidden = true; }
+  }
+}
+const safeInfo = t => { try { return T().tabInfo(t) || {}; } catch (_) { return { name: 'קובץ', dirty: false }; } };
+function refresh1(force) {
+  try { addHeaderButton(); addEditorButtons(); } catch (e) { console.error(e); }
+  const tabs = T();
+  let v = null; try { v = window.SIMAN_VOICE && SIMAN_VOICE.state ? SIMAN_VOICE.state() : null; } catch (_) {}
   // the bar of a recording / a transcript in work, while its screen is put aside
   const showLive = v && v.parked && (v.rec || v.job);
   live.classList.toggle('on', !!showLive); live.classList.toggle('job', !!(showLive && !v.rec));
   if (showLive) live.querySelector('span').textContent = v.rec ? `${v.paused ? 'הקלטה מושהית' : 'מקליט'} ${clock(v.recT)} · חזרה` : 'התמלול בעבודה · חזרה';
   // the card on the home screen
-  if (tabs && tabs.dropDead && homeShown()) tabs.dropDead();
+  try { if (tabs && tabs.dropDead && homeShown()) tabs.dropDead(); } catch (e) { console.error(e); }
   const list = tabs ? tabs.TB.list : [];
   const on = homeShown() && (list.length || (v && v.parked));
   const home = document.querySelector('#empty .v7-home') || $('empty');
@@ -239,20 +259,18 @@ function refresh(force) {
   if (card.parentNode !== home) home.prepend(card);
   const from = tabs && tabs.homeFrom ? tabs.homeFrom() : null;
   const main = from || list[list.length - 1];
-  const sig = [list.map(t => t.id + (tabs.tabInfo(t).name)).join(','), main && main.id, v && v.parked, lastPage].join('|');
+  const sig = [list.map(t => t.id + (safeInfo(t).name)).join(','), main && main.id, v && v.parked, lastPage].join('|');
   if (asking != null && list.some(t => t.id === asking) && !card.hidden) return;   // the card is asking: leave it
   asking = null;
   if (!force && sig === lastSig && !card.hidden) return;
   lastSig = sig; card.hidden = false;
-  const info = t => tabs.tabInfo(t);
+  const info = safeInfo;
   const kind = t => { const n = info(t).name || ''; return (/\.(\w+)$/.exec(n) || ['', 'pdf'])[1].toUpperCase(); };
   const X = (t, small) => `<button type="button" class="sh-x${small ? ' s' : ''}" data-x="${t.id}" title="סגירת ${esc(info(t).name)}" aria-label="סגירת ${esc(info(t).name)}">×</button>`;
   card.innerHTML = `<h3>${HOUSE.replace('<svg', '<svg width="18" height="18"')}ממשיכים מאיפה שעצרת</h3>
     ${main ? `<div class="sh-row"><button type="button" class="sh-main" data-t="${main.id}"><span class="k">${esc(kind(main))}</span><span style="min-width:0"><b>${esc(info(main).name)}</b><small>${main === from && lastPage ? 'עמוד ' + lastPage + ' · ' : ''}${info(main).dirty ? 'יש שינויים שעוד לא נשמרו · ' : ''}בדיוק איפה שהפסקת</small></span><span class="go">חזרה ›</span></button>${X(main)}</div>` : ''}
     ${v && v.parked ? `<button type="button" class="sh-main" data-v="1" style="background:#FDE2E2"><span class="k" style="background:#B3232A">🎙</span><span><b>${v.rec ? 'הקלטה פעילה' : v.job ? 'תמלול בעבודה' : 'תמלול'}</b><small>${v.rec ? clock(v.recT) + ' · ממשיכה ברקע' : esc(v.title || '')}</small></span><span class="go">חזרה ›</span></button>` : ''}
     ${list.length > 1 ? `<div class="sh-more">${list.filter(t => t !== main).map(t => `<span class="sh-chip"><button type="button" data-t="${t.id}" title="${esc(info(t).name)}">${esc(kind(t))} · ${esc(info(t).name)}</button>${X(t, 1)}</span>`).join('')}</div>` : ''}`;
-  card.querySelectorAll('[data-t]').forEach(b => b.onclick = () => { const t = list.find(x => String(x.id) === b.dataset.t); if (t) back(t); else refresh(true); });
-  card.querySelectorAll('[data-x]').forEach(b => b.onclick = () => { const t = list.find(x => String(x.id) === b.dataset.x); if (t) closeFromCard(t); else refresh(true); });
   const vb = card.querySelector('[data-v]'); if (vb) vb.onclick = () => { SIMAN_VOICE.unpark(); refresh(); };
 }
 setInterval(() => { if (!document.hidden) refresh(); }, 1000);

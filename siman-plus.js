@@ -257,7 +257,11 @@ const edKindOfId = id => Object.keys(ED).find(k => ED[k].id === id);
 const edApi = k => window[ED[k].api];
 const edState = k => { const A = edApi(k); return A && A._test ? A._test[ED[k].st] : null; };
 const edLive = t => !!(t && t.ed && t.liveEl && document.body.contains(t.liveEl));
+// 6.3.4: never throws — one odd tab (a file kept in an unusual state) froze the tab bar and the home card
 function tabInfo(t) {
+  try { return tabInfo1(t); } catch (e) { console.error('tabInfo', e); return { name: (t && t.data && t.data.name) || 'מסמך', dirty: !!(t && t.data && t.data.dirty), kind: t && t.ed ? ED[t.ed].kind : 'PDF', edit: !!(t && t.ed) }; }
+}
+function tabInfo1(t) {
   if (t.ed) {
     const live = edLive(t), st = live && edState(t.ed);
     const inp = live && t.liveEl.querySelector(ED[t.ed].name);
@@ -265,7 +269,7 @@ function tabInfo(t) {
     return { name: base + '.' + t.ed, dirty: live ? !!(st && (st.dirty || st.snapT)) : !!(t.data && t.data.dirty), kind: ED[t.ed].kind, edit: true };
   }
   const d = tabData(t);
-  return { name: (d.office ? d.office.name : d.name) || 'מסמך', dirty: !!d.dirty, kind: d.office ? d.office.kind.toUpperCase() : 'PDF' };
+  return { name: (d.office ? d.office.name : d.name) || 'מסמך', dirty: !!d.dirty, kind: d.office ? String(d.office.kind || 'office').toUpperCase() : 'PDF' };
 }
 const tabName = t => tabInfo(t).name;
 const deskTabs = () => TB.list.filter(t => !t.ed);
