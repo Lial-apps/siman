@@ -231,6 +231,28 @@ const ED = {
   pptx: { api: 'PPTX_EDITOR', st: 'X', id: 'ped', name: '#peName', kind: 'POWERPOINT', build: 'buildPptx', lib: 'pptx', file: 'ppt-editor.js' },
 };
 const ED_IDS = Object.values(ED).map(e => e.id), ED_SEL = ED_IDS.map(i => '#' + i).join(',');
+/* 6.3.2: an editor takes a moment to open (it builds the page, then waits a frame to fit the zoom). "בית" or
+   "+ חדש" pressed in that moment closed it half-built: it crashed, and its tab stayed on the home screen as a
+   "back" that did nothing. Now each editor's open / close wait for an open that is still running. */
+const ED_BUSY = {};
+for (const k of Object.keys(ED)) {
+  const name = ED[k].api;
+  const wrap = A => {
+    if (!A || A.__simanSafe) return A;
+    const o = A.open, c = A.close;
+    A.open = async function (opts) {
+      const prev = ED_BUSY[k]; if (prev) { try { await prev; } catch (_) {} }
+      const p = o.call(this, opts); ED_BUSY[k] = p;
+      try { return await p; } finally { if (ED_BUSY[k] === p) ED_BUSY[k] = null; }
+    };
+    A.close = async function (...a) { const p = ED_BUSY[k]; if (p) { try { await p; } catch (_) {} } return c.apply(this, a); };
+    A.__simanSafe = true; return A;
+  };
+  let val = window[name];
+  if (val) window[name] = wrap(val);
+  else Object.defineProperty(window, name, { configurable: true, enumerable: true, get: () => val, set: v => { val = wrap(v); } });
+}
+const edSettled = async k => { const p = ED_BUSY[k]; if (p) { try { await p; } catch (_) {} } };
 const edKindOfId = id => Object.keys(ED).find(k => ED[k].id === id);
 const edApi = k => window[ED[k].api];
 const edState = k => { const A = edApi(k); return A && A._test ? A._test[ED[k].st] : null; };
@@ -248,6 +270,7 @@ function tabInfo(t) {
 const tabName = t => tabInfo(t).name;
 const deskTabs = () => TB.list.filter(t => !t.ed);
 async function park(t) {
+  await edSettled(t.ed);
   if (!edLive(t)) return;
   const A = edApi(t.ed), st = edState(t.ed); if (!A || !st) return;
   busy(true, 'שומר את הקובץ בצד…');
@@ -379,10 +402,11 @@ let switching = false;
 async function switchTo(t) {
   if (t === TB.cur || switching) return;
   if (isBusy() || TR.running) { toast('רגע, פעולה עדיין רצה'); return; }
-  switching = true;
+  switching = true; switchingAt = Date.now();
   try { await leave(); await enter(t); } finally { switching = false; renderTabs(); }
 }
 async function closeTab(t) {
+  if (switching && Date.now() - switchingAt > 15000) switching = false;
   if (isBusy() || switching) return;
   const info = tabInfo(t);
   if (info.dirty && !confirm(`ב"${info.name}" יש שינויים שלא נשמרו. לסגור בכל זאת?`)) return;
@@ -422,7 +446,8 @@ async function closeAll() {
 function edButton(el) {
   if (el.querySelector('.ed-ai')) return;
   const close = el.querySelector('#weClose,#xeClose,#peClose'); if (!close) return;
-  const peer = [...close.parentElement.querySelectorAll('button')].find(b => b !== close && !b.classList.contains('primary'));
+  // (not the "בית" / "+ חדש" buttons of siman-home: their class carries their action)
+  const peer = [...close.parentElement.querySelectorAll('button')].find(b => b !== close && !b.classList.contains('primary') && !/\bsh-ed/.test(b.className));
   const b = document.createElement('button');
   b.type = 'button'; b.className = (peer ? peer.className + ' ' : '') + 'ed-ai';
   b.title = 'העוזר: שאלות על הקובץ, סיכום והקראה';
@@ -628,12 +653,31 @@ async function goHome() {
   await leave(); toEmpty(); homeFrom = t; renderTabs();
   return true;
 }
+// 6.3.2: an editor tab that is neither open nor kept aside (its editor closed, or setting it aside failed) cannot
+// come back: it is taken off the list instead of staying on the home screen as a "back" that does nothing
+const deadTab = t => !!(t && t.ed && !edLive(t) && !t.data && TB.opening !== t && !t.parking);
+function dropDead() {
+  const dead = TB.list.filter(deadTab); if (!dead.length) return 0;
+  for (const t of dead) { TB.list.splice(TB.list.indexOf(t), 1); AS.forget(t); if (TB.cur === t) TB.cur = null; if (homeFrom === t) homeFrom = null; }
+  renderTabs(); return dead.length;
+}
+let switchingAt = 0;
 async function backFromHome(t) {
+  if (dropDead() && t && !TB.list.includes(t)) { toast('הקובץ הזה כבר לא פתוח'); return false; }
   t = t || homeFrom; if (!t || !TB.list.includes(t)) t = TB.list[TB.list.length - 1];
   if (!t) return false;
-  homeFrom = null; await switchTo(t); return true;
+  homeFrom = null;
+  if (switching && Date.now() - switchingAt > 15000) switching = false;     // a switch that never finished
+  // the home screen shows, but this tab is still marked as the one in front: bring it up as it is
+  if (t === TB.cur) {
+    if (t.ed && edLive(t)) { renderTabs(); return true; }
+    if (!t.ed && S.doc) { applyUI(); renderTabs(); AS.onTab(); return true; }
+    TB.cur = null;
+  }
+  await switchTo(t);
+  return TB.cur === t;
 }
-window.SIMAN_TABS = { TB, switchTo, closeTab, mergeAll, zipAll, openMany, tabInfo, goHome, backFromHome, homeFrom: () => (homeFrom && TB.list.includes(homeFrom) ? homeFrom : null) };
+window.SIMAN_TABS = { TB, switchTo, closeTab, mergeAll, zipAll, openMany, tabInfo, goHome, backFromHome, dropDead, homeFrom: () => (homeFrom && TB.list.includes(homeFrom) ? homeFrom : null) };
 
 /* =====================================================================
    2. AI — the smart server (siman-ai)

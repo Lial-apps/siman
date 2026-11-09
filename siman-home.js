@@ -49,6 +49,14 @@ header.bar .brand b{cursor:pointer}
 .sh-resume .sh-main .k{flex:none;font-size:11px;font-weight:800;border-radius:6px;padding:4px 6px;background:#1B1C1F;color:#fff}
 .sh-resume .sh-main .go{margin-inline-start:auto;font-weight:800;font-size:15px;white-space:nowrap}
 .sh-resume .sh-more{display:flex;flex-wrap:wrap;gap:6px}
+.sh-resume .sh-row{display:flex;align-items:stretch;gap:8px}
+.sh-resume .sh-row .sh-main{flex:1;min-width:0}
+.sh-resume .sh-x{flex:none;font:inherit;font-size:22px;line-height:1;width:44px;border-radius:14px;border:2px solid var(--ink,#2B1660);background:var(--bar,#fff);color:var(--ink,#2B1660);cursor:pointer}
+.sh-resume .sh-x:hover{background:#FDE2E2;color:#B3232A;border-color:#B3232A}
+.sh-resume .sh-chip{display:inline-flex;align-items:center;border:1px solid var(--line,#D4DBE5);background:var(--desk,#F4F6FA);border-radius:999px;max-width:280px}
+.sh-resume .sh-chip>button[data-t]{border:0!important;background:transparent!important}
+.sh-resume .sh-more .sh-x.s{flex:none;display:grid;place-items:center;width:26px;height:26px;padding:0;font-size:17px;line-height:1;overflow:visible;text-overflow:clip;border:0;border-radius:50%;background:transparent;margin-inline-end:3px;opacity:.7}
+.sh-resume .sh-more .sh-x.s:hover{opacity:1}
 .sh-resume .sh-more button{font:inherit;font-size:13px;border:1px solid var(--line,#D4DBE5);background:var(--desk,#F4F6FA);color:inherit;border-radius:999px;padding:5px 12px;cursor:pointer;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sh-resume .sh-more button:hover,.sh-resume .sh-main:hover{filter:brightness(.97)}
 .sh-live{position:fixed;z-index:2147482990;top:calc(8px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);display:none;align-items:center;gap:8px;font:600 14px/1 "SF-rubik","Rubik","Segoe UI",Arial,sans-serif;direction:rtl;background:#B3232A;color:#fff;border:0;border-radius:999px;padding:9px 16px;box-shadow:0 6px 20px rgba(0,0,0,.25);cursor:pointer}
@@ -80,8 +88,17 @@ async function go() {
 }
 async function back(t) {
   const tabs = T(); if (!tabs) return false;
-  const ok = await tabs.backFromHome(t);
-  refresh(); return ok;
+  let ok = false;
+  try { ok = await tabs.backFromHome(t); }
+  catch (e) { console.error(e); if (typeof toast === 'function') toast('לא הצלחתי לחזור לקובץ: ' + (e && e.message || e)); }
+  refresh(true); return ok;
+}
+// × on the card: the file is closed (with the usual question if it has unsaved changes)
+async function closeFromCard(t) {
+  const tabs = T(); if (!tabs) return;
+  try { await tabs.closeTab(t); } catch (e) { console.error(e); }
+  // closing the last tab from the home screen: nothing else needs to open
+  refresh(true);
 }
 const canBack = () => { const tabs = T(); return !!(tabs && !tabs.TB.cur && tabs.homeFrom && tabs.homeFrom()); };
 
@@ -96,13 +113,13 @@ function addHeaderButton() {
 }
 // the editors (Word / Excel / PowerPoint): the logo goes home, and a "בית" button next to ×
 document.addEventListener('click', e => {
-  const b = e.target.closest && e.target.closest('.we-brand,.xe-brand,.pe-brand,.sh-edhome'); if (!b) return;
+  const b = e.target.closest && e.target.closest('.we-brand,.xe-brand,.pe-brand,.sh-edhome'); if (!b || b.classList.contains('ed-ai')) return;
   e.preventDefault(); go();
 }, true);
 // (next to the logo, which always shows: at the end of the bar the buttons may run off a narrow window)
 function addEditorButtons() {
   for (const sel of ['.we-brand', '.xe-brand', '.pe-brand']) {
-    const br = document.querySelector(sel); if (!br || (br.nextElementSibling && br.nextElementSibling.classList.contains('sh-edhome'))) continue;
+    const br = document.querySelector(sel); if (!br || br.parentElement.querySelector(':scope>.sh-ednew')) continue;
     const kind = sel === '.we-brand' ? 'docx' : sel === '.xe-brand' ? 'xlsx' : 'pptx';
     const home = h(`<button type="button" class="sh-edhome" title="מסך הבית. הקובץ נשאר פתוח, וחוזרים אליו מאותו מקום">${HOUSE}<span>בית</span></button>`);
     const nw = h(`<button type="button" class="sh-ednew" data-kind="${kind}" aria-haspopup="menu" title="קובץ חדש (Alt+N). הקובץ הזה נשאר פתוח בלשונית שלו">${PLUS}<span>חדש</span></button>`);
@@ -190,6 +207,7 @@ function refresh(force) {
   live.classList.toggle('on', !!showLive); live.classList.toggle('job', !!(showLive && !v.rec));
   if (showLive) live.querySelector('span').textContent = v.rec ? `${v.paused ? 'הקלטה מושהית' : 'מקליט'} ${clock(v.recT)} · חזרה` : 'התמלול בעבודה · חזרה';
   // the card on the home screen
+  if (tabs && tabs.dropDead && homeShown()) tabs.dropDead();
   const list = tabs ? tabs.TB.list : [];
   const on = homeShown() && (list.length || (v && v.parked));
   const home = document.querySelector('#empty .v7-home') || $('empty');
@@ -202,16 +220,20 @@ function refresh(force) {
   lastSig = sig; card.hidden = false;
   const info = t => tabs.tabInfo(t);
   const kind = t => { const n = info(t).name || ''; return (/\.(\w+)$/.exec(n) || ['', 'pdf'])[1].toUpperCase(); };
+  const X = (t, small) => `<button type="button" class="sh-x${small ? ' s' : ''}" data-x="${t.id}" title="סגירת ${esc(info(t).name)}" aria-label="סגירת ${esc(info(t).name)}">×</button>`;
   card.innerHTML = `<h3>${HOUSE.replace('<svg', '<svg width="18" height="18"')}ממשיכים מאיפה שעצרת</h3>
-    ${main ? `<button type="button" class="sh-main" data-t="${main.id}"><span class="k">${esc(kind(main))}</span><span style="min-width:0"><b>${esc(info(main).name)}</b><small>${main === from && lastPage ? 'עמוד ' + lastPage + ' · ' : ''}${info(main).dirty ? 'יש שינויים שעוד לא נשמרו · ' : ''}בדיוק איפה שהפסקת</small></span><span class="go">חזרה ›</span></button>` : ''}
+    ${main ? `<div class="sh-row"><button type="button" class="sh-main" data-t="${main.id}"><span class="k">${esc(kind(main))}</span><span style="min-width:0"><b>${esc(info(main).name)}</b><small>${main === from && lastPage ? 'עמוד ' + lastPage + ' · ' : ''}${info(main).dirty ? 'יש שינויים שעוד לא נשמרו · ' : ''}בדיוק איפה שהפסקת</small></span><span class="go">חזרה ›</span></button>${X(main)}</div>` : ''}
     ${v && v.parked ? `<button type="button" class="sh-main" data-v="1" style="background:#FDE2E2"><span class="k" style="background:#B3232A">🎙</span><span><b>${v.rec ? 'הקלטה פעילה' : v.job ? 'תמלול בעבודה' : 'תמלול'}</b><small>${v.rec ? clock(v.recT) + ' · ממשיכה ברקע' : esc(v.title || '')}</small></span><span class="go">חזרה ›</span></button>` : ''}
-    ${list.length > 1 ? `<div class="sh-more">${list.filter(t => t !== main).map(t => `<button type="button" data-t="${t.id}" title="${esc(info(t).name)}">${esc(kind(t))} · ${esc(info(t).name)}</button>`).join('')}</div>` : ''}`;
-  card.querySelectorAll('[data-t]').forEach(b => b.onclick = () => { const t = list.find(x => String(x.id) === b.dataset.t); if (t) back(t); });
+    ${list.length > 1 ? `<div class="sh-more">${list.filter(t => t !== main).map(t => `<span class="sh-chip"><button type="button" data-t="${t.id}" title="${esc(info(t).name)}">${esc(kind(t))} · ${esc(info(t).name)}</button>${X(t, 1)}</span>`).join('')}</div>` : ''}`;
+  card.querySelectorAll('[data-t]').forEach(b => b.onclick = () => { const t = list.find(x => String(x.id) === b.dataset.t); if (t) back(t); else refresh(true); });
+  card.querySelectorAll('[data-x]').forEach(b => b.onclick = () => { const t = list.find(x => String(x.id) === b.dataset.x); if (t) closeFromCard(t); else refresh(true); });
   const vb = card.querySelector('[data-v]'); if (vb) vb.onclick = () => { SIMAN_VOICE.unpark(); refresh(); };
 }
 setInterval(() => { if (!document.hidden) refresh(); }, 1000);
 addEventListener('siman:voice', () => refresh(true));
 new MutationObserver(() => refresh()).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+// an editor that opens gets its "בית" and "+ חדש" at once (not on the next tick of the timer)
+new MutationObserver(() => addEditorButtons()).observe(document.body, { childList: true });
 
 /* ---------------- keyboard ---------------- */
 addEventListener('keydown', e => {
