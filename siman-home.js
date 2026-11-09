@@ -42,6 +42,8 @@ header.bar .brand b{cursor:pointer}
    Now they go to a second line instead */
 .we-top,.xe-top,.pe-top{flex-wrap:wrap;row-gap:6px}
 .sh-resume{position:relative;z-index:3;max-width:860px;margin:14px auto 4px;padding:14px 16px;border-radius:18px;background:var(--bar,#fff);color:var(--ink,#16213A);border:2px solid var(--ink,#2B1660);box-shadow:4px 4px 0 var(--ink,#2B1660);display:grid;gap:10px;direction:rtl;text-align:start}
+/* 6.3.6: "display:grid" above beat the browser's own rule for [hidden], so a hidden card stayed on the screen */
+.sh-resume[hidden]{display:none!important}
 .sh-resume h3{margin:0;font-size:15px;display:flex;align-items:center;gap:8px}
 .sh-resume .sh-main{display:flex;align-items:center;gap:12px;width:100%;font:inherit;text-align:start;cursor:pointer;border:0;border-radius:14px;padding:12px 14px;background:var(--marker,#FFD84D);color:#1B1C1F}
 .sh-resume .sh-main b{font-size:16px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
