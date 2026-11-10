@@ -635,9 +635,10 @@ const CSS=`
 .we-scroll{flex:1;overflow:auto;position:relative;-webkit-user-select:text;user-select:text;overscroll-behavior:contain}
 .we-canvas{padding:26px 24px 60px;width:max-content;min-width:100%;box-sizing:border-box;display:flex;justify-content:center}
 .we-sheet{background:#fff;position:relative;box-sizing:border-box;box-shadow:0 1px 0 rgba(22,33,58,.05),0 12px 30px -14px rgba(22,33,58,.4);flex:none}
-.we-body{outline:none;min-height:100%;position:relative;z-index:1;color:#000;caret-color:#000;overflow-wrap:break-word;line-height:normal;text-align:start}
+.we-body{outline:none;min-height:100%;position:relative;display:flow-root;z-index:1;color:#000;caret-color:#000;overflow-wrap:break-word;line-height:normal;text-align:start}
 .we-body:empty::before,.we-body>p:only-child:empty::before{content:"מתחילים לכתוב כאן…";color:#A4AEC0}
 .we-body img{max-width:100%}
+.we-body :not(img):not(svg):not(svg *){max-height:none!important;-webkit-line-clamp:none!important}
 .we-body a{cursor:text}
 .we-body a[href]{color:inherit}
 .we-body table{border-collapse:collapse}
@@ -804,7 +805,7 @@ function after(){markDirty();refreshCounters();schedule();updateUI();}
 const cmSig=()=>JSON.stringify([...E.cm.values()].filter(c=>!c.fresh&&(c.keep||cmLive(c))).map(c=>[c.id,c.text,c.done,c.parent]));
 function markDirty(){const d=E.main.innerHTML!==E.cleanHtml||E.pageDirty||hfChanged()||cmSig()!==E.cmClean;if(d!==E.dirty){E.dirty=d;}
   const s=q('weState');s.textContent=E.dirty?'שינויים שלא נשמרו':(E.savedOnce?'נשמר':'');s.classList.toggle('dirty',E.dirty);}
-let schT=0;function schedule(){clearTimeout(schT);schT=setTimeout(()=>{if(!E)return;if(!E.hf&&!E.composing&&liftBlocks(E.main))snap();if(E.hf)fitHF();guides();words();posImgBox();cmRender();},250);}
+let schT=0;function schedule(){clearTimeout(schT);schT=setTimeout(()=>{if(!E)return;if(!E.hf&&!E.composing&&(liftBlocks(E.main)|unclamp(E.main)))snap();if(E.hf)fitHF();guides();words();posImgBox();cmRender();},250);}
 function hint(m){const h=q('weHint');h.textContent=m;clearTimeout(E.hintT);E.hintT=setTimeout(()=>{if(E)h.textContent='';},3000);}
 
 /* ---------- character formatting ---------- */
@@ -1298,9 +1299,9 @@ function fitHF(){
 function guides(){
   const g=q('weGuides'),b=E.main,pg=E.page;g.innerHTML='';
   const H=px(pg.h)-(E.padT||px(pg.top))-(E.padB||px(pg.bottom));if(H<50)return;
-  let start=0,pages=1;const marks=[];
+  let start=0,pages=1,end=0;const marks=[];
   for(const el of b.children){
-    const t=el.offsetTop,h=el.offsetHeight;
+    const t=el.offsetTop,h=Math.max(el.offsetHeight,el.scrollHeight);if(t+h>end)end=t+h;
     let guard=0;
     while(t+h>start+H+.5&&guard++<500){
       const lh=parseFloat(getComputedStyle(el).lineHeight)||20;
@@ -1311,6 +1312,8 @@ function guides(){
     if(pb){const y=offIn(pb,b).y+pb.offsetHeight;start=y;marks.push(y);pages++;}
   }
   E.pageMarks=marks;E.pageCount=pages;
+  {const sh=q('weSheet'),need=Math.ceil(b.offsetTop+end+12+(E.padB||px(pg.bottom))),base=px(pg.h);
+   const mh=Math.max(base,need)+'px';if(sh.style.minHeight!==mh)sh.style.minHeight=mh;}
   for(const f of E.root.querySelectorAll('.we-fld[data-f=NUMPAGES]'))if(f.textContent!==String(pages))f.textContent=pages;
   const top=b.offsetTop;
   marks.forEach((y,i)=>{const m=document.createElement('i');m.style.top=(top+y)+'px';const l=document.createElement('b');l.textContent='עמוד '+(i+2);m.append(l);g.append(m);});
@@ -1442,6 +1445,28 @@ html,body{margin:0;padding:0;background:#fff}*{-webkit-print-color-adjust:exact;
 </style></head><body><div class="doc ${P}" style="${esc(E.body.getAttribute('style')||'')}">${E.body.innerHTML}</div>${notes?`<div class="notes ${P}">${notes}</div>`:''}</body></html>`;
   await printFrame(html,fileName());
 }
+// Like Word, text always makes the document longer. A block that arrived with a fixed or capped height
+// (pasted from a web page or a PDF, written by the assistant, or saved that way) let the text run past the
+// last page while the page count stopped growing. Such caps are taken off; images and table rows keep theirs.
+const KEEP_H=/^(IMG|SVG|TD|TH|TR|TABLE|COL|COLGROUP|CANVAS)$/;
+function unclamp(root){
+  let ch=false;
+  for(const el of root.querySelectorAll('[style],[height]')){
+    const tag=el.tagName.toUpperCase();
+    if(tag==='IMG'||tag==='SVG'||el.closest('svg,.we-atom,[data-atom]'))continue;
+    const s=el.style;if(!s)continue;
+    if(s.maxHeight&&s.maxHeight!=='none'){s.removeProperty('max-height');ch=true;}
+    for(const pr of ['overflow','overflow-x','overflow-y','-webkit-line-clamp','line-clamp','columns','column-count','column-width','column-fill','writing-mode'])
+      if(s.getPropertyValue(pr)){s.removeProperty(pr);ch=true;}
+    if(s.position==='absolute'||s.position==='fixed'||s.position==='sticky'){for(const pr of ['position','top','left','right','bottom','inset','z-index'])s.removeProperty(pr);ch=true;}
+    const hasImg=!!el.querySelector('img,svg,canvas');
+    if(s.float&&s.float!=='none'&&!hasImg){s.removeProperty('float');ch=true;}
+    if(KEEP_H.test(tag)||hasImg)continue;
+    if(el.hasAttribute('height')){el.removeAttribute('height');ch=true;}
+    if(s.height&&s.height!=='auto'){s.removeProperty('height');ch=true;}
+  }
+  return ch;
+}
 function sanitize(html){
   const d=new DOMParser().parseFromString(html,'text/html');
   d.querySelectorAll('script,style,meta,link,title,xml,iframe,object,embed,form,input,button,select,textarea,svg,canvas,video,audio,noscript').forEach(n=>n.remove());
@@ -1455,6 +1480,7 @@ function sanitize(html){
       [...el.style].filter(x=>x.startsWith('mso-')).forEach(x=>el.style.removeProperty(x));}
     if(el.tagName==='IMG'&&!/^(data:image\/|blob:|https?:)/i.test(el.getAttribute('src')||''))el.remove();
   }
+  unclamp(d.body);
   return d.body.innerHTML;
 }
 function pasteHtml(html){const clean=sanitize(html);if(!clean.trim())return;liveRange();document.execCommand('insertHTML',false,clean);}
@@ -2352,7 +2378,7 @@ async function open(opts){
   E={opts,root,body:null,hist:[],hi:-1,zoom:1,dirty:false,blobs:new Set(),map:new Map(),name};
   E.body=q('weBody');E.main=E.body;q('weName').value=name;
   const load=document.createElement('div');load.className='we-load';load.textContent='פותח את המסמך לעריכה…';q('weScroll').append(load);
-  try{E.st=await prepare(opts.bytes||null);await mount();}
+  try{E.st=await prepare(opts.bytes||null);await mount();unclamp(E.body);}
   catch(e){root.remove();E=null;throw e;}
   load.remove();
   fillFonts();buildGallery();wire();

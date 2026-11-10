@@ -886,6 +886,12 @@ function pageBreaks(sh){
   acc=0;for(let r=A.r1;r<=A.r2;r++){const x=rowPx(sh,r);if(acc+x>eh&&acc>0){rows.add(r-1);acc=0;}acc+=x;}rows.add(A.r2);
   return{cols,rows,scale,pages:cols.size*rows.size,w,h};
 }
+// like Excel: scrolling toward the end of the sheet keeps adding rows and columns (up to Excel's own 1,048,576 × 16,384)
+function growOnScroll(w){
+  const sh=cur(),g=sh&&sh.g;if(!g)return;
+  if(w.scrollTop+w.clientHeight*1.5>=w.scrollHeight&&g.rows<1048576)g.rows=Math.min(1048576,g.rows+200);
+  if(Math.abs(w.scrollLeft)+w.clientWidth*1.5>=w.scrollWidth&&g.cols<16384)g.cols=Math.min(16384,g.cols+12);
+}
 function render(){
   X.cfTick=(X.cfTick||0)+1;
   const sh=cur(),g=geo(sh),wrap=q('xeWrap'),z=X.zoom;
@@ -1487,7 +1493,7 @@ function wire(){
   wrap.addEventListener('contextmenu',ctxMenu);
   wrap.addEventListener('wheel',e=>{if(e.ctrlKey||e.metaKey){e.preventDefault();setZoom(X.zoom+(e.deltaY<0?.1:-.1));}},{passive:false});
   const ac=q('xeAc');ac.addEventListener('mousedown',e=>e.preventDefault());ac.addEventListener('click',e=>{const b=e.target.closest('[data-fn]');if(b)fnPick(b.dataset.fn);});
-  wrap.addEventListener('scroll',()=>{if(X.editing)commitEdit();closePop();renderSoon();},{passive:true});
+  wrap.addEventListener('scroll',()=>{if(X.editing)commitEdit();closePop();growOnScroll(wrap);renderSoon();},{passive:true});
   const ed=q('xeEdit');ed.addEventListener('input',()=>{q('xeFx').value=ed.value;growEdit();fnSuggest(ed);});ed.addEventListener('blur',()=>{q('xeAc').hidden=true;});
   const fx=q('xeFx');
   fx.addEventListener('focus',()=>{if(!X.editing)X.editing={r:X.act.r,c:X.act.c,typed:false,orig:rawText(cellAt(cur(),X.act.r,X.act.c)),fx:true};});
