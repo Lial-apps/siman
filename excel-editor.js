@@ -766,9 +766,11 @@ const CSS=`
 #xed .xe-grid th{position:sticky;background:#F3F5F8;color:#5D6982;font:11px Arial,sans-serif;border:1px solid #D9DEE6;z-index:2;cursor:default;padding:0}
 #xed .xe-grid thead th{top:0;height:22px}#xed .xe-grid tbody th{inset-inline-start:0;min-width:44px;text-align:center}
 #xed .xe-grid thead th.corner{inset-inline-start:0;z-index:3}
-#xed .xe-grid th.on{background:#D7E6DC;color:#14532D;font-weight:700}
+#xed .xe-grid th.on{background:#CFE3D6;color:#0E4A26;font-weight:700}#xed .xe-grid th[data-col].on{box-shadow:inset 0 -3px 0 #217346}
 #xed .xe-grid th .rz{position:absolute;top:0;bottom:0;inset-inline-end:-3px;width:6px;cursor:col-resize;z-index:4}
-#xed .xe-grid tr:not(.fzr)>td.xin:not(.fz){background-color:rgba(33,115,70,.12)!important}
+#xed .xe-grid td.xin{box-shadow:inset 0 0 0 9999px rgba(40,40,40,.17)}
+#xed .xe-grid td.et::after,#xed .xe-grid td.eb::after,#xed .xe-grid td.es::after,#xed .xe-grid td.ee::after{content:"";position:absolute;inset:-1px;pointer-events:none;z-index:2;border:0 solid #217346}
+#xed .xe-grid td.et::after{border-top-width:2px}#xed .xe-grid td.eb::after{border-bottom-width:2px}#xed .xe-grid td.es::after{border-inline-start-width:2px}#xed .xe-grid td.ee::after{border-inline-end-width:2px}
 #xed .xe-grid td.xact{outline:2px solid var(--xg);outline-offset:-2px;z-index:1}
 #xed .xe-grid tr.sp td{border:0;padding:0;height:auto}
 #xed .xe-edit{position:absolute;z-index:5;margin:0;border:2px solid var(--xg);padding:1px 3px;font:11pt Arial,sans-serif;resize:none;overflow:hidden;background:#fff;box-sizing:border-box;outline:none;-webkit-user-select:text;user-select:text;white-space:pre}
@@ -796,7 +798,7 @@ const CSS=`
 #xed .xg-b:has(> .num){flex-direction:column;align-items:stretch;justify-content:center}
 #xed .num{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--xmu)}#xed .num input{width:56px;height:26px;border:1px solid #CBD3DF;border-radius:6px;padding:0 5px;font:inherit;color:var(--xt)}
 #xed .xe-grid td.pbc{border-inline-end:1.5px dashed #2E58CC!important}#xed .xe-grid td.pbr{border-bottom:1.5px dashed #2E58CC!important}
-#xed .xe-grid td.fz{background-color:#fff}#xed .xe-grid tr.fzr td.xin,#xed .xe-grid td.fz.xin{background-image:linear-gradient(rgba(33,115,70,.14),rgba(33,115,70,.14))}#xed .xe-grid tr.fzr td,#xed .xe-grid tr.fzr th{background-color:#fff}
+#xed .xe-grid td.fz{background-color:#fff}#xed .xe-grid tr.fzr td,#xed .xe-grid tr.fzr th{background-color:#fff}
 #xed .xe-grid tr.fzr th{background:#F3F5F8}#xed .xe-grid td.fzl{box-shadow:inset -1px 0 0 #8E9AB3}#xed .xe-grid tr.fzlast td{border-bottom:1.5px solid #8E9AB3}
 #xed .xe-grid td.fzedge{border-inline-end:1.5px solid #8E9AB3}
 #xed #xePrint{display:none}
@@ -954,11 +956,18 @@ let rT=0;const renderSoon=()=>{cancelAnimationFrame(rT);rT=requestAnimationFrame
 function paintSel(){
   const s=X.sel,a=X.act;const grid=q('xeGrid');
   // every selected area: the current one and the ones added with Ctrl
-  const all=[s,...(X.more||[])];const inAny=(r,c)=>all.some(x=>r>=x.r1&&r<=x.r2&&c>=x.c1&&c<=x.c2);
+  const all=[s,...(X.more||[])];const sh=cur();
+  const multi=all.length>1||s.r2>s.r1||s.c2>s.c1;
   for(const td of grid.querySelectorAll('td[data-r]')){
     const r=+(td.dataset.mr??td.dataset.r),c=+(td.dataset.mc??td.dataset.c);
-    td.classList.toggle('xin',inAny(r,c)&&!(r===a.r&&c===a.c));
-    td.classList.toggle('xact',r===a.r&&c===a.c);
+    const m=td.dataset.mr!==undefined||td.colSpan>1||td.rowSpan>1?mergeAt(sh,r,c):null;const r2=m?m.r2:r,c2=m?m.c2:c;
+    // like Excel: the cells get a grey tint over their own colour, and each area gets a green frame
+    let inA=false,et=false,eb=false,es=false,ee=false;
+    for(const x of all){if(r2<x.r1||r>x.r2||c2<x.c1||c>x.c2)continue;inA=true;if(r<=x.r1)et=true;if(r2>=x.r2)eb=true;if(c<=x.c1)es=true;if(c2>=x.c2)ee=true;}
+    const act=r===a.r&&c===a.c;
+    td.classList.toggle('xin',inA&&!act);
+    td.classList.toggle('xact',act);
+    td.classList.toggle('et',inA&&multi&&et);td.classList.toggle('eb',inA&&multi&&eb);td.classList.toggle('es',inA&&multi&&es);td.classList.toggle('ee',inA&&multi&&ee);
   }
   for(const th of grid.querySelectorAll('th[data-col]')){const c=+th.dataset.col;th.classList.toggle('on',all.some(x=>c>=x.c1&&c<=x.c2));}
   for(const th of grid.querySelectorAll('th[data-row]')){const r=+th.dataset.row;th.classList.toggle('on',all.some(x=>r>=x.r1&&r<=x.r2));}
