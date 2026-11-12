@@ -237,7 +237,39 @@ function level(a) {
   return a;
 }
 // who spoke when (in the engine worker): 10-second windows, 5 seconds apart
+/* 5.10.1: more than one engine at a time on a strong computer (each worker uses its own processor core) */
+function lanes() {
+  const c = navigator.hardwareConcurrency || 2, mem = navigator.deviceMemory || 8;
+  const mob = (navigator.userAgentData && navigator.userAgentData.mobile) || /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent || '');
+  if (mob || mem < 4) return 1; return c >= 8 ? 3 : c >= 4 ? 2 : 1;
+}
+function sideWorker() {
+  const w = new Worker(new URL('siman-asr-worker.js', location.href), { type: 'module' }); let seq = 0; const wait = new Map();
+  w.onmessage = e => { const d = e.data; if (d.type === 'progress') return; const p = wait.get(d.id); if (!p) return; wait.delete(d.id); if (d.error) p.rej(new Error(d.error)); else p.res(d); };
+  w.onerror = e => { const err = new Error((e && e.message) || 'Worker failed'); for (const p of wait.values()) p.rej(err); wait.clear(); };
+  return { ask: (m, tr) => new Promise((res, rej) => { const id = ++seq; wait.set(id, { res, rej }); w.postMessage(Object.assign({ id }, m), tr || []); }), end: () => { try { w.terminate(); } catch (_) {} for (const p of wait.values()) p.rej(abortErr()); wait.clear(); } };
+}
 async function diarize(pcm, K, onProg, opt) {
+  const n = lanes(), W0 = 10 * SR, H0 = 5 * SR;
+  const offs = []; for (let o = 0; ; o += H0) { const last = o + W0 >= pcm.length; offs.push({ o, first: o === 0, last }); if (last) break; }
+  if (n > 1 && offs.length > 4) {
+    // the 10-second windows are shared between a few workers; the voices are then joined in one place
+    const side = [];
+    for (let i = 0; i < n - 1; i++) { const sw = sideWorker(); try { await sw.ask({ type: 'dz-load' }); side.push(sw); } catch (e) { console.warn('dz lane', e); sw.end(); break; } }
+    try {
+      const L = [{ main: true, ask: (m, tr) => ASR.call(m, tr) }, ...side.map(sw => ({ ask: sw.ask }))];
+      const wins = new Array(offs.length), queue = offs.map((_, i) => i); let done = 0;
+      await Promise.all(L.map(async lane => {
+        while (queue.length) {
+          const k = queue.shift(), f = offs[k]; const win = pcm.slice(f.o, Math.min(pcm.length, f.o + W0));
+          try { const r = await lane.ask({ type: 'dz-win1', audio: win, offset: f.o / SR, first: f.first, last: f.last }, [win.buffer]); wins[k] = r.win; }
+          catch (e) { if (lane.main) throw e; queue.push(k); return; }
+          done++; if (onProg) onProg(done / offs.length);
+        }
+      }));
+      return await ASR.call({ type: 'dz-end2', windows: wins, speakers: K || 0, minSpeakers: (opt && opt.minK) || 0, kind: (opt && opt.kind) || '' });
+    } finally { side.forEach(sw => sw.end()); }
+  }
   await ASR.call({ type: 'dz-begin' });
   const W = 10 * SR, H = 5 * SR;
   for (let o = 0, first = true; o < pcm.length; o += H, first = false) {
@@ -985,21 +1017,41 @@ async function transcribeFile(file, opts) {
     if (!parts || !parts.length) parts = plan(pcm);
     if (!parts.length) throw new Error('לא נשמע דיבור בהקלטה');
     // 3. part by part; the text shows up as it is written
+    // 5.10.1: on a computer without a graphics card the parts are written two at a time (a second engine in parallel)
     step('tx', 'now', '0%');
     const total = parts.reduce((a, p) => a + p.e - p.s, 0) / SR;
     let done = 0; const t0 = Date.now();
-    for (let k = 0; k < parts.length; k++) {
-      if (sig.aborted) throw abortErr();
-      const p = parts[k];
-      const r = await ASR.text(level(pcm.slice(p.s, p.e)), lang);
-      const text = clean(r.text, kind);
-      if (text) { item.segments.push({ spk: p.spk || 'spk_1', start: p.s / SR, end: p.e / SR, text }); liveLine(text); }
-      done += (p.e - p.s) / SR;
-      const spent = (Date.now() - t0) / 1000;
-      bar('tx', done / total);
-      step('tx', 'now', Math.round(done / total * 100) + '%' + (k >= 1 && done < total ? ' · ' + eta(spent / done * (total - done)) : ''));
-      if (k % 8 === 7) await DB.put(stripForDb(item));
+    const runners = [{ text: (a, l) => ASR.text(a, l) }];
+    let side = null;
+    if (parts.length > 6 && ASR.device === 'wasm' && spec.key !== 'acc' && lanes() >= 2) {
+      try { side = sideWorker(); await side.ask({ type: 'load', engine: spec.key }); runners.push({ side: true, text: (a, l) => side.ask({ type: 'run', audio: a, lang: l || 'he', engine: spec.key }, [a.buffer]) }); }
+      catch (e) { console.warn('second engine', e); if (side) side.end(); side = null; }
     }
+    const res = new Array(parts.length); let nextK = 0, emit = 0, flushing = false;
+    const flush = async () => {
+      if (flushing) return; flushing = true;
+      try { while (emit < parts.length && res[emit] !== undefined) { const k = emit++, p = parts[k], text = res[k];
+        if (text) { item.segments.push({ spk: p.spk || 'spk_1', start: p.s / SR, end: p.e / SR, text }); liveLine(text); }
+        if (k % 8 === 7) await DB.put(stripForDb(item)); } } finally { flushing = false; }
+    };
+    try {
+      await Promise.all(runners.map(async R => {
+        while (nextK < parts.length) {
+          if (sig.aborted) throw abortErr();
+          const k = nextK++, p = parts[k];
+          let r;
+          try { r = await R.text(level(pcm.slice(p.s, p.e)), lang); }
+          catch (e) { if (!R.side) throw e; console.warn('second engine stopped', e); r = await ASR.text(level(pcm.slice(p.s, p.e)), lang); res[k] = clean(r.text, kind) || ''; done += (p.e - p.s) / SR; await flush(); return; }
+          res[k] = clean(r.text, kind) || '';
+          done += (p.e - p.s) / SR;
+          const spent = (Date.now() - t0) / 1000;
+          bar('tx', done / total);
+          step('tx', 'now', Math.round(done / total * 100) + '%' + (done > 2 && done < total ? ' · ' + eta(spent / done * (total - done)) : ''));
+          await flush();
+        }
+      }));
+      await flush();
+    } finally { if (side) side.end(); }
     item.segments = normalize(item.segments);
     if (!item.segments.length) throw new Error('לא נשמע דיבור בהקלטה');
     starMarks(item);

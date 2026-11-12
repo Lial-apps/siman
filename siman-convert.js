@@ -806,6 +806,7 @@ const CSS = `
 .cvx-range{border:1.5px solid var(--c-l);border-radius:12px;min-height:40px;padding:0 12px;font:inherit;font-size:15px;width:170px;background:var(--c-s);color:var(--c-i)}
 .cvx-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
 .cvx-fmt{position:relative;text-align:start;border:1.5px solid var(--c-l);background:var(--c-s);color:var(--c-i);border-radius:20px;padding:16px;cursor:pointer;font:inherit;display:flex;flex-direction:column;gap:8px;min-height:120px;transition:border-color .15s,transform .15s,box-shadow .15s}
+.cvx-more{display:block;margin:12px 0 2px;font:inherit;font-size:14px;font-weight:700;background:none;border:0;color:var(--c-a);cursor:pointer;padding:6px 2px;text-decoration:underline;text-underline-offset:3px}
 .cvx-fmt:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(20,40,80,.08)}
 .cvx-fmt[aria-checked=true]{border-color:var(--c-a);box-shadow:0 0 0 3px color-mix(in srgb,var(--c-a) 22%,transparent)}
 .cvx-fmt b{font-size:16.5px}
@@ -958,6 +959,12 @@ function make() {
     b.ondblclick = () => go();
     fm.append(b);
   }
+  // 6.4.1: the other kinds that the conversion window of סימן 6.0 added (pictures, Markdown, plain text, PDF/A…)
+  if (OLD_OPEN) {
+    const more = el(`<button type="button" class="cvx-more">סוגים נוספים: תמונה (JPG / PNG), Markdown, טקסט ועוד ›</button>`);
+    more.onclick = () => { close(); try { OLD_OPEN(); } catch (e) { console.error(e); } };
+    fm.after(more);
+  }
   fm.addEventListener('keydown', e => { // arrow keys move between the cards, like radio buttons
     const list = [...fm.querySelectorAll('.cvx-fmt')]; const i = list.indexOf(document.activeElement); if (i < 0) return;
     const d = { ArrowLeft: 1, ArrowDown: 1, ArrowRight: -1, ArrowUp: -1 }[e.key]; if (!d) return; e.preventDefault();
@@ -1093,7 +1100,8 @@ function fitDoc() {
 function setView(v) { ui.q('cvxCmp').dataset.v = v; ui.root.querySelectorAll('.cvx-seg button').forEach(b => b.setAttribute('aria-pressed', b.dataset.v === v)); requestAnimationFrame(fitDoc); }
 
 // the convert button (and everything that "clicks" it: the command search, the phone menu) opens the new window
-function hook() { const b = $id('convBtn'); if (!b) return; b.onclick = () => { if (!S.doc || S.office) return; open(); }; }
+let OLD_OPEN = null;
+function hook() { const b = $id('convBtn'); if (!b) return; const prev = b.onclick; if (typeof prev === 'function') OLD_OPEN = () => prev.call(b, new MouseEvent('click')); b.onclick = () => { if (!S.doc || S.office) return; open(); }; }
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', hook); else hook();
 
 /* =====================================================================

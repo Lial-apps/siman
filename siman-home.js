@@ -288,6 +288,35 @@ addEventListener('keydown', e => {
   if (e.altKey && (e.key === 'Home' || e.code === 'Home')) { e.preventDefault(); go(); }
 });
 
+/* ---------------- 6.4.1: paste a file with the mouse, anywhere on the home screen ----------------
+   Ctrl+V already opened a copied file anywhere on the home screen, but the browser offers "הדבק" in the right-click
+   menu only over a box you can type in — on the home screen that was only the "גוררים לכאן" box. Now a right-click
+   on any empty spot of the home screen puts a small invisible paste box under the mouse, so the menu offers
+   "הדבק", and the pasted file opens. (Not on a phone's long press: a box to type in would open the keyboard.) */
+const catcher = h('<div class="sh-paste" contenteditable="true" spellcheck="false" aria-hidden="true" tabindex="-1"></div>');
+document.body.append(catcher);
+document.head.append(h(`<style>.sh-paste{position:fixed;display:none;width:64px;height:64px;margin:-32px 0 0 -32px;opacity:0;z-index:2147483000;caret-color:transparent;color:transparent;outline:0;overflow:hidden;white-space:nowrap;font-size:1px}.sh-paste.on{display:block}</style>`));
+const onHome = () => homeShown() && !(typeof S !== 'undefined' && S && S.doc);
+const catcherOff = () => { catcher.classList.remove('on'); catcher.textContent = ''; };
+const catchAt = e => {
+  if (!onHome()) return;
+  const t = e.target;
+  if (t === catcher || (t.closest && t.closest('input,textarea,select,[contenteditable="true"],a[href],dialog,.sh-resume,.nb-field'))) return;
+  catcher.style.left = e.clientX + 'px'; catcher.style.top = e.clientY + 'px';
+  catcher.classList.add('on'); catcher.focus({ preventScroll: true });
+};
+addEventListener('mousedown', e => { if (e.button === 2) catchAt(e); else if (e.target !== catcher) catcherOff(); }, true);
+catcher.addEventListener('blur', () => setTimeout(catcherOff, 0));
+catcher.addEventListener('keydown', e => { if (!(e.ctrlKey || e.metaKey)) { e.preventDefault(); catcherOff(); } });
+catcher.addEventListener('beforeinput', e => { if (e.inputType !== 'insertFromPaste') e.preventDefault(); });
+catcher.addEventListener('paste', e => {
+  e.preventDefault(); e.stopPropagation();
+  const f = e.clipboardData && e.clipboardData.files && e.clipboardData.files[0];
+  catcherOff(); catcher.blur();
+  if (f) { const open = window.openFile || (typeof openFile === 'function' ? openFile : null); if (open) open(f.name ? f : new File([f], 'הדבקה' + ({ 'image/png': '.png', 'image/jpeg': '.jpg', 'application/pdf': '.pdf' }[f.type] || ''), { type: f.type })); }
+  else if (typeof toast === 'function') toast('אין קובץ בהעתקה. מעתיקים קובץ (בסייר הקבצים: לחיצה ימנית ← העתקה) ומדביקים כאן');
+});
+
 // "הפרטים שלי" in the settings too, so they can be prepared before any form
 { const note = document.querySelector('#setDlg .fmt-note');
   if (note) { const b = h('<button type="button" class="pro-link" style="display:block;margin:6px 0">👤 הפרטים שלי ושל המשפחה (למילוי אוטומטי של טפסים)</button>');

@@ -191,7 +191,54 @@ async function textOf(page, vp) {
     const p1 = vp.convertToViewportPoint(tx[4], tx[5]), p2 = vp.convertToViewportPoint(tx[4] + (it.width || fh * s.length * .5), tx[5] + fh);
     out.push({ s, fh, x0: Math.min(p1[0], p2[0]), x1: Math.max(p1[0], p2[0]), y0: Math.min(p1[1], p2[1]), y1: Math.max(p1[1], p2[1]), rtl: it.dir === 'rtl' || RTL_CH.test(s) });
   }
+  return joinLine(out);
+}
+/* 6.4.1: many PDFs keep one line in several pieces: "שם מאשר ההצעה ____________" + "___" + "______", or "ח" +
+   "תימה +חותמת ______". Each piece alone gave a blank line cut into small places (the text then broke to a new
+   line in a box of a few points) and labels cut in the middle ("תימה" is not "חתימה": no signature place).
+   Pieces that touch on the same line become one, and each keeps where its letters are (segs). */
+function joinLine(items) {
+  const lines = [];
+  for (const it of [...items].sort((a, b) => a.y1 - b.y1)) {
+    const ln = lines.find(l => Math.abs(l.y1 - it.y1) < Math.max(1.5, Math.min(l.fh, it.fh) * .25) && Math.max(l.fh, it.fh) / Math.min(l.fh, it.fh) < 1.4);
+    if (ln) ln.items.push(it); else lines.push({ y1: it.y1, fh: it.fh, items: [it] });
+  }
+  const out = [];
+  for (const ln of lines) {
+    const row = ln.items.sort((a, b) => a.x0 - b.x0);
+    let grp = [row[0]];
+    const flush = () => {
+      if (grp.length === 1) { const t = grp[0]; t.segs = [{ i0: 0, i1: t.s.length, x0: t.x0, x1: t.x1, rtl: t.rtl, s: t.s, fh: t.fh }]; out.push(t); return; }
+      const rtl = grp.some(t => RTL_CH.test(t.s)) ? grp.filter(t => t.rtl).length * 2 >= grp.length || RTL_CH.test(grp[grp.length - 1].s) : false;
+      const order = rtl ? [...grp].reverse() : grp;   // reading order: a Hebrew line starts at its right
+      let s = '', prev = null; const segs = [];
+      for (const t of order) {
+        if (prev) { const gap = rtl ? prev.x0 - t.x1 : t.x0 - prev.x1; if (gap > Math.min(prev.fh, t.fh) * .12 && !/\s$/.test(s)) s += ' '; }
+        segs.push({ i0: s.length, i1: s.length + t.s.length, x0: t.x0, x1: t.x1, rtl: t.rtl, s: t.s, fh: t.fh }); s += t.s; prev = t;
+      }
+      out.push({ s, fh: Math.max(...grp.map(t => t.fh)), x0: Math.min(...grp.map(t => t.x0)), x1: Math.max(...grp.map(t => t.x1)), y0: Math.min(...grp.map(t => t.y0)), y1: Math.max(...grp.map(t => t.y1)), rtl, segs });
+    };
+    for (let i = 1; i < row.length; i++) {
+      const a = grp[grp.length - 1], b = row[i], gap = b.x0 - a.x1;
+      if (gap <= Math.min(a.fh, b.fh) * .35 && gap > -Math.min(a.fh, b.fh)) grp.push(b); else { flush(); grp = [b]; }
+    }
+    flush();
+  }
   return out;
+}
+// where letters i0..i1 of an item stand on the page: measured by the width of the letters, not their number
+// (an underscore is not as wide as a letter, so counting letters put the place a little off)
+const mw = document.createElement('canvas').getContext('2d');
+function spanOf(it, i0, i1) {
+  let x0 = Infinity, x1 = -Infinity;
+  for (const g of it.segs || [{ i0: 0, i1: it.s.length, x0: it.x0, x1: it.x1, rtl: it.rtl, s: it.s, fh: it.fh }]) {
+    const a = Math.max(i0, g.i0) - g.i0, b = Math.min(i1, g.i1) - g.i0; if (b <= a) continue;
+    mw.font = `${Math.max(4, g.fh || 10)}px Arial`;
+    const all = mw.measureText(g.s).width || 1, f = k => mw.measureText(g.s.slice(0, k)).width / all, span = g.x1 - g.x0;
+    const p = g.rtl ? [g.x1 - span * f(b), g.x1 - span * f(a)] : [g.x0 + span * f(a), g.x0 + span * f(b)];
+    x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[1]);
+  }
+  return x0 <= x1 ? [x0, x1] : [it.x0, it.x1];
 }
 // the words next to a blank on the same line (Hebrew: to its right, otherwise to its left), and their size
 function labelFor(items, b, pageRtl) {
@@ -286,19 +333,23 @@ async function detectPage(P, widgets) {
   // 1. blanks written as characters: "שם: ________", "........", "☐ אני מסכים/ה"
   for (const it of items) {
     const s = it.s, n = s.length, span = it.x1 - it.x0;
-    for (const m of [...s.matchAll(new RegExp(BLANK.source, "g"))]) {
-      const a = m.index / n, b = (m.index + m[0].length) / n;
-      const x0 = it.rtl ? it.x1 - span * b : it.x0 + span * a, x1 = it.rtl ? it.x1 - span * a : it.x0 + span * b;
-      const rest = (s.slice(0, m.index) + ' ' + s.slice(m.index + m[0].length)).replace(BLANK, ' ').trim();
+    const ms = [...s.matchAll(new RegExp(BLANK.source, "g"))];
+    ms.forEach((m, mi) => {
+      const [x0, x1] = spanOf(it, m.index, m.index + m[0].length);
+      // its own label: the words just before it ("שם: ____ כיתה: ____" — "כיתה" for the second one, not the whole
+      // line); a blank at the start of the line takes the words after it
+      const from = mi ? ms[mi - 1].index + ms[mi - 1][0].length : 0, to = mi < ms.length - 1 ? ms[mi + 1].index : n;
+      const before = s.slice(from, m.index).replace(/[(（]\s*$/, '').trim(), after = s.slice(m.index + m[0].length, to).trim();
+      const rest = before.length > 1 ? before : !mi && after.length > 1 && !/^[(（]/.test(after) ? after : '';
       const lb = rest.length > 1 ? { text: rest, fh: it.fh } : null;
       const bl = { x0, x1, y0: it.y1 - Math.max(14, it.fh * 1.5), y1: it.y1 + it.fh * .15 };
       const lab = lb || labelFor(items, bl, pageRtl);
       push({ ...bl, kind: kindOf(lab && lab.text) || 'text', fh: lab ? lab.fh : it.fh, label: lab ? lab.text : '', rtl: pageRtl });
       if (m[0].length === n) it.blank = true;
-    }
+    });
     // check boxes written as a character
-    for (const m of [...s.matchAll(new RegExp(BOXCH.source, "g"))]) { const a = m.index / n, b = (m.index + 1) / n;
-      const x0 = it.rtl ? it.x1 - span * b : it.x0 + span * a, x1 = it.rtl ? it.x1 - span * a : it.x0 + span * b, sz = Math.max(x1 - x0, it.fh * .8);
+    for (const m of [...s.matchAll(new RegExp(BOXCH.source, "g"))]) {
+      const [x0, x1] = spanOf(it, m.index, m.index + 1), sz = Math.max(x1 - x0, it.fh * .8);
       push({ x0: (x0 + x1) / 2 - sz / 2, x1: (x0 + x1) / 2 + sz / 2, y0: it.y1 - it.fh * .85, y1: it.y1 - it.fh * .85 + sz, kind: 'check', label: '', rtl: pageRtl }); }
   }
   // 2. lines, table cells and check boxes drawn on the page (and every scanned form)
@@ -395,7 +446,8 @@ function fromDocxMap() {
 }
 
 /* ---------------------------------------------------------------- המצב */
-const F = { list: [], cur: null, run: 0, busy: false, doc: null };
+// quiet (5.10.2, brought back in 6.4.1): the places were found but are not offered — the file does not look like a form
+const F = { list: [], cur: null, run: 0, busy: false, doc: null, quiet: true, force: false };
 // each open file has its own places (switching between files in tabs brings back that file's places and what was filled)
 const FOUND = new WeakMap();
 let ensureT = 0;
@@ -406,7 +458,7 @@ function ensure() {
   ensureT = setTimeout(() => {
     if (!S.doc || F.doc === S.doc) return;
     if (F.cur) { pnl.hidden = true; F.cur = null; document.body.classList.remove('fz-filling'); }
-    if (FOUND.has(S.doc)) { F.doc = S.doc; F.list = FOUND.get(S.doc); paintAll(); bar(); }
+    if (FOUND.has(S.doc)) { F.doc = S.doc; F.list = FOUND.get(S.doc); F.quiet = F.list.quiet !== false; paintAll(); bar(); }
     else run().catch(e => console.warn('fill', e));
   }, 0);
   return false;
@@ -421,6 +473,7 @@ function layerOf(P) {
 function paint(P) {
   if (!P || !P.ann) return;
   if (!ensure()) { if (P.fzl) P.fzl.innerHTML = ''; return; }
+  if (F.quiet) { if (P.fzl) P.fzl.innerHTML = ''; return; }   // found, but not offered (5.10.2)
   const ly = layerOf(P); ly.innerHTML = '';
   const vp1 = P.page.getViewport({ scale: 1 });
   for (const t of F.list) { if (t.page !== P.i - 1) continue;
@@ -799,7 +852,7 @@ function profileDialog(after, note) {
 /* ---------------------------------------------------------------- הפס "מקומות למילוי" */
 function bar() {
   const n = open().length, b = bar.el, all = F.list.length;
-  b.hidden = !F.list.length || !pnl.hidden || !S.doc || officeNoFill() || F.doc !== S.doc;
+  b.hidden = F.quiet || !F.list.length || !pnl.hidden || !S.doc || officeNoFill() || F.doc !== S.doc;
   b.querySelector('.go').textContent = n ? L().show(n) + ' ›' : LX().save;
   b.querySelector('.go').classList.toggle('fin', !n);
   b.querySelector('.x').title = L().hide; b.querySelector('.x').setAttribute('aria-label', L().hide);
@@ -819,19 +872,49 @@ bar.el.querySelector('.go').onclick = () => {
   // everything is filled: the same button saves the form
   if (!open().length) { const sb = document.getElementById('saveBtn'); if (sb && !sb.disabled) sb.click(); return; }
   document.body.classList.remove('fz-off'); if (typeof setTool === 'function' && S.tool !== 'select' && S.tool !== 'text') setTool('select'); const r = open(); if (r.length) act(r[0]); };
-bar.el.querySelector('.x').onclick = () => { document.body.classList.toggle('fz-off'); bar(); };
+bar.el.querySelector('.x').onclick = () => { hidePlaces(true); };
+/* 5.10.2 (brought back in 6.4.1): the places are offered on their own only on a real form, × hides them, and they
+   can always be asked for in the command search (Ctrl+K → "מקומות למילוי"); the automatic offer can be turned off */
+const AUTO_KEY = 'siman.fill.auto';
+const autoOn = () => { try { return localStorage.getItem(AUTO_KEY) !== 'off'; } catch (_) { return true; } };
+function hidePlaces(say) { F.quiet = F.list.quiet = true; document.body.classList.remove('fz-off'); pnl.hidden = true; F.cur = null; document.body.classList.remove('fz-filling'); S.pages.forEach(paint); bar();
+  if (say) toast('המקומות למילוי הוסתרו. כדי להחזיר: חיפוש פקודות (Ctrl+K) ← "מקומות למילוי"'); }
+function showPlaces() {
+  if (!S.doc || officeNoFill()) return;
+  if (!F.list.length) { toast(F.doc === S.doc ? 'לא נמצאו בקובץ הזה מקומות למילוי' : 'מחפש מקומות למילוי…'); if (F.doc !== S.doc) { F.force = true; run(); } return; }
+  F.quiet = F.list.quiet = false; S.pages.forEach(paint); bar(); const g = bar.el.querySelector('.go'); if (g) g.focus({ preventScroll: true });
+}
+try {
+  if (typeof CMDS !== 'undefined') {
+    CMDS.push({ l: 'מקומות למילוי', k: 'מילוי טופס מקומות למילוי שדות למלא קווים חתימה fill form fields', doc: 1, run: () => showPlaces() });
+    CMDS.push({ l: 'הצעה אוטומטית של מקומות למילוי: הפעלה / כיבוי', k: 'מילוי טופס הצעה אוטומטית להפסיק לא להציע הודעה מקומות למילוי כיבוי fill auto off', run: () => {
+      const on = !autoOn(); try { localStorage.setItem(AUTO_KEY, on ? 'on' : 'off'); } catch (_) {}
+      if (!on) hidePlaces(false);
+      toast(on ? 'סימן יציע שוב מקומות למילוי בטפסים' : 'סימן לא יציע יותר מקומות למילוי מעצמו. אפשר תמיד לבקש: Ctrl+K ← "מקומות למילוי"'); } });
+  }
+} catch (_) {}
+// a file is offered its places on its own only when it really is a form: fields built into the PDF, places with
+// a label beside them ("שם:", "תאריך:", "חתימה"), or a short file with several places on a page
+function offer(force) {
+  const typed = F.list.filter(t => t.kind && t.kind !== 'text' && t.label && !/^[(\[]/.test(String(t.label).trim())).length;
+  const perPage = new Map(); F.list.forEach(t => perPage.set(t.page, (perPage.get(t.page) || 0) + 1));
+  const dense = S.pages.length <= 4 && Math.max(0, ...perPage.values()) >= 3;
+  const formLike = S.hasForm || typed >= 2 || dense;
+  if (force || (autoOn() && formLike)) { F.quiet = F.list.quiet = false; paintAll(); bar(); if (F.list.length && !S.hasForm && !force) toast(L().found(F.list.length)); }
+}
 
 /* ---------------------------------------------------------------- חיבור לאפליקציה */
 async function run() {
-  const my = ++F.run; F.list = []; F.cur = null; pnl.hidden = true; document.body.classList.remove("fz-filling");
+  const force = !!F.force; F.force = false;
+  const my = ++F.run; F.list = []; F.cur = null; F.quiet = F.list.quiet = !force; pnl.hidden = true; document.body.classList.remove("fz-filling");
   F.doc = S.doc; if (S.doc) FOUND.set(S.doc, F.list); bar();
   S.pages.forEach(P => { if (P.fzl) P.fzl.innerHTML = ''; });
   if (!S.doc || officeNoFill() || !S.pages.length) return;
   // 6.3: a Word file: its blank lines are already known
   if (S.office) {
     await sleep(300); if (my !== F.run) return;
-    F.list.push(...fromDocxMap().slice(0, 120)); paintAll(); bar();
-    if (F.list.length && !S.hasForm) toast(L().found(F.list.length));
+    F.list.push(...fromDocxMap().slice(0, 120));
+    offer(force);
     return;
   }
   await sleep(400);                                      // the first page is drawn first
@@ -850,8 +933,17 @@ async function run() {
     F.list.push(...found.slice(0, 90)); paint(P); bar();
     await sleep(0);
   }
-  const n = F.list.length;
-  if (n && !S.hasForm) toast(L().found(n));
+  // 6.4.1: a line with no words beside it in the very same place on every page is the page's frame (a line above
+  // the footer, the edge of the letterhead), not a place to fill
+  if (pages.length >= 2) {
+    // (a wide one is the frame even when words happen to sit above it on one page; a short labelled one, like a
+    // "חתימה" line at the foot of every page, stays)
+    const W1 = S.pages[0].page.getViewport({ scale: 1 }).width;
+    const rec = t => pages.filter((_, pi) => F.list.some(o => o.page === pi && Math.abs(o.x0 - t.x0) < 4 && Math.abs(o.x1 - t.x1) < 4 && Math.abs(o.y1 - t.y1) < 4)).length;
+    const frame = F.list.filter(t => t.kind === 'text' && (!t.label || t.x1 - t.x0 > W1 * .5) && rec(t) >= Math.min(3, pages.length));
+    if (frame.length) { const drop = new Set(frame); for (let i = F.list.length - 1; i >= 0; i--) if (drop.has(F.list[i])) F.list.splice(i, 1); paintAll(); bar(); }
+  }
+  offer(force);
 }
 
 // the marks follow the page: drawn again whenever the page's notes are drawn (zoom, undo)

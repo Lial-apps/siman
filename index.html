@@ -1353,7 +1353,7 @@ body:has(#wed) .busy,body:has(#xed) .busy,body:has(#ped) .busy{z-index:1000}body
 </dialog>
 
 <header class="bar">
-  <div class="brand"><b title="גרסה 6.4">סימן</b><span class="ver">6.4</span><span class="fname" id="fname"></span></div>
+  <div class="brand"><b title="גרסה 6.4.1">סימן</b><span class="ver">6.4.1</span><span class="fname" id="fname"></span></div>
 
   <nav class="tools" id="tools" aria-label="כלים">
     <button class="tool" data-tool="select" aria-pressed="true" title="בחירה וגלילה (V)">
@@ -2883,7 +2883,7 @@ async function pageLines(P){
     });
     if(rtl){ // English words / numbers inside a Hebrew line read left-to-right
       for(let a=0;a<seq.length;a+=2){
-        if(!seq[a].ltr)continue;let b=a;while(b+2<seq.length&&seq[b+2].ltr)b+=2;
+        if(!seq[a].ltr)continue;let b=a;while(b+2<seq.length&&(seq[b+2].ltr||(/^[-–\/.:,+×]{1,2}$/.test(seq[b+2].tok||'')&&!seq[b+1].sep&&b+4<seq.length&&!seq[b+3].sep&&seq[b+4].ltr)))b+=2; // 5.10.0: "1-9", "12/5", "3.5" stay one number (they came out as "9-1")
         if(b>a){const part=seq.slice(a,b+1).reverse();seq.splice(a,part.length,...part);}a=b;
       }
     }
@@ -3827,7 +3827,11 @@ async function snipRegion(P,x,y,w,h){
     c.getContext('2d').drawImage(full,Math.round(x*k),Math.round(y*k),c.width,c.height,0,0,c.width,c.height);
     const blob=await new Promise(r=>c.toBlob(r,'image/png'));
     S.clip={src:c.toDataURL('image/png'),ratio:c.height/c.width,wPt:w/S.zoom};S.copied='image';updatePaste(true);
-    try{await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]);toast(IS_TOUCH?'האזור הועתק. לוחצים "הדבקה" כדי לשים אותו בדף, או מדביקים באפליקציה אחרת':'האזור הועתק. אפשר להדביק עם Ctrl+V או בכפתור "הדבקה"');}
+    // 5.10.1: an area with lines of text goes to the clipboard also as text (Word / Excel / PowerPoint paste it as editable text)
+    let rich=null;try{rich=window.SIMAN_CONV&&await SIMAN_CONV.areaRich(P,x,y,w,h);}catch(_){}
+    if(rich&&rich.text.trim()){S.copiedText=rich.text;S.copiedHtml=rich.html;}else{S.copiedText='';S.copiedHtml='';}
+    const types={'image/png':blob};if(rich&&rich.text.trim()){types['text/html']=new Blob([rich.html],{type:'text/html'});types['text/plain']=new Blob([rich.text],{type:'text/plain'});}
+    try{try{await navigator.clipboard.write([new ClipboardItem(types)]);}catch(e1){if(Object.keys(types).length>1)await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]);else throw e1;}toast(IS_TOUCH?'האזור הועתק. לוחצים "הדבקה" כדי לשים אותו בדף, או מדביקים באפליקציה אחרת':'האזור הועתק. אפשר להדביק עם Ctrl+V או בכפתור "הדבקה"');}
     catch(_){toast('האזור הועתק. לוחצים "הדבקה" כדי לשים אותו בדף');}
   }catch(e){console.error(e);toast('ההעתקה נכשלה');}
 }
@@ -5705,7 +5709,7 @@ if('launchQueue' in window){
 <link rel="stylesheet" href="siman-phone.css?v=5.9.3">
 <script src="siman-phone.js?v=5.9.3" defer></script>
 <script src="a11y.js?v=5.9.3" defer></script>
-<script src="siman-voice.js?v=5.9.6" defer></script>
+<script src="siman-voice.js?v=6.4.1" defer></script>
 <script src="siman-back.js?v=5.9.3" defer></script>
 <!-- 5.9.3: one design for everyone (the ?beta=1 shell and the classic design were removed) -->
 <link rel="stylesheet" href="siman-v7.css?v=5.9.6">
@@ -5714,9 +5718,10 @@ if('launchQueue' in window){
 <script src="siman-scan.js?v=5.9.6" defer></script>
 <script src="siman-merge.js?v=5.9.6" defer></script>
 <script src="siman-ux.js?v=5.9.5" defer></script>
-<script src="siman-fill.js?v=6.3" defer></script>
+<script src="siman-fill.js?v=6.4.1" defer></script>
+<script src="siman-convert.js?v=6.4.1" defer></script>
 <script src="siman-pro.js?v=6.3" defer></script>
-<script src="siman-home.js?v=6.3.6" defer></script>
+<script src="siman-home.js?v=6.4.1" defer></script>
 <link rel="stylesheet" href="siman-nb.css?v=5.9.5">
 <script src="siman-nb.js?v=5.9.5" defer></script>
 </body>
