@@ -183,12 +183,99 @@ const SCAN_SCHEMA = {
 const cors = origin => ({
   'Access-Control-Allow-Origin': origin,
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'content-type',
+  'Access-Control-Allow-Headers': 'content-type, x-siman-pass, x-user-key',
   'Access-Control-Max-Age': '86400',
   'Vary': 'Origin',
 });
 const json = (obj, status, origin) => new Response(JSON.stringify(obj), { status, headers: { 'content-type': 'application/json; charset=utf-8', ...cors(origin) } });
 const fail = (msg, status, origin) => json({ error: { message: msg } }, status, origin);
+
+// ===================================================================================================
+// 6.4 GUARD — who may use the Gemini key, and how much. The same block is in siman-ai, siman-voice and
+// siman-translate. The "Origin" check alone can be faked by any script, so:
+//  1. a pass: the app proves once that a person is using it (Cloudflare Turnstile, free and invisible), and
+//     gets a pass signed with PASS_SECRET for a few hours. Every request to Gemini must carry a valid pass.
+//  2. a fair daily share: requests are counted per device and per internet address (D1, free), so one heavy
+//     user (or someone abusing the service) cannot use up the free Gemini quota for everybody.
+//  3. a personal key: a person who added their own free Gemini key in the app's settings uses it here
+//     (sent in "x-user-key", used for this request only, never stored or logged) and has no daily share.
+// Setup (Settings → Variables and Secrets / Bindings):
+//   PASS_SECRET       Secret — the same long random text in all three workers
+//   TURNSTILE_SECRET  Secret — siman-ai only (it gives out the passes)
+//   DB                D1 binding → the siman-stats database (the counters live in their own table)
+//   LIMIT_DEVICE / LIMIT_IP / LIMIT_ALL   optional plain-text variables: units per day (defaults below; 0 = no limit)
+// While PASS_SECRET is not set, nothing changes (the worker answers as before), so the code can be pasted first.
+// ===================================================================================================
+const GUARD_HOSTS = ['lial-apps.github.io', 'siman.siman-app.workers.dev'];   // where the Turnstile check may come from
+const PASS_TTL = 6 * 3600;                                                     // a pass lasts 6 hours
+const LIMITS = { device: 40, ip: 100, all: 0, pass: 25 };                      // per day (UTC); pass = new passes per address
+const USER_KEY_RE = /^(AIza[\w-]{30,60}|AQ\.[\w.-]{20,200})$/;
+const DAY_MSG = 'הגעת למכסה היומית של השירותים החכמים בסימן (הסיכום, התרגום והקריאה החכמה). הכלים שבמכשיר ממשיכים לעבוד כרגיל. אפשר להמשיך מחר, או להוסיף בהגדרות מפתח Gemini אישי בחינם ולהמשיך בלי הגבלה.';
+const ALL_MSG = 'השירות החכם של סימן הגיע היום למכסה הכוללת שלו. אפשר לנסות שוב מחר, או להוסיף בהגדרות מפתח Gemini אישי בחינם ולהמשיך מיד.';
+const PASS_MSG = 'לא הצלחנו לאמת את המכשיר. רעננו את סימן ונסו שוב (אם יש חוסם פרסומות, ייתכן שהוא חוסם את challenges.cloudflare.com).';
+const b64u = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const sameText = (a, b) => { a = String(a || ''); b = String(b || ''); if (!a || a.length !== b.length) return false; let d = 0; for (let i = 0; i < a.length; i++) d |= a.charCodeAt(i) ^ b.charCodeAt(i); return d === 0; };
+const hmacKeys = new Map();
+async function sign(secret, text) {
+  let k = hmacKeys.get(secret);
+  if (!k) { k = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']); hmacKeys.set(secret, k); }
+  return b64u(await crypto.subtle.sign('HMAC', k, new TextEncoder().encode(text)));
+}
+// pass = <device>.<expires, unix seconds>.<signature>
+async function makePass(env, dev) { const p = `${dev}.${Math.floor(Date.now() / 1000) + PASS_TTL}`; return { pass: `${p}.${await sign(env.PASS_SECRET, p)}`, ttl: PASS_TTL }; }
+async function readPass(env, pass) {
+  const m = /^([a-z0-9]{16,40})\.(\d{9,11})\.([\w-]{40,50})$/.exec(String(pass || ''));
+  if (!m || +m[2] < Date.now() / 1000) return null;
+  return sameText(m[3], await sign(env.PASS_SECRET, `${m[1]}.${m[2]}`)) ? m[1] : null;
+}
+const limitOf = (env, name) => { const v = env['LIMIT_' + name.toUpperCase()]; return v != null && v !== '' && Number.isFinite(+v) ? +v : LIMITS[name]; };
+let usageReady = null;
+// adds w to each counter of today and returns the new totals; null = no database (no limits)
+async function addUsage(env, keys, w) {
+  if (!env.DB) return null;
+  if (!usageReady) usageReady = env.DB.prepare('CREATE TABLE IF NOT EXISTS ai_usage (day TEXT NOT NULL, k TEXT NOT NULL, n INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (day, k))').run()
+    .then(() => env.DB.prepare('DELETE FROM ai_usage WHERE day < ?').bind(new Date(Date.now() - 3 * 864e5).toISOString().slice(0, 10)).run())
+    .catch(e => { usageReady = null; throw e; });
+  await usageReady;
+  const day = new Date().toISOString().slice(0, 10);
+  const st = env.DB.prepare('INSERT INTO ai_usage (day, k, n) VALUES (?, ?, ?) ON CONFLICT (day, k) DO UPDATE SET n = n + excluded.n RETURNING n');
+  const out = await env.DB.batch(keys.map(k => st.bind(day, k, w)));
+  return out.map(r => (r.results && r.results[0] && r.results[0].n) || 0);
+}
+const clientIp = req => req.headers.get('CF-Connecting-IP') || 'unknown';
+const guardFail = (status, code, message) => ({ ok: false, status, body: { error: { message, code, status, ...(code === 'DAY' || code === 'ALL' ? { quota: 'per day' } : {}) } } });
+// → { ok: true, env } (env.GEMINI_KEY may be the person's own key) or { ok: false, status, body }
+async function guard(req, env, weight = 1) {
+  if (!env.PASS_SECRET) return { ok: true, env };                    // not set up yet: as before
+  const dev = await readPass(env, req.headers.get('x-siman-pass'));
+  if (!dev) return guardFail(401, 'PASS', PASS_MSG);
+  const own = String(req.headers.get('x-user-key') || '').trim();
+  if (USER_KEY_RE.test(own)) return { ok: true, env: { ...env, GEMINI_KEY: own }, own: true };
+  let n;
+  try { n = await addUsage(env, ['d:' + dev, 'i:' + clientIp(req), 'all'], weight); } catch (_) { n = null; }   // a database hiccup does not stop the app
+  if (n) {
+    const [d, i, all] = n, ld = limitOf(env, 'device'), li = limitOf(env, 'ip'), la = limitOf(env, 'all');
+    if (la && all > la) return guardFail(429, 'ALL', ALL_MSG);
+    if ((ld && d > ld) || (li && i > li)) return guardFail(429, 'DAY', DAY_MSG);
+  }
+  return { ok: true, env };
+}
+// POST /pass {t: Turnstile token, dev} → {pass, ttl}   (siman-ai only)
+async function givePass(req, env) {
+  if (!env.PASS_SECRET || !env.TURNSTILE_SECRET) return { status: 503, body: { error: { message: 'pass not set up', code: 'NOPASS' } } };
+  let b; try { b = await req.json(); } catch (_) { b = null; }
+  const dev = String(b && b.dev || ''), t = String(b && b.t || '');
+  if (!/^[a-z0-9]{16,40}$/.test(dev) || !t || t.length > 2048) return { status: 400, body: { error: { message: 'bad request', code: 'PASS' } } };
+  try { const n = await addUsage(env, ['p:' + clientIp(req)], 1); if (n && limitOf(env, 'pass') && n[0] > limitOf(env, 'pass')) return guardFail(429, 'PASSDAY', PASS_MSG); } catch (_) {}
+  const form = new FormData(); form.append('secret', env.TURNSTILE_SECRET); form.append('response', t); form.append('remoteip', clientIp(req));
+  let v = {};
+  try { v = await (await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', { method: 'POST', body: form })).json(); } catch (_) {}
+  if (!v.success || !GUARD_HOSTS.includes(v.hostname)) return { status: 401, body: { error: { message: PASS_MSG, code: 'PASS', why: v['error-codes'] || [] } } };
+  return { status: 200, body: await makePass(env, dev) };
+}
+// how many units a request costs (a careful reading of a page asks Gemini two or three times)
+const WEIGHT = { scanAccurate: 3, lines: 2, table: 2, tableCheck: 1, linesCheck: 1 };
+// ======================================== end of the guard ========================================
 
 function build(body) {
   const mode = body.mode;
@@ -334,6 +421,7 @@ export default {
     if (req.method === 'OPTIONS') return new Response(null, { status: okOrigin ? 204 : 403, headers: okOrigin ? cors(origin) : {} });
     if (!okOrigin) return new Response(JSON.stringify({ error: { message: 'origin not allowed' } }), { status: 403, headers: { 'content-type': 'application/json' } });
     if (req.method !== 'POST') return fail('POST only', 405, origin);
+    if (new URL(req.url).pathname === '/pass') { const p = await givePass(req, env); return json(p.body, p.status, origin); }
     if (!env.GEMINI_KEY) return fail('GEMINI_KEY is not set on the worker', 500, origin);
 
     let body;
@@ -341,6 +429,10 @@ export default {
     const g = build(body || {});
     if (g.err) return fail(g.err, 400, origin);
     const mode = body.mode === 'scan' && body.quality !== 'fast' ? 'scanAccurate' : body.mode === 'lines' && body.quality === 'fast' ? 'linesFast' : body.mode;
+    // 6.4: a pass, and a fair daily share (or the person's own key)
+    const gd = await guard(req, env, WEIGHT[mode] || 1);
+    if (!gd.ok) return json(gd.body, gd.status, origin);
+    env = gd.env;
 
     const deadline = Date.now() + (BUDGET[mode] || 85000);
     if (!STREAM_MODES.includes(mode)) {
