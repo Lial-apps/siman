@@ -1353,7 +1353,7 @@ body:has(#wed) .busy,body:has(#xed) .busy,body:has(#ped) .busy{z-index:1000}body
 </dialog>
 
 <header class="bar">
-  <div class="brand"><b title="גרסה 6.4.2">סימן</b><span class="ver">6.4.2</span><span class="fname" id="fname"></span></div>
+  <div class="brand"><b title="גרסה 6.5.0">סימן</b><span class="ver">6.5.0</span><span class="fname" id="fname"></span></div>
 
   <nav class="tools" id="tools" aria-label="כלים">
     <button class="tool" data-tool="select" aria-pressed="true" title="בחירה וגלילה (V)">
@@ -4164,6 +4164,7 @@ const loadEditLibs=k=>editLibs[k]||(editLibs[k]=(async()=>{
   if(!window.html2canvas)await loadScript('html2canvas.min.js');
   if(k==='docx'&&!window.docx)await loadScript('docx-preview.min.js');
   if(k==='xlsx'&&!window.XLSX)await loadScript('xlsx.mini.min.js');
+  if(k==='xlsx'&&!window.XL_CHARTS)await loadScript('xl-charts.js?v=6.5.0');
   if(k==='pptx'){if(!window.PptxGenJS)await loadScript('pptxgen.min.js');if(!window.PPTX_EDITOR)await loadScript('ppt-editor.js');}
   if(!window.OFFICE_EDIT)await loadScript('office-edit.js');
 })().catch(e=>{editLibs[k]=null;throw e;}));

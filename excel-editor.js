@@ -567,6 +567,12 @@ const FMTS=[['General','כללי'],['#,##0.00','מספר'],['[$₪-40D] #,##0.00
 
 /* ------------------------------------------------------------ the editor screen */
 const ICO={
+  chart:'<path d="M3 17h14"/><rect x="4.5" y="9" width="2.6" height="8"/><rect x="8.7" y="5" width="2.6" height="12"/><rect x="12.9" y="11" width="2.6" height="6"/>',
+  cBar:'<path d="M3 3v14"/><rect x="3" y="4.5" width="9" height="2.6"/><rect x="3" y="8.7" width="13" height="2.6"/><rect x="3" y="12.9" width="6" height="2.6"/>',
+  cLine:'<path d="M3 17h14"/><path d="M3.5 13l4-4 3 2.5 6-6"/>',
+  cArea:'<path d="M3 17h14"/><path d="M3 16v-4l4-4 3 3 7-6v11z" fill="currentColor" fill-opacity=".25"/>',
+  cPie:'<circle cx="10" cy="10" r="7"/><path d="M10 3v7h7"/>',
+  cDonut:'<circle cx="10" cy="10" r="7"/><circle cx="10" cy="10" r="3"/><path d="M10 3v4M16.5 12l-3.7-1"/>',
   fx:'<path d="M8.5 16c1.6 0 2-1.4 2.3-3l1.2-6.5c.3-1.6.8-3 2.5-3"/><path d="M7.5 8h6"/><path d="M12.5 11l4 5M16.5 11l-4 5" stroke-width="1.5"/>',
   fshow:'<rect x="2.5" y="4" width="15" height="12" rx="1.5"/><path d="M5.5 10.5h2.5M5.5 8h2.5"/><path d="M11 7.5c-.7 0-1 .5-1.1 1.2l-.5 3.6c-.1.7-.5 1.2-1.1 1.2M9 9.5h3"/>',
   fnmath:'<path d="M4 6h5M6.5 3.5v5M11.5 6h5M4 13.5l4 4M8 13.5l-4 4M11.5 14h5M11.5 17h5"/>',
@@ -635,6 +641,9 @@ function ribbonHtml(){return `
  ${G('תאים',`<div class="row">${B('rowIns',ic('rowIns'),'הוספת שורה מעל')}${B('colIns',ic('colIns'),'הוספת עמודה לפני')}</div><div class="row">${B('rowDel',ic('rowDel'),'מחיקת שורות')}${B('colDel',ic('colDel'),'מחיקת עמודות')}</div>`)}
  ${G('עריכה',BL('sum','sum','סכום','סכום אוטומטי (Alt+=)')+`<div class="col">${B('sortAZ',ic('sortAZ'),'מיון מהקטן לגדול')}${B('sortZA',ic('sortZA'),'מיון מהגדול לקטן')}${B('clear',ic('clear'),'ניקוי העיצוב')}</div>`+BL('find','find','חיפוש','חיפוש (Ctrl+F)'))}
 </div>
+<div class="xpanel" data-panel="insert" hidden>
+ ${G('תרשימים',BL('chart','chart','תרשים','הוספת תרשים מהנתונים המסומנים')+CH_TYPES.map(t=>BL('chart_'+t[0],t[2],t[1],'תרשים '+t[1]+' מהנתונים המסומנים')).join(''))}
+</div>
 <div class="xpanel" data-panel="formulas" hidden>
  ${G('ספריית פונקציות',BL('fnInsert','fx','הוספת פונקציה','חיפוש ובחירה של פונקציה','data-pop="fn-all"')+BL('sumMenu','sum','סכום אוטומטי','סכום, ממוצע, ספירה, מקסימום ומינימום','data-pop="fn-auto"')+FN_CATS.map(c=>BL('fnCat','fn'+c[0],c[1],c[1],`data-pop="fn-${c[0]}"`)).join(''))}
  ${G('ביקורת נוסחאות',BL('formulas','fshow','הצגת נוסחאות','הצגת הנוסחאות בתאים במקום התוצאות','data-toggle'))}
@@ -667,7 +676,7 @@ function shellHtml(){return `
   <button type="button" class="xe-tb pri" id="xeSave" title="שמירה כקובץ Excel (Ctrl+S)">שמירה</button>
   <button type="button" class="xe-x" id="xeClose" aria-label="סגירת העורך" title="סגירה">×</button>
 </div>
-<div class="xe-tabs" role="tablist"><button type="button" role="tab" data-tab="home" aria-selected="true">בית</button><button type="button" role="tab" data-tab="formulas" aria-selected="false">נוסחאות</button><button type="button" role="tab" data-tab="data" aria-selected="false">נתונים</button><button type="button" role="tab" data-tab="layout" aria-selected="false">פריסה</button><button type="button" role="tab" data-tab="view" aria-selected="false">תצוגה</button></div>
+<div class="xe-tabs" role="tablist"><button type="button" role="tab" data-tab="home" aria-selected="true">בית</button><button type="button" role="tab" data-tab="insert" aria-selected="false">הוספה</button><button type="button" role="tab" data-tab="formulas" aria-selected="false">נוסחאות</button><button type="button" role="tab" data-tab="data" aria-selected="false">נתונים</button><button type="button" role="tab" data-tab="layout" aria-selected="false">פריסה</button><button type="button" role="tab" data-tab="view" aria-selected="false">תצוגה</button></div>
 <div class="xe-ribbon" id="xeRibbon">${ribbonHtml()}</div>
 <div class="xe-fbar"><input id="xeRef" class="xe-ref" aria-label="כתובת התא" dir="ltr" spellcheck="false"><span class="xe-fx">fx</span><input id="xeFx" class="xe-fxin" aria-label="תוכן התא" dir="auto" spellcheck="false" autocomplete="off"></div>
 <div class="xe-wrap" id="xeWrap" tabindex="0" aria-label="תאי הגיליון"><table class="xe-grid" id="xeGrid"></table><textarea class="xe-edit" id="xeEdit" hidden spellcheck="false" aria-label="עריכת תא"></textarea></div>
@@ -723,6 +732,30 @@ const CSS=`
 #xed .xe-wrap{flex:1;overflow:auto;position:relative;outline:none;background:#fff;overscroll-behavior:contain}
 #xed .xe-pics{position:absolute;overflow:hidden;pointer-events:none;z-index:6}
 #xed .xe-pics img{position:absolute;max-width:none}
+#xed .xe-chart{position:absolute;pointer-events:auto;cursor:pointer;user-select:none;touch-action:none}
+#xed .xe-chart>svg{display:block}
+#xed .xe-chart.on{cursor:move;outline:2px solid #217346;outline-offset:1px}
+#xed .xe-ch-bar{position:absolute;top:6px;inset-inline-end:6px;display:flex;gap:6px}
+#xed .xe-ch-bar button{font:inherit;font-size:12.5px;border:1px solid #CBD3DF;background:#fff;border-radius:7px;padding:4px 10px;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.12)}
+#xed .xe-ch-bar button:hover{background:#E8F3EC;border-color:#217346}
+#xed .xe-ch-bar button[data-chact=del]:hover{background:#FDECEC;border-color:#C42B1C;color:#C42B1C}
+#xed .xe-ch-rs{position:absolute;bottom:-6px;width:12px;height:12px;background:#fff;border:2px solid #217346;border-radius:3px;cursor:nwse-resize}
+#xed .xe-dlg-in.xch{width:min(760px,96vw)}
+#xed .xch-types{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+#xed .xch-ty{display:flex;flex-direction:column;align-items:center;gap:3px;min-width:74px;padding:7px 6px;border:1px solid #CBD3DF;border-radius:10px;background:#fff;font:inherit;font-size:12.5px;cursor:pointer;color:#16213A}
+#xed .xch-ty svg{width:24px;height:24px}
+#xed .xch-ty[aria-checked=true]{border-color:#217346;background:#E8F3EC;box-shadow:inset 0 0 0 1px #217346}
+#xed .xch-body{display:grid;grid-template-columns:minmax(0,1fr) 250px;gap:14px;align-items:start}
+#xed .xch-prev{border-radius:8px;overflow:hidden;background:#F5F7FA;min-height:150px}
+#xed .xch-prev svg{display:block;width:100%;height:auto}
+#xed .xch-opts{display:flex;flex-direction:column;gap:7px;font-size:13px}
+#xed .xch-opts .fl{display:flex;flex-direction:column;gap:3px;color:#5D6982}
+#xed .xch-opts input:not([type]),#xed .xch-opts input[dir],#xed .xch-opts select{height:32px;border:1px solid #CBD3DF;border-radius:8px;padding:0 9px;font:inherit;color:#16213A;background:#fff}
+#xed .xch-opts .ck{display:flex;align-items:center;gap:6px;cursor:pointer}
+#xed .xch-ser{display:flex;flex-direction:column;gap:4px;max-height:150px;overflow:auto;border-top:1px solid #EDF0F4;padding-top:6px}
+#xed .xch-ser .t{color:#5D6982;font-size:12px}#xed .xch-ser .t.warn{color:#C42B1C}
+#xed .xch-ser .sw{width:11px;height:11px;border-radius:2px;flex:none}
+@media (max-width:640px){#xed .xch-body{grid-template-columns:1fr}}
 @media print{#xed .xe-pics{display:none}}
 #xed .xe-grid{border-collapse:collapse;table-layout:fixed;font:11pt Arial,sans-serif;color:#000;width:max-content}
 #xed .xe-grid td{height:20px;padding:0 3px;border:1px solid #E1E5EA;white-space:nowrap;overflow:visible;vertical-align:bottom;position:relative;cursor:cell;line-height:1.2}
@@ -1370,7 +1403,7 @@ function buildTabs(){
   X.st.sheets.forEach((sh,i)=>{if(sh.hidden)return;const b=document.createElement('button');b.type='button';b.textContent=sh.name;b.className=i===X.si?'on':'';b.onclick=()=>switchSheet(i);box.append(b);});
   const add=document.createElement('button');add.type='button';add.className='add';add.title='גיליון חדש';add.setAttribute('aria-label','גיליון חדש');add.textContent='+';add.onclick=addSheet;box.append(add);
 }
-function switchSheet(i){commitEdit();X.si=i;X.sel={r1:0,c1:0,r2:0,c2:0};X.act={r:0,c:0};q('xeWrap').scrollTop=0;q('xeWrap').scrollLeft=0;buildTabs();render();q('xeWrap').focus({preventScroll:true});}
+function switchSheet(i){commitEdit();X.si=i;X.chartSel=null;X.sel={r1:0,c1:0,r2:0,c2:0};X.act={r:0,c:0};q('xeWrap').scrollTop=0;q('xeWrap').scrollLeft=0;buildTabs();render();q('xeWrap').focus({preventScroll:true});}
 function addSheet(){
   const st=X.st;let n=st.sheets.length+1;const base=st.heb?'גיליון':'Sheet';while(st.sheets.some(s=>s.name===base+n))n++;
   let k=1;while(st.files.has(`xl/worksheets/sheet${k}.xml`))k++;const path=`xl/worksheets/sheet${k}.xml`;
@@ -1385,6 +1418,8 @@ function addSheet(){
 /* ---------- commands ---------- */
 const CMD={
   undo,redo,
+  chart:()=>chartDialog(),chart_col:()=>{X.chartType='col';chartDialog();},chart_bar:()=>{X.chartType='bar';chartDialog();},chart_line:()=>{X.chartType='line';chartDialog();},
+  chart_area:()=>{X.chartType='area';chartDialog();},chart_pie:()=>{X.chartType='pie';chartDialog();},chart_doughnut:()=>{X.chartType='doughnut';chartDialog();},
   copy:()=>{const t=doCopy(false);navigator.clipboard&&navigator.clipboard.writeText(t).catch(()=>{});hint('הועתק');},
   cut:()=>{const t=doCopy(true);navigator.clipboard&&navigator.clipboard.writeText(t).catch(()=>{});},
   paste:async()=>{try{const t=await navigator.clipboard.readText();if(t)doPaste(t);}catch(_){hint('הדבקה: Ctrl+V');}},
@@ -1484,6 +1519,7 @@ function wire(){
       else if(th.dataset.row!==undefined){const r=+th.dataset.row;if(e.shiftKey){X.sel={c1:0,c2:Math.max(sh.maxC,0),r1:Math.min(X.anchor.r,r),r2:Math.max(X.anchor.r,r)};}else{X.act={r,c:0};X.anchor={r,c:0};X.sel={r1:r,r2:r,c1:0,c2:Math.max(sh.maxC,0)};}}
       wrap.focus({preventScroll:true});paintSel();return;}
     const p=cellFromEvent(e);if(!p)return;e.preventDefault();
+    if(X.chartSel!=null){X.chartSel=null;paintPics();}
     if(X.editing){if(X.editing.r===p.r&&X.editing.c===p.c)return;commitEdit();}
     wrap.focus({preventScroll:true});if(e.shiftKey)select(p.r,p.c,true);else select(p.r,p.c);drag=true;
   });
@@ -1566,6 +1602,10 @@ function onKey(e){
     if(c==='KeyC'||c==='KeyX'||c==='KeyV')return;
     return;
   }
+  if(X.chartSel!=null&&!['Shift','Control','Alt','Meta'].includes(k)){
+    if(k==='Delete'||k==='Backspace')return run(deleteChart,X.chartSel);
+    if(k==='Enter')return run(chartDialog,X.chartSel);
+    X.chartSel=null;paintPics();if(k==='Escape'){e.preventDefault();return;}}
   if(e.altKey&&(c==='Equal'))return run(autoSum);
   if(e.altKey&&k==='ArrowDown'){e.preventDefault();if(dvOpen(q('xeGrid').querySelector('.xdd')))return;const F=filterOf(cur());if(F&&X.act.r===F.r1&&X.act.c>=F.c1&&X.act.c<=F.c2){const b=q('xeGrid').querySelector(`.xfb[data-fc="${X.act.c}"]`);if(b)filterMenu(X.act.c,b);}return;}
   if(e.shiftKey&&c==='Space'&&!e.ctrlKey&&!e.metaKey){e.preventDefault();const sh=cur();X.sel={r1:X.sel.r1,r2:X.sel.r2,c1:0,c2:Math.max(sh.maxC,0)};paintSel();return;}
@@ -1651,7 +1691,7 @@ function ctxMenu(e){
   const p=cellFromEvent(e);if(!p)return;e.preventDefault();commitEdit();
   const s=X.sel;if(!(p.r>=s.r1&&p.r<=s.r2&&p.c>=s.c1&&p.c<=s.c2))select(p.r,p.c);
   const items=[['cut','גזירה','Ctrl+X'],['copy','העתקה','Ctrl+C'],['paste','הדבקה','Ctrl+V'],'-',['rowIns','הוספת שורה מעל'],['colIns','הוספת עמודה לפני'],['rowDel','מחיקת שורות'],['colDel','מחיקת עמודות'],'-',
-    ['clearVal','ניקוי התוכן','Delete'],['clear','ניקוי העיצוב'],'-',['sortAZ','מיון מהקטן לגדול'],['sortZA','מיון מהגדול לקטן'],'-',['merge',mergeAt(cur(),X.act.r,X.act.c)?'ביטול המיזוג':'מיזוג ומרכוז'],['freezeHere','הקפאה עד כאן'],'-',['filter',filterOf(cur())?'הסרת הסינון':'סינון'],['dv','אימות נתונים…']];
+    ['clearVal','ניקוי התוכן','Delete'],['clear','ניקוי העיצוב'],'-',['sortAZ','מיון מהקטן לגדול'],['sortZA','מיון מהגדול לקטן'],'-',['merge',mergeAt(cur(),X.act.r,X.act.c)?'ביטול המיזוג':'מיזוג ומרכוז'],['freezeHere','הקפאה עד כאן'],'-',['filter',filterOf(cur())?'הסרת הסינון':'סינון'],['dv','אימות נתונים…'],'-',['chart','הוספת תרשים…']];
   const html=items.map(it=>it==='-'?'<div class="sep"></div>':`<button type="button" class="mi" data-v="${it[0]}">${it[1]}${it[2]?`<small style="margin-inline-start:auto;color:#5D6982" dir="ltr">${it[2]}</small>`:''}</button>`).join('');
   const anchor={getBoundingClientRect:()=>({left:e.clientX,right:e.clientX,top:e.clientY,bottom:e.clientY}),contains:()=>false};
   const pp=pop(anchor,html,v=>{if(v==='clearVal')return clearCells();if(v==='freezeHere'){const sh=cur();sh.freeze=X.act.r||X.act.c?{r:X.act.r,c:X.act.c}:null;sh.viewDirty=true;touch();render();return;}const f=CMD[v];if(f)f();});
@@ -2237,6 +2277,7 @@ function cellXml(c,si,pfx,ctx){
 }
 async function buildXlsx(){
   if(X.editing)commitEdit();
+  try{flushCharts();}catch(e){console.error('charts',e);}
   const st=X.st,files=new Map(st.files);const sst=st.sst;
   const newStrs=[];const strIdx=new Map();
   const ctx={addStr:s=>{if(strIdx.has(s))return strIdx.get(s);const i=sst.list.length+newStrs.length;newStrs.push(s);strIdx.set(s,i);return i;}};
@@ -2313,11 +2354,14 @@ function readPics(files,path,sh){
       sh.pics.push({from,to,w,h,abs:absPos?{x:(+absPos.getAttribute('x')||0)/9525,y:(+absPos.getAttribute('y')||0)/9525}:null,url:URL.createObjectURL(new Blob([b],{type:mime}))});
     }
   }catch(e){console.warn('pictures',e);}
+  readCharts(files,path,sh);
 }
 function paintPics(){
   let layer=q('xePics');const sh=cur();
-  if(!sh.pics||!sh.pics.length){if(layer)layer.innerHTML='';return;}
-  if(!layer){layer=document.createElement('div');layer.id='xePics';layer.className='xe-pics';X.root.append(layer);}
+  const charts=(sh.charts||[]).filter(c=>!c.del);
+  if(!(sh.pics&&sh.pics.length)&&!charts.length){if(layer)layer.innerHTML='';return;}
+  if(!layer){layer=document.createElement('div');layer.id='xePics';layer.className='xe-pics';X.root.append(layer);wireCharts(layer);}
+  if(X.chartDrag)return;
   const wrap=q('xeWrap'),grid=q('xeGrid'),z=X.zoom,R=X.root.getBoundingClientRect(),W=wrap.getBoundingClientRect(),g=sh.g;
   const head=grid.querySelector('thead');const hb=head?head.getBoundingClientRect().bottom:W.top;
   const lead=grid.querySelector('thead th.corner');const lb=lead?lead.getBoundingClientRect():null;
@@ -2325,10 +2369,13 @@ function paintPics(){
   const clipT=Math.max(W.top,hb),clipL=W.left+(lb&&!sh.rtl?lb.width:0),clipR=W.right-(lb&&sh.rtl?lb.width:0);
   Object.assign(layer.style,{left:(clipL-R.left)+'px',top:(clipT-R.top)+'px',width:Math.max(0,Math.min(clipR,W.left+wrap.clientWidth)-clipL)+'px',height:Math.max(0,W.top+wrap.clientHeight-clipT)+'px'});
   // where a cell starts on screen, worked out from a cell that is drawn (rows far away are not)
-  const anyTd=grid.querySelector('tbody td[data-r]');if(!anyTd){layer.innerHTML='';return;}
+  // (a cell that scrolls: frozen rows and columns stay put)
+  const anyTd=grid.querySelector('tbody tr:not(.fzr) td[data-r]:not(.fz)')||grid.querySelector('tbody td[data-r]');if(!anyTd){layer.innerHTML='';return;}
   const ar=+anyTd.dataset.r,ac=+anyTd.dataset.c,tb=anyTd.getBoundingClientRect();
   const colX=c=>{let x=0;const a=Math.min(c,ac),b=Math.max(c,ac);for(let i=a;i<b;i++)x+=(g.cw[i]||0);return(c>=ac?x:-x)*z;};
-  const cellX=(c,off)=>sh.rtl?tb.right-colX(c)-off*z:tb.left+colX(c)+off*z;
+  // columns can come out wider on screen than their saved width, so the heading of the column is the real place
+  const cellX=(c,off)=>{const th=grid.querySelector(`thead th[data-col="${c}"]`);if(th){const b=th.getBoundingClientRect();return sh.rtl?b.right-off*z:b.left+off*z;}
+    return sh.rtl?tb.right-colX(c)-off*z:tb.left+colX(c)+off*z;};
   const cellY=(r,off)=>tb.top+((g.top[r]||0)-(g.top[ar]||0)+off)*z;
   let h='';
   for(const p of sh.pics){
@@ -2340,7 +2387,275 @@ function paintPics(){
     if(sh.rtl)x-=w*z;
     h+=`<img src="${p.url}" alt="" draggable="false" style="left:${x-clipL}px;top:${y-clipT}px;width:${w*z}px;height:${hh*z}px">`;
   }
+  // charts: drawn from the cells, so they follow every change
+  (sh.charts||[]).forEach((c,i)=>{
+    if(c.del||!c.from||!c.to)return;
+    const x=cellX(c.from.c,c.from.co),y=cellY(c.from.r,c.from.ro),x2=cellX(c.to.c,c.to.co),y2=cellY(c.to.r,c.to.ro);
+    const w=Math.max(40,Math.abs(x2-x)/z),hh=Math.max(30,Math.abs(y2-y)/z);const L=Math.min(x,x2);
+    let pic='';try{pic=XL_CHARTS.svg(c.model,w,hh,chartCells,{pxW:w*z,pxH:hh*z,acc:chAcc()});}catch(e){console.warn('chart',e);}
+    const on=X.chartSel===i;
+    h+=`<div class="xe-chart${on?' on':''}" data-ch="${i}" title="${on?'גוררים כדי להזיז · לחיצה כפולה לעריכה':'לחיצה לבחירת התרשים'}" style="left:${L-clipL}px;top:${y-clipT}px;width:${w*z}px;height:${hh*z}px">${pic}${on?`<div class="xe-ch-bar"><button type="button" data-chact="edit">עריכת התרשים</button><button type="button" data-chact="del">מחיקה</button></div><i class="xe-ch-rs" title="שינוי גודל" style="${sh.rtl?"left:-6px;cursor:nesw-resize":"right:-6px;cursor:nwse-resize"}"></i>`:''}</div>`;
+  });
   layer.innerHTML=h;
+}
+/* ------------------------------------------------------------ charts (xl-charts.js draws and writes them)
+   The file's charts are shown over the cells like in Excel, and can be moved, resized, edited or deleted.
+   New charts are made from the selected cells ("הוספה" › "תרשים"). Charts no one touched stay in the file exactly as they were. */
+const accOf=new WeakMap();
+const DEF_ACC=['4472C4','ED7D31','A5A5A5','FFC000','5B9BD5','70AD47'];
+const chAcc=()=>X.st.acc||(X.st.acc=accOf.get(X.st.files)||(window.XL_CHARTS?XL_CHARTS.accents(p=>txt(X.st.files,p)):DEF_ACC));
+function readCharts(files,path,sh){
+  sh.charts=[];if(!window.XL_CHARTS)return;
+  try{
+    const get=p=>txt(files,p);let acc=accOf.get(files);if(!acc){acc=XL_CHARTS.accents(get);accOf.set(files,acc);}
+    const r=XL_CHARTS.readSheet(get,path,ser(sh.doc),acc);
+    sh.drawPath=r.drawPath;sh.drawDoc=r.drawDoc;
+    if(!r.charts.length)return;
+    const g=geo(sh);
+    for(const c of r.charts){
+      // every chart gets a start cell and an end cell, also when the file gave a size instead
+      if(!c.from&&c.abs)c.from=cellOfPx(sh,g,c.abs.x,c.abs.y);
+      if(!c.from)continue;
+      if(!c.to&&c.ext){const p=pxOfCell(sh,g,c.from);c.to=cellOfPx(sh,g,p.x+c.ext.w,p.y+c.ext.h);}
+      if(!c.to)continue;
+      sh.charts.push(c);
+    }
+  }catch(e){console.warn('charts',e);}
+}
+const colStartPx=(sh,g,c)=>{let x=0;for(let i=0;i<c;i++)x+=i<g.cw.length?g.cw[i]:colPx(sh,i);return x;};
+function pxOfCell(sh,g,p){let y;if(p.r<g.top.length)y=g.top[p.r];else{y=g.top[g.top.length-1];for(let r=g.top.length-1;r<p.r;r++)y+=rowPx(sh,r);}return{x:colStartPx(sh,g,p.c)+p.co,y:y+p.ro};}
+function cellOfPx(sh,g,x,y){
+  x=Math.max(0,x);y=Math.max(0,y);let c=0,acc=0;
+  for(;c<16383;c++){const w=c<g.cw.length?g.cw[c]:colPx(sh,c);if(acc+w>x)break;acc+=w;}
+  let r=0,top=0;for(;r<1048575;r++){const hh=r+1<g.top.length?g.top[r+1]-g.top[r]:rowPx(sh,r);if(top+hh>y)break;top+=hh;}
+  return{c,co:Math.max(0,x-acc),r,ro:Math.max(0,y-top)};
+}
+// the cells a chart reference points to, as {v, w}: the value and the text shown in the cell. Hidden rows are left out, like in Excel
+function chartCells(f){
+  const R=XL_CHARTS.splitRef(f);if(!R)return null;
+  const si=X.st.sheets.findIndex(s=>s.name===R.sheet);if(si<0)return null;
+  if((R.r2-R.r1+1)*(R.c2-R.c1+1)>20000)return null;
+  const sh=X.st.sheets[si],out=[],line=R.r1===R.r2||R.c1===R.c2;
+  for(let r=R.r1;r<=R.r2;r++)for(let c=R.c1;c<=R.c2;c++){
+    if(line&&((sh.rows.get(r)||{}).hidden||(sh.cols.get(c)||{}).hidden))continue;
+    const cell=cellAt(sh,r,c);if(!cell){out.push({v:null,w:''});continue;}
+    let v=cell.f&&!cell.array?valueOf(si,r,c):(cell.t==='e'?null:cell.v);if(isErr(v))v=null;
+    const d=display(si,cell,r,c);out.push({v:v===''?null:v,w:d.err?'':d.t});
+  }
+  return out;
+}
+function wireCharts(layer){
+  layer.addEventListener('wheel',e=>{q('xeWrap').scrollBy(e.deltaX,e.deltaY);},{passive:true});
+  layer.addEventListener('dblclick',e=>{const el=e.target.closest('.xe-chart');if(el&&!e.target.closest('[data-chact]'))chartDialog(+el.dataset.ch);});
+  layer.addEventListener('contextmenu',e=>{if(e.target.closest('.xe-chart'))e.preventDefault();});
+  layer.addEventListener('pointerdown',e=>{
+    const el=e.target.closest('.xe-chart');if(!el||e.button!==0)return;
+    e.preventDefault();e.stopPropagation();commitEdit();closePop();
+    const sh=cur(),i=+el.dataset.ch,c=sh.charts[i];if(!c)return;
+    const act=e.target.closest('[data-chact]');
+    if(act){if(act.dataset.chact==='del')deleteChart(i);else chartDialog(i);return;}
+    if(X.chartSel!==i){X.chartSel=i;paintPics();}
+    q('xeWrap').focus({preventScroll:true});
+    const box=layer.querySelector(`.xe-chart[data-ch="${i}"]`);if(!box)return;
+    const rs=!!e.target.closest('.xe-ch-rs'),x0=e.clientX,y0=e.clientY,L0=parseFloat(box.style.left),T0=parseFloat(box.style.top),W0=box.offsetWidth,H0=box.offsetHeight,rtl=sh.rtl;
+    let moved=false,dx=0,dy=0;
+    const mv=ev=>{dx=ev.clientX-x0;dy=ev.clientY-y0;if(!moved&&Math.abs(dx)+Math.abs(dy)<4)return;moved=true;X.chartDrag=true;
+      if(rs){const w=Math.max(60,rtl?W0-dx:W0+dx),h=Math.max(40,H0+dy);box.style.width=w+'px';box.style.height=h+'px';if(rtl)box.style.left=(L0+W0-w)+'px';
+        const s=box.querySelector('svg');if(s){s.setAttribute('width',w);s.setAttribute('height',h);s.setAttribute('preserveAspectRatio','none');}}
+      else{box.style.left=(L0+dx)+'px';box.style.top=(T0+dy)+'px';}};
+    const up=()=>{removeEventListener('pointermove',mv);removeEventListener('pointerup',up);removeEventListener('pointercancel',up);X.chartDrag=false;
+      if(moved){const z=X.zoom,g=geo(sh),dc=(rtl?-dx:dx)/z,dr=dy/z;const a=pxOfCell(sh,g,c.from),b=pxOfCell(sh,g,c.to);
+        if(rs)c.to=cellOfPx(sh,g,Math.max(a.x+60/z,b.x+dc),Math.max(a.y+40/z,b.y+dr));
+        else{const sx=Math.max(-a.x,dc),sy=Math.max(-a.y,dr);c.from=cellOfPx(sh,g,a.x+sx,a.y+sy);c.to=cellOfPx(sh,g,b.x+sx,b.y+sy);}
+        c.moved=true;chartsTouched(sh);}
+      paintPics();};
+    addEventListener('pointermove',mv);addEventListener('pointerup',up);addEventListener('pointercancel',up);
+  });
+}
+function chartsTouched(sh){sh.chartsDirty=true;X.dirty=true;markDirty();}
+function deleteChart(i){
+  const sh=cur(),c=sh.charts[i];if(!c)return;
+  c.del=true;X.chartSel=null;chartsTouched(sh);paintPics();hint('התרשים נמחק');
+}
+// a chart made from a block of cells, the way Excel decides: headings, a category column, series by columns or by rows
+function chartCell(si,r,c){const sh=X.st.sheets[si],cell=cellAt(sh,r,c);if(!cell)return{v:null};let v=cell.f&&!cell.array?valueOf(si,r,c):cell.v;if(isErr(v))v=null;
+  const d=descOf(X.st.st,cell.s);return{v:v===''||v===undefined?null:v,date:typeof v==='number'&&isDateFmt(d.fmt),fmt:d.fmt};}
+function chartGuess(g,byRow){
+  const si=X.si,rows=g.r2-g.r1+1,cols=g.c2-g.c1+1;if(byRow===undefined)byRow=cols>rows;
+  const nS=byRow?rows:cols,nP=byRow?cols:rows;const at=(i,j)=>byRow?chartCell(si,g.r1+i,g.c1+j):chartCell(si,g.r1+j,g.c1+i);
+  let hdr=false;if(nP>1){let txt=0,num=0;for(let i=0;i<nS;i++)if(typeof at(i,0).v==='string')txt++;for(let i=0;i<nS;i++)for(let j=1;j<Math.min(nP,40);j++)if(typeof at(i,j).v==='number')num++;hdr=txt>0&&num>0;}
+  let cat=false;if(nS>1){let n=0,d=0,t=0;for(let j=hdr?1:0;j<nP;j++){const x=at(0,j);if(x.v===null)continue;n++;if(x.date)d++;else if(typeof x.v!=='number')t++;}
+    cat=n>0&&(d+t)>=n*.6||hdr&&at(0,0).v===null&&n>0;}
+  return{hdr,cat,byRow};
+}
+function chartSeries(g,o){
+  const si=X.si,sh=cur();const nS=o.byRow?g.r2-g.r1+1:g.c2-g.c1+1,nP=o.byRow?g.c2-g.c1+1:g.r2-g.r1+1;
+  const rc=(i,j)=>o.byRow?[g.r1+i,g.c1+j]:[g.r1+j,g.c1+i];const at=(i,j)=>chartCell(si,...rc(i,j));
+  const j0=o.hdr?1:0,j1=nP-1;if(j1<j0)return{series:[],catFmt:null};
+  const R=i=>{const [ra,ca]=rc(i,j0),[rb,cb]=rc(i,j1);return XL_CHARTS.refText(sh.name,ra,ca,rb,cb);};
+  let catFmt=null;if(o.cat)for(let j=j0;j<=j1;j++){const x=at(0,j);if(x.v!==null){catFmt=x.date?x.fmt:null;break;}}
+  const catRef=o.cat&&nS>1?R(0):null;
+  const series=[];
+  for(let i=catRef?1:0;i<nS;i++){
+    let has=false;for(let j=j0;j<=j1;j++)if(typeof at(i,j).v==='number'){has=true;break;}if(!has)continue;
+    const [rn,cn]=rc(i,0);const nm=o.hdr?display(si,cellAt(sh,rn,cn),rn,cn).t:'';
+    series.push({name:nm||`סדרה ${series.length+1}`,nameRef:o.hdr&&nm?XL_CHARTS.refText(sh.name,rn,cn,rn,cn):null,
+      cat:catRef?{f:catRef,cache:[],num:!!catFmt,fmt:catFmt}:null,val:{f:R(i),cache:[],num:true,fmt:'General'},kind:'bar',pts:{},color:null});
+  }
+  return{series,catFmt};
+}
+const CH_TYPES=[['col','עמודות','chart'],['bar','פסים','cBar'],['line','קו','cLine'],['area','שטח','cArea'],['pie','עוגה','cPie'],['doughnut','טבעת','cDonut']];
+function chartModel(type,base,S){
+  const sh=cur(),m=Object.assign({grouping:'clustered',legend:null,labels:false,pct:false,catName:false,valFmt:null,grid:true,catHide:false,valHide:false,markers:false,hole:50,gap:150,min:null,max:null,vary:false},base||{});
+  m.type=type==='col'||type==='bar'?'bar':type;m.dir=type==='bar'?'bar':'col';
+  if(m.type!=='bar'&&m.grouping==='clustered')m.grouping='standard';if(m.type==='bar'&&m.grouping==='standard')m.grouping='clustered';
+  const pie=m.type==='pie'||m.type==='doughnut';
+  m.series=(S||[]).map((s,i)=>({...s,kind:pie?'pie':m.type,color:s.color||XL_CHARTS.autoColor(i,chAcc()),labels:m.labels,pct:m.pct,marker:m.markers}));
+  if(pie)m.series=m.series.slice(0,1);
+  const horiz=m.type==='bar'&&m.dir==='bar';
+  m.catRev=horiz?false:!!sh.rtl;m.valPos=sh.rtl&&!horiz?'r':'l';
+  if(pie){m.grid=false;}
+  return m;
+}
+function chartDialog(idx){
+  if(!window.XL_CHARTS){hint('רכיב התרשימים עוד נטען, נסו שוב בעוד רגע');return;}
+  const sh=cur();if(!sh.charts)sh.charts=[];const old=idx!=null?sh.charts[idx]:null;
+  if(old&&old.del)return;
+  let g=null,o=null;
+  if(!old){g=region();if(g.r1===g.r2&&g.c1===g.c2){hint('מסמנים קודם את הנתונים לתרשים (עם הכותרות), ואז לוחצים על "תרשים"');return;}o=chartGuess(g);}
+  const om=old&&old.model;
+  let type=om?(om.type==='bar'?(om.dir==='bar'?'bar':'col'):om.type==='scatter'?'line':om.type):(X.chartType||'col');
+  const firstName=()=>{const r=g?chartSeries(g,o).series:[];return r.length===1?r[0].name:'';};
+  const st={legend:om?om.legend||'':null,keep:null};
+  dialog(`<h3>${old?'עריכת התרשים':'הוספת תרשים'}</h3>
+    <div class="xch-types" role="radiogroup" aria-label="סוג התרשים">${CH_TYPES.map(t=>`<button type="button" class="xch-ty" data-ty="${t[0]}" role="radio" aria-checked="false">${ic(t[2])}<span>${t[1]}</span></button>`).join('')}</div>
+    <div class="xch-body"><div class="xch-prev" id="xchPrev"></div>
+    <div class="xch-opts">
+      <label class="fl">כותרת<input id="xchTitle" dir="auto" maxlength="200"></label>
+      <label class="fl">טווח הנתונים<input id="xchRange" dir="ltr" spellcheck="false" placeholder="${old?'ריק = הנתונים של התרשים':'A1:B10'}"></label>
+      <div id="xchData"><label class="ck"><input type="checkbox" id="xchHdr"> בשורה הראשונה יש כותרות</label>
+      <label class="ck"><input type="checkbox" id="xchCat"> <span id="xchCatL"></span></label>
+      <label class="ck"><input type="checkbox" id="xchRow"> סדרות לפי שורות</label></div>
+      <div class="xch-ser" id="xchSer"></div>
+      <label class="ck"><input type="checkbox" id="xchLbl"> ערכים על התרשים</label>
+      <label class="fl">מקרא<select id="xchLeg"><option value="">בלי מקרא</option><option value="b">למטה</option><option value="t">למעלה</option><option value="r">בצד</option></select></label>
+    </div></div>
+    <div class="acts"><button type="button" data-a="x">ביטול</button><button type="button" class="pri" data-a="ok">${old?'עדכון':'הוספה'}</button></div>`,a=>{if(a==='ok')apply();});
+  const inn=q('xeDlg').firstElementChild;inn.classList.add('xch');
+  const $=id=>inn.querySelector('#'+id);
+  if(g)$('xchRange').value=rangeStr(g);
+  $('xchTitle').value=om?om.title||'':firstName();$('xchLbl').checked=om?!!om.labels:false;
+  let series=[];
+  const build=()=>{
+    const S=g?chartSeries(g,o).series:om.series.map(s=>({...s}));
+    series=S;if(!st.keep||st.keep.length!==S.length)st.keep=S.map(()=>true);
+    const pie=type==='pie'||type==='doughnut';
+    if(st.legend===null)st.legend=S.length>1||pie?'b':'';
+    $('xchLeg').value=st.legend;$('xchData').hidden=!g;
+    if(g){$('xchHdr').checked=o.hdr;$('xchCat').checked=o.cat;$('xchRow').checked=o.byRow;$('xchCatL').textContent=o.byRow?'בעמודה הראשונה יש שמות או תאריכים לציר':'בעמודה הראשונה יש שמות או תאריכים לציר';
+      if(o.byRow)$('xchHdr').parentNode.lastChild.textContent=' בעמודה הראשונה יש כותרות';else $('xchHdr').parentNode.lastChild.textContent=' בשורה הראשונה יש כותרות';
+      $('xchCatL').textContent=o.byRow?'בשורה הראשונה יש שמות או תאריכים לציר':'בעמודה הראשונה יש שמות או תאריכים לציר';}
+    const first=st.keep.indexOf(true);
+    $('xchSer').innerHTML=S.length?`<div class="t">${pie?'בעוגה מוצגת סדרה אחת:':'הסדרות בתרשים:'}</div>`+S.map((s,i)=>`<label class="ck"><input type="${pie?'radio':'checkbox'}" name="xchS" data-si="${i}"${pie?(i===first?' checked':''):(st.keep[i]?' checked':'')}> <span class="sw" style="background:#${s.color||XL_CHARTS.autoColor(i,chAcc())}"></span>${escH(s.name||('סדרה '+(i+1)))}</label>`).join(''):'<div class="t warn">לא נמצאו מספרים בטווח הזה</div>';
+    preview();
+  };
+  const model=()=>{
+    const pie=type==='pie'||type==='doughnut';let S=series.filter((s,i)=>st.keep[i]);
+    const base=om?{...om}:{};delete base.series;
+    base.title=$('xchTitle').value.trim()||null;base.labels=$('xchLbl').checked;base.legend=$('xchLeg').value||null;
+    if(g){const r=chartSeries(g,o);if(r.catFmt)base.catFmt=r.catFmt;}
+    if(pie&&base.labels)base.pct=false;
+    return chartModel(type,base,S);
+  };
+  let lastM=null;
+  const preview=()=>{inn.querySelectorAll('.xch-ty').forEach(b=>b.setAttribute('aria-checked',b.dataset.ty===type?'true':'false'));
+    try{lastM=model();$('xchPrev').innerHTML=XL_CHARTS.svg(lastM,400,250,chartCells,{acc:chAcc()});}catch(e){console.warn(e);$('xchPrev').textContent='';}};
+  inn.querySelector('.xch-types').addEventListener('click',e=>{const b=e.target.closest('[data-ty]');if(!b)return;const was=type==='pie'||type==='doughnut';type=b.dataset.ty;const pie=type==='pie'||type==='doughnut';
+    if(pie&&!was&&!$('xchLeg').value)st.legend='b';if(pie!==was){const f=st.keep.indexOf(true);if(pie)st.keep=st.keep.map((_,j)=>j===Math.max(0,f));}build();});
+  $('xchSer').addEventListener('change',e=>{const i=e.target.closest('[data-si]');if(!i)return;const k=+i.dataset.si;if(i.type==='radio')st.keep=st.keep.map((_,j)=>j===k);else st.keep[k]=i.checked;preview();});
+  $('xchTitle').addEventListener('input',preview);$('xchLbl').addEventListener('change',preview);$('xchLeg').addEventListener('change',()=>{st.legend=$('xchLeg').value;preview();});
+  const redo=()=>{o={hdr:$('xchHdr').checked,cat:$('xchCat').checked,byRow:o.byRow};st.keep=null;build();};
+  $('xchHdr').addEventListener('change',redo);$('xchCat').addEventListener('change',redo);
+  $('xchRow').addEventListener('change',()=>{o=chartGuess(g,$('xchRow').checked);st.keep=null;build();});
+  $('xchRange').addEventListener('change',()=>{const v=$('xchRange').value.replace(/[\s$]/g,'').replace(/^.*!/,'');if(!v){if(old){g=null;st.keep=null;build();}return;}
+    const r=parseRange(v);if(!r){hint('טווח לא תקין, למשל A1:C20');return;}g=r;o=chartGuess(g);st.keep=null;if(!$('xchTitle').value)$('xchTitle').value=firstName();build();});
+  build();
+  setTimeout(()=>{const t=$('xchTitle');if(t)t.focus();},40);
+  function apply(){
+    const m=lastM;if(!m||!m.series.length){hint('אין בטווח הזה מספרים לתרשים');return;}
+    X.chartType=type;
+    if(old){old.model=m;old.changed=true;X.chartSel=idx;}
+    else{
+      // next to the data, like Excel: a column after the table, about 480 × 288 pixels
+      // after the last filled column of these rows, and below any chart that is already there
+      const g2=geo(sh),src=g;let endC=src.c2;for(const cl of sh.cells.values())if(cl.r>=src.r1&&cl.r<=src.r2&&cl.c>endC&&(cl.v!==null&&cl.v!==''||cl.f))endC=cl.c;
+      const from={c:endC+2,co:0,r:src.r1,ro:0};let p=pxOfCell(sh,g2,from),to=cellOfPx(sh,g2,p.x+480,p.y+288);
+      for(let k=0;k<20;k++){const hit=sh.charts.find(o2=>!o2.del&&o2.from&&o2.to&&!(o2.to.c<from.c||o2.from.c>to.c||o2.to.r<from.r||o2.from.r>to.r));if(!hit)break;
+        from.r=hit.to.r+2;p=pxOfCell(sh,g2,from);to=cellOfPx(sh,g2,p.x+480,p.y+288);}
+      sh.charts.push({isNew:true,model:m,from,to,name:'תרשים '+(sh.charts.length+1)});X.chartSel=sh.charts.length-1;
+      setTimeout(()=>{if(!X)return;scrollToCell(from.r,Math.min(to.c,from.c+5));paintPics();},30);
+    }
+    chartsTouched(sh);paintPics();hint(old?'התרשים עודכן':'התרשים נוסף. גוררים אותו כדי להזיז, ומהפינה כדי לשנות את הגודל');
+  }
+}
+// writes what changed in the charts into the file's parts, just before saving
+function flushCharts(){
+  const st=X.st,files=st.files,XC=window.XL_CHARTS;if(!XC)return;
+  for(const sh of st.sheets){
+    if(!sh.charts)continue;
+    // a drawing Siman added must stay linked even after an undo brought back an older copy of the sheet
+    if(sh.drawNewRid&&!kids(sh.root).some(e=>e.localName==='drawing')){const de=sh.doc.createElementNS(S,'drawing');de.setAttributeNS(NS.r,'r:id',sh.drawNewRid);insertOrdered(sh.root,de);sh.dirty=true;}
+    if(!sh.chartsDirty)continue;
+    if(!sh.drawPath&&sh.charts.some(c=>c.isNew&&!c.del)){
+      let n=1;while(files.has(`xl/drawings/drawing${n}.xml`))n++;
+      sh.drawPath=`xl/drawings/drawing${n}.xml`;
+      put(files,sh.drawPath,XML_HEAD+`<xdr:wsDr xmlns:xdr="${XC.NS.xdr}" xmlns:a="${XC.NS.a}"></xdr:wsDr>`);ctOverride(files,sh.drawPath,XC.CT_DRAW);
+      const rid=addRel(files,sh.path,XC.RT_DRAW,`../drawings/drawing${n}.xml`);sh.drawNewRid=rid;
+      const de=sh.doc.createElementNS(S,'drawing');de.setAttributeNS(NS.r,'r:id',rid);insertOrdered(sh.root,de);sh.dirty=true;
+      sh.drawDoc=parseXml(txt(files,sh.drawPath));
+    }
+    if(!sh.drawPath){sh.charts=sh.charts.filter(c=>!c.del);sh.chartsDirty=false;continue;}
+    const dd=sh.drawDoc||(sh.drawDoc=parseXml(txt(files,sh.drawPath)));const root=dd.documentElement,XD=XC.NS.xdr;
+    const anchorEl=(c,rid,id)=>dd.importNode(parseXml(XC.anchorXml(c.from,c.to,rid,id,c.name||'תרשים')).documentElement,true);
+    let maxId=0;for(const e of dd.getElementsByTagNameNS(XD,'cNvPr'))maxId=Math.max(maxId,+e.getAttribute('id')||0);
+    const dropRel=(part,id)=>{const rp=relsPathOf(part);const s0=txt(files,rp);if(s0)put(files,rp,s0.replace(new RegExp(`<Relationship[^>]*Id="${id}"[^>]*/>`),''));};
+    for(const c of sh.charts){
+      if(c.del){
+        if(c.el&&c.el.parentNode)c.el.parentNode.removeChild(c.el);
+        if(c.part){dropRel(sh.drawPath,c.rid);
+          for(const r of rels(files,c.part)){const t=resolveTarget(c.part,r.target);if(/^xl\/charts\/(colors|style)\d+\.xml$/.test(t)){files.delete(t);ctRemove(files,t);}}
+          files.delete(relsPathOf(c.part));files.delete(c.part);ctRemove(files,c.part);}
+        continue;
+      }
+      if(c.isNew){
+        let n=1;while(files.has(`xl/charts/chart${n}.xml`))n++;const part=`xl/charts/chart${n}.xml`;
+        put(files,part,XC.chartXml(c.model,chartCells,{acc:chAcc()}));ctOverride(files,part,XC.CT_CHART);
+        const rid=addRel(files,sh.drawPath,XC.RT_CHART,`../charts/chart${n}.xml`);
+        const el=anchorEl(c,rid,++maxId);root.appendChild(el);Object.assign(c,{el,part,rid,isNew:false,changed:false,moved:false});
+        continue;
+      }
+      if(c.changed){
+        put(files,c.part,XC.chartXml(c.model,chartCells,{acc:chAcc()}));
+        // the new chart text has no pictures or shapes of its own: only Excel's style and colour files stay linked
+        for(const r of rels(files,c.part))if(!/chartStyle|chartColorStyle/.test(r.type))dropRel(c.part,r.id);
+        c.changed=false;
+      }
+      if(c.moved&&c.el){
+        if(c.el.localName==='twoCellAnchor'){
+          for(const [t,p] of [['from',c.from],['to',c.to]]){const e=[...c.el.childNodes].find(n=>n.nodeType===1&&n.localName===t);if(!e)continue;
+            for(const [k,v] of [['col',p.c],['colOff',Math.round(p.co*XC.EMU)],['row',p.r],['rowOff',Math.round(p.ro*XC.EMU)]]){const x=e.getElementsByTagNameNS(XD,k)[0];if(x)x.textContent=String(v);}}
+        }else{
+          const gf=c.el.getElementsByTagNameNS(XD,'graphicFrame')[0];const el=anchorEl(c,'rIdX',++maxId);const ng=el.getElementsByTagNameNS(XD,'graphicFrame')[0];
+          if(gf&&ng)el.replaceChild(gf,ng);c.el.parentNode.replaceChild(el,c.el);c.el=el;
+        }
+        c.moved=false;
+      }
+    }
+    put(files,sh.drawPath,ser(dd));
+    const keepSel=X.chartSel!=null&&st.sheets[X.si]===sh?sh.charts[X.chartSel]:null;
+    sh.charts=sh.charts.filter(c=>!c.del);if(st.sheets[X.si]===sh)X.chartSel=keepSel?sh.charts.indexOf(keepSel):null;
+    sh.chartsDirty=false;
+  }
 }
 /* ------------------------------------------------------------ opening and closing */
 function injectCss(){if(document.getElementById('xeCss'))return;const s=document.createElement('style');s.id='xeCss';s.textContent=CSS;document.head.append(s);}

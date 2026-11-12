@@ -174,18 +174,30 @@ async function xlsxToPages(bytes,progress){
   const wb=XLSX.read(bytes,{type:'array',cellStyles:true,cellNF:true});
   const host=makeHost(0);
   const pages=[],mp=[];
+  // charts (xl-charts.js): the parts they need, read once
+  const XC=window.XL_CHARTS,T=new Map();
+  if(XC)for(const p of Object.keys(zip.files))if(/^xl\/(drawings|charts|theme|worksheets\/_rels)\/.*\.(xml|rels)$/.test(p))T.set(p,await zip.file(p).async('string'));
+  const getT=p=>T.has(p)?T.get(p):null;const acc=XC?XC.accents(getT):null;
+  const cellsOf=f=>{const R=XC.splitRef(f);if(!R)return null;const w2=wb.Sheets[R.sheet];if(!w2)return null;if((R.r2-R.r1+1)*(R.c2-R.c1+1)>20000)return null;const out=[];
+    for(let r=R.r1;r<=R.r2;r++)for(let c=R.c1;c<=R.c2;c++){const cell=w2[XLSX.utils.encode_cell({r,c})];if(!cell){out.push({v:null,w:''});continue;}
+      const date=cell.t==='n'&&cell.z&&/^m+\/d+\/y+$/i.test(String(cell.z));out.push({v:cell.t==='e'?null:cell.v,w:date?XC.fmtNum(cell.v,'m/d/yyyy'):(cell.w!==undefined?cell.w:null)});}
+    return out;};
   try{
     for(let si=0;si<wb.SheetNames.length;si++){
       const meta=(wb.Workbook&&wb.Workbook.Sheets||[])[si]||{};if(meta.Hidden)continue;
       const ws=wb.Sheets[wb.SheetNames[si]];if(!ws||!ws['!ref'])continue;
-      const f=files[si]||{};let rtl=false;
-      if(f.path&&zip.file(f.path)){const x=await zip.file(f.path).async('string');rtl=/<sheetView\b[^>]*rightToLeft="(1|true)"/.test(x);}
+      const f=files[si]||{};let rtl=false,charts=[];
+      if(f.path&&zip.file(f.path)){const x=await zip.file(f.path).async('string');rtl=/<sheetView\b[^>]*rightToLeft="(1|true)"/.test(x);
+        if(XC&&/<(\w+:)?drawing\b/.test(x))try{charts=XC.readSheet(getT,f.path,x,acc).charts.filter(c=>c.from);}catch(e){console.warn('charts',e);}}
       const rg=XLSX.utils.decode_range(ws['!ref']);
-      const R1=Math.min(rg.e.r,rg.s.r+4999),C1=Math.min(rg.e.c,rg.s.c+79);
+      let chR=0,chC=0;for(const ch of charts){const t=ch.to||{c:ch.from.c+8,r:ch.from.r+15};chR=Math.max(chR,t.r);chC=Math.max(chC,t.c);}
+      const R1=Math.min(Math.max(rg.e.r,chR),rg.s.r+4999),C1=Math.min(Math.max(rg.e.c,chC),rg.s.c+79);
       // trim empty trailing rows / columns
       let lastR=0,lastC=0;
       for(const k in ws){if(k[0]==='!')continue;const a=XLSX.utils.decode_cell(k),c=ws[k];if(c&&(c.v!==undefined&&c.v!==''||c.s&&c.s.fgColor&&c.s.patternType==='solid')){if(a.r>lastR)lastR=a.r;if(a.c>lastC)lastC=a.c;}}
       for(const m of ws['!merges']||[]){if(m.e.r>lastR)lastR=m.e.r;if(m.e.c>lastC)lastC=m.e.c;}
+      // the page also takes in the charts that sit next to the table
+      for(const ch of charts){const t=ch.to||{c:ch.from.c+8,r:ch.from.r+15};lastR=Math.max(lastR,t.r);lastC=Math.max(lastC,t.c);}
       const rN=Math.min(R1,lastR),cN=Math.min(C1,lastC);
       const cols=ws['!cols']||[],rows=ws['!rows']||[];
       const cw=[],rh=[];
@@ -205,6 +217,8 @@ async function xlsxToPages(bytes,progress){
       while(r0<=rN){
         let r1=r0,h=0;
         while(r1<=rN&&(h+rh[r1]<=usableH||r1===r0)){h+=rh[r1];r1++;}
+        // a chart is not cut between two pages when it fits on one
+        for(const ch of charts){const t=ch.to;if(t&&ch.from.r>r0&&ch.from.r<r1&&t.r>=r1&&rowT[Math.min(t.r,rN+1)]-rowT[ch.from.r]<=usableH)r1=ch.from.r;}
         progress&&progress(`מכין את הגיליון "${wb.SheetNames[si]}"…`);
         // one table per page
         const t=document.createElement('table');t.dir=rtl?'rtl':'ltr';
@@ -239,6 +253,18 @@ async function xlsxToPages(bytes,progress){
         const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);
         const left=rtl?pw-M-tableW*scale:M;
         g.drawImage(cv,Math.round(left*2),M*2,Math.round(tableW*scale*2),Math.round(t.offsetHeight*scale*2));
+        for(const ch of charts){
+          if(ch.from.r<r0||ch.from.r>=r1)continue;
+          try{
+            const X0=(colL[Math.min(ch.from.c,cN+1)]||0)+ch.from.co,Y0=rowT[ch.from.r]+ch.from.ro;
+            let w,hh;if(ch.to){w=(colL[Math.min(ch.to.c,cN+1)]||0)+ch.to.co-X0;hh=(rowT[Math.min(ch.to.r,rN+1)]||0)+ch.to.ro-Y0;}else if(ch.ext){w=ch.ext.w;hh=ch.ext.h;}else continue;
+            if(w<20||hh<20)continue;
+            const sx=rtl?left+(tableW-X0-w)*scale:left+X0*scale,sy=M+(Y0-rowT[r0])*scale;
+            const svg=XC.svg(ch.model,w,hh,cellsOf,{pxW:Math.round(w*scale*2),pxH:Math.round(hh*scale*2),acc});
+            const url=URL.createObjectURL(new Blob([svg],{type:'image/svg+xml'}));
+            try{const im=new Image();im.src=url;await im.decode();g.drawImage(im,Math.round(sx*2),Math.round(sy*2),Math.round(w*scale*2),Math.round(hh*scale*2));}finally{URL.revokeObjectURL(url);}
+          }catch(e){console.warn('chart',e);}
+        }
         pages.push({canvas:c,w:pw,h:ph});
         mp.push({w:pw,h:ph,sheet:si,path:f.path,r0,left,top:M,scale,tableW,rtl,colL,rowT:rowT.slice(0)});
         r0=r1;
