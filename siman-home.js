@@ -304,9 +304,18 @@ const catchAt = e => {
   if (t === catcher || (t.closest && t.closest('input,textarea,select,[contenteditable="true"],a[href],dialog,.sh-resume,.nb-field'))) return;
   catcher.style.left = e.clientX + 'px'; catcher.style.top = e.clientY + 'px';
   catcher.classList.add('on'); catcher.focus({ preventScroll: true });
+  // the press itself would move the focus to the page right after this (and the box closed on blur, so Edge's menu
+  // showed no "הדבק" — seen in a real Edge window): the press's own focus move is cancelled on this empty spot
+  if (e.preventDefault) e.preventDefault();
+  catchAt.at = Date.now();
 };
 addEventListener('mousedown', e => { if (e.button === 2) catchAt(e); else if (e.target !== catcher) catcherOff(); }, true);
-catcher.addEventListener('blur', () => setTimeout(catcherOff, 0));
+// if the focus still moves away during the right-click itself, it is brought back before the menu is built
+addEventListener('contextmenu', () => { if (catcher.classList.contains('on') && document.activeElement !== catcher) catcher.focus({ preventScroll: true }); }, true);
+// a blur right at the press (the menu opening) does not close the box; a later one (the menu closed, a click
+// elsewhere) does
+catcher.addEventListener('blur', () => { if (Date.now() - (catchAt.at || 0) < 1500) return; setTimeout(catcherOff, 0); });
+addEventListener('keydown', e => { if (e.key === 'Escape' && catcher.classList.contains('on')) catcherOff(); }, true);
 catcher.addEventListener('keydown', e => { if (!(e.ctrlKey || e.metaKey)) { e.preventDefault(); catcherOff(); } });
 catcher.addEventListener('beforeinput', e => { if (e.inputType !== 'insertFromPaste') e.preventDefault(); });
 catcher.addEventListener('paste', e => {

@@ -237,8 +237,14 @@ function level(a) {
   return a;
 }
 // who spoke when (in the engine worker): 10-second windows, 5 seconds apart
-/* 5.10.1: more than one engine at a time on a strong computer (each worker uses its own processor core) */
+/* 5.10.1: more than one engine at a time on a strong computer (each worker uses its own processor core).
+   Off since 6.4.1 (see lanes()); localStorage 'siman.voice.parallel' = '1' turns it on for a test. */
+const PARALLEL = (() => { try { return localStorage.getItem('siman.voice.parallel') === '1'; } catch (_) { return false; } })();
 function lanes() {
+  // 6.4.1: measured with a real 110-second recording on an 8-core computer (Edge, no graphics card for the engine):
+  // one engine wrote it in 5:36, two engines together in 6:10 (they share the same cores and each runs slower), and
+  // speaker detection took about a minute either way. So one engine, until a computer where more really helps.
+  if (!PARALLEL) return 1;
   const c = navigator.hardwareConcurrency || 2, mem = navigator.deviceMemory || 8;
   const mob = (navigator.userAgentData && navigator.userAgentData.mobile) || /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent || '');
   if (mob || mem < 4) return 1; return c >= 8 ? 3 : c >= 4 ? 2 : 1;
@@ -1021,11 +1027,15 @@ async function transcribeFile(file, opts) {
     step('tx', 'now', '0%');
     const total = parts.reduce((a, p) => a + p.e - p.s, 0) / SR;
     let done = 0; const t0 = Date.now();
-    const runners = [{ text: (a, l) => ASR.text(a, l) }];
-    let side = null;
+    const main = { text: (a, l) => ASR.text(a, l) };
+    // 6.4.1: the second engine joins when it is ready, and the writing does not wait for it. (Checked with a real
+    // recording: loading it took about 2 minutes, and until then nothing was written — slower than one engine.)
+    let side = null, joined = false, sideJoin = null;
     if (parts.length > 6 && ASR.device === 'wasm' && spec.key !== 'acc' && lanes() >= 2) {
-      try { side = sideWorker(); await side.ask({ type: 'load', engine: spec.key }); runners.push({ side: true, text: (a, l) => side.ask({ type: 'run', audio: a, lang: l || 'he', engine: spec.key }, [a.buffer]) }); }
-      catch (e) { console.warn('second engine', e); if (side) side.end(); side = null; }
+      sideJoin = (async () => {
+        try { side = sideWorker(); await side.ask({ type: 'load', engine: spec.key }); return { side: true, text: (a, l) => side.ask({ type: 'run', audio: a, lang: l || 'he', engine: spec.key }, [a.buffer]) }; }
+        catch (e) { if (side) { console.warn('second engine', e); side.end(); } side = null; return null; }
+      })();
     }
     const res = new Array(parts.length); let nextK = 0, emit = 0, flushing = false;
     const flush = async () => {
@@ -1034,8 +1044,7 @@ async function transcribeFile(file, opts) {
         if (text) { item.segments.push({ spk: p.spk || 'spk_1', start: p.s / SR, end: p.e / SR, text }); liveLine(text); }
         if (k % 8 === 7) await DB.put(stripForDb(item)); } } finally { flushing = false; }
     };
-    try {
-      await Promise.all(runners.map(async R => {
+    const work = async R => {
         while (nextK < parts.length) {
           if (sig.aborted) throw abortErr();
           const k = nextK++, p = parts[k];
@@ -1049,7 +1058,13 @@ async function transcribeFile(file, opts) {
           step('tx', 'now', Math.round(done / total * 100) + '%' + (done > 2 && done < total ? ' · ' + eta(spent / done * (total - done)) : ''));
           await flush();
         }
-      }));
+    };
+    try {
+      await Promise.all([
+        // the main engine: starts at once. When it has nothing left and the second one never joined, that one is stopped
+        work(main).then(() => { if (!joined && side) { const s = side; side = null; s.end(); } }),
+        sideJoin ? sideJoin.then(R => { if (R && side && nextK < parts.length) { joined = true; return work(R); } }) : null
+      ]);
       await flush();
     } finally { if (side) side.end(); }
     item.segments = normalize(item.segments);
