@@ -1353,7 +1353,7 @@ body:has(#wed) .busy,body:has(#xed) .busy,body:has(#ped) .busy{z-index:1000}body
 </dialog>
 
 <header class="bar">
-  <div class="brand"><b title="גרסה 6.3.8">סימן</b><span class="ver">6.3.8</span><span class="fname" id="fname"></span></div>
+  <div class="brand"><b title="גרסה 6.4">סימן</b><span class="ver">6.4</span><span class="fname" id="fname"></span></div>
 
   <nav class="tools" id="tools" aria-label="כלים">
     <button class="tool" data-tool="select" aria-pressed="true" title="בחירה וגלילה (V)">
@@ -3138,6 +3138,8 @@ async function callTranslateOnce(text,target,second){
           :await fetchT(AI_URL,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({mode:'translate',text,target,style:trExtra(target)})}))
         :await fetchT(url,{method:'POST',headers:{'content-type':'application/json','x-goog-api-key':key},body});
       const d=await r.json().catch(()=>({}));
+      // 6.4: the fair daily share of סימן's own service, or the device check, says it in its own words
+      if(d.error&&['DAY','ALL','PASS','PASSDAY'].includes(d.error.code))return{error:'SIMAN_GUARD',msg:d.error.message,status:0};
       if(r.status===429||r.status===503){
         if(/per ?day/i.test(JSON.stringify(d)))return{error:'DAILY_LIMIT',status:429};
         const info=((d.error&&d.error.details)||[]).find(x=>x.retryDelay);
@@ -3160,6 +3162,7 @@ function parseTr(raw){
   return m?{lang:m[1].toLowerCase().slice(0,2),text:raw.slice(m[0].length).trim()}:{lang:null,text:raw.trim()};
 }
 function errText(r){
+  if(r.error==='SIMAN_GUARD')return r.msg;
   if(r.error==='NO_KEY')return'צריך להזין מפתח API בהגדרות התרגום (⚙).';
   if(r.error==='NETWORK')return'אין חיבור לאינטרנט. התרגום דורש חיבור.';
   if(r.error==='DAILY_LIMIT')return'נגמרה המכסה היומית החינמית של Gemini. היא מתאפסת מחר בסביבות 10:00 בבוקר.';
@@ -3262,7 +3265,7 @@ async function runTranslate(){
       if(text.replace(/\s/g,'').length<2){el.textContent='אין טקסט בעמוד הזה. אם הוא סרוק: "עמודים" ← "זיהוי טקסט (OCR)", ואז לתרגם שוב.';el.className='tt err';TR.pages[i]={text:'',target};done++;continue;}
       el.textContent='מתרגם…';
       const r=await callTranslate(text,target);
-      if(r.error){if(TR.stop){el.textContent='נעצר';break;}el.textContent=errText(r);el.className='tt err';if(['NO_KEY','NETWORK','DAILY_LIMIT'].includes(r.error)||r.status===401||r.status===403||(r.status===400&&/credit|balance/i.test(r.error)))failed=r;continue;}
+      if(r.error){if(TR.stop){el.textContent='נעצר';break;}el.textContent=errText(r);el.className='tt err';if(['NO_KEY','NETWORK','DAILY_LIMIT','SIMAN_GUARD'].includes(r.error)||r.status===401||r.status===403||(r.status===400&&/credit|balance/i.test(r.error)))failed=r;continue;}
       const p=parseTr(r.raw);
       if(p.lang&&!TR.langFromApi){TR.langFromApi=p.lang;$('tpLang').textContent=LANG_HE[p.lang]||p.lang;}
       TR.pages[i]={text:cleanText(p.text),target};renderTT(el,i);
@@ -3537,7 +3540,7 @@ const TRANSLATE_URL='https://siman-translate.siman-app.workers.dev/';
 const AI_URL='https://siman-ai.siman-app.workers.dev/'; // smart features + translation to more languages (siman-ai.js)
 const PROVIDERS={
   builtin:{help:'תרגום מוכן לשימוש, בלי מפתח ובלי הרשמה. מתאים למסמכים רגילים; למסמכים רגישים עדיף לא להשתמש בתרגום מקוון.',ph:'',re:/.*/,reMsg:'',models:[['default','ברירת מחדל']]},
-  gemini:{help:'תרגום חינמי באמצעות Google Gemini. יוצרים מפתח בחינם, בלי כרטיס אשראי, ב-<a href="https://aistudio.google.com/apikey" data-ext>aistudio.google.com/apikey</a>. במסלול החינמי Google רשאית להשתמש בטקסט לשיפור המודלים, לכן לא מומלץ למסמכים רגישים.',
+  gemini:{help:'תרגום חינמי באמצעות Google Gemini. יוצרים מפתח בחינם, בלי כרטיס אשראי, ב-<a href="https://aistudio.google.com/apikey" data-ext>aistudio.google.com/apikey</a>. עם מפתח אישי, גם הסיכום, השאלות והקריאה החכמה משתמשים במכסה שלך, בלי המגבלה היומית של סימן. במסלול החינמי Google רשאית להשתמש בטקסט לשיפור המודלים, לכן לא מומלץ למסמכים רגישים.',
     ph:'AQ.…',re:/^(AQ\.|AIza)/,reMsg:'מפתח Gemini מתחיל ב-AQ. (או ב-AIza במפתחות ישנים)',
     models:[['gemini-flash-latest','Gemini Flash — איכות טובה'],['gemini-flash-lite-latest','Gemini Flash-Lite — מהיר, מכסה גדולה יותר']]},
   claude:{help:'תרגום באיכות הגבוהה ביותר באמצעות Claude. דורש מפתח בתשלום מ-<a href="https://console.anthropic.com/settings/keys" data-ext>console.anthropic.com</a>.',
@@ -5602,6 +5605,7 @@ if('launchQueue' in window){
   launchQueue.setConsumer(async p=>{if(p.files&&p.files.length){for(const h of p.files){try{await openFile(await h.getFile(),h);}catch(e){console.error(e);}}}});
 }
 </script>
+<script src="siman-guard.js?v=6.4"></script>
 <script src="siman-plus.js?v=6.3.4"></script>
 <script>
 /* =====================================================================

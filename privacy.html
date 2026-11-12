@@ -52,6 +52,7 @@ a{color:inherit}
 <li><b>חשבון ועדכונים:</b> לכל נרשם נשמרים המייל, השם ומועד ההרשמה. נעדכן במייל על שינויים חשובים בשירות, כמו מסלולים ומחירים. השימוש בסימן כפוף ל<a href="terms.html">תנאי השימוש</a>.</li>
 <li><b>נתוני שימוש (רק לנרשמים):</b> פעם ביום האפליקציה שולחת כמה פעמים השתמשתם בכל יכולת (למשל: תרגום 3 פעמים, חתימה פעמיים), יחד עם המייל שלכם וגרסת האפליקציה. לא נשלחים שמות קבצים, תוכן מסמכים או חתימות. המידע משמש רק כדי לשפר את סימן ולהחליט אילו יכולות לפתח, ונמחק יחד עם החשבון. מי שלא נרשם לא שולח נתוני שימוש בכלל.</li>
 <li><b>שמירה בענן ושיתוף:</b> כשבוחרים Google Drive, מייל או וואטסאפ, הקובץ עובר ישירות לשירות שבחרתם, לפי תנאי השירות שלו.</li>
+<li><b>בדיקת מכשיר ומכסה הוגנת לשירותים החכמים:</b> בפעם הראשונה שמשתמשים בשירות חכם (תרגום, עוזר, קריאת דף או סיכום תמליל), Cloudflare Turnstile בודק ברקע שאדם משתמש באפליקציה ולא תוכנה אוטומטית. הבדיקה כפופה ל<a href="https://www.cloudflare.com/turnstile-privacy-policy/" target="_blank" rel="noopener">מדיניות הפרטיות של Cloudflare Turnstile</a>. אחרי הבדיקה המכשיר מקבל אישור לכמה שעות. כדי שכל המשתמשים יוכלו להשתמש בשירות החינמי, השרת סופר כמה בקשות נשלחו היום מכל מכשיר (לפי מספר אקראי שנוצר במכשיר) ומכל כתובת IP. נשמר רק המספר, בלי תוכן, והספירה נמחקת אחרי שלושה ימים. מי שהוסיף בהגדרות מפתח Gemini אישי משתמש במכסה שלו: המפתח עובר עם הבקשה בלבד ולא נשמר אצלנו.</li>
 <li><b>ספירה אנונימית של מכשירים:</b> פעם ביום האפליקציה שולחת מספר אקראי שנוצר במכשיר ולא קשור למייל או לשם, ואיתו גרסת האפליקציה, סוג המכשיר (אנדרואיד, אייפון, Windows, Mac), השפה, האם סימן מותקן או פתוח בדפדפן, והאם נרשמתם (כן או לא). לא נשלחים שמות קבצים, תוכן או פרטים אישיים, וכתובת ה-IP לא נשמרת. המטרה: לדעת כמה משתמשים בסימן ובאיזו גרסה. אפשר לכבות בהגדרות ← "שליחת נתוני שימוש אנונימיים".</li>
 </ul>
 <p>כדי לדעת מה יקרה לפני שלוחצים: כל שירות שרץ על שרת מסומן בהסבר קצר במסך עצמו, ובחלון "מה יוצא מהמכשיר" בהגדרות.</p>
@@ -60,6 +61,7 @@ a{color:inherit}
 <ul>
 <li>השרתים שלנו פועלים ב-Cloudflare. הבינה המלאכותית היא של Google (Gemini), ובתרגום גם Anthropic (Claude), אם נבחר. השרתים של השירותים האלה עשויים להיות מחוץ לישראל, כך שהמידע עשוי לעבור לחו״ל, לחברות שמחויבות להגן עליו.</li>
 <li>טקסט שנשלח לעוזר, לתרגום או לסיכום לא נשמר אצלנו אחרי שהתשובה חוזרת.</li>
+<li><b>חשוב לדעת:</b> השירות המובנה של סימן משתמש במסלול החינמי של Google Gemini. במסלול הזה Google רשאית להשתמש בטקסט ובתמונות שנשלחים כדי לשפר את המוצרים שלה, ובודקים אנושיים עשויים לקרוא אותם (לפי Google, אחרי ניתוק מהחשבון). לכן לא מומלץ לשלוח לשירותים החכמים מסמכים רגישים, כמו מסמכים רפואיים, פיננסיים או מסמכים עם מספרי זהות. כל הכלים שרצים במכשיר, כמו עריכה, חתימה, השחרה, דחיסה, תמלול והדפסה, לא שולחים כלום.</li>
 <li>מסמך שנשלח בקישור, והחתימות עליו, נמחקים אחרי 30 יום, או קודם אם השולח מוחק אותם.</li>
 <li>פרטי החשבון ונתוני השימוש נשמרים עד שמוחקים את החשבון.</li>
 </ul>
@@ -68,7 +70,7 @@ a{color:inherit}
 <p>ההגדרות, החתימות השמורות, החותמת, הפרטים לשימוש חוזר במילוי טפסים, התמלילים ומילון התיקונים נשמרים בזיכרון המקומי של הדפדפן במכשיר שלכם בלבד. מחיקת נתוני האתר בדפדפן מוחקת אותם.</p>
 
 <h2>אבטחה</h2>
-<p>כל התקשורת עם השרתים מוצפנת (HTTPS). מפתחות הגישה לשירותי הבינה המלאכותית שמורים בשרת ולא באפליקציה. השרתים שלנו עונים רק לבקשות שמגיעות מהאפליקציה עצמה.</p>
+<p>כל התקשורת עם השרתים מוצפנת (HTTPS). מפתחות הגישה לשירותי הבינה המלאכותית שמורים בשרת כסוד מוצפן, ולא באפליקציה או בקוד. השרתים שלנו עונים רק לבקשות מהאפליקציה עצמה, שמגיעות עם אישור חתום שהמכשיר קיבל אחרי בדיקת Turnstile, ובכפוף למכסה יומית הוגנת.</p>
 
 <h2>הזכויות שלכם</h2>
 <ul>
@@ -99,6 +101,8 @@ a{color:inherit}
 <li><b>Sign-up:</b> your email, optional name and newsletter choice are stored to manage your account and, if you agreed, to send updates about Siman. You can ask for deletion at any time.</li>
 <li><b>Account and updates:</b> for each user we store the email, name and sign-up date. We will email you about important changes to the service, such as plans and prices. Use of Siman is subject to the <a href="terms.html">terms of use</a>.</li>
 <li><b>Usage data:</b> once a day the app sends how many times you used each feature (for example: translation 3 times, signing twice), with your email and the app version. No file names, document content or signatures are sent. This is used only to improve Siman and is deleted with your account.</li>
+<li><b>Device check and fair daily share for the smart services:</b> the first time you use a smart service, Cloudflare Turnstile checks in the background that a person is using the app (<a href="https://www.cloudflare.com/turnstile-privacy-policy/" target="_blank" rel="noopener">Turnstile privacy policy</a>), and the device gets a pass for a few hours. So that everyone can use the free service, the server counts how many requests came today from each device (a random number made on the device) and each IP address. Only the count is kept, no content, and it is deleted after three days. If you add your own Gemini key in Settings, your own quota is used; the key travels with the request only and is not stored by us.</li>
+<li><b>Free Gemini tier:</b> Siman's built-in service uses Google Gemini's free tier, where Google may use the text and images sent to improve its products, and human reviewers may read them (disconnected from your account, according to Google). Please don't send sensitive documents (medical, financial, ID numbers) to the smart services. Everything that runs on the device (editing, signing, redaction, compression, transcription, printing) sends nothing.</li>
 <li><b>Anonymous device count:</b> once a day the app sends a random number made on the device (not linked to your email or name), the app version, the kind of device, the language, whether Siman is installed, and whether you signed up. No files, content or personal details; the IP address is not stored. It can be turned off in Settings.</li>
 <li><b>Cloud saving and sharing:</b> when you choose Google Drive, email or WhatsApp, the file goes directly to that service under its own terms.</li>
 </ul>
