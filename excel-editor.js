@@ -953,13 +953,15 @@ function render(){
 let rT=0;const renderSoon=()=>{cancelAnimationFrame(rT);rT=requestAnimationFrame(()=>{if(X)render();});};
 function paintSel(){
   const s=X.sel,a=X.act;const grid=q('xeGrid');
+  // every selected area: the current one and the ones added with Ctrl
+  const all=[s,...(X.more||[])];const inAny=(r,c)=>all.some(x=>r>=x.r1&&r<=x.r2&&c>=x.c1&&c<=x.c2);
   for(const td of grid.querySelectorAll('td[data-r]')){
     const r=+(td.dataset.mr??td.dataset.r),c=+(td.dataset.mc??td.dataset.c);
-    td.classList.toggle('xin',r>=s.r1&&r<=s.r2&&c>=s.c1&&c<=s.c2&&!(r===a.r&&c===a.c));
+    td.classList.toggle('xin',inAny(r,c)&&!(r===a.r&&c===a.c));
     td.classList.toggle('xact',r===a.r&&c===a.c);
   }
-  for(const th of grid.querySelectorAll('th[data-col]')){const c=+th.dataset.col;th.classList.toggle('on',c>=s.c1&&c<=s.c2);}
-  for(const th of grid.querySelectorAll('th[data-row]')){const r=+th.dataset.row;th.classList.toggle('on',r>=s.r1&&r<=s.r2);}
+  for(const th of grid.querySelectorAll('th[data-col]')){const c=+th.dataset.col;th.classList.toggle('on',all.some(x=>c>=x.c1&&c<=x.c2));}
+  for(const th of grid.querySelectorAll('th[data-row]')){const r=+th.dataset.row;th.classList.toggle('on',all.some(x=>r>=x.r1&&r<=x.r2));}
   placeHandle();placeDD();updateUI();
 }
 function tdOf(r,c){return q('xeGrid').querySelector(`td[data-r="${r}"][data-c="${c}"]`)||q('xeGrid').querySelector(`td[data-mr="${r}"][data-mc="${c}"]`);}
@@ -968,7 +970,7 @@ function select(r,c,extend){
   const sh=cur();r=Math.max(0,Math.min(1048575,r));c=Math.max(0,Math.min(16383,c));
   const g=sh.g;if(g&&(r>=g.rows-5||c>=g.cols-3)){g.rows=Math.max(g.rows,r+40);g.cols=Math.max(g.cols,c+6);}
   if(extend){const a=X.anchor||X.act;X.sel={r1:Math.min(a.r,r),c1:Math.min(a.c,c),r2:Math.max(a.r,r),c2:Math.max(a.c,c)};X.cursor={r,c};}
-  else{const m=mergeAt(sh,r,c);if(m){r=m.r1;c=m.c1;X.sel={...m};}else X.sel={r1:r,c1:c,r2:r,c2:c};X.act={r,c};X.anchor={r,c};X.cursor={r,c};}
+  else{if(!X.keepMore)X.more=[];const m=mergeAt(sh,r,c);if(m){r=m.r1;c=m.c1;X.sel={...m};}else X.sel={r1:r,c1:c,r2:r,c2:c};X.act={r,c};X.anchor={r,c};X.cursor={r,c};}
   // a selection always covers whole merged blocks
   for(let i=0;i<3;i++)for(const m of sh.merges)if(m.r2>=X.sel.r1&&m.r1<=X.sel.r2&&m.c2>=X.sel.c1&&m.c1<=X.sel.c2){X.sel.r1=Math.min(X.sel.r1,m.r1);X.sel.c1=Math.min(X.sel.c1,m.c1);X.sel.r2=Math.max(X.sel.r2,m.r2);X.sel.c2=Math.max(X.sel.c2,m.c2);}
   scrollToCell(X.cursor.r,X.cursor.c);paintSel();
@@ -1403,7 +1405,7 @@ function buildTabs(){
   X.st.sheets.forEach((sh,i)=>{if(sh.hidden)return;const b=document.createElement('button');b.type='button';b.textContent=sh.name;b.className=i===X.si?'on':'';b.onclick=()=>switchSheet(i);box.append(b);});
   const add=document.createElement('button');add.type='button';add.className='add';add.title='גיליון חדש';add.setAttribute('aria-label','גיליון חדש');add.textContent='+';add.onclick=addSheet;box.append(add);
 }
-function switchSheet(i){commitEdit();X.si=i;X.chartSel=null;X.sel={r1:0,c1:0,r2:0,c2:0};X.act={r:0,c:0};q('xeWrap').scrollTop=0;q('xeWrap').scrollLeft=0;buildTabs();render();q('xeWrap').focus({preventScroll:true});}
+function switchSheet(i){commitEdit();X.si=i;X.chartSel=null;X.more=[];X.sel={r1:0,c1:0,r2:0,c2:0};X.act={r:0,c:0};q('xeWrap').scrollTop=0;q('xeWrap').scrollLeft=0;buildTabs();render();q('xeWrap').focus({preventScroll:true});}
 function addSheet(){
   const st=X.st;let n=st.sheets.length+1;const base=st.heb?'גיליון':'Sheet';while(st.sheets.some(s=>s.name===base+n))n++;
   let k=1;while(st.files.has(`xl/worksheets/sheet${k}.xml`))k++;const path=`xl/worksheets/sheet${k}.xml`;
@@ -1505,7 +1507,7 @@ function wire(){
   sc.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();sc.onchange();wrap.focus();}};
   rb.querySelector('[data-in=fmt]').onchange=e=>{if(e.target.value!=='__custom')setFmt(e.target.value);wrap.focus();};
   // grid
-  let drag=false;
+  let drag=false,hdrDrag=null;
   wrap.addEventListener('mousedown',e=>{
     if(e.button!==0)return;if(e.target.closest('.xfh')){startFill(e);return;}
     const fb=e.target.closest('.xfb');if(fb){e.preventDefault();e.stopPropagation();commitEdit();if(X.popFor===fb){closePop();return;}filterMenu(+fb.dataset.fc,fb);return;}
@@ -1514,6 +1516,9 @@ function wire(){
     const rz=e.target.closest('[data-rz]');if(rz){startResize(e,+rz.dataset.rz);return;}
     const th=e.target.closest('th');
     if(th){e.preventDefault();commitEdit();const sh=cur(),g=geo(sh);
+      // Ctrl adds another area, like in Excel (A and E for a chart); without it the earlier areas are dropped
+      const add=(e.ctrlKey||e.metaKey)&&!th.dataset.all&&!e.shiftKey;X.more=add?[...(X.more||[]),{...X.sel}]:[];
+      hdrDrag=th.dataset.col!==undefined?'c':th.dataset.row!==undefined?'r':null;
       if(th.dataset.all){X.act={r:0,c:0};X.anchor={r:0,c:0};X.sel={r1:0,c1:0,r2:Math.max(sh.maxR,0),c2:Math.max(sh.maxC,0)};}
       else if(th.dataset.col!==undefined){const c=+th.dataset.col;if(e.shiftKey){X.sel={r1:0,r2:Math.max(sh.maxR,g.rows-1),c1:Math.min(X.anchor.c,c),c2:Math.max(X.anchor.c,c)};}else{X.act={r:0,c};X.anchor={r:0,c};X.sel={r1:0,r2:Math.max(sh.maxR,0),c1:c,c2:c};}}
       else if(th.dataset.row!==undefined){const r=+th.dataset.row;if(e.shiftKey){X.sel={c1:0,c2:Math.max(sh.maxC,0),r1:Math.min(X.anchor.r,r),r2:Math.max(X.anchor.r,r)};}else{X.act={r,c:0};X.anchor={r,c:0};X.sel={r1:r,r2:r,c1:0,c2:Math.max(sh.maxC,0)};}}
@@ -1521,10 +1526,17 @@ function wire(){
     const p=cellFromEvent(e);if(!p)return;e.preventDefault();
     if(X.chartSel!=null){X.chartSel=null;paintPics();}
     if(X.editing){if(X.editing.r===p.r&&X.editing.c===p.c)return;commitEdit();}
-    wrap.focus({preventScroll:true});if(e.shiftKey)select(p.r,p.c,true);else select(p.r,p.c);drag=true;
+    wrap.focus({preventScroll:true});
+    if((e.ctrlKey||e.metaKey)&&!e.shiftKey){X.more=[...(X.more||[]),{...X.sel}];X.keepMore=true;try{select(p.r,p.c);}finally{X.keepMore=false;}}
+    else if(e.shiftKey)select(p.r,p.c,true);else select(p.r,p.c);drag=true;
   });
-  wrap.addEventListener('mouseover',e=>{if(!drag||!(e.buttons&1)){drag=false;return;}const p=cellFromEvent(e);if(p)select(p.r,p.c,true);});
-  X.onUp=()=>{drag=false;};window.addEventListener('mouseup',X.onUp);
+  wrap.addEventListener('mouseover',e=>{
+    if(hdrDrag&&(e.buttons&1)){const th=e.target.closest&&e.target.closest('th[data-col],th[data-row]');if(!th)return;const sh=cur();
+      if(hdrDrag==='c'&&th.dataset.col!==undefined){const c=+th.dataset.col,a=X.anchor.c;X.sel={r1:0,r2:Math.max(sh.maxR,0),c1:Math.min(a,c),c2:Math.max(a,c)};paintSel();}
+      else if(hdrDrag==='r'&&th.dataset.row!==undefined){const r=+th.dataset.row,a=X.anchor.r;X.sel={c1:0,c2:Math.max(sh.maxC,0),r1:Math.min(a,r),r2:Math.max(a,r)};paintSel();}
+      return;}
+    if(!drag||!(e.buttons&1)){drag=false;return;}const p=cellFromEvent(e);if(p)select(p.r,p.c,true);});
+  X.onUp=()=>{drag=false;hdrDrag=null;};window.addEventListener('mouseup',X.onUp);
   wrap.addEventListener('dblclick',e=>{if(e.target.closest('.xfh')){fillDownAuto();return;}const rz=e.target.closest('[data-rz]');if(rz){autoFit(+rz.dataset.rz);return;}const p=cellFromEvent(e);if(p){select(p.r,p.c);startEdit();}});
   wrap.addEventListener('contextmenu',ctxMenu);
   wrap.addEventListener('wheel',e=>{if(e.ctrlKey||e.metaKey){e.preventDefault();setZoom(X.zoom+(e.deltaY<0?.1:-.1));}},{passive:false});
@@ -2480,17 +2492,37 @@ function deleteChart(i){
 // a chart made from a block of cells, the way Excel decides: headings, a category column, series by columns or by rows
 function chartCell(si,r,c){const sh=X.st.sheets[si],cell=cellAt(sh,r,c);if(!cell)return{v:null};let v=cell.f&&!cell.array?valueOf(si,r,c):cell.v;if(isErr(v))v=null;
   const d=descOf(X.st.st,cell.s);return{v:v===''||v===undefined?null:v,date:typeof v==='number'&&isDateFmt(d.fmt),fmt:d.fmt};}
+// several selected areas (Ctrl) become one table: columns side by side (A1:A33 + E1:E33), or rows one under the other
+function gFromAreas(areas){
+  areas=areas.filter(Boolean);if(areas.length<2)return areas[0]?{...areas[0]}:null;
+  const sameCols=areas.every(a=>a.c1===areas[0].c1&&a.c2===areas[0].c2);
+  const uniq=a=>[...new Set(a)].sort((x,y)=>x-y);
+  if(sameCols){const rows=uniq(areas.flatMap(a=>Array.from({length:a.r2-a.r1+1},(_,k)=>a.r1+k)));
+    return{r1:rows[0],r2:rows[rows.length-1],c1:areas[0].c1,c2:areas[0].c2,rows:rows.length===rows[rows.length-1]-rows[0]+1?null:rows};}
+  const cols=uniq(areas.flatMap(a=>Array.from({length:a.c2-a.c1+1},(_,k)=>a.c1+k)));
+  return{r1:Math.min(...areas.map(a=>a.r1)),r2:Math.max(...areas.map(a=>a.r2)),c1:cols[0],c2:cols[cols.length-1],cols:cols.length===cols[cols.length-1]-cols[0]+1?null:cols};
+}
+const gRows=g=>g.rows||Array.from({length:g.r2-g.r1+1},(_,k)=>g.r1+k);
+const gCols=g=>g.cols||Array.from({length:g.c2-g.c1+1},(_,k)=>g.c1+k);
+// the text of the areas, Excel style: A1:A33,E1:E33
+function gText(g){
+  const runs=list=>{const out=[];let a=list[0],b=a;for(const x of list.slice(1)){if(x===b+1)b=x;else{out.push([a,b]);a=b=x;}}out.push([a,b]);return out;};
+  if(g.cols)return runs(g.cols).map(([a,b])=>rangeStr({r1:g.r1,r2:g.r2,c1:a,c2:b})).join(',');
+  if(g.rows)return runs(g.rows).map(([a,b])=>rangeStr({r1:a,r2:b,c1:g.c1,c2:g.c2})).join(',');
+  return rangeStr(g);
+}
 function chartGuess(g,byRow){
-  const si=X.si,rows=g.r2-g.r1+1,cols=g.c2-g.c1+1;if(byRow===undefined)byRow=cols>rows;
-  const nS=byRow?rows:cols,nP=byRow?cols:rows;const at=(i,j)=>byRow?chartCell(si,g.r1+i,g.c1+j):chartCell(si,g.r1+j,g.c1+i);
+  const si=X.si,RW=gRows(g),CL=gCols(g),rows=RW.length,cols=CL.length;
+  if(g.cols)byRow=false;else if(g.rows)byRow=true;else if(byRow===undefined)byRow=cols>rows;
+  const nS=byRow?rows:cols,nP=byRow?cols:rows;const at=(i,j)=>byRow?chartCell(si,RW[i],CL[j]):chartCell(si,RW[j],CL[i]);
   let hdr=false;if(nP>1){let txt=0,num=0;for(let i=0;i<nS;i++)if(typeof at(i,0).v==='string')txt++;for(let i=0;i<nS;i++)for(let j=1;j<Math.min(nP,40);j++)if(typeof at(i,j).v==='number')num++;hdr=txt>0&&num>0;}
   let cat=false;if(nS>1){let n=0,d=0,t=0;for(let j=hdr?1:0;j<nP;j++){const x=at(0,j);if(x.v===null)continue;n++;if(x.date)d++;else if(typeof x.v!=='number')t++;}
     cat=n>0&&(d+t)>=n*.6||hdr&&at(0,0).v===null&&n>0;}
   return{hdr,cat,byRow};
 }
 function chartSeries(g,o){
-  const si=X.si,sh=cur();const nS=o.byRow?g.r2-g.r1+1:g.c2-g.c1+1,nP=o.byRow?g.c2-g.c1+1:g.r2-g.r1+1;
-  const rc=(i,j)=>o.byRow?[g.r1+i,g.c1+j]:[g.r1+j,g.c1+i];const at=(i,j)=>chartCell(si,...rc(i,j));
+  const si=X.si,sh=cur(),RW=gRows(g),CL=gCols(g);const nS=o.byRow?RW.length:CL.length,nP=o.byRow?CL.length:RW.length;
+  const rc=(i,j)=>o.byRow?[RW[i],CL[j]]:[RW[j],CL[i]];const at=(i,j)=>chartCell(si,...rc(i,j));
   const j0=o.hdr?1:0,j1=nP-1;if(j1<j0)return{series:[],catFmt:null};
   const R=i=>{const [ra,ca]=rc(i,j0),[rb,cb]=rc(i,j1);return XL_CHARTS.refText(sh.name,ra,ca,rb,cb);};
   let catFmt=null;if(o.cat)for(let j=j0;j<=j1;j++){const x=at(0,j);if(x.v!==null){catFmt=x.date?x.fmt:null;break;}}
@@ -2522,7 +2554,7 @@ function chartDialog(idx){
   const sh=cur();if(!sh.charts)sh.charts=[];const old=idx!=null?sh.charts[idx]:null;
   if(old&&old.del)return;
   let g=null,o=null;
-  if(!old){g=region();if(g.r1===g.r2&&g.c1===g.c2){hint('מסמנים קודם את הנתונים לתרשים (עם הכותרות), ואז לוחצים על "תרשים"');return;}o=chartGuess(g);}
+  if(!old){g=X.more&&X.more.length?gFromAreas([...X.more,X.sel]):region();if(!g.cols&&!g.rows&&g.r1===g.r2&&g.c1===g.c2){hint('מסמנים קודם את הנתונים לתרשים (עם הכותרות), ואז לוחצים על "תרשים"');return;}o=chartGuess(g);}
   const om=old&&old.model;
   let type=om?(om.type==='bar'?(om.dir==='bar'?'bar':'col'):om.type==='scatter'?'line':om.type):(X.chartType||'col');
   const firstName=()=>{const r=g?chartSeries(g,o).series:[];return r.length===1?r[0].name:'';};
@@ -2532,7 +2564,7 @@ function chartDialog(idx){
     <div class="xch-body"><div class="xch-prev" id="xchPrev"></div>
     <div class="xch-opts">
       <label class="fl">כותרת<input id="xchTitle" dir="auto" maxlength="200"></label>
-      <label class="fl">טווח הנתונים<input id="xchRange" dir="ltr" spellcheck="false" placeholder="${old?'ריק = הנתונים של התרשים':'A1:B10'}"></label>
+      <label class="fl">טווח הנתונים<input id="xchRange" dir="ltr" spellcheck="false" placeholder="${old?'ריק = הנתונים של התרשים':'A1:A33,E1:E33'}"></label>
       <div id="xchData"><label class="ck"><input type="checkbox" id="xchHdr"> בשורה הראשונה יש כותרות</label>
       <label class="ck"><input type="checkbox" id="xchCat"> <span id="xchCatL"></span></label>
       <label class="ck"><input type="checkbox" id="xchRow"> סדרות לפי שורות</label></div>
@@ -2543,7 +2575,7 @@ function chartDialog(idx){
     <div class="acts"><button type="button" data-a="x">ביטול</button><button type="button" class="pri" data-a="ok">${old?'עדכון':'הוספה'}</button></div>`,a=>{if(a==='ok')apply();});
   const inn=q('xeDlg').firstElementChild;inn.classList.add('xch');
   const $=id=>inn.querySelector('#'+id);
-  if(g)$('xchRange').value=rangeStr(g);
+  if(g)$('xchRange').value=gText(g);
   $('xchTitle').value=om?om.title||'':firstName();$('xchLbl').checked=om?!!om.labels:false;
   let series=[];
   const build=()=>{
@@ -2552,8 +2584,8 @@ function chartDialog(idx){
     const pie=type==='pie'||type==='doughnut';
     if(st.legend===null)st.legend=S.length>1||pie?'b':'';
     $('xchLeg').value=st.legend;$('xchData').hidden=!g;
-    if(g){$('xchHdr').checked=o.hdr;$('xchCat').checked=o.cat;$('xchRow').checked=o.byRow;$('xchCatL').textContent=o.byRow?'בעמודה הראשונה יש שמות או תאריכים לציר':'בעמודה הראשונה יש שמות או תאריכים לציר';
-      if(o.byRow)$('xchHdr').parentNode.lastChild.textContent=' בעמודה הראשונה יש כותרות';else $('xchHdr').parentNode.lastChild.textContent=' בשורה הראשונה יש כותרות';
+    if(g){$('xchHdr').checked=o.hdr;$('xchCat').checked=o.cat;$('xchRow').checked=o.byRow;$('xchRow').disabled=!!(g.cols||g.rows);
+      $('xchHdr').parentNode.lastChild.textContent=o.byRow?' בעמודה הראשונה יש כותרות':' בשורה הראשונה יש כותרות';
       $('xchCatL').textContent=o.byRow?'בשורה הראשונה יש שמות או תאריכים לציר':'בעמודה הראשונה יש שמות או תאריכים לציר';}
     const first=st.keep.indexOf(true);
     $('xchSer').innerHTML=S.length?`<div class="t">${pie?'בעוגה מוצגת סדרה אחת:':'הסדרות בתרשים:'}</div>`+S.map((s,i)=>`<label class="ck"><input type="${pie?'radio':'checkbox'}" name="xchS" data-si="${i}"${pie?(i===first?' checked':''):(st.keep[i]?' checked':'')}> <span class="sw" style="background:#${s.color||XL_CHARTS.autoColor(i,chAcc())}"></span>${escH(s.name||('סדרה '+(i+1)))}</label>`).join(''):'<div class="t warn">לא נמצאו מספרים בטווח הזה</div>';
@@ -2578,7 +2610,8 @@ function chartDialog(idx){
   $('xchHdr').addEventListener('change',redo);$('xchCat').addEventListener('change',redo);
   $('xchRow').addEventListener('change',()=>{o=chartGuess(g,$('xchRow').checked);st.keep=null;build();});
   $('xchRange').addEventListener('change',()=>{const v=$('xchRange').value.replace(/[\s$]/g,'').replace(/^.*!/,'');if(!v){if(old){g=null;st.keep=null;build();}return;}
-    const r=parseRange(v);if(!r){hint('טווח לא תקין, למשל A1:C20');return;}g=r;o=chartGuess(g);st.keep=null;if(!$('xchTitle').value)$('xchTitle').value=firstName();build();});
+    const parts=v.split(/[,;]/).filter(Boolean).map(x=>parseRange(x.replace(/^.*!/,'')));if(!parts.length||parts.some(x=>!x)){hint('טווח לא תקין, למשל A1:C20 או A1:A33,E1:E33');return;}
+    g=gFromAreas(parts);o=chartGuess(g);st.keep=null;if(!$('xchTitle').value)$('xchTitle').value=firstName();build();});
   build();
   setTimeout(()=>{const t=$('xchTitle');if(t)t.focus();},40);
   function apply(){
