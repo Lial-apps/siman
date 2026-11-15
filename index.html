@@ -1353,7 +1353,7 @@ body:has(#wed) .busy,body:has(#xed) .busy,body:has(#ped) .busy{z-index:1000}body
 </dialog>
 
 <header class="bar">
-  <div class="brand"><b title="גרסה 6.6.2">סימן</b><span class="ver">6.6.2</span><span class="fname" id="fname"></span></div>
+  <div class="brand"><b title="גרסה 6.6.3">סימן</b><span class="ver">6.6.3</span><span class="fname" id="fname"></span></div>
 
   <nav class="tools" id="tools" aria-label="כלים">
     <button class="tool" data-tool="select" aria-pressed="true" title="בחירה וגלילה (V)">
@@ -3974,7 +3974,7 @@ async function renderThumbs(){
     drawing=false;
   };
   let root=ol;while(root&&root!==document.body){const o=getComputedStyle(root).overflowY;if(o==='auto'||o==='scroll')break;root=root.parentElement;}
-  thumbIO=new IntersectionObserver(es=>{for(const e of es)if(e.isIntersecting){queue.push(+e.target.parentElement.dataset.i);thumbIO.unobserve(e.target);}queue.sort((a,b)=>a-b);draw();},{root:root&&root!==document.body?root:null,rootMargin:'300px 0px'});
+  thumbIO=new IntersectionObserver(es=>{for(const e of es)if(e.isIntersecting){queue.push(+e.target.parentElement.dataset.i);thumbIO.unobserve(e.target);}queue.sort((a,b)=>a-b);draw();},{root:root&&root!==document.body?root:null,rootMargin:'300px'});   // also sideways: on phones the thumbnails are one row
   ol.querySelectorAll('.thumb .tc').forEach(t=>thumbIO.observe(t));
 }
 var thumbIO=null,thumbGen=0;
@@ -5181,13 +5181,16 @@ const CMDS=[
   {l:'ביטול הפעולה האחרונה',k:'בטל ביטול חזור אחורה undo',key:'Ctrl Z',doc:1,run:()=>undo()},
   {l:'הגדרות: השם והמייל שלי',k:'הגדרות מייל שם חשבון settings',run:()=>$('setBtn').click()}
 ];
-CMDS.forEach(c=>{c.hay=normHe(c.l+' '+c.k);c.toks=c.hay.split(/\s+/).filter(t=>t.length>=3);});
+// 6.6.3: commands added later by other parts (form filling) are indexed when first searched: before, they had no
+// index and every search threw, so after a form was opened the palette found nothing at all
+function cmdIndex(c){if(!c.hay){c.hay=normHe(c.l+' '+(c.k||''));c.toks=c.hay.split(/\s+/).filter(t=>t.length>=3);}}
+CMDS.forEach(cmdIndex);
 const CMD={list:[],at:0};
 function cmdMatch(q){
   const words=normHe(q).split(/\s+/).filter(w=>w&&!CMD_STOP.has(w));
   const hasDoc=!!S.doc;
   if(!words.length)return CMDS.filter(c=>hasDoc||!c.doc).slice(0,12);
-  return CMDS.map((c,i)=>{let sc=0;
+  return CMDS.map((c,i)=>{cmdIndex(c);let sc=0;
       for(const w of words){if(c.hay.includes(w))sc+=2;else if(c.toks.some(t=>w.includes(t)))sc+=1.5;}
       if(!hasDoc&&c.doc)sc-=.5;return{c,sc,i};})
     .filter(x=>x.sc>0).sort((a,b)=>b.sc-a.sc||a.i-b.i).slice(0,9).map(x=>x.c);

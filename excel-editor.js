@@ -948,7 +948,9 @@ function render(){
   h+=rowsHtml(sh,g,r0,r1,vis,o);
   const rest=g.top[g.rows]-g.top[r1+1];if(rest>0)h+=`<tr class="sp"><td colspan="${vis.length+1}" style="height:${rest}px"></td></tr>`;
   h+='</tbody>';
-  const grid=q('xeGrid');grid.innerHTML=h;grid.style.direction=sh.rtl?'rtl':'ltr';grid.classList.toggle('nogrid',!sh.grid);grid.style.zoom=z;
+  const grid=q('xeGrid');grid.innerHTML=h;grid.style.direction=sh.rtl?'rtl':'ltr';
+  // 6.6.3: the scrolling area takes the sheet's direction too: a left-to-right sheet opened scrolled to its far end, with column A off screen (on a phone, columns M-Q showed)
+  {const d=sh.rtl?'rtl':'ltr';if(wrap.style.direction!==d){wrap.style.direction=d;wrap.scrollLeft=0;}}grid.classList.toggle('nogrid',!sh.grid);grid.style.zoom=z;
   paintSel();
   try{paintPics();}catch(e){console.warn(e);}
 }
