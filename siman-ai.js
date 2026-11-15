@@ -78,7 +78,7 @@ Rules:
 - A word you are not sure of: your best reading inside [[ ]], for example [[שלום]]. Use [[?]] only when not even a guess is possible. A best guess in [[ ]] is always better than [[?]].
 - Arrows drawn between words (→ ← ↓) are kept as → or ← or ↓ in the text, in the place they appear. Abbreviations, codes and English or Latin letters inside Hebrew text are kept exactly as written.
 - Skip crossed-out words, page decorations and doodles. Keep numbers, dates, math and signs as written.
-- Right-to-left languages (Hebrew, Arabic) in normal logical order.
+- Right-to-left languages (Hebrew, Arabic) in normal logical order. Write Hebrew words only with Hebrew letters (א-ת): never put an Arabic letter (such as ط ح ع) inside a Hebrew word.
 - If the page is empty, return {"lang":null,"blocks":[]}.${hint ? `\nThe page is probably in: ${hint}.` : ''}`,
 
   ask: () => `You are the assistant inside סימן, a document app. The user opened a document; its text is given page by page, each page starting with a line like "===== עמוד 3 =====".
@@ -106,7 +106,7 @@ Rules:
 - Skip running headers and footers that repeat on every page (book title, page number), and anything showing through from the other side of the paper.
 - Form fields: keep the label and what is filled in, for example "שם: ישראל ישראלי". An empty field keeps its label followed by "____".
 - A word you really cannot read (blurred, cut off): your best reading inside [[ ]]. Use [[?]] only when not even a guess is possible.
-- Right-to-left languages (Hebrew, Arabic) in normal logical order.
+- Right-to-left languages (Hebrew, Arabic) in normal logical order. Write Hebrew words only with Hebrew letters (א-ת): never put an Arabic letter (such as ط ح ع) inside a Hebrew word.
 - If the page is empty, return {"hand":false,"lang":null,"blocks":[]}.${hint ? `\nThe page is probably in: ${hint}.` : ''}`;
 
 // 6.6.5: a slide that is one picture (NotebookLM, Canva, a scanned or exported deck): every piece of text with its
@@ -115,7 +115,7 @@ const SLIDE_TEXT_PROMPT = `You turn a picture of a presentation slide into edita
 Return only JSON: {"blocks":[{"text":"...","box":[ymin,xmin,ymax,xmax],"lines":1,"bold":false,"serif":false,"align":"right"}]}
 - box: integers 0-1000 relative to the whole picture, tight around the letters of that block (all of its lines), not around a frame or a background shape.
 - One block per paragraph of the same style: a title, the sentence under it and each bullet item are separate blocks. "lines" = how many lines the block takes on the slide; in "text" join those lines with a space (keep a real line break only between separate list lines).
-- Copy the text exactly, letter by letter, with its punctuation, numbers, quotes and niqqud. Hebrew and Arabic in normal logical order. Do not translate or correct.
+- Copy the text exactly, letter by letter, with its punctuation, numbers, quotes and niqqud. Hebrew in normal logical order, written only with Hebrew letters (א-ת) — never an Arabic letter such as ط ح ع inside a Hebrew word. Do not translate or correct.
 - serif: true when the letters have serifs (like Frank Ruehl or Times), false for plain letters (like Arial or Heebo). align: how the block's lines are aligned on the slide (right, center or left).
 - Skip text that is part of a photo or illustration (a sign inside a picture), and small logos or watermarks such as a "Gemini Notebook" or "NotebookLM" mark in a corner.
 - If there is no text, return {"blocks":[]}.`;
@@ -140,6 +140,18 @@ const SLIDE_TEXT_SCHEMA = {
   },
   required: ['blocks'],
 };
+
+// 6.6.6: the model sometimes writes one Arabic letter inside a Hebrew word ("מצحך", "העطורה"). In a word that
+// has Hebrew letters, every Arabic letter becomes its Hebrew twin; a word written wholly in Arabic is left alone
+// (a real Arabic document keeps its text).
+const AR_HE = { 'ا': 'א', 'أ': 'א', 'إ': 'א', 'آ': 'א', 'ب': 'ב', 'ت': 'ת', 'ث': 'ת', 'ج': 'ג', 'ح': 'ח', 'خ': 'ח', 'د': 'ד', 'ذ': 'ד', 'ر': 'ר', 'ز': 'ז', 'س': 'ס', 'ش': 'ש', 'ص': 'צ', 'ض': 'צ', 'ط': 'ט', 'ظ': 'ט', 'ع': 'ע', 'غ': 'ע', 'ف': 'פ', 'ق': 'ק', 'ك': 'כ', 'ل': 'ל', 'م': 'מ', 'ن': 'נ', 'ه': 'ה', 'ة': 'ה', 'و': 'ו', 'ي': 'י', 'ى': 'י', 'ء': '' };
+const fixMixed = t => String(t).replace(/[֐-׿؀-ۿיִ-ﭏ]+/g, w => /[א-ת]/.test(w) && /[؀-ۿ]/.test(w) ? w.replace(/[؀-ۿ]/g, c => AR_HE[c] ?? c) : w);
+const READING = ['slideText', 'print', 'scan', 'scanAccurate', 'lines', 'linesFast', 'linesCheck', 'table', 'tableCheck'];
+function cleanReading(mode, d) {
+  if (!READING.includes(mode) || !d || !Array.isArray(d.candidates)) return d;
+  for (const c of d.candidates) for (const p of (c && c.content && c.content.parts) || []) if (typeof p.text === 'string') p.text = fixMixed(p.text);
+  return d;
+}
 
 // finding the sheet of paper in a photo: its four corners, so the app can cut it out and straighten it
 const LINES_PROMPT = hint => `You read handwritten notes for a document app. You get several lines, numbered, in reading order (the page's first line first). Each line is cut from a photographed page and usually comes in two views of the same picture: view A is high-contrast (ink black, paper white), view B is softer and keeps the thin strokes. Use both views to decide each letter.
@@ -567,7 +579,7 @@ export default {
       }
       clearInterval(ping);
       if (res.status !== 200 && gd.refund) await gd.refund();   // 6.6.5: a failed request is not counted
-      const out = res.status === 200 ? res.d : { error: { ...(res.d && res.d.error || {}), message: (res.d && res.d.error && res.d.error.message) || 'Gemini error', status: res.status } };
+      const out = res.status === 200 ? cleanReading(mode, res.d) : { error: { ...(res.d && res.d.error || {}), message: (res.d && res.d.error && res.d.error.message) || 'Gemini error', status: res.status } };
       try { await w.write(enc.encode(JSON.stringify(out))); await w.close(); } catch (_) {}
     })();
     ctx.waitUntil(job);
