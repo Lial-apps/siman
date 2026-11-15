@@ -960,19 +960,26 @@ function ensureBlocks(){
       while(p.nextSibling&&(p.nextSibling.nodeType===3||(!PARA.test(p.nextSibling.tagName)&&!/^(TABLE|UL|OL|HR|DIV)$/.test(p.nextSibling.tagName))))p.append(p.nextSibling);
       changed=true;}
   }
+  // 6.6.6: text left straight in a table cell (its paragraph was deleted) gets a paragraph again, so the paragraph
+  // tools (line spacing, alignment, spacing before/after) reach it
+  for(const td of b.querySelectorAll('td,th')){
+    if(td.querySelector('p,h1,h2,h3,h4,h5,h6,li,pre,blockquote,table,ul,ol')||!td.textContent.trim())continue;
+    if(!sel)sel=getSel();const p=document.createElement('p');p.style.direction=getComputedStyle(td).direction;while(td.firstChild)p.append(td.firstChild);td.append(p);changed=true;}
   if(!b.querySelector('p,h1,h2,h3,h4,h5,h6,li,table')){const p=document.createElement('p');p.style.direction=E.st.heb?'rtl':'ltr';p.append(document.createElement('br'));b.append(p);changed=true;}
   if(changed&&sel)setSel(sel);
   return changed;
 }
-function blocksOr(){let bs=selBlocks();if(!bs.length&&ensureBlocks())bs=selBlocks();if(!bs.length){const r=liveRange();const b=r&&blockOf(r.startContainer);if(b)bs=[b];}return bs;}
+function blocksOr(){ensureBlocks();let bs=selBlocks();if(!bs.length){const r=liveRange();const b=r&&blockOf(r.startContainer);if(b)bs=[b];}return bs;}
 const visAlign=cs=>{const t=cs.textAlign,rtl=cs.direction==='rtl';
   if(t==='start'||t==='-webkit-auto'||t==='auto')return rtl?'right':'left';if(t==='end')return rtl?'left':'right';
   if(t==='-webkit-right')return'right';if(t==='-webkit-left')return'left';if(t==='-webkit-center')return'center';return t;};
 function align(v){mutate(()=>blocksOr().forEach(b=>b.style.textAlign=v));}
 function setDir(d){mutate(()=>blocksOr().forEach(b=>{const cs=getComputedStyle(b),va=visAlign(cs),old=cs.direction;
   b.style.direction=d;if(va===(old==='rtl'?'right':'left'))b.style.textAlign='start';else if(va===(old==='rtl'?'left':'right'))b.style.textAlign='end';}));}
-function lineSpacing(v){mutate(()=>blocksOr().forEach(b=>b.style.lineHeight=String(v)));}
-function paraSpace(which,pt){mutate(()=>blocksOr().forEach(b=>b.style[which==='before'?'marginTop':'marginBottom']=pt+'pt'));}
+// 6.6.6: all = every paragraph of the document (the spacing menu offers it, and ticks it when the cursor is not in the text)
+const allBlocks=()=>{ensureBlocks();return[...E.body.querySelectorAll('p,h1,h2,h3,h4,h5,h6,li,pre,blockquote')].filter(b=>!b.querySelector('p,h1,h2,h3,h4,h5,h6,li,table'));};
+function lineSpacing(v,all){mutate(()=>(all?allBlocks():blocksOr()).forEach(b=>b.style.lineHeight=String(v)));}
+function paraSpace(which,pt,all){mutate(()=>(all?allBlocks():blocksOr()).forEach(b=>b.style[which==='before'?'marginTop':'marginBottom']=pt+'pt'));}
 function indentPhys(side,cm){mutate(()=>blocksOr().forEach(b=>b.style[side==='r'?'marginRight':'marginLeft']=(Math.max(0,cm)*37.7953).toFixed(1)+'px'));}
 const numRe=new RegExp(`^${P}-num-(\\d+)-(\\d+)$`);
 function numOf(b){for(const c of b.classList){const m=numRe.exec(c);if(m)return{id:+m[1],lvl:+m[2],cls:c};}return null;}
@@ -1242,12 +1249,16 @@ function openPop(kind,btn){
   else if(kind==='hilite')pop(btn,`<h4>צבע הדגשה</h4>${pal(HLS,'ללא צבע')}`,v=>setHilite(v==='none'?null:v));
   else if(kind==='shade')pop(btn,`<h4>הצללת התא</h4>${pal(['D9E2F3','DEEAF6','E2EFD9','FFF2CC','FBE4D5','EDEDED','B4C6E7','C5E0B3','FFE599','F7CAAC','BFBFBF','FFFFFF','8EAADB','A8D08D','FFD966','F4B083','A5A5A5','2E58CC','FFD43B','16213A'],'ללא הצללה')}`,v=>shade(v==='none'?null:v));
   else if(kind==='spacing'){
-    const b=curBlock();const cs=b&&getComputedStyle(b);const cur=b?(b.style.lineHeight||''):'';
+    // 6.6.6: where the change goes is said in the menu: the paragraph of the cursor (or the selected ones), or — when the
+    // cursor is not in the text — the whole document (before, it went silently to the first paragraph and looked like nothing happened)
+    const live=!!curRange(),b=live?curBlock():null;const cs=b&&getComputedStyle(b);const cur=b?(b.style.lineHeight||''):'';
     const mb=cs?parseFloat(cs.marginBottom):0,mt=cs?parseFloat(cs.marginTop):0;
-    pop(btn,`<h4>ריווח בין שורות</h4>${['1','1.15','1.5','2','2.5','3'].map(v=>`<button type="button" class="mi ${cur===v?'on':''}" data-v="lh:${v}">${v==='1'?'1.0':v}</button>`).join('')}<div class="sep"></div>
+    const p=pop(btn,`<h4>ריווח בין שורות</h4><label class="mi" style="gap:8px;cursor:pointer"><input type="checkbox" data-all ${live?'':'checked'}> לכל המסמך</label><div class="sep"></div>${['1','1.15','1.5','2','2.5','3'].map(v=>`<button type="button" class="mi ${cur===v?'on':''}" data-v="lh:${v}">${v==='1'?'1.0':v}</button>`).join('')}<div class="sep"></div>
       <button type="button" class="mi" data-v="${mt>0?'sb:0':'sb:12'}">${mt>0?'הסרת הרווח לפני הפסקה':'הוספת רווח לפני הפסקה'}</button>
       <button type="button" class="mi" data-v="${mb>0?'sa:0':'sa:8'}">${mb>0?'הסרת הרווח אחרי הפסקה':'הוספת רווח אחרי הפסקה'}</button>`,v=>{
-      const[k,x]=v.split(':');if(k==='lh')lineSpacing(+x);else paraSpace(k==='sb'?'before':'after',+x);});}
+      const all=!!(p.querySelector('[data-all]')||{}).checked;
+      const[k,x]=v.split(':');if(k==='lh')lineSpacing(+x,all);else paraSpace(k==='sb'?'before':'after',+x,all);
+      if(all)hint(`הריווח שונה בכל המסמך`);});}
   else if(kind==='table'){
     const p=pop(btn,`<h4>הוספת טבלה</h4><div class="tgrid">${Array.from({length:80},(_,i)=>`<i data-v="${Math.floor(i/10)+1}x${i%10+1}"></i>`).join('')}</div><div class="tlab" id="weTLab">בחרו גודל</div>`,v=>{const[r,c]=v.split('x').map(Number);insertTable(r,c);});
     p.querySelector('.tgrid').onmouseover=e=>{const v=e.target.dataset.v;if(!v)return;const[r,c]=v.split('x').map(Number);

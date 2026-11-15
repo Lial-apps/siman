@@ -685,6 +685,7 @@ function writeTx(X, tx, txBody) {
     const need = () => pPr || (pPr = aNew(doc, 'pPr'));
     if (div.dataset.algn && ALG[div.style.textAlign]) need().setAttribute('algn', ALG[div.style.textAlign]);
     if (div.dataset.rtl) need().setAttribute('rtl', div.dir === 'rtl' ? '1' : '0');
+    if (div.dataset.ln) { const P = need(); for (const k of kids(P, 'lnSpc')) k.remove(); const l = aNew(doc, 'lnSpc'); l.append(aNew(doc, 'spcPct', { val: Math.round(+div.dataset.ln * 100000) })); putOrdered(P, l, PPR_ORDER); }
     if (div.dataset.buset) {
       const P = need(); for (const k of kids(P)) if (/^bu/.test(k.localName)) k.remove();
       if (div.dataset.buset === 'none') { putOrdered(P, aNew(doc, 'buNone'), PPR_ORDER); }
@@ -1293,7 +1294,7 @@ function ribbonHtml() {
  ${G('גופן', `<div class="row"><select class="wsel font" data-in="font" title="גופן" aria-label="גופן"></select><input class="wsel size" data-in="size" list="peSizes" inputmode="decimal" title="גודל גופן" aria-label="גודל גופן"><datalist id="peSizes">${SIZES.map(s => `<option value="${s}">`).join('')}</datalist>${B('grow', ic('grow'), 'הגדלת הגופן')}${B('shrink', ic('shrink'), 'הקטנת הגופן')}</div>
    <div class="row">${B('bold', '<b class="gl">B</b>', 'מודגש (Ctrl+B)')}${B('italic', '<i class="gl" style="font-family:Georgia,serif">I</i>', 'נטוי (Ctrl+I)')}${B('underline', '<u class="gl">U</u>', 'קו תחתי (Ctrl+U)')}${B('strike', '<s class="gl">ab</s>', 'קו חוצה')}
    <span class="wsplit">${B('color', '<span class="gl a">A</span><i class="cbar" data-bar="color"></i>', 'צבע גופן')}${B('colorMenu', ic('caret'), 'בחירת צבע גופן', 'data-pop="color"')}</span></div>`)}
- ${G('פסקה', `<div class="row">${B('bullets', ic('bullets'), 'תבליטים')}${B('numbers', ic('numbers'), 'מספור')}${B('rtl', ic('rtl'), 'מימין לשמאל')}${B('ltr', ic('ltr'), 'משמאל לימין')}</div>
+ ${G('פסקה', `<div class="row">${B('bullets', ic('bullets'), 'תבליטים')}${B('numbers', ic('numbers'), 'מספור')}${B('spacingMenu', ic('spacing'), 'ריווח בין שורות', 'data-pop="spacing"')}${B('rtl', ic('rtl'), 'מימין לשמאל')}${B('ltr', ic('ltr'), 'משמאל לימין')}</div>
    <div class="row">${B('right', ic('aright'), 'יישור לימין')}${B('center', ic('acenter'), 'מרכוז')}${B('left', ic('aleft'), 'יישור לשמאל')}${B('justify', ic('ajust'), 'יישור לשני הצדדים')}</div>`)}
  ${G('סידור', `<div class="col">${B('front', ic('front'), 'הבאה לקדמה')}${B('back', ic('back'), 'שליחה לרקע')}</div>` + B('delShape', ic('trash'), 'מחיקת הצורה (Delete)') + B('dupShape', ic('copy'), 'שכפול הצורה (Ctrl+D)'))}
  ${G('הצגה', BL('playStart', 'play', 'הצגה', 'הצגת המצגת מההתחלה (F5)'))}
@@ -1601,6 +1602,8 @@ function paraSet(fn) {
   ps.forEach(fn); if (X.editing) { X.txDirty = true; commitText(); } else finish(sc);
 }
 const align = a => paraSet(p => { p.style.textAlign = a; p.dataset.algn = '1'; });
+// 6.6.6: line spacing, as in PowerPoint (1.0 = single); shown as the renderer shows a file's own spacing (x 1.2)
+const lineSpacing = v => paraSet(p => { p.dataset.ln = String(v); p.style.lineHeight = (v * 1.2).toFixed(3); });
 const setDir = d => paraSet(p => { p.dir = d; p.dataset.rtl = '1'; p.style.textAlign = d === 'rtl' ? 'right' : 'left'; p.dataset.algn = '1'; });
 function bullets(kind) {
   const sc = scope(); if (!sc) return; const ps = parasIn(sc);
@@ -1696,6 +1699,7 @@ function pop(kind, anchor) {
   else if (kind === 'shapes') P.innerHTML = `<div class="pl">${SHAPES.map(([k, l]) => `<button type="button" data-s="${k}">${l}</button>`).join('')}</div>`;
   else if (kind === 'layouts') P.innerHTML = `<div class="pl">${layoutsOf(X, curPath()).map(l => `<button type="button" data-l="${esc(l.path)}">${esc(l.name)}</button>`).join('') || '<button type="button" data-l="">שקף ריק</button>'}</div>`;
   else if (kind === 'table') P.innerHTML = `<div class="tg">${Array.from({ length: 48 }, (_, i) => `<i data-r="${Math.floor(i / 8) + 1}" data-c="${i % 8 + 1}"></i>`).join('')}</div><div class="tgl">טבלה</div>`;
+  else if (kind === 'spacing') P.innerHTML = `<div class="pl"><b style="display:block;padding:4px 10px;font-size:12.5px;color:#5D6982">ריווח בין שורות</b>${['1', '1.15', '1.5', '2', '2.5', '3'].map(v => `<button type="button" data-ln="${v}">${v === '1' ? '1.0' : v}</button>`).join('')}</div>`;
   P.hidden = false; P.dataset.kind = kind;
   const r = anchor.getBoundingClientRect(), R = X.root.getBoundingClientRect();
   P.style.top = (r.bottom - R.top + 4) + 'px'; P.style.left = Math.max(6, Math.min(R.width - P.offsetWidth - 6, r.right - R.left - P.offsetWidth)) + 'px';
@@ -1709,6 +1713,7 @@ function popPick(e) {
   else if (k === 'bg') { setBackground(X.doc, b.dataset.c || null); commit(); renderStage(); }
   else if (k === 'shapes') insertCentered(bx => addShapeXml(X.doc, b.dataset.s, bx), 180, b.dataset.s === 'line' ? 2 : 120);
   else if (k === 'layouts') newSlide(b.dataset.l || null);
+  else if (k === 'spacing') lineSpacing(+b.dataset.ln);
 }
 function tableHover(e) { const c = e.target.closest && e.target.closest('.tg i'); if (!c) return; const r = +c.dataset.r, cc = +c.dataset.c; for (const i of q('pePop').querySelectorAll('.tg i')) i.classList.toggle('on', +i.dataset.r <= r && +i.dataset.c <= cc); q('pePop').querySelector('.tgl').textContent = `${cc} × ${r}`; }
 
