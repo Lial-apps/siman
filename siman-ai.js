@@ -28,7 +28,7 @@ const MODEL_TIMEOUT = { print: 55000, tableCheck: 80000, orient: 20000, table: 9
 // lines: on the ivrit.ai Hebrew handwriting benchmark the main model reads single lines best of all models
 // (median 12% of letters wrong), far ahead of the light one — and far ahead of itself on a whole page
 // 6.6: a printed page (book, letter, form, screenshot): the main model with no thinking reads print almost perfectly in seconds
-const MODELS_FOR = { print: ['gemini-flash-latest', 'gemini-flash-lite-latest'], tableCheck: ['gemini-flash-latest'], orient: ['gemini-flash-lite-latest', 'gemini-flash-latest'], table: ['gemini-flash-latest', 'gemini-flash-lite-latest'], linesCheck: ['gemini-flash-latest'], lines: ['gemini-flash-latest', 'gemini-flash-lite-latest'], linesFast: ['gemini-flash-lite-latest', 'gemini-flash-latest'], scan: ['gemini-flash-lite-latest', 'gemini-flash-latest'], scanAccurate: ['gemini-flash-latest', 'gemini-flash-lite-latest'], scanCheck: ['gemini-flash-latest'], corners: ['gemini-flash-latest', 'gemini-flash-lite-latest'] };
+const MODELS_FOR = { print: ['gemini-flash-latest', 'gemini-flash-lite-latest'], tableCheck: ['gemini-flash-latest'], orient: ['gemini-flash-lite-latest', 'gemini-flash-latest'], table: ['gemini-flash-latest', 'gemini-flash-lite-latest'], linesCheck: ['gemini-flash-latest'], lines: ['gemini-flash-latest', 'gemini-flash-lite-latest'], linesFast: ['gemini-flash-lite-latest', 'gemini-flash-latest'], scan: ['gemini-flash-lite-latest', 'gemini-flash-latest'], scanAccurate: ['gemini-flash-latest', 'gemini-flash-lite-latest'], scanCheck: ['gemini-flash-latest'], corners: ['gemini-flash-lite-latest', 'gemini-flash-latest'] };   // 6.6.5: the light model first: finding a sheet's corners does not need the main model's small free quota
 // no "thinking" for reading and translating = a much faster answer; a little for questions
 // Models differ in which setting they take (older: thinkingBudget, newer: thinkingLevel), and one that does
 // not take a setting answers "invalid argument" — so each is tried in turn, and at the end none at all.
@@ -252,7 +252,9 @@ const fail = (msg, status, origin) => json({ error: { message: msg } }, status, 
 // ===================================================================================================
 const GUARD_HOSTS = ['lial-apps.github.io', 'siman.siman-app.workers.dev'];   // where the Turnstile check may come from
 const PASS_TTL = 6 * 3600;                                                     // a pass lasts 6 hours
-const LIMITS = { device: 40, ip: 100, all: 0, pass: 25 };                      // per day (UTC); pass = new passes per address
+// 6.6.5: 200 / 500 (was 40 / 100: a few handwritten pages used up a whole day). Helper steps cost nothing and a
+// request that failed gives its unit back, so a printed page costs 1 and a handwritten page about 6.
+const LIMITS = { device: 200, ip: 500, all: 0, pass: 25 };                     // per day (UTC); pass = new passes per address
 const USER_KEY_RE = /^(AIza[\w-]{30,60}|AQ\.[\w.-]{20,200})$/;
 const DAY_MSG = 'הגעת למכסה היומית של השירותים החכמים בסימן (הסיכום, התרגום והקריאה החכמה). הכלים שבמכשיר ממשיכים לעבוד כרגיל. אפשר להמשיך מחר, או להוסיף בהגדרות מפתח Gemini אישי בחינם ולהמשיך בלי הגבלה.';
 const ALL_MSG = 'השירות החכם של סימן הגיע היום למכסה הכוללת שלו. אפשר לנסות שוב מחר, או להוסיף בהגדרות מפתח Gemini אישי בחינם ולהמשיך מיד.';
@@ -295,14 +297,17 @@ async function guard(req, env, weight = 1) {
   if (!dev) return guardFail(401, 'PASS', PASS_MSG);
   const own = String(req.headers.get('x-user-key') || '').trim();
   if (USER_KEY_RE.test(own)) return { ok: true, env: { ...env, GEMINI_KEY: own }, own: true };
-  let n;
-  try { n = await addUsage(env, ['d:' + dev, 'i:' + clientIp(req), 'all'], weight); } catch (_) { n = null; }   // a database hiccup does not stop the app
+  if (!weight) return { ok: true, env };                              // a helper step (page edges, turning, the second look): free
+  let n; const keys = ['d:' + dev, 'i:' + clientIp(req), 'all'];
+  try { n = await addUsage(env, keys, weight); } catch (_) { n = null; }   // a database hiccup does not stop the app
   if (n) {
     const [d, i, all] = n, ld = limitOf(env, 'device'), li = limitOf(env, 'ip'), la = limitOf(env, 'all');
-    if (la && all > la) return guardFail(429, 'ALL', ALL_MSG);
-    if ((ld && d > ld) || (li && i > li)) return guardFail(429, 'DAY', DAY_MSG);
+    // a request turned away is not counted either
+    if (la && all > la) { addUsage(env, keys, -weight).catch(() => {}); return guardFail(429, 'ALL', ALL_MSG); }
+    if ((ld && d > ld) || (li && i > li)) { addUsage(env, keys, -weight).catch(() => {}); return guardFail(429, 'DAY', DAY_MSG); }
   }
-  return { ok: true, env };
+  // refund(): the unit is given back when the request failed (Gemini busy, out of quota, too slow)
+  return { ok: true, env, refund: n ? () => addUsage(env, keys, -weight).catch(() => {}) : null };
 }
 // POST /pass {t: Turnstile token, dev} → {pass, ttl}   (siman-ai only)
 async function givePass(req, env) {
@@ -318,7 +323,7 @@ async function givePass(req, env) {
   return { status: 200, body: await makePass(env, dev) };
 }
 // how many units a request costs (a careful reading of a page asks Gemini two or three times)
-const WEIGHT = { scanAccurate: 3, lines: 1, table: 2, tableCheck: 1, linesCheck: 1 };
+const WEIGHT = { scanAccurate: 2, lines: 1, table: 2, tableCheck: 0, linesCheck: 0, corners: 0, orient: 0 };
 // ======================================== end of the guard ========================================
 
 function build(body) {
@@ -493,13 +498,14 @@ export default {
     if (g.err) return fail(g.err, 400, origin);
     const mode = body.mode === 'scan' && body.quality !== 'fast' ? 'scanAccurate' : body.mode === 'lines' && body.quality === 'fast' ? 'linesFast' : body.mode;
     // 6.4: a pass, and a fair daily share (or the person's own key)
-    const gd = await guard(req, env, WEIGHT[mode] || 1);
+    const gd = await guard(req, env, WEIGHT[mode] ?? 1);
     if (!gd.ok) return json(gd.body, gd.status, origin);
     env = gd.env;
 
     const deadline = Date.now() + (BUDGET[mode] || 85000);
     if (!STREAM_MODES.includes(mode)) {
       const res = await callGemini(g, mode, env, deadline);
+      if (res.status !== 200 && gd.refund) ctx.waitUntil(gd.refund());   // 6.6.5: a failed request is not counted
       return json(res.d, res.status, origin);
     }
     // answer at once, keep the line open, write the result when it is ready
@@ -517,6 +523,7 @@ export default {
         try { res = await proofread(g, res, env, deadline); } catch (_) {}
       }
       clearInterval(ping);
+      if (res.status !== 200 && gd.refund) await gd.refund();   // 6.6.5: a failed request is not counted
       const out = res.status === 200 ? res.d : { error: { ...(res.d && res.d.error || {}), message: (res.d && res.d.error && res.d.error.message) || 'Gemini error', status: res.status } };
       try { await w.write(enc.encode(JSON.stringify(out))); await w.close(); } catch (_) {}
     })();

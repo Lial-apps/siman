@@ -54,7 +54,9 @@ const fail = (msg, status, origin) => json({ error: { message: msg } }, status, 
 // ===================================================================================================
 const GUARD_HOSTS = ['lial-apps.github.io', 'siman.siman-app.workers.dev'];   // where the Turnstile check may come from
 const PASS_TTL = 6 * 3600;                                                     // a pass lasts 6 hours
-const LIMITS = { device: 40, ip: 100, all: 0, pass: 25 };                      // per day (UTC); pass = new passes per address
+// 6.6.5: 200 / 500 (was 40 / 100: a few handwritten pages used up a whole day). Helper steps cost nothing and a
+// request that failed gives its unit back, so a printed page costs 1 and a handwritten page about 6.
+const LIMITS = { device: 200, ip: 500, all: 0, pass: 25 };                     // per day (UTC); pass = new passes per address
 const USER_KEY_RE = /^(AIza[\w-]{30,60}|AQ\.[\w.-]{20,200})$/;
 const DAY_MSG = 'הגעת למכסה היומית של השירותים החכמים בסימן (הסיכום, התרגום והקריאה החכמה). הכלים שבמכשיר ממשיכים לעבוד כרגיל. אפשר להמשיך מחר, או להוסיף בהגדרות מפתח Gemini אישי בחינם ולהמשיך בלי הגבלה.';
 const ALL_MSG = 'השירות החכם של סימן הגיע היום למכסה הכוללת שלו. אפשר לנסות שוב מחר, או להוסיף בהגדרות מפתח Gemini אישי בחינם ולהמשיך מיד.';
@@ -97,14 +99,17 @@ async function guard(req, env, weight = 1) {
   if (!dev) return guardFail(401, 'PASS', PASS_MSG);
   const own = String(req.headers.get('x-user-key') || '').trim();
   if (USER_KEY_RE.test(own)) return { ok: true, env: { ...env, GEMINI_KEY: own }, own: true };
-  let n;
-  try { n = await addUsage(env, ['d:' + dev, 'i:' + clientIp(req), 'all'], weight); } catch (_) { n = null; }   // a database hiccup does not stop the app
+  if (!weight) return { ok: true, env };                              // a helper step (page edges, turning, the second look): free
+  let n; const keys = ['d:' + dev, 'i:' + clientIp(req), 'all'];
+  try { n = await addUsage(env, keys, weight); } catch (_) { n = null; }   // a database hiccup does not stop the app
   if (n) {
     const [d, i, all] = n, ld = limitOf(env, 'device'), li = limitOf(env, 'ip'), la = limitOf(env, 'all');
-    if (la && all > la) return guardFail(429, 'ALL', ALL_MSG);
-    if ((ld && d > ld) || (li && i > li)) return guardFail(429, 'DAY', DAY_MSG);
+    // a request turned away is not counted either
+    if (la && all > la) { addUsage(env, keys, -weight).catch(() => {}); return guardFail(429, 'ALL', ALL_MSG); }
+    if ((ld && d > ld) || (li && i > li)) { addUsage(env, keys, -weight).catch(() => {}); return guardFail(429, 'DAY', DAY_MSG); }
   }
-  return { ok: true, env };
+  // refund(): the unit is given back when the request failed (Gemini busy, out of quota, too slow)
+  return { ok: true, env, refund: n ? () => addUsage(env, keys, -weight).catch(() => {}) : null };
 }
 // POST /pass {t: Turnstile token, dev} → {pass, ttl}   (siman-ai only)
 async function givePass(req, env) {
@@ -120,7 +125,7 @@ async function givePass(req, env) {
   return { status: 200, body: await makePass(env, dev) };
 }
 // how many units a request costs (a careful reading of a page asks Gemini two or three times)
-const WEIGHT = { scanAccurate: 3, lines: 1, table: 2, tableCheck: 1, linesCheck: 1 };
+const WEIGHT = { scanAccurate: 2, lines: 1, table: 2, tableCheck: 0, linesCheck: 0, corners: 0, orient: 0 };
 // ======================================== end of the guard ========================================
 
 export default {
