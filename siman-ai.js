@@ -19,21 +19,22 @@ const MAX_IMAGE = 7 * 1024 * 1024;  // base64 characters of one page picture
 // Cloudflare cuts a request that sends nothing back for 100 seconds (error 524). Reading a page of
 // handwriting can take longer, so "scan" and "ask" answer at once and keep the line open with spaces
 // until Gemini is done. The app reads the JSON at the end (JSON allows spaces before it).
-const STREAM_MODES = ['print', 'scan', 'scanAccurate', 'ask', 'lines', 'linesFast', 'linesCheck', 'table', 'tableCheck'];
+const STREAM_MODES = ['slideText', 'print', 'scan', 'scanAccurate', 'ask', 'lines', 'linesFast', 'linesCheck', 'table', 'tableCheck'];
 // the whole request has one time budget (the app gives up after 150 s): each model gets what is left
-const BUDGET = { print: 90000, tableCheck: 100000, orient: 30000, table: 120000, linesCheck: 80000, lines: 110000, linesFast: 60000, scan: 70000, scanAccurate: 125000, ask: 85000, translate: 85000, corners: 30000 };
-const MODEL_TIMEOUT = { print: 55000, tableCheck: 80000, orient: 20000, table: 90000, linesCheck: 70000, lines: 75000, linesFast: 45000, scan: 60000, scanAccurate: 90000, scanCheck: 45000, ask: 80000, translate: 80000, corners: 30000 }; // ms per model before trying the next one
+const BUDGET = { slideText: 100000, print: 90000, tableCheck: 100000, orient: 30000, table: 120000, linesCheck: 80000, lines: 110000, linesFast: 60000, scan: 70000, scanAccurate: 125000, ask: 85000, translate: 85000, corners: 30000 };
+const MODEL_TIMEOUT = { slideText: 60000, print: 55000, tableCheck: 80000, orient: 20000, table: 90000, linesCheck: 70000, lines: 75000, linesFast: 45000, scan: 60000, scanAccurate: 90000, scanCheck: 45000, ask: 80000, translate: 80000, corners: 30000 }; // ms per model before trying the next one
 // reading a page: "accurate" = the main model, thinking a little (best for handwriting, ~20–90 s);
 // "fast" = the light model, no thinking (a few seconds, guesses more)
 // lines: on the ivrit.ai Hebrew handwriting benchmark the main model reads single lines best of all models
 // (median 12% of letters wrong), far ahead of the light one — and far ahead of itself on a whole page
 // 6.6: a printed page (book, letter, form, screenshot): the main model with no thinking reads print almost perfectly in seconds
-const MODELS_FOR = { print: ['gemini-flash-latest', 'gemini-flash-lite-latest'], tableCheck: ['gemini-flash-latest'], orient: ['gemini-flash-lite-latest', 'gemini-flash-latest'], table: ['gemini-flash-latest', 'gemini-flash-lite-latest'], linesCheck: ['gemini-flash-latest'], lines: ['gemini-flash-latest', 'gemini-flash-lite-latest'], linesFast: ['gemini-flash-lite-latest', 'gemini-flash-latest'], scan: ['gemini-flash-lite-latest', 'gemini-flash-latest'], scanAccurate: ['gemini-flash-latest', 'gemini-flash-lite-latest'], scanCheck: ['gemini-flash-latest'], corners: ['gemini-flash-lite-latest', 'gemini-flash-latest'] };   // 6.6.5: the light model first: finding a sheet's corners does not need the main model's small free quota
+const MODELS_FOR = { slideText: ['gemini-flash-latest', 'gemini-flash-lite-latest'], print: ['gemini-flash-latest', 'gemini-flash-lite-latest'], tableCheck: ['gemini-flash-latest'], orient: ['gemini-flash-lite-latest', 'gemini-flash-latest'], table: ['gemini-flash-latest', 'gemini-flash-lite-latest'], linesCheck: ['gemini-flash-latest'], lines: ['gemini-flash-latest', 'gemini-flash-lite-latest'], linesFast: ['gemini-flash-lite-latest', 'gemini-flash-latest'], scan: ['gemini-flash-lite-latest', 'gemini-flash-latest'], scanAccurate: ['gemini-flash-latest', 'gemini-flash-lite-latest'], scanCheck: ['gemini-flash-latest'], corners: ['gemini-flash-lite-latest', 'gemini-flash-latest'] };   // 6.6.5: the light model first: finding a sheet's corners does not need the main model's small free quota
 // no "thinking" for reading and translating = a much faster answer; a little for questions
 // Models differ in which setting they take (older: thinkingBudget, newer: thinkingLevel), and one that does
 // not take a setting answers "invalid argument" — so each is tried in turn, and at the end none at all.
 const THINKING = {
   print: [{ thinkingBudget: 0 }, { thinkingLevel: 'minimal' }, null],
+  slideText: [{ thinkingBudget: 0 }, { thinkingLevel: 'minimal' }, null],
   scan: [{ thinkingBudget: 0 }, { thinkingLevel: 'minimal' }, { thinkingLevel: 'low' }, null],
   // handwriting is read better with more thinking: each step down is tried only if the model refuses the one above
   // a little thinking: much faster than "medium", and the clean picture from the app does most of the work
@@ -107,6 +108,38 @@ Rules:
 - A word you really cannot read (blurred, cut off): your best reading inside [[ ]]. Use [[?]] only when not even a guess is possible.
 - Right-to-left languages (Hebrew, Arabic) in normal logical order.
 - If the page is empty, return {"hand":false,"lang":null,"blocks":[]}.${hint ? `\nThe page is probably in: ${hint}.` : ''}`;
+
+// 6.6.5: a slide that is one picture (NotebookLM, Canva, a scanned or exported deck): every piece of text with its
+// place, so the app can take the words out of the picture and put real, editable text boxes in their place
+const SLIDE_TEXT_PROMPT = `You turn a picture of a presentation slide into editable text. Find every piece of written text on the slide: the title, subtitles, sentences, bullet items, labels and captions.
+Return only JSON: {"blocks":[{"text":"...","box":[ymin,xmin,ymax,xmax],"lines":1,"bold":false,"serif":false,"align":"right"}]}
+- box: integers 0-1000 relative to the whole picture, tight around the letters of that block (all of its lines), not around a frame or a background shape.
+- One block per paragraph of the same style: a title, the sentence under it and each bullet item are separate blocks. "lines" = how many lines the block takes on the slide; in "text" join those lines with a space (keep a real line break only between separate list lines).
+- Copy the text exactly, letter by letter, with its punctuation, numbers, quotes and niqqud. Hebrew and Arabic in normal logical order. Do not translate or correct.
+- serif: true when the letters have serifs (like Frank Ruehl or Times), false for plain letters (like Arial or Heebo). align: how the block's lines are aligned on the slide (right, center or left).
+- Skip text that is part of a photo or illustration (a sign inside a picture), and small logos or watermarks such as a "Gemini Notebook" or "NotebookLM" mark in a corner.
+- If there is no text, return {"blocks":[]}.`;
+const SLIDE_TEXT_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    blocks: {
+      type: 'ARRAY',
+      items: {
+        type: 'OBJECT',
+        properties: {
+          text: { type: 'STRING' },
+          box: { type: 'ARRAY', items: { type: 'INTEGER' } },
+          lines: { type: 'INTEGER' },
+          bold: { type: 'BOOLEAN' },
+          serif: { type: 'BOOLEAN' },
+          align: { type: 'STRING', enum: ['right', 'center', 'left'] },
+        },
+        required: ['text', 'box'],
+      },
+    },
+  },
+  required: ['blocks'],
+};
 
 // finding the sheet of paper in a photo: its four corners, so the app can cut it out and straighten it
 const LINES_PROMPT = hint => `You read handwritten notes for a document app. You get several lines, numbered, in reading order (the page's first line first). Each line is cut from a photographed page and usually comes in two views of the same picture: view A is high-contrast (ink black, paper white), view B is softer and keeps the thin strokes. Use both views to decide each letter.
@@ -341,6 +374,16 @@ function build(body) {
       generationConfig: { temperature: 0.2, maxOutputTokens: 16384 },
     };
   }
+  if (mode === 'slideText') {
+    const image = String(body.image || '');
+    if (!image || image.length > MAX_IMAGE || !/^[A-Za-z0-9+/=]+$/.test(image.slice(0, 200))) return { err: 'image missing or too large' };
+    const mime = /^image\/(jpeg|png|webp)$/.test(body.mime) ? body.mime : 'image/jpeg';
+    return {
+      systemInstruction: { parts: [{ text: SLIDE_TEXT_PROMPT }] },
+      contents: [{ role: 'user', parts: [{ inlineData: { mimeType: mime, data: image } }, { text: 'Find the text of this slide.' }] }],
+      generationConfig: { temperature: 0, maxOutputTokens: 8192, responseMimeType: 'application/json', responseSchema: SLIDE_TEXT_SCHEMA },
+    };
+  }
   if (mode === 'print') {
     const image = String(body.image || '');
     if (!image || image.length > MAX_IMAGE || !/^[A-Za-z0-9+/=]+$/.test(image.slice(0, 200))) return { err: 'image missing or too large' };
@@ -567,7 +610,7 @@ async function proofread(g, first, env, deadline) {
 // · a model that just hung or failed is remembered for a few minutes (in this worker copy): the next requests
 //   start with the other model at once, and the sick one only joins after the hedge time.
 // 6.6.1: ask/translate send a whole document: a second model joins later, so the long ones are not paid twice
-const HEDGE = { print: 12000, ask: 20000, translate: 15000, corners: 6000, orient: 6000, scan: 15000, linesFast: 15000, scanAccurate: 50000, lines: 45000, table: 50000 };
+const HEDGE = { slideText: 20000, print: 12000, ask: 20000, translate: 15000, corners: 6000, orient: 6000, scan: 15000, linesFast: 15000, scanAccurate: 50000, lines: 45000, table: 50000 };
 const SICK_MS = 4 * 60 * 1000;
 const thinkOk = new Map();   // model/mode → the thinking setting it took last time
 const sick = new Map();   // model → time until which it is skipped first
