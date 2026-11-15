@@ -954,7 +954,7 @@ body:has(.tpanel:not(.hidden)) .a11y-fab{left:auto!important;right:14px!importan
 
 .toast{position:fixed;bottom:calc(20px + env(safe-area-inset-bottom,0px));inset-inline-start:50%;transform:translateX(50%);background:var(--ink);color:var(--bar);padding:10px 18px;border-radius:8px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:20;max-width:90vw}
 .toast.show{opacity:1}
-.busy{position:fixed;inset:0;background:rgba(0,0,0,.15);display:grid;place-items:center;z-index:30}
+.busy{position:fixed;inset:0;background:rgba(0,0,0,.15);display:grid;place-items:center;align-content:center;gap:12px;z-index:30}
 .busy div{background:var(--bar);padding:14px 22px;border-radius:8px;box-shadow:var(--shadow)}
 
 @media (max-width:720px){
@@ -1353,7 +1353,7 @@ body:has(#wed) .busy,body:has(#xed) .busy,body:has(#ped) .busy{z-index:1000}body
 </dialog>
 
 <header class="bar">
-  <div class="brand"><b title="גרסה 6.6.1">סימן</b><span class="ver">6.6.1</span><span class="fname" id="fname"></span></div>
+  <div class="brand"><b title="גרסה 6.6.2">סימן</b><span class="ver">6.6.2</span><span class="fname" id="fname"></span></div>
 
   <nav class="tools" id="tools" aria-label="כלים">
     <button class="tool" data-tool="select" aria-pressed="true" title="בחירה וגלילה (V)">
@@ -1739,7 +1739,7 @@ body:has(#wed) .busy,body:has(#xed) .busy,body:has(#ped) .busy{z-index:1000}body
 </dialog>
 <div id="printArea" aria-hidden="true"></div>
 <div class="toast" id="toast" role="status"></div>
-<div class="busy hidden" id="busy" role="status" aria-live="polite"><div id="busyMsg">רגע…</div></div>
+<div class="busy hidden" id="busy" role="status" aria-live="polite"><div id="busyMsg">רגע…</div><button type="button" id="busyStop" class="btn hidden">ביטול</button></div>
 
 <script src="pdf.min.js"></script>
 <!-- 5.9.3: pdf-lib and fontkit are needed only when saving or changing pages, so they no longer hold up the first screen -->
@@ -1819,7 +1819,10 @@ const dpr=()=>Math.min(window.devicePixelRatio||1,2.5);
 /* ===================== ui helpers ===================== */
 let toastT;
 function toast(msg){const t=$('toast');t.textContent=msg;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),/נכשל|שגיאה|לא הצלח|לא זמין|DOC ישן/.test(msg)?9000:2600);}
-function busy(on,msg){$('busy').classList.toggle('hidden',!on);if(msg)$('busyMsg').textContent=msg;}
+// 6.6.2: a long job can offer "ביטול" on the busy screen (busyCancel(fn)); it is taken away when the screen closes
+let busyStopFn=null;
+function busy(on,msg){$('busy').classList.toggle('hidden',!on);if(msg)$('busyMsg').textContent=msg;if(!on)busyCancel(null);}
+function busyCancel(fn){busyStopFn=fn;const b=$('busyStop');if(!b)return;b.classList.toggle('hidden',!fn);b.disabled=false;b.textContent='ביטול';b.onclick=()=>{if(!busyStopFn)return;b.disabled=true;b.textContent='עוצר…';try{busyStopFn();}catch(_){}};}
 // a Hebrew name with "12.pdf" at its end showed as "pdf.12": the extension is set apart from the right-to-left text
 function dispName(n){n=String(n||'');return /[\u0590-\u05FF]/.test(n)?n.replace(/([^\s\u0590-\u05FF][^\u0590-\u05FF]*\.[A-Za-z0-9]{1,5})$/,'\u2066$1\u2069'):n;}
 function setDirty(v){S.dirty=v;document.title=(v?'• ':'')+(S.name?S.name+' — ':'')+'סימן';}
@@ -1857,8 +1860,10 @@ async function openFile(file,handle){
     $('wordEditBtn').classList.toggle('hidden',!(S.office&&(S.office.kind==='docx'||S.office.kind==='xlsx')));
     if(S.office){$('wordEditBtn').textContent=S.office.kind==='xlsx'?'עריכת Excel':'עריכת Word';$('wordEditBtn').title=S.office.kind==='xlsx'?'עריכת הגיליון כמו ב-Excel: ערכים, נוסחאות, עיצוב ומיזוג':'עריכת המסמך כמו ב-Word: גופנים, הדגשה, קו תחתי, רשימות וטבלאות';}
     TR.reset();
-    S.hasForm=false;try{S.hasForm=!!(await doc.getFieldObjects());}catch(_){}
+    // 6.6.2: the form fields are looked for while the pages are being laid out, not before
+    S.hasForm=false;const formQ=doc.getFieldObjects().then(f=>!!f,()=>false);
     await buildPages();
+    S.hasForm=await formQ;
     setTool(S.tool);
     if(S.hasForm&&!S.office)toast('יש בקובץ שדות טופס. לחצו עליהם כדי למלא');
     // 5.9.6: a PDF locked against changes opens for reading, but a saved copy may come out damaged: the user is told now, not after saving
@@ -1891,8 +1896,11 @@ async function buildPages(){
   // long documents: a page far off screen drops its picture (it is drawn again when it comes back)
   if(far)far.disconnect();
   far=new IntersectionObserver(es=>es.forEach(e=>{if(!e.isIntersecting&&S.pages.length>6)releasePage(S.pages[+e.target.dataset.i]);}),{root:$('desk'),rootMargin:'3000px 0px'});
-  for(let i=1;i<=S.doc.numPages;i++){
-    const page=await S.doc.getPage(i);
+  // 6.6.2: the pages are asked for 40 at a time (one by one, a 500-page file kept the busy screen up for seconds)
+  const doc=S.doc,n=doc.numPages,got=new Array(n+1);
+  for(let a=1;a<=n;a+=40){const ix=[];for(let i=a;i<=Math.min(n,a+39);i++)ix.push(i);(await Promise.all(ix.map(i=>doc.getPage(i)))).forEach((p,k)=>got[ix[k]]=p);if(S.doc!==doc)return;}
+  for(let i=1;i<=n;i++){
+    const page=got[i];
     const el=document.createElement('div');el.className='page';el.dataset.i=i-1;
     const canvas=document.createElement('canvas');
     const txl=document.createElement('div');txl.className='textLayer';
@@ -3095,11 +3103,18 @@ $('tpGloss').onclick=()=>{
   d.addEventListener('close',()=>d.remove());document.body.append(d);d.showModal();
 };
 trGlossUI();
+// 6.6.2: a text already translated (same target, same style and glossary) is not sent again in this session:
+// translating the document a second time, or after switching modes, is instant and costs nothing of the daily share
+const TR_CACHE=new Map();
 async function callTranslate(text,target){
   if(window.cloudGate&&!cloudGate('tr'))throw new Error(CLOUD_REG_MSG);
+  const ck=target+'\u0001'+JSON.stringify(trPrefs())+'\u0001'+text;
+  if(TR_CACHE.has(ck))return{...TR_CACHE.get(ck)};
   const mk=trMask(text);text=mk.text;
   const r0=await callTranslate0(text,target);
-  return r0&&r0.raw?{...r0,raw:mk.un(r0.raw)}:r0;
+  const r=r0&&r0.raw?{...r0,raw:mk.un(r0.raw)}:r0;
+  if(r&&r.raw&&!r.error){TR_CACHE.set(ck,r);if(TR_CACHE.size>300)TR_CACHE.delete(TR_CACHE.keys().next().value);}
+  return r;
 }
 async function callTranslate0(text,target){
   const sourceForeign=foreignWords(text,target).length; // the original's own words in that alphabet don't count
@@ -3766,10 +3781,11 @@ function textQuality(lines){
 async function runOCR(idx){
   if(!S.doc)return;
   busy(true,'טוען את מנוע זיהוי הטקסט… (בפעם הראשונה זה לוקח כחצי דקה)');
-  let done=0,found=0,skipped=0,bad=0;const doc=S.doc;
+  let done=0,found=0,skipped=0,bad=0,stop=false;const doc=S.doc;
+  if(idx.length>1)busyCancel(()=>{stop=true;});   // 6.6.2: the pages already read are kept
   try{
     for(const i of idx){
-      if(S.doc!==doc)break;   // 6.6.1: another file was opened
+      if(S.doc!==doc||stop)break;   // 6.6.1: another file was opened
       const P=S.pages[i];const has=await pageLines(P);
       if(has&&has.length&&!P.ocr&&textQuality(has)>=.6){skipped++;continue;}
       if(P.ocr&&has&&has.length){skipped++;continue;}   // 5.9.6: a page already read is not read again
@@ -3941,15 +3957,27 @@ async function renderThumbs(){
     ol.append(li);
   });
   markCurrentThumb();
-  for(let i=0;i<n;i++){ // draw sequentially so big files stay responsive
-    const P=S.pages[i];if(!P||!document.body.contains(ol))return;
-    const vp=P.page.getViewport({scale:1});const sc=Math.min(130/vp.width,180/vp.height)*Math.min(devicePixelRatio||1,2);
-    const v=P.page.getViewport({scale:sc});const c=document.createElement('canvas');c.width=Math.floor(v.width);c.height=Math.floor(v.height);
-    c.style.width=Math.floor(v.width/Math.min(devicePixelRatio||1,2))+'px';
-    try{await P.page.render({canvasContext:c.getContext('2d'),viewport:v}).promise;}catch(_){continue;}
-    const slot=ol.querySelector(`.thumb[data-i="${i}"] .tc`);if(slot){slot.innerHTML='';slot.append(c);}
-  }
+  // 6.6.2: a thumbnail is drawn only when it comes into view (before: every page was drawn at once, even with the
+  // panel closed — a 500-page file kept ~185 MB of thumbnails). Each place keeps the page's size meanwhile.
+  if(thumbIO)thumbIO.disconnect();const gen=++thumbGen,dpr=Math.min(devicePixelRatio||1,2),queue=[];let drawing=false;
+  const sizeOf=P=>{const vp=P.page.getViewport({scale:1});return Math.min(130/vp.width,180/vp.height);};
+  S.pages.forEach((P,i)=>{const slot=ol.querySelector(`.thumb[data-i="${i}"] .tc`);if(!slot||!P.page)return;const vp=P.page.getViewport({scale:sizeOf(P)});slot.style.width=Math.floor(vp.width)+'px';slot.style.height=Math.floor(vp.height)+'px';});
+  const draw=async()=>{
+    if(drawing)return;drawing=true;
+    while(queue.length&&gen===thumbGen){
+      const i=queue.shift(),P=S.pages[i],slot=ol.querySelector(`.thumb[data-i="${i}"] .tc`);if(!P||!slot||slot.firstChild)continue;
+      const v=P.page.getViewport({scale:sizeOf(P)*dpr});const c=document.createElement('canvas');c.width=Math.floor(v.width);c.height=Math.floor(v.height);
+      c.style.width=Math.floor(v.width/dpr)+'px';
+      try{await P.page.render({canvasContext:c.getContext('2d'),viewport:v}).promise;}catch(_){continue;}
+      if(gen!==thumbGen)break;slot.innerHTML='';slot.append(c);
+    }
+    drawing=false;
+  };
+  let root=ol;while(root&&root!==document.body){const o=getComputedStyle(root).overflowY;if(o==='auto'||o==='scroll')break;root=root.parentElement;}
+  thumbIO=new IntersectionObserver(es=>{for(const e of es)if(e.isIntersecting){queue.push(+e.target.parentElement.dataset.i);thumbIO.unobserve(e.target);}queue.sort((a,b)=>a-b);draw();},{root:root&&root!==document.body?root:null,rootMargin:'300px 0px'});
+  ol.querySelectorAll('.thumb .tc').forEach(t=>thumbIO.observe(t));
 }
+var thumbIO=null,thumbGen=0;
 function markCurrentThumb(){const cur=currentPageIndex();document.querySelectorAll('.thumb').forEach(t=>t.classList.toggle('cur',+t.dataset.i===cur));}
 function updateSel(){
   const n=S.sel.size;$('selCount').textContent=n?`${n} מסומנים`:'';$('saveSelBtn').disabled=!n;$('splitSelBtn').disabled=!n;
@@ -5064,7 +5092,7 @@ window.cloudGate=why=>{if(!needRegCloud())return true;showReg(why);return false;
 window.CLOUD_REG_MSG='כדי להשתמש בשירות הזה נרשמים עם מייל (חינם). אחרי ההרשמה נסו שוב';
 $('regDlg').addEventListener('cancel',e=>{e.preventDefault();regSkip();}); // Esc = "not now"
 function regSkip(){USER={...USER,skipped:true};try{localStorage.setItem(USER_KEY,JSON.stringify(USER));}catch(_){}
-  $('regDlg').close();if(pendingOpen){const p=pendingOpen;pendingOpen=null;setTimeout(()=>openFile(p.f,p.h),0);}}
+  $('regDlg').close();if(pendingOpen){const p=pendingOpen;pendingOpen=null;setTimeout(()=>openFile(p.f,p.h),0);}pendingSend=null;}
 $('regLater').onclick=regSkip;
 $('regForm').addEventListener('submit',e=>{
   const mail=$('regMail').value.trim();
@@ -5074,6 +5102,7 @@ $('regForm').addEventListener('submit',e=>{
   applyUser();registerUser('signup');
   toast(USER.name?`נעים להכיר, ${USER.name}`:'נרשמת לסימן');
   if(pendingOpen){const p=pendingOpen;pendingOpen=null;setTimeout(()=>openFile(p.f,p.h),0);}
+  if(pendingSend){const k=pendingSend;pendingSend=null;setTimeout(()=>sendLink(k),0);}   // 6.6.2: after signing up, the sending goes on by itself
 });
 $('setDelete').onclick=async()=>{
   if(!confirm('למחוק את החשבון שלך בסימן?\n\nהמייל יימחק מרשימת הנרשמים, והשם, המייל והחתימות השמורות יימחקו מהמכשיר. הקבצים שלך לא נפגעים.'))return;
@@ -5086,7 +5115,7 @@ $('setDelete').onclick=async()=>{
   $('setDlg').close();applyUser();toast('החשבון נמחק');
   if(needReg())setTimeout(showReg,300);
 };
-let pendingOpen=null;
+let pendingOpen=null,pendingSend=null;
 // 6.2: no sign-up window on opening the app. People who signed up before the sign-up list existed are added once
 if(!USER.sent&&validMail(USER.mail||'')){registerUser('existing');}
 // …and once, gently, after the first file is saved (only if the person never said "later")
@@ -5325,8 +5354,12 @@ async function sendLink(kind){
   const ext=SH.ext;
   if(!S.bytes&&!ext){toast('קודם פותחים מסמך');return;}
   if($('shareDlg').open)$('shareDlg').close();
+  // 6.6.2: the email sign-up is asked for now, before the fields are placed (before: only at the very end, and the work had to be done again)
+  if(window.cloudGate&&!cloudGate('send')){pendingSend=kind;return;}
   busy(true,kind==='sign'?'מכין את המסמך לחתימה…':'מכין קישור…');
   try{await loadSend();const bytes=ext?new Uint8Array(await (await ext.api.share.file('pdf')).arrayBuffer()):await buildPdf();busy(false);
+    // and the size limit of the link server (15 MB), also before any work
+    if(bytes.length>15*1024*1024){toast(`הקובץ גדול מדי לשליחה בקישור (${(bytes.length/1048576).toFixed(1)}MB, עד 15MB). אפשר לכווץ אותו קודם, בפקודה "דחיסת PDF"`);return;}
     const o={bytes,name:fileName(),sender:{name:USER.name||'',mail:USER.mail||''},toast,save:(n,b,k)=>saveBytes(n,b,k)};
     if(kind!=='sign')o.orig=await linkOrig(SH.file);
     if(kind==='sign')await SIMAN_SEND.open(o);else await SIMAN_SEND.openView(o);}
@@ -5632,7 +5665,7 @@ if('launchQueue' in window){
 }
 </script>
 <script src="siman-guard.js?v=6.4"></script>
-<script src="siman-plus.js?v=6.3.4"></script>
+<script src="siman-plus.js?v=6.6.2"></script>
 <script>
 /* =====================================================================
    4.7 — launch period (4 months per user) + feature-use counting
@@ -5732,17 +5765,17 @@ if('launchQueue' in window){
 <script src="siman-phone.js?v=5.9.3" defer></script>
 <script src="a11y.js?v=5.9.3" defer></script>
 <script src="siman-voice.js?v=6.4.2" defer></script>
-<script src="siman-back.js?v=5.9.3" defer></script>
+<script src="siman-back.js?v=6.6.2" defer></script>
 <!-- 5.9.3: one design for everyone (the ?beta=1 shell and the classic design were removed) -->
 <link rel="stylesheet" href="siman-v7.css?v=5.9.6">
 <script src="siman-v7.js?v=5.9.5" defer></script>
-<script src="siman-media.js?v=5.3.2" defer></script>
-<script src="siman-scan.js?v=5.9.6" defer></script>
+<script src="siman-media.js?v=6.6.2" defer></script>
+<script src="siman-scan.js?v=6.6.2" defer></script>
 <script src="siman-merge.js?v=5.9.6" defer></script>
-<script src="siman-ux.js?v=5.9.5" defer></script>
+<script src="siman-ux.js?v=6.6.2" defer></script>
 <script src="siman-fill.js?v=6.4.1" defer></script>
 <script src="siman-convert.js?v=6.4.1" defer></script>
-<script src="siman-pro.js?v=6.3" defer></script>
+<script src="siman-pro.js?v=6.6.2" defer></script>
 <script src="siman-home.js?v=6.4.2" defer></script>
 <link rel="stylesheet" href="siman-nb.css?v=5.9.5">
 <script src="siman-nb.js?v=5.9.5" defer></script>

@@ -690,6 +690,9 @@ window.SIMAN_TABS = { TB, switchTo, closeTab, mergeAll, zipAll, openMany, tabInf
 /* =====================================================================
    2. AI — the smart server (siman-ai)
    ===================================================================== */
+// 6.6.2: answers already given in this session (see askQ), keyed by a short fingerprint of the document text
+const ASK_CACHE = new Map();
+const textSig = t => { let h = 2166136261; for (let i = 0; i < t.length; i++) { h ^= t.charCodeAt(i); h = Math.imul(h, 16777619); } return t.length + ':' + (h >>> 0).toString(36); };
 async function ai(payload, { onWait, signal, timeout = 300000, once = false } = {}) {
   // 6.2: the smart services run on our server: they ask for an email first (the tools on the device do not)
   if (window.cloudGate && !cloudGate('ai')) throw new Error(window.CLOUD_REG_MSG || 'צריך להירשם עם מייל');
@@ -1141,7 +1144,14 @@ async function askQ(q, label, kind) {
     if (empty) { if (it.plain) { it.err = 'הקובץ ריק, אין עדיין על מה לשאול'; return; } it.err = 'לא מצאתי טקסט במסמך. כנראה שהוא סרוק או מצולם — אפשר לזהות בו את הטקסט קודם:'; it.scanned = true; return; }
     const history = list.filter(x => x.a && x !== it).slice(-4).map(x => ({ q: x.q, a: x.a }));
     const followOk = !kind && !it.plain;
-    it.a = await ai({ mode: 'ask', text, question: (multi ? q + MULTI_TAIL : q) + (followOk ? FOLLOW_TAIL : ''), history: history.map(x => ({ q: x.q, a: x.a.replace(/^❓.*$/gm, '').trim() })) }, { onWait: s => { it.wait = `השירות עמוס, מנסה שוב בעוד ${s} שניות…`; const w = document.getElementById('aiWait'); if (w && AS.key() === tabKey) w.textContent = it.wait; } });
+    // 6.6.2: the same first question on the same text (a summary asked again, after clearing the chat or in another
+    // tab of the same file) is answered from this session's memory: at once, and without using the daily share
+    const ck = !history.length ? `${multi ? 'M' : ''}${followOk ? 'F' : ''}${q}\u0001${textSig(text)}` : null;
+    if (ck && ASK_CACHE.has(ck)) it.a = ASK_CACHE.get(ck);
+    else {
+      it.a = await ai({ mode: 'ask', text, question: (multi ? q + MULTI_TAIL : q) + (followOk ? FOLLOW_TAIL : ''), history: history.map(x => ({ q: x.q, a: x.a.replace(/^❓.*$/gm, '').trim() })) }, { onWait: s => { it.wait = `השירות עמוס, מנסה שוב בעוד ${s} שניות…`; const w = document.getElementById('aiWait'); if (w && AS.key() === tabKey) w.textContent = it.wait; } });
+      if (ck && it.a) { ASK_CACHE.set(ck, it.a); if (ASK_CACHE.size > 60) ASK_CACHE.delete(ASK_CACHE.keys().next().value); }
+    }
     if (followOk) { const f = splitFollow(it.a); it.a = f.a; it.follow = f.follow; }
   } catch (e) { it.err = e.message || String(e); }
   finally { AS.busySet.delete(tabKey); renderTabs(); if (AS.key() === tabKey) renderLog(); }

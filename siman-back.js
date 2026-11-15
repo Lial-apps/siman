@@ -141,7 +141,8 @@
   /* ---------- one step back ---------- */
   function stepBack() {
     const busy = $('busy');
-    if (busy && !busy.classList.contains('hidden') && shown(busy)) { say('רגע, פעולה עדיין רצה'); return true; }
+    // 6.6.2: a job that can be stopped is stopped by Back, like its ביטול button
+    if (busy && !busy.classList.contains('hidden') && shown(busy)) { const st = $('busyStop'); if (st && !st.classList.contains('hidden') && !st.disabled) { st.click(); return true; } say('רגע, פעולה עדיין רצה'); return true; }
 
     const L = topLayer();
     if (L && closeLayer(L) !== false) return true;

@@ -377,7 +377,8 @@ async function autoRedact() {
   busy(true, 'מחפש מידע רגיש…');
   let hits = [];
   try {
-    for (const P of S.pages) { $('busyMsg').textContent = `מחפש מידע רגיש… עמוד ${P.i} מתוך ${S.pages.length}`; hits.push(...await pageHits(P)); }
+    let stop = false; if (S.pages.length > 3) busyCancel(() => { stop = true; });   // 6.6.2
+    for (const P of S.pages) { if (stop) break; $('busyMsg').textContent = `מחפש מידע רגיש… עמוד ${P.i} מתוך ${S.pages.length}`; hits.push(...await pageHits(P)); }
   } catch (e) { console.error(e); busy(false); toast('החיפוש נכשל: ' + (e.message || e)); return; }
   busy(false);
   // what is already blacked out is not offered again
@@ -442,7 +443,9 @@ async function compress(lv) {
     const before = built.length || built.byteLength;
     doc = await pdfjs.getDocument({ data: built.slice ? built.slice() : built, isEvalSupported: false }).promise;
     const out = await PDFLib.PDFDocument.create();
+    let stop = false; if (doc.numPages > 2) busyCancel(() => { stop = true; });   // 6.6.2: stopping keeps the file as it was
     for (let i = 1; i <= doc.numPages; i++) {
+      if (stop) { busy(false); toast('הדחיסה בוטלה'); return; }
       $('busyMsg').textContent = `דוחס עמוד ${i} מתוך ${doc.numPages}…`;
       const page = await doc.getPage(i), v1 = page.getViewport({ scale: 1 });
       // no side over 3000 pixels: phones run out of memory beyond that

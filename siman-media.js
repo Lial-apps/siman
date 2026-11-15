@@ -21,7 +21,8 @@
   const say = m => { try { toast(m); } catch (_) { } };
   const extOf = n => ((n || '').match(/\.([a-z0-9]{2,5})(?:[?#].*)?$/i) || [])[1] || '';
   const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
-  const idle = () => new Promise(r => (window.requestIdleCallback || setTimeout)(r, 30));
+  // 6.6.2: requestIdleCallback takes options, not a number: Chrome and Edge threw here, and the scan for files inside a PDF never ran
+  const idle = () => new Promise(r => window.requestIdleCallback ? requestIdleCallback(() => r(), { timeout: 200 }) : setTimeout(r, 30));
 
   /* ---------------- סוג הקישור ---------------- */
   function parseT(t) {

@@ -998,20 +998,29 @@ function scrollToCell(r,c){
 
 /* ---------- history ---------- */
 const cloneCell=c=>{const n={...c};delete n.ast;return n;};
-function snapSheets(all){
-  const list=all?X.st.sheets.map((_,i)=>i):[X.si];
+function snapSheets(all,only){
+  const list=only||(all?X.st.sheets.map((_,i)=>i):[X.si]);
   return list.map(i=>{const s=X.st.sheets[i];return{i,cells:new Map([...s.cells].map(([k,v])=>[k,cloneCell(v)])),rows:new Map([...s.rows].map(([k,v])=>[k,{...v,attrs:{...v.attrs}}])),
     cols:new Map([...s.cols].map(([k,v])=>[k,{...v}])),merges:s.merges.map(m=>({...m})),maxR:s.maxR,maxC:s.maxC,dirty:s.dirty,doc:all?ser(s.doc):null};});
 }
 function restore(snap){for(const s of snap){const sh=X.st.sheets[s.i];Object.assign(sh,{cells:s.cells,rows:s.rows,cols:s.cols,merges:s.merges,maxR:s.maxR,maxC:s.maxC,dirty:true});if(s.doc){sh.doc=parseXml(s.doc);sh.root=sh.doc.documentElement;}}}
+// 6.6.2: an edit copies the sheet once, before the change. The copy "after" is taken only when the edit is undone
+// (before: two full copies on every edit — on a sheet of 100,000 cells, 200,000 copied cells per typed value).
+// History is also capped by size: a very big sheet keeps fewer steps instead of filling the memory.
+const HIST_CELLS=1500000;
+const snapCells=snap=>snap.reduce((n,s)=>n+s.cells.size,0);
+const cloneSnap=snap=>snap.map(s=>({...s,cells:new Map([...s.cells].map(([k,v])=>[k,cloneCell(v)]))}));
 function change(fn,all){
-  const before=snapSheets(all);fn();X.cfVer=(X.cfVer||0)+1;X.dvVer=(X.dvVer||0)+1;X.st.st.dxfs=null;const after=snapSheets(all);
-  X.hist.splice(X.hi+1);X.hist.push({si:X.si,before,after});if(X.hist.length>60)X.hist.shift();X.hi=X.hist.length-1;
-  for(const s of after)X.st.sheets[s.i].dirty=true;
+  const before=snapSheets(all);fn();X.cfVer=(X.cfVer||0)+1;X.dvVer=(X.dvVer||0)+1;X.st.st.dxfs=null;
+  X.hist.splice(X.hi+1);X.hist.push({si:X.si,all:!!all,before,size:snapCells(before)});
+  let tot=X.hist.reduce((n,h)=>n+h.size*(h.after?2:1),0);
+  while(X.hist.length>1&&(X.hist.length>60||tot>HIST_CELLS)){const h=X.hist.shift();tot-=h.size*(h.after?2:1);}
+  X.hi=X.hist.length-1;
+  for(const s of before)X.st.sheets[s.i].dirty=true;
   X.calc.reset();X.dirty=true;markDirty();render();
 }
-function undo(){X.cfVer=(X.cfVer||0)+1;X.dvVer=(X.dvVer||0)+1;if(X.hi<0)return hint('אין עוד מה לבטל');const h=X.hist[X.hi--];restore(h.before.map(s=>({...s,cells:new Map([...s.cells].map(([k,v])=>[k,cloneCell(v)]))})));X.si=h.si;X.calc.reset();X.dirty=true;markDirty();buildTabs();render();}
-function redo(){X.cfVer=(X.cfVer||0)+1;X.dvVer=(X.dvVer||0)+1;if(X.hi>=X.hist.length-1)return;const h=X.hist[++X.hi];restore(h.after.map(s=>({...s,cells:new Map([...s.cells].map(([k,v])=>[k,cloneCell(v)]))})));X.si=h.si;X.calc.reset();X.dirty=true;markDirty();buildTabs();render();}
+function undo(){X.cfVer=(X.cfVer||0)+1;X.dvVer=(X.dvVer||0)+1;if(X.hi<0)return hint('אין עוד מה לבטל');const h=X.hist[X.hi--];h.after=snapSheets(h.all,h.before.map(s=>s.i));restore(cloneSnap(h.before));X.si=h.si;X.calc.reset();X.dirty=true;markDirty();buildTabs();render();}
+function redo(){X.cfVer=(X.cfVer||0)+1;X.dvVer=(X.dvVer||0)+1;if(X.hi>=X.hist.length-1)return;const h=X.hist[++X.hi];if(!h.after)return;restore(cloneSnap(h.after));X.si=h.si;X.calc.reset();X.dirty=true;markDirty();buildTabs();render();}
 function markDirty(){const s=q('xeState');s.textContent=X.dirty?'שינויים שלא נשמרו':(X.savedOnce?'נשמר':'');s.classList.toggle('dirty',X.dirty);}
 function hint(m){X.opts.toast(m);}
 
