@@ -147,10 +147,29 @@ const SLIDE_TEXT_SCHEMA = {
 const AR_HE = { 'ا': 'א', 'أ': 'א', 'إ': 'א', 'آ': 'א', 'ب': 'ב', 'ت': 'ת', 'ث': 'ת', 'ج': 'ג', 'ح': 'ח', 'خ': 'ח', 'د': 'ד', 'ذ': 'ד', 'ر': 'ר', 'ز': 'ז', 'س': 'ס', 'ش': 'ש', 'ص': 'צ', 'ض': 'צ', 'ط': 'ט', 'ظ': 'ט', 'ع': 'ע', 'غ': 'ע', 'ف': 'פ', 'ق': 'ק', 'ك': 'כ', 'ل': 'ל', 'م': 'מ', 'ن': 'נ', 'ه': 'ה', 'ة': 'ה', 'و': 'ו', 'ي': 'י', 'ى': 'י', 'ء': '' };
 const fixMixed = t => String(t).replace(/[֐-׿؀-ۿיִ-ﭏ]+/g, w => /[א-ת]/.test(w) && /[؀-ۿ]/.test(w) ? w.replace(/[؀-ۿ]/g, c => AR_HE[c] ?? '') : w);   // an Arabic vowel mark or other sign inside a Hebrew word is dropped
 const READING = ['slideText', 'print', 'scan', 'scanAccurate', 'lines', 'linesFast', 'linesCheck', 'table', 'tableCheck'];
+// a whole word in Arabic letters on a Hebrew page ("الملحين" for "המלחין"): the Arabic article "ال" becomes "ה"
+const FINAL = { 'כ': 'ך', 'מ': 'ם', 'נ': 'ן', 'פ': 'ף', 'צ': 'ץ' };
+const toHebWord = w => w.replace(/^(ال)(?=[ء-ي])/, 'ה').replace(/[؀-ۿ]/g, c => AR_HE[c] ?? '').replace(/[כמנפצ]$/, c => FINAL[c]);
+const answerText = d => ((d && d.candidates) || []).flatMap(c => ((c && c.content && c.content.parts) || []).map(p => typeof p.text === 'string' ? p.text : '')).join(' ');
+const letters = t => ({ he: (t.match(/[א-ת]/g) || []).length, ar: (t.match(/[ء-ي]/g) || []).length });
+// 6.6.6: on a page that is clearly Hebrew (4 Hebrew letters or more for each Arabic one), every Arabic word is Hebrew
+const hebrewPage = t => { const n = letters(t); return n.ar > 0 && n.he >= n.ar * 4; };
 function cleanReading(mode, d) {
   if (!READING.includes(mode) || !d || !Array.isArray(d.candidates)) return d;
-  for (const c of d.candidates) for (const p of (c && c.content && c.content.parts) || []) if (typeof p.text === 'string') p.text = fixMixed(p.text);
+  const whole = hebrewPage(answerText(d));
+  for (const c of d.candidates) for (const p of (c && c.content && c.content.parts) || []) if (typeof p.text === 'string') {
+    p.text = fixMixed(p.text);
+    if (whole) p.text = p.text.replace(/[؀-ۿ]+/g, toHebWord);
+  }
   return d;
+}
+// the answer still has Arabic letters on a Hebrew page → it is asked once more, with a plain reminder
+const needsHebrewRetry = (mode, res) => READING.includes(mode) && res && res.status === 200 && hebrewPage(answerText(res.d));
+function withHebrewReminder(g) {
+  const contents = JSON.parse(JSON.stringify(g.contents || []));
+  const last = contents[contents.length - 1];
+  if (last && Array.isArray(last.parts)) last.parts.push({ text: 'Important: this text is Hebrew. Write every Hebrew word with Hebrew letters (א-ת) only. A previous reading wrongly wrote some Hebrew words in Arabic letters - do not use any Arabic letter or Arabic vowel mark.' });
+  return { ...g, contents };
 }
 
 // finding the sheet of paper in a photo: its four corners, so the app can cut it out and straighten it
@@ -572,6 +591,13 @@ export default {
       let res;
       const t0 = Date.now();
       try { res = await callGemini(g, mode, env, deadline); } catch (e) { res = { status: 502, d: { error: { message: String(e && e.message || e) } } }; }
+      // 6.6.6: Hebrew written in Arabic letters → asked once more (if there is time); the answer with fewer Arabic letters wins
+      if (needsHebrewRetry(mode, res) && deadline - Date.now() > 20000) {
+        try {
+          const again = await callGemini(withHebrewReminder(g), mode, env, deadline);
+          if (again.status === 200 && letters(answerText(again.d)).ar < letters(answerText(res.d)).ar) res = again;
+        } catch (_) {}
+      }
       // an accurate reading is checked once more against the picture, word by word (if there is time left)
       // only when the first reading was quick and there is time left for a second look
       if (mode === 'scanAccurate' && res.status === 200 && Date.now() - t0 < 50000 && deadline - Date.now() > 40000) {
