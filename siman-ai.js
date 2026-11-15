@@ -19,19 +19,21 @@ const MAX_IMAGE = 7 * 1024 * 1024;  // base64 characters of one page picture
 // Cloudflare cuts a request that sends nothing back for 100 seconds (error 524). Reading a page of
 // handwriting can take longer, so "scan" and "ask" answer at once and keep the line open with spaces
 // until Gemini is done. The app reads the JSON at the end (JSON allows spaces before it).
-const STREAM_MODES = ['scan', 'scanAccurate', 'ask', 'lines', 'linesFast', 'linesCheck', 'table', 'tableCheck'];
+const STREAM_MODES = ['print', 'scan', 'scanAccurate', 'ask', 'lines', 'linesFast', 'linesCheck', 'table', 'tableCheck'];
 // the whole request has one time budget (the app gives up after 150 s): each model gets what is left
-const BUDGET = { tableCheck: 100000, orient: 30000, table: 120000, linesCheck: 80000, lines: 110000, linesFast: 60000, scan: 70000, scanAccurate: 125000, ask: 85000, translate: 85000, corners: 30000 };
-const MODEL_TIMEOUT = { tableCheck: 80000, orient: 20000, table: 90000, linesCheck: 70000, lines: 75000, linesFast: 45000, scan: 60000, scanAccurate: 90000, scanCheck: 45000, ask: 80000, translate: 80000, corners: 30000 }; // ms per model before trying the next one
+const BUDGET = { print: 90000, tableCheck: 100000, orient: 30000, table: 120000, linesCheck: 80000, lines: 110000, linesFast: 60000, scan: 70000, scanAccurate: 125000, ask: 85000, translate: 85000, corners: 30000 };
+const MODEL_TIMEOUT = { print: 55000, tableCheck: 80000, orient: 20000, table: 90000, linesCheck: 70000, lines: 75000, linesFast: 45000, scan: 60000, scanAccurate: 90000, scanCheck: 45000, ask: 80000, translate: 80000, corners: 30000 }; // ms per model before trying the next one
 // reading a page: "accurate" = the main model, thinking a little (best for handwriting, ~20–90 s);
 // "fast" = the light model, no thinking (a few seconds, guesses more)
 // lines: on the ivrit.ai Hebrew handwriting benchmark the main model reads single lines best of all models
 // (median 12% of letters wrong), far ahead of the light one — and far ahead of itself on a whole page
-const MODELS_FOR = { tableCheck: ['gemini-flash-latest'], orient: ['gemini-flash-lite-latest', 'gemini-flash-latest'], table: ['gemini-flash-latest', 'gemini-flash-lite-latest'], linesCheck: ['gemini-flash-latest'], lines: ['gemini-flash-latest', 'gemini-flash-lite-latest'], linesFast: ['gemini-flash-lite-latest', 'gemini-flash-latest'], scan: ['gemini-flash-lite-latest', 'gemini-flash-latest'], scanAccurate: ['gemini-flash-latest', 'gemini-flash-lite-latest'], scanCheck: ['gemini-flash-latest'], corners: ['gemini-flash-latest', 'gemini-flash-lite-latest'] };
+// 6.6: a printed page (book, letter, form, screenshot): the main model with no thinking reads print almost perfectly in seconds
+const MODELS_FOR = { print: ['gemini-flash-latest', 'gemini-flash-lite-latest'], tableCheck: ['gemini-flash-latest'], orient: ['gemini-flash-lite-latest', 'gemini-flash-latest'], table: ['gemini-flash-latest', 'gemini-flash-lite-latest'], linesCheck: ['gemini-flash-latest'], lines: ['gemini-flash-latest', 'gemini-flash-lite-latest'], linesFast: ['gemini-flash-lite-latest', 'gemini-flash-latest'], scan: ['gemini-flash-lite-latest', 'gemini-flash-latest'], scanAccurate: ['gemini-flash-latest', 'gemini-flash-lite-latest'], scanCheck: ['gemini-flash-latest'], corners: ['gemini-flash-latest', 'gemini-flash-lite-latest'] };
 // no "thinking" for reading and translating = a much faster answer; a little for questions
 // Models differ in which setting they take (older: thinkingBudget, newer: thinkingLevel), and one that does
 // not take a setting answers "invalid argument" — so each is tried in turn, and at the end none at all.
 const THINKING = {
+  print: [{ thinkingBudget: 0 }, { thinkingLevel: 'minimal' }, null],
   scan: [{ thinkingBudget: 0 }, { thinkingLevel: 'minimal' }, { thinkingLevel: 'low' }, null],
   // handwriting is read better with more thinking: each step down is tried only if the model refuses the one above
   // a little thinking: much faster than "medium", and the clean picture from the app does most of the work
@@ -83,6 +85,28 @@ Answer the user's question only from the document. If the answer is not in it, s
 After every fact, cite the page it came from: [עמ' 3] when you answer in Hebrew, [p. 3] in any other language.
 Answer in the language the question is written in. Be clear and short: plain short paragraphs, or lines that start with "• ". No markdown headings, no bold, no tables.`,
 };
+
+// 6.6: printed pages — fast and exact. The answer also says whether the page is really handwriting,
+// so the app can send such a page to the slower, careful handwriting reading instead.
+const PRINT_PROMPT = hint => `You convert a photographed or scanned page into an editable document (Word). Usually the page is printed or typed — a book, a letter, a form, an article, an invoice, a screenshot — often in Hebrew.
+Return only JSON:
+{"hand":<true|false>,"lang":"<ISO 639-1 of the main language>","blocks":[ ... ]}
+"hand": true only when most of the text, or whole lines of it, are handwritten. A printed page with a few handwritten words, filled-in fields, a signature or a stamp is "hand": false.
+Each block is one of:
+{"t":"h1","text":"..."}   the main title
+{"t":"h2","text":"..."}   a heading or sub-heading
+{"t":"p","text":"..."}    a paragraph: join the printed lines of one paragraph into one string (a word split by a hyphen at a line end is joined back)
+{"t":"li","text":"..."}   a bullet item (without the bullet sign)
+{"t":"oli","text":"..."}  a numbered item (without its number)
+{"t":"table","rows":[["cell","cell"],["cell","cell"]]}  a table, first row first, cells in reading order (right to left in Hebrew)
+Rules:
+- Copy the text exactly, character by character: every word, number, date, sign, punctuation mark, niqqud and English or Latin word as printed. Do not correct, complete, summarize, rephrase or translate.
+- Read the whole page top to bottom in its reading order: with two or more columns, finish one column before the next (the right column first in Hebrew and Arabic).
+- Skip running headers and footers that repeat on every page (book title, page number), and anything showing through from the other side of the paper.
+- Form fields: keep the label and what is filled in, for example "שם: ישראל ישראלי". An empty field keeps its label followed by "____".
+- A word you really cannot read (blurred, cut off): your best reading inside [[ ]]. Use [[?]] only when not even a guess is possible.
+- Right-to-left languages (Hebrew, Arabic) in normal logical order.
+- If the page is empty, return {"hand":false,"lang":null,"blocks":[]}.${hint ? `\nThe page is probably in: ${hint}.` : ''}`;
 
 // finding the sheet of paper in a photo: its four corners, so the app can cut it out and straighten it
 const LINES_PROMPT = hint => `You read handwritten notes for a document app. You get several lines, numbered, in reading order (the page's first line first). Each line is cut from a photographed page and usually comes in two views of the same picture: view A is high-contrast (ink black, paper white), view B is softer and keeps the thin strokes. Use both views to decide each letter.
@@ -160,6 +184,26 @@ const CORNERS_SCHEMA = {
     corners: { type: 'ARRAY', items: { type: 'ARRAY', items: { type: 'INTEGER' } } },
   },
   required: ['found', 'corners'],
+};
+const PRINT_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    hand: { type: 'BOOLEAN' },
+    lang: { type: 'STRING', nullable: true },
+    blocks: {
+      type: 'ARRAY',
+      items: {
+        type: 'OBJECT',
+        properties: {
+          t: { type: 'STRING', enum: ['h1', 'h2', 'p', 'li', 'oli', 'table'] },
+          text: { type: 'STRING' },
+          rows: { type: 'ARRAY', items: { type: 'ARRAY', items: { type: 'STRING' } } },
+        },
+        required: ['t'],
+      },
+    },
+  },
+  required: ['hand', 'blocks'],
 };
 const SCAN_SCHEMA = {
   type: 'OBJECT',
@@ -290,6 +334,24 @@ function build(body) {
       systemInstruction: { parts: [{ text: PROMPTS.translate(t) + (style ? '\n' + style : '') }] },
       contents: [{ role: 'user', parts: [{ text: `<page>\n${text}\n</page>` }] }],
       generationConfig: { temperature: 0.2, maxOutputTokens: 16384 },
+    };
+  }
+  if (mode === 'print') {
+    const image = String(body.image || '');
+    if (!image || image.length > MAX_IMAGE || !/^[A-Za-z0-9+/=]+$/.test(image.slice(0, 200))) return { err: 'image missing or too large' };
+    const mime = /^image\/(jpeg|png|webp)$/.test(body.mime) ? body.mime : 'image/jpeg';
+    const strips = (Array.isArray(body.strips) ? body.strips : []).slice(0, 4).map(String)
+      .filter(s => s && s.length <= MAX_IMAGE && /^[A-Za-z0-9+/=]+$/.test(s.slice(0, 200)));
+    const parts = [{ inlineData: { mimeType: mime, data: image } }];
+    if (strips.length) {
+      parts.push({ text: `The same page again in ${strips.length} sharper strips, from top to bottom. Neighbouring strips overlap a little: write each line only once. Use the whole page for the order and the layout, and the strips to read small print.` });
+      for (const s of strips) parts.push({ inlineData: { mimeType: 'image/jpeg', data: s } });
+    }
+    parts.push({ text: 'Convert this page.' });
+    return {
+      systemInstruction: { parts: [{ text: PRINT_PROMPT(LANGS[body.hint] || '') }] },
+      contents: [{ role: 'user', parts }],
+      generationConfig: { temperature: 0, maxOutputTokens: 16384, responseMimeType: 'application/json', responseSchema: PRINT_SCHEMA },
     };
   }
   if (mode === 'scan') {
@@ -496,7 +558,7 @@ async function proofread(g, first, env, deadline) {
 //   a translation), long where the main model reads much better (handwriting), so it normally gets its chance.
 // · a model that just hung or failed is remembered for a few minutes (in this worker copy): the next requests
 //   start with the other model at once, and the sick one only joins after the hedge time.
-const HEDGE = { ask: 9000, translate: 8000, corners: 6000, orient: 6000, scan: 15000, linesFast: 15000, scanAccurate: 50000, lines: 45000, table: 50000 };
+const HEDGE = { print: 12000, ask: 9000, translate: 8000, corners: 6000, orient: 6000, scan: 15000, linesFast: 15000, scanAccurate: 50000, lines: 45000, table: 50000 };
 const SICK_MS = 4 * 60 * 1000;
 const sick = new Map();   // model → time until which it is skipped first
 const isSick = m => (sick.get(m) || 0) > Date.now();

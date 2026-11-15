@@ -1290,7 +1290,7 @@ const imgIn = h('<input type="file" accept="image/*" multiple hidden>');
 const pdfIn = h('<input type="file" accept="application/pdf,.pdf" hidden>');
 dlg.append(camIn, imgIn, pdfIn);
 const SC = {
-  pages: [], tray: [], stop: false, running: false, hint: '', name: '', quality: 'accurate',
+  pages: [], tray: [], stop: false, running: false, hint: '', name: '', quality: (() => { try { const q = localStorage.getItem('siman.scan.q'); return ['auto', 'print', 'accurate', 'fast'].includes(q) ? q : 'auto'; } catch (_) { return 'auto'; } })(),
   body: () => dlg.querySelector('.sc-body'), foot: () => dlg.querySelector('.sc-foot'),
   // a modal dialog covers the app's toasts and busy screen, so messages are shown inside it
   note(msg) {
@@ -1320,7 +1320,7 @@ const SC = {
     const b = this.body(); this.foot().classList.add('hidden');
     b.innerHTML = `<div class="sc-pick">
       <h3>מצלמים דף, מקבלים מסמך מוכן</h3>
-      <p class="sub">כתב יד, צילום של מסמך או PDF סרוק: סימן קורא את הכתוב, גם בכתב יד, ובונה ממנו קובץ Word או PDF עם כותרות, רשימות וטבלאות. לפני השמירה רואים את התמונה ואת הטקסט זה לצד זה ומתקנים. מילים שהזיהוי לא בטוח בהן מסומנות בצהוב.</p>
+      <p class="sub">דף מודפס, כתב יד, צילום של מסמך או PDF סרוק: סימן קורא את הכתוב (דף מודפס בכמה שניות, גם כתב יד) ובונה ממנו קובץ Word או PDF עם כותרות, רשימות וטבלאות. לפני השמירה רואים את התמונה ואת הטקסט זה לצד זה ומתקנים. מילים שהזיהוי לא בטוח בהן מסומנות בצהוב.</p>
       <div class="sc-srcs">
         <button class="sc-src" type="button" data-s="cam">${ICON.scan}<b>צילום במצלמה</b><span>בטלפון: נפתחת המצלמה. מצלמים ישר מלמעלה, באור טוב. אפשר לצלם כמה עמודים לקובץ אחד</span></button>
         <button class="sc-src" type="button" data-s="img"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M21 16l-5-5-8 8"/></svg><b>בחירת תמונות</b><span>אפשר כמה תמונות יחד. כל תמונה היא עמוד</span></button>
@@ -1328,12 +1328,12 @@ const SC = {
         ${docN ? `<button class="sc-src" type="button" data-s="doc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="1.5"/><path d="M9 8h6M9 12h6M9 16h3"/></svg><b>הקובץ הפתוח</b><span></span></button>` : ''}
       </div>
       <div class="sc-opts"><label>שפת הכתב <select data-o="hint">${SC_LANGS.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select></label>
-        <label>אופן הקריאה <select data-o="quality"><option value="accurate">מדויק: הכי טוב לכתב יד (חצי דקה עד שתי דקות לעמוד)</option><option value="fast">מהיר: כמה שניות לעמוד, מנחש יותר</option></select></label></div>
-      <p class="sc-fine">התמונות נשלחות לזיהוי אצל Google Gemini ולא נשמרות אצלנו. בשירות החינמי Google עשויה להשתמש בהן לשיפור השירות שלה, לכן לא כדאי לסרוק כך מסמכים רגישים במיוחד (תעודות זהות, מסמכים רפואיים). כל עמוד לוקח כמה שניות.</p>
+        <label>סוג הדף <select data-o="quality"><option value="auto">זיהוי אוטומטי (מומלץ): מודפס בכמה שניות, כתב יד בזהירות</option><option value="print">מודפס או מוקלד: הכי מהיר (ספר, מכתב, טופס, צילום מסך)</option><option value="accurate">כתב יד: הכי מדויק (חצי דקה עד שתי דקות לעמוד)</option><option value="fast">כתב יד מהיר: כמה שניות לעמוד, מנחש יותר</option></select></label></div>
+      <p class="sc-fine">התמונות נשלחות לזיהוי אצל Google Gemini ולא נשמרות אצלנו. בשירות החינמי Google עשויה להשתמש בהן לשיפור השירות שלה, לכן לא כדאי לסרוק כך מסמכים רגישים במיוחד (תעודות זהות, מסמכים רפואיים). דף מודפס נקרא בכמה שניות; כתב יד לוקח יותר.</p>
     </div>`;
     if (docN) b.querySelector('[data-s=doc] span').textContent = `${dispName(S.office ? S.office.name : S.name)} · ${docN} ${docN === 1 ? 'עמוד' : 'עמודים'}`;
     const sel = b.querySelector('[data-o=hint]'); sel.value = this.hint; sel.onchange = () => { this.hint = sel.value; };
-    const q = b.querySelector('[data-o=quality]'); q.value = this.quality; q.onchange = () => { this.quality = q.value; };
+    const q = b.querySelector('[data-o=quality]'); q.value = this.quality; q.onchange = () => { this.quality = q.value; try { localStorage.setItem('siman.scan.q', q.value); } catch (_) {} };
     b.querySelector('[data-s=cam]').onclick = () => camIn.click();
     b.querySelector('[data-s=img]').onclick = () => imgIn.click();
     b.querySelector('[data-s=pdf]').onclick = () => pdfIn.click();
@@ -1345,11 +1345,18 @@ const SC = {
     if (!files.length) return;
     if (!this.name && !this.pages.length && !this.tray.length) this.name = files.length === 1 && !/^(image|img|photo|pxl|dsc|תמונה)[-_ ]?\d*/i.test(files[0].name) ? files[0].name.replace(/\.[a-z0-9]+$/i, '') : 'כתב יד';
     const bad = [], take = files.slice(0, this.room());
-    for (const [i, f] of take.entries()) {
-      this.wait(take.length > 1 ? `מזהה את הדף ומכין אותו… (${i + 1} מתוך ${take.length})` : 'מזהה את הדף ומכין אותו…');
-      try { this.tray.push(await imgToJpeg(f)); }
-      catch (e) { bad.push(`${f.name}${/heic|heif/i.test(f.type + f.name) ? ' (HEIC: צלמו ישר מהמצלמה או שמרו כ-JPG)' : ''}`); }
-    }
+    // 6.6: several pictures are prepared three at a time (each waits for its page-edge check), in their order
+    const got = new Array(take.length).fill(null); let nx = 0, ready = 0;
+    this.wait(take.length > 1 ? `מזהה את הדפים ומכין אותם… (0 מתוך ${take.length})` : 'מזהה את הדף ומכין אותו…');
+    await Promise.all(Array.from({ length: Math.min(3, take.length) }, async () => {
+      while (nx < take.length) {
+        const i = nx++, f = take[i];
+        try { got[i] = await imgToJpeg(f); }
+        catch (e) { bad.push(`${f.name}${/heic|heif/i.test(f.type + f.name) ? ' (HEIC: צלמו ישר מהמצלמה או שמרו כ-JPG)' : ''}`); }
+        ready++; if (take.length > 1) this.wait(`מזהה את הדפים ומכין אותם… (${ready} מתוך ${take.length})`);
+      }
+    }));
+    for (const it of got) if (it) this.tray.push(it);
     // a photo just taken: its frame is shown at once, to confirm or fix
     if (fromCamera && take.length === 1 && this.tray.length && !bad.length) { this.frame(this.tray.length - 1); return; }
     this.showTray();
@@ -1446,24 +1453,35 @@ const SC = {
     f.innerHTML = '<span class="hint" style="margin-inline-end:auto"></span><button class="btn" type="button" data-a="stop">עצירה</button>';
     f.querySelector('[data-a=stop]').onclick = () => { this.stop = true; this.ctl.abort(); };
     const st = b.querySelector('.sc-status'), lis = [...b.querySelectorAll('.sc-prog li')];
-    for (let i = 0; i < fresh.length; i++) {
-      if (this.stop) break;
-      const p = fresh[i], li = lis[i];
-      li.className = 'now'; li.querySelector('span').textContent = 'קורא…';
-      const t0 = Date.now(), line = `${i ? '' : pre}קורא את עמוד ${start + i + 1}${fresh.length > 1 ? ` (${i + 1} מתוך ${fresh.length})` : ''}`;
-      st.textContent = line + '…';
-      const clock = setInterval(() => { const sec = Math.round((Date.now() - t0) / 1000); li.querySelector('span').textContent = `קורא… ${sec} שנ׳`; st.textContent = `${line} · ${sec} שניות${sec > 45 ? ' (דף צפוף לוקח לפעמים עד שתי דקות)' : ''}`; }, 1000);
+    // 6.6: printed pages are read two at a time (each is one quick request); handwriting stays one page at a time
+    const par = (this.quality === 'auto' || this.quality === 'print') && fresh.length > 1 ? 2 : 1;
+    let nextI = 0, t00 = Date.now();
+    const one = async i => {
+      const p = fresh[i], li = lis[i], sp = li.querySelector('span');
+      li.className = 'now'; sp.textContent = 'קורא…';
+      const t0 = Date.now(), lineOf = () => `${pre}קורא ${fresh.length > 1 ? `את העמודים: ${fresh.filter(x => x.blocks || x.err).length} מתוך ${fresh.length} מוכנים` : 'את העמוד'}`;
+      let line = lineOf(); st.textContent = line + '…';
+      let hand = false;
+      const clock = setInterval(() => { const sec = Math.round((Date.now() - t0) / 1000); if (!/שורה|בודק/.test(sp.textContent)) sp.textContent = `${hand ? 'כתב יד: קורא בזהירות…' : 'קורא…'} ${sec} שנ׳`; line = lineOf(); st.textContent = `${line} · ${Math.round((Date.now() - t00) / 1000)} שניות${hand && sec > 45 ? ' (דף כתב יד צפוף לוקח לפעמים עד שתי דקות)' : ''}`; }, 1000);
       try {
-        const raw = await readPage(p, this.hint, this.quality, { signal: this.ctl.signal, onWait: s => { st.textContent = `השירות עמוס, ממשיך בעוד ${s} שניות…`; }, onLines: (d, n) => { li.querySelector('span').textContent = `שורה ${d} מתוך ${n}`; }, onCheck: () => { li.querySelector('span').textContent = 'בודק את כל הדף שוב…'; } }).finally(() => clearInterval(clock));
+        const raw = await readPage(p, this.hint, this.quality, { signal: this.ctl.signal, onHand: () => { hand = true; sp.textContent = 'כתב יד: קורא בזהירות…'; }, onWait: s => { st.textContent = `השירות עמוס, ממשיך בעוד ${s} שניות…`; }, onLines: (d, n) => { sp.textContent = `שורה ${d} מתוך ${n}`; }, onCheck: () => { sp.textContent = 'בודק את כל הדף שוב…'; } }).finally(() => clearInterval(clock));
         p.blocks = parseBlocks(raw); p.lang = p.blocks.lang;
-        li.className = 'ok'; li.querySelector('span').textContent = p.blocks.length ? `${p.blocks.length} קטעים` : 'עמוד ריק';
+        li.className = 'ok'; sp.textContent = p.blocks.length ? `${p.blocks.length} קטעים · ${Math.round((Date.now() - t0) / 1000)} שנ׳` : 'עמוד ריק';
       } catch (e) {
-        if (this.stop && e && e.name === 'AbortError') { li.className = ''; li.querySelector('span').textContent = 'נעצר'; break; }
-        p.err = e.message || String(e); li.className = 'bad'; li.querySelector('span').textContent = 'לא נקרא';
-        if (/מכסה|לא הוקם|חוסם|אין חיבור/.test(p.err)) { st.textContent = p.err; this.stop = true; break; }
+        if (this.stop && e && e.name === 'AbortError') { li.className = ''; sp.textContent = 'נעצר'; return false; }
+        p.err = e.message || String(e); li.className = 'bad'; sp.textContent = 'לא נקרא';
+        if (/מכסה|לא הוקם|חוסם|אין חיבור/.test(p.err)) { st.textContent = p.err; this.stop = true; if (this.ctl) this.ctl.abort(); return false; }
       }
-      if (i < fresh.length - 1 && !this.stop) await sleep(1200);   // the free service allows only a few pages a minute
-    }
+      return true;
+    };
+    const lane = async () => {
+      while (nextI < fresh.length && !this.stop) {
+        const i = nextI++;
+        if (!(await one(i))) break;
+        if (nextI < fresh.length && !this.stop && par === 1) await sleep(1200);   // the free service allows only a few pages a minute
+      }
+    };
+    await Promise.all(Array.from({ length: par }, lane));
     this.running = false;
     const done = this.pages.filter(p => p.blocks);
     if (!done.length && !append) {
@@ -1613,7 +1631,35 @@ window.SIMAN_VOCAB = VOCAB;
    in a few requests of up to 6 lines, two at a time. On the ivrit.ai Hebrew handwriting benchmark this is
    where the reading models are by far the most accurate. Other pages (a PDF, an old reader photo) are read
    as one page, as before. The answer has the same shape either way: {"lang","blocks"}. */
-async function readPage(p, hint, quality, { onWait, onLines, onCheck, signal } = {}) {
+/* 6.6: a printed page (a book, a letter, a form, a screenshot) is read whole, in one quick request, in a few
+   seconds — the careful line-by-line reading below was made for handwriting and took minutes on print.
+   "auto" (the default): the quick reading also says whether the page is really handwritten; only such a page
+   goes on to the careful handwriting reading. An older server that does not know "print" answers "unknown
+   mode": then the reading goes on as before. */
+let PRINT_OK = true;
+async function readPrinted(p, hint, { onWait, signal } = {}) {
+  if (!PRINT_OK) return null;
+  try {
+    const raw = await ai({ mode: 'print', image: p.b64, strips: p.strips || [], mime: 'image/jpeg', hint }, { timeout: 100000, onWait, signal });
+    let hand = false;
+    try { hand = !!JSON.parse(String(raw).replace(/^\s*```(?:json)?|```\s*$/g, '')).hand; } catch (_) {}
+    return { raw, hand };
+  } catch (e) {
+    if (/unknown mode/i.test(e && e.message || '')) { PRINT_OK = false; return null; }
+    throw e;
+  }
+}
+async function readPage(p, hint, quality, opts = {}) {
+  if (quality === 'auto' || quality === 'print') {
+    const r = await readPrinted(p, hint, opts);
+    if (r && (quality === 'print' || !r.hand)) { p.kind = 'print'; return r.raw; }
+    if (!r && quality === 'print') return ai({ mode: 'scan', image: p.b64, strips: p.strips || [], mime: 'image/jpeg', hint, quality: 'fast' }, { timeout: 150000, onWait: opts.onWait, signal: opts.signal });
+    p.kind = 'hand'; opts.onHand && opts.onHand();
+    quality = 'accurate';
+  }
+  return readHand(p, hint, quality, opts);
+}
+async function readHand(p, hint, quality, { onWait, onLines, onCheck, signal } = {}) {
   if (!p.lines || !p.lines.length) return ai({ mode: 'scan', image: p.b64, strips: p.strips || [], mime: 'image/jpeg', hint, quality }, { timeout: 150000, onWait, signal });
   // 5.9.6: no internet / the daily limit: stop at once, instead of rows of [?] and more requests that will fail too
   const FATAL = /מכסה|אין חיבור|חוסם|לא הוקם/;

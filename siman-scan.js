@@ -1811,7 +1811,8 @@ async function readingPic(p, fast) {
     }
   }
   free(gray);
-  const sp = splitLines(g, gs, W, H, x0, y0, cw, ch);
+  // 6.6: a page marked as printed is read whole: no need to cut it into lines
+  const sp = (window.SIMAN_SCAN || {}).quality === 'print' ? [] : splitLines(g, gs, W, H, x0, y0, cw, ch);
   return { url: page.u, b64: page.u.split(',')[1], w: page.w, h: page.h, strips, lines: sp.map(l => l.a), lines2: sp.map(l => l.b) };
 }
 window.SIMAN_CAM = CAM;
