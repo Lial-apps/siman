@@ -145,7 +145,7 @@ const SLIDE_TEXT_SCHEMA = {
 // has Hebrew letters, every Arabic letter becomes its Hebrew twin; a word written wholly in Arabic is left alone
 // (a real Arabic document keeps its text).
 const AR_HE = { 'ا': 'א', 'أ': 'א', 'إ': 'א', 'آ': 'א', 'ب': 'ב', 'ت': 'ת', 'ث': 'ת', 'ج': 'ג', 'ح': 'ח', 'خ': 'ח', 'د': 'ד', 'ذ': 'ד', 'ر': 'ר', 'ز': 'ז', 'س': 'ס', 'ش': 'ש', 'ص': 'צ', 'ض': 'צ', 'ط': 'ט', 'ظ': 'ט', 'ع': 'ע', 'غ': 'ע', 'ف': 'פ', 'ق': 'ק', 'ك': 'כ', 'ل': 'ל', 'م': 'מ', 'ن': 'נ', 'ه': 'ה', 'ة': 'ה', 'و': 'ו', 'ي': 'י', 'ى': 'י', 'ء': '' };
-const fixMixed = t => String(t).replace(/[֐-׿؀-ۿיִ-ﭏ]+/g, w => /[א-ת]/.test(w) && /[؀-ۿ]/.test(w) ? w.replace(/[؀-ۿ]/g, c => AR_HE[c] ?? c) : w);
+const fixMixed = t => String(t).replace(/[֐-׿؀-ۿיִ-ﭏ]+/g, w => /[א-ת]/.test(w) && /[؀-ۿ]/.test(w) ? w.replace(/[؀-ۿ]/g, c => AR_HE[c] ?? '') : w);   // an Arabic vowel mark or other sign inside a Hebrew word is dropped
 const READING = ['slideText', 'print', 'scan', 'scanAccurate', 'lines', 'linesFast', 'linesCheck', 'table', 'tableCheck'];
 function cleanReading(mode, d) {
   if (!READING.includes(mode) || !d || !Array.isArray(d.candidates)) return d;
