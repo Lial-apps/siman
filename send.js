@@ -257,6 +257,7 @@ const listSet=l=>{try{localStorage.setItem(LIST_KEY,JSON.stringify(l.slice(0,200
 
 /* ------------------------------------------------------------ the screen */
 const CSS=`
+#snd [hidden]{display:none!important} /* 6.6.1: buttons with their own display rule stayed visible when hidden */
 #snd{--n:#16213A;--m:#FFD43B;--b:#2E58CC;--l:#D4DBE5;--t:#16213A;--mu:#5D6982;position:fixed;inset:0;z-index:950;display:flex;flex-direction:column;background:#E4E8EF;color:var(--t);direction:rtl;font:14px/1.4 "SF-heebo","Heebo",system-ui,sans-serif}
 #snd *{box-sizing:border-box}
 #snd .s-top{display:flex;align-items:center;gap:10px;padding:8px 14px;background:var(--n);color:#E4EAF4;min-height:52px}

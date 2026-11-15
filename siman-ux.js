@@ -187,7 +187,7 @@ function redoButton(){
   const u=$('undo');if(!u||$('redoBtn'))return;
   const b=document.createElement('button');b.className=u.className;b.id='redoBtn';b.title=L().redo;b.setAttribute('aria-label',L().redo);b.textContent='↷';
   b.onclick=()=>{if(typeof redoAct==='function')redoAct();};u.after(b);
-  const sync=()=>{b.disabled=!(typeof S!=='undefined'&&S.redo&&S.redo.length);};setInterval(sync,500);sync();
+  const sync=()=>{b.disabled=!(typeof S!=='undefined'&&S.redo&&S.redo.length);};setInterval(()=>{if(!document.hidden)sync();},500);sync();
 }
 
 /* ------------------------------------------------------------ 4. the "more" menu in the phone bar */

@@ -318,7 +318,7 @@ async function givePass(req, env) {
   return { status: 200, body: await makePass(env, dev) };
 }
 // how many units a request costs (a careful reading of a page asks Gemini two or three times)
-const WEIGHT = { scanAccurate: 3, lines: 2, table: 2, tableCheck: 1, linesCheck: 1 };
+const WEIGHT = { scanAccurate: 3, lines: 1, table: 2, tableCheck: 1, linesCheck: 1 };
 // ======================================== end of the guard ========================================
 
 function build(body) {
@@ -458,7 +458,8 @@ function build(body) {
   }
   if (mode === 'ask') {
     const text = String(body.text || '').slice(0, MAX_TEXT);
-    const q = String(body.question || '').slice(0, 2000);
+    // 6.6.1: 8000 — the Office assistant sends its rules before the request (~4000 characters); at 2000 the request itself was cut off
+    const q = String(body.question || '').slice(0, 8000);
     if (!text.trim() || !q.trim()) return { err: 'document text or question missing' };
     const history = Array.isArray(body.history) ? body.history.slice(-6) : [];
     const contents = [{ role: 'user', parts: [{ text: `<document>\n${text}\n</document>` }] }, { role: 'model', parts: [{ text: 'קראתי את המסמך. מה השאלה?' }] }];
@@ -558,8 +559,10 @@ async function proofread(g, first, env, deadline) {
 //   a translation), long where the main model reads much better (handwriting), so it normally gets its chance.
 // · a model that just hung or failed is remembered for a few minutes (in this worker copy): the next requests
 //   start with the other model at once, and the sick one only joins after the hedge time.
-const HEDGE = { print: 12000, ask: 9000, translate: 8000, corners: 6000, orient: 6000, scan: 15000, linesFast: 15000, scanAccurate: 50000, lines: 45000, table: 50000 };
+// 6.6.1: ask/translate send a whole document: a second model joins later, so the long ones are not paid twice
+const HEDGE = { print: 12000, ask: 20000, translate: 15000, corners: 6000, orient: 6000, scan: 15000, linesFast: 15000, scanAccurate: 50000, lines: 45000, table: 50000 };
 const SICK_MS = 4 * 60 * 1000;
+const thinkOk = new Map();   // model/mode → the thinking setting it took last time
 const sick = new Map();   // model → time until which it is skipped first
 const isSick = m => (sick.get(m) || 0) > Date.now();
 
@@ -568,7 +571,8 @@ async function runModel(model, g, mode, env, deadline, stop) {
   let last = null;
   const t0 = Date.now();
   const options = THINKING[mode] || [null];
-  for (let k = 0; k < options.length; k++) {
+  // 6.6.1: start from the thinking setting this model last took (each refused one costs a full upload)
+  for (let k = Math.min(thinkOk.get(model + '/' + mode) || 0, options.length - 1); k < options.length; k++) {
     const thinking = options[k];
     const left = deadline - Date.now();
     if (left < 6000 || stop.signal.aborted) return last || { status: 504, d: { error: { message: 'took too long' } } };
@@ -593,7 +597,7 @@ async function runModel(model, g, mode, env, deadline, stop) {
       return { status: 504, d: { error: { message: ctl.signal.aborted ? `${model} took too long` : 'Gemini not reachable' } } };
     }
     clearTimeout(timer); stop.signal.removeEventListener('abort', onStop);
-    if (r.ok) { sick.delete(model); return { status: 200, d }; }
+    if (r.ok) { sick.delete(model); thinkOk.set(model + '/' + mode, k); return { status: 200, d }; }
     last = { status: r.status, d };
     if (r.status === 400 && thinking) continue;   // a setting this model does not take: the next setting
     if ([429, 500, 503, 504].includes(r.status)) sick.set(model, Date.now() + SICK_MS);

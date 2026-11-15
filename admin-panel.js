@@ -115,7 +115,7 @@
   const _sync = syncButtons;
   syncButtons = function () { _sync(); markAdminPlan(); };
   syncButtons();
-  setInterval(syncButtons, 2000);
+  setInterval(() => { if (!document.hidden) syncButtons(); }, 2000);
   document.addEventListener('click', () => setTimeout(syncButtons, 300), true);
   topBtn.onclick = open;
   setPanelBtn.onclick = open;

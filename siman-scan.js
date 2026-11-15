@@ -1470,10 +1470,8 @@ const CAM = {
   },
   async toEditor(ocr) {
     if (typeof openFile !== 'function') throw new Error('העורך לא נטען');
-    // asked before the work, not after it
-    if (typeof S !== 'undefined' && S.dirty && !confirm('בקובץ הפתוח יש שינויים שלא נשמרו. לפתוח את הסריקה במקומו?')) return;
     const f = await this.buildPdf(); this.busy(null);
-    try { if (typeof S !== 'undefined') S.dirty = false; } catch (_) {}
+    // 6.6.1: the open file is kept in its own tab, with its unsaved changes (before, it was marked saved here and its changes could be lost)
     this.close(true);
     await openFile(f);
     try { if (typeof setDirty === 'function') setDirty(true); } catch (_) {}
@@ -1496,7 +1494,7 @@ const CAM = {
       try {
         const img = await decodeImg(p.src), c = scaledCanvas(img, 900); if (img.close) img.close();
         const u = c.toDataURL('image/jpeg', 0.82); free(c);
-        const j = JSON.parse(String(await AI({ mode: 'corners', image: u.split(',')[1] }, { timeout: 40000 })).replace(/^\s*```(?:json)?|```\s*$/g, ''));
+        const j = JSON.parse(String(await AI({ mode: 'corners', image: u.split(',')[1] }, { timeout: 20000, once: true })).replace(/^\s*```(?:json)?|```\s*$/g, ''));
         if (j && j.found && Array.isArray(j.corners) && j.corners.length === 4 && !p.cropEdited) {
           const pts = j.corners.map(q => [Math.max(0, Math.min(1, (+q[1] || 0) / 1000)), Math.max(0, Math.min(1, (+q[0] || 0) / 1000))]);
           // סדר: למעלה-שמאל, למעלה-ימין, למטה-ימין, למטה-שמאל

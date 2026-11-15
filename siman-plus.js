@@ -690,10 +690,12 @@ window.SIMAN_TABS = { TB, switchTo, closeTab, mergeAll, zipAll, openMany, tabInf
 /* =====================================================================
    2. AI — the smart server (siman-ai)
    ===================================================================== */
-async function ai(payload, { onWait, signal, timeout = 300000 } = {}) {
+async function ai(payload, { onWait, signal, timeout = 300000, once = false } = {}) {
   // 6.2: the smart services run on our server: they ask for an email first (the tools on the device do not)
   if (window.cloudGate && !cloudGate('ai')) throw new Error(window.CLOUD_REG_MSG || 'צריך להירשם עם מייל');
-  for (let attempt = 0; attempt < 4; attempt++) {
+  // 6.6.1: once = a quick helper request (the page edges): one try, no waiting, it is only a help
+  const tries = once ? 1 : 4;
+  for (let attempt = 0; attempt < tries; attempt++) {
     // 5.9.6: with no internet at all there is nothing to wait for (before: three retries, 30 seconds of "working")
     if (navigator.onLine === false) throw new Error('אין חיבור לאינטרנט');
     let r, d, status;
@@ -710,7 +712,7 @@ async function ai(payload, { onWait, signal, timeout = 300000 } = {}) {
       if (e && e.name === 'AbortError') throw new Error('הבקשה לקחה יותר מדי זמן. נסו שוב, או צלמו את הדף קרוב יותר ובאור טוב');
       // a phone's connection drops for a moment (switching between Wi-Fi and mobile data, a long wait for a page):
       // the request is sent again a few times before giving up
-      if (attempt < 3) {
+      if (attempt < tries - 1) {
         for (let k = 5 * (attempt + 1); k > 0; k--) { onWait && onWait(k); await sleep(1000); if (signal && signal.aborted) throw new DOMException('stop', 'AbortError'); }
         continue;
       }
@@ -727,11 +729,13 @@ async function ai(payload, { onWait, signal, timeout = 300000 } = {}) {
       throw new Error('התקבלה תשובה ריקה. נסו שוב');
     }
     const all = JSON.stringify(d), msg = (d.error && d.error.message) || ('HTTP ' + r.status);
+    // 6.6.1: the server's own words for its daily share (they also say a personal key lifts the limit)
+    if (d.error && /^(DAY|ALL)$/.test(d.error.code || '') && d.error.message) throw new Error(d.error.message);
     if (r.status === 429 && /per ?day|PerDay/i.test(all)) throw new Error('נגמרה המכסה היומית החינמית. היא מתאפסת מחר בבוקר');
     if (r.status === 403) throw new Error('השרת החכם חוסם את הכתובת הזו של האפליקציה');
     if (r.status === 404) throw new Error('השרת החכם (siman-ai) עוד לא הוקם');
     // 6.3.1: one more try at once: the server now remembers a model that hung and starts with the other one
-    if ((r.status === 504 || r.status === 524) && attempt === 0) { onWait && onWait(1); continue; }
+    if ((r.status === 504 || r.status === 524) && attempt === 0 && !once) { onWait && onWait(1); continue; }
     if (r.status === 504 || r.status === 524) throw new Error('הקריאה לקחה יותר מדי זמן. נסו שוב בעוד רגע');
     if ([429, 500, 502, 503].includes(r.status)) {
       const wait = 8 * (attempt + 1);
@@ -1079,7 +1083,7 @@ function renderLog() {
     // 6.0: the follow-up questions the assistant suggested after its last answer come first
     const last = items[items.length - 1];
     for (const f of (last && last.follow) || []) { const b = h(`<button class="ai-chip follow" type="button" dir="auto"></button>`); b.textContent = f; b.onclick = () => askQ(f); chips.append(b); }
-    for (const [l, q] of chipsNow().filter(c => !items.some(i => i.q === c[1])).slice(0, last && last.follow && last.follow.length ? 1 : 3)) { const b = h(`<button class="ai-chip" type="button">${esc(l)}</button>`); b.onclick = () => askQ(q, l); chips.append(b); }
+    for (const [l, q] of chipsNow().filter(c => !items.some(i => i.q === c[1] && i.a)).slice(0, last && last.follow && last.follow.length ? 1 : 3)) { const b = h(`<button class="ai-chip" type="button">${esc(l)}</button>`); b.onclick = () => askQ(q, l); chips.append(b); }
     if (!AS.isBusy() && chips.childElementCount) log.append(chips);
     if (!AS.isBusy() && !edKind()) {
       log.append(studyChips());
@@ -1792,7 +1796,7 @@ const quadArea = q => Math.abs(q.reduce((a, p, i) => { const n = q[(i + 1) % 4];
 // the smart service points at the sheet's corners; an older server, or no answer, leaves the whole photo
 async function detectSheet(it) {
   try {
-    const raw = await ai({ mode: 'corners', image: it.viewB64 }, { timeout: 45000 });
+    const raw = await ai({ mode: 'corners', image: it.viewB64 }, { timeout: 20000, once: true });
     const j = JSON.parse(String(raw).replace(/^\s*```(?:json)?|```\s*$/g, ''));
     if (!j || !j.found || !Array.isArray(j.corners) || j.corners.length !== 4) return null;
     const q = orderQuad(j.corners.map(p => [Math.max(0, Math.min(1, (+p[1] || 0) / 1000)), Math.max(0, Math.min(1, (+p[0] || 0) / 1000))]));
@@ -2090,8 +2094,17 @@ let ocrPref = 'he';
 try { ocrPref = localStorage.getItem('siman.ocrlang') || 'he'; if (!OCR_SETS[ocrPref]) ocrPref = 'he'; } catch (_) {}
 getTess = async function () {
   if (!window.Tesseract) await loadScript(TESS_URL);
-  if (tessWorker && tessWorker._siman !== ocrPref) { try { await tessWorker.terminate(); } catch (_) {} tessWorker = null; }
-  if (!tessWorker) { tessWorker = await Tesseract.createWorker(OCR_SETS[ocrPref], 1, { logger: m => tessLog && tessLog(m) }); tessWorker._siman = ocrPref; }
+  // 6.6.1: the worker is kept as a promise at once (two quick calls made two engines before), and the first
+  // download shows its progress again
+  if (tessWorker && tessWorker._siman !== ocrPref) { const old = tessWorker; tessWorker = null; try { (await old).terminate(); } catch (_) {} }
+  if (!tessWorker) {
+    const lang = ocrPref;
+    tessWorker = Tesseract.createWorker(OCR_SETS[lang], 1, { logger: m => {
+      if (tessLog && m.status === 'recognizing text') tessLog(m);
+      else if (/load|download|init/i.test(m.status || '') && m.progress != null) { const b = $('busyMsg'); if (b && !$('busy').classList.contains('hidden')) b.textContent = `מוריד את מנוע זיהוי הטקסט (פעם אחת)… ${Math.round(m.progress * 100)}%`; }
+    } }).catch(e => { tessWorker = null; throw e; });
+    tessWorker._siman = lang;
+  }
   return tessWorker;
 };
 const ocrSel = () => h(`<select class="ocr-lang" aria-label="שפת הטקסט הסרוק" title="שפת הטקסט הסרוק"><option value="he">עברית + אנגלית</option><option value="ru">רוסית + אנגלית</option><option value="heru">עברית + רוסית + אנגלית</option><option value="ar">ערבית + אנגלית</option><option value="fr">צרפתית + אנגלית</option><option value="es">ספרדית + אנגלית</option></select>`);

@@ -114,7 +114,7 @@ async function givePass(req, env) {
   return { status: 200, body: await makePass(env, dev) };
 }
 // how many units a request costs (a careful reading of a page asks Gemini two or three times)
-const WEIGHT = { scanAccurate: 3, lines: 2, table: 2, tableCheck: 1, linesCheck: 1 };
+const WEIGHT = { scanAccurate: 3, lines: 1, table: 2, tableCheck: 1, linesCheck: 1 };
 // ======================================== end of the guard ========================================
 
 function tooManyLocal(ip) {

@@ -552,7 +552,7 @@ function makeCalc(X){
     if(!ast)return ERR('#NAME?');
     try{const v=ev(ast,si);return v&&v.rng?v.rng:v;}catch(e){if(isErr(e))return e;return ERR('#VALUE!');}
   }
-  return{value:cellVal,reset:()=>memo.clear(),evalF};
+  return{value:cellVal,reset:()=>{memo.clear();X.calcN=(X.calcN||0)+1;},evalF};
 }
 
 /* ------------------------------------------------------------ number formats */
@@ -1206,7 +1206,8 @@ function sortSel(desc,auto){
     X.calc.reset();
     const rank=v=>v===null||v===undefined||v===''?2:typeof v==='number'?0:1;
     rows.sort((x,y)=>{const a=x.k,b=y.k;const ra=rank(a),rb=rank(b);if(ra!==rb)return ra-rb;if(ra===2)return 0;const d=ra===0?a-b:String(a).localeCompare(String(b),'he',{numeric:true});return desc?-d:d;});
-    rows.forEach((row,i)=>{for(const c of row.cells){c.r=s.r1+i;c.mod=true;delete c.ast;sh.cells.set(key(c.r,c.c),c);}});
+    // 6.6.1: a formula that moves with its row keeps pointing at its own row, as in Excel (=B5*C5 moved to row 2 → =B2*C2)
+    rows.forEach((row,i)=>{for(const c of row.cells){const dr=s.r1+i-c.r;c.r=s.r1+i;c.mod=true;delete c.ast;if(c.f&&dr)c.f=moveFormula(c.f,dr,0);sh.cells.set(key(c.r,c.c),c);}});
   });
   select(s.r1,by);X.anchor={r:s.r1,c:by};select(s.r2,s.c2,true);X.act={r:s.r1,c:by};paintSel();hint(`מוינו ${s.r2-s.r1+1} שורות לפי עמודה ${colName(by)}${desc?' (מהגדול לקטן)':''}`);
 }
@@ -1258,7 +1259,7 @@ function doPaste(text){
   }
   const rows=parseTsv(text);if(!rows.length)return;
   change(()=>{rows.forEach((row,i)=>row.forEach((v,j)=>putValue(sh,r0+i,c0+j,v)));});
-  X.sel={r1:r0,c1:c0,r2:r0+rows.length-1,c2:c0+Math.max(...rows.map(r=>r.length))-1};paintSel();
+  X.sel={r1:r0,c1:c0,r2:r0+rows.length-1,c2:c0+rows.reduce((m,r)=>Math.max(m,r.length),1)-1};paintSel();
 }
 
 /* ---------- editing a cell ---------- */
@@ -1781,7 +1782,7 @@ const DRAFT={db:null,
   async del(k){try{const db=await this.open();await new Promise(r=>{const t=db.transaction('d','readwrite');t.objectStore('d').delete(k);t.oncomplete=t.onerror=r;});}catch(_){}}
 };
 const draftKey=()=>'x:'+(X.opts.name||'new');
-function startDrafts(){X.draftT=setInterval(async()=>{if(!X||!X.dirty||X.saving||X.editing)return;try{const b=await buildXlsx();if(X)await DRAFT.put(draftKey(),{bytes:b,time:Date.now(),name:fileName()});}catch(_){}},40000);}
+function startDrafts(){X.draftT=setInterval(async()=>{if(!X||!X.dirty||X.saving||X.editing||X.draftAt===X.calcN)return;try{const b=await buildXlsx();if(X)X.draftAt=X.calcN;   /* 6.6.1: no new draft until something changes (building one resets the calculation too) */if(X)await DRAFT.put(draftKey(),{bytes:b,time:Date.now(),name:fileName()});}catch(_){}},40000);}
 
 
 /* ------------------------------------------------------------ ranges as lists of rectangles (sqref) */
@@ -1847,11 +1848,11 @@ function cfRules(sh){
 }
 // numbers and texts of a rule's cells, worked out once per drawing of the grid
 function cfStats(sh,si,R){
-  if(R.st&&R.st.t===X.cfTick)return R.st;
+  if(R.st&&R.st.t===X.calcN&&R.st.v===X.cfVer)return R.st;   // 6.6.1: once per change of the data, not on every drawing (scrolling)
   const vals=[];for(const g of R.ranges){const r2=Math.min(g.r2,sh.maxR),c2=Math.min(g.c2,sh.maxC);for(const c of sh.cells.values())if(c.r>=g.r1&&c.r<=r2&&c.c>=g.c1&&c.c<=c2){const v=c.f?valueOf(si,c.r,c.c):c.v;if(v!==null&&v!==''&&!isErr(v))vals.push(v);}}
   const nums=vals.filter(v=>typeof v==='number').sort((a,b)=>a-b);const cnt=new Map();for(const v of vals){const k=String(v).toLowerCase();cnt.set(k,(cnt.get(k)||0)+1);}
   const avg=nums.length?nums.reduce((a,b)=>a+b,0)/nums.length:0;
-  return R.st={t:X.cfTick,nums,cnt,avg,min:nums[0],max:nums[nums.length-1]};
+  return R.st={t:X.calcN,v:X.cfVer,nums,cnt,avg,min:nums[0],max:nums[nums.length-1]};
 }
 function cfvoVal(sh,si,R,v,st){
   const pct=p=>{const n=st.nums;if(!n.length)return 0;const i=(n.length-1)*p;const lo=Math.floor(i);return n[lo]+(n[Math.min(n.length-1,lo+1)]-n[lo])*(i-lo);};
