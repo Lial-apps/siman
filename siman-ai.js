@@ -134,7 +134,7 @@ const SLIDE_TEXT_SCHEMA = {
           serif: { type: 'BOOLEAN' },
           align: { type: 'STRING', enum: ['right', 'center', 'left'] },
         },
-        required: ['text', 'box'],
+        required: ['text', 'box', 'lines', 'align'],
       },
     },
   },

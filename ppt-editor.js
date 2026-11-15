@@ -849,6 +849,163 @@ function addMedia(X, slidePath, bytes, ext, mime) {
   return addRel(X.files, slidePath, RT.image, mp);
 }
 
+/* ---------- 6.6.5: a slide that is one picture → editable text
+   Decks made by NotebookLM, Canva and similar tools are often saved as one picture per slide: the words are
+   pixels, so nothing can be typed or deleted. The AI finds each piece of text and where it sits; the words are
+   taken out of the picture (filled from the background around them) and real text boxes are put in their
+   place, in a similar size, colour and alignment. The design stays, and every word can be edited. */
+const tAttr = (n, ns, name) => n && (n.getAttributeNS(ns, name) || n.getAttribute((ns === NS.r ? 'r:' : '') + name));
+function picOnly(doc, size) {
+  if (!doc) return null;
+  for (const t of doc.getElementsByTagNameNS(NS.a, 't')) if (t.textContent.trim()) return null;
+  let best = null;
+  for (const pic of doc.getElementsByTagNameNS(NS.p, 'pic')) {
+    const sp = kid(pic, 'spPr'), xf = sp && kid(sp, 'xfrm'), off = xf && kid(xf, 'off'), ext = xf && kid(xf, 'ext');
+    const blip = pic.getElementsByTagNameNS(NS.a, 'blip')[0], rid = tAttr(blip, NS.r, 'embed');
+    if (!ext || !rid) continue;
+    const b = { x: num(at(off, 'x')) / PT, y: num(at(off, 'y')) / PT, w: num(at(ext, 'cx')) / PT, h: num(at(ext, 'cy')) / PT };
+    const a = (b.w * b.h) / (size.w * size.h);
+    if (a > 0.55 && (!best || a > best.a)) best = { pic, blip, rid, box: b, a };
+  }
+  return best;
+}
+const picSlides = () => X.order.map((p, i) => i).filter(i => picOnly(i === X.cur ? X.doc : parseXml(X.files.get(X.order[i])), X.size));
+// the median colour of a ring of pixels around a box
+function ringColor(D, W, H, x0, y0, x1, y1) {
+  const r = [], g = [], b = [];
+  const take = (x, y) => { if (x < 0 || y < 0 || x >= W || y >= H) return; const o = (y * W + x) * 4; r.push(D[o]); g.push(D[o + 1]); b.push(D[o + 2]); };
+  const st = Math.max(1, Math.round((x1 - x0 + y1 - y0) / 400));
+  for (let x = x0; x <= x1; x += st) { take(x, y0 - 2); take(x, y1 + 2); }
+  for (let y = y0; y <= y1; y += st) { take(x0 - 2, y); take(x1 + 2, y); }
+  const med = a => { a.sort((p, q) => p - q); return a.length ? a[a.length >> 1] : 0; };
+  return [med(r), med(g), med(b)];
+}
+async function unpictureSlide(i) {
+  const path = X.order[i], doc = i === X.cur ? X.doc : parseXml(X.files.get(path));
+  const P = picOnly(doc, X.size); if (!P) return 0;
+  const rel = rels(X.files, path).get(P.rid), media = rel && !rel.external && rel.target, raw = media && X.files.get(media);
+  if (!raw) throw new Error('התמונה של השקף לא נמצאה בקובץ');
+  const ext = (media.split('.').pop() || '').toLowerCase(), mime = MIME[ext] || 'image/png';
+  const bmp = await createImageBitmap(new Blob([raw], { type: mime }));
+  const W = bmp.width, H = bmp.height, c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(bmp, 0, 0); if (bmp.close) bmp.close();
+  // the reader gets a picture of up to 1600 dots
+  const k = Math.min(1, 1600 / Math.max(W, H)), s = document.createElement('canvas'); s.width = Math.round(W * k); s.height = Math.round(H * k);
+  s.getContext('2d').drawImage(c, 0, 0, s.width, s.height);
+  const AI = window.SIMAN_AI; if (typeof AI !== 'function') throw new Error('השירות החכם לא נטען. רעננו את סימן ונסו שוב');
+  const out = await AI({ mode: 'slideText', image: s.toDataURL('image/jpeg', 0.9).split(',')[1], mime: 'image/jpeg' }, { timeout: 120000 });
+  s.width = s.height = 0;
+  let j; try { j = JSON.parse(String(out).replace(/^\s*```(?:json)?|```\s*$/g, '')); } catch (_) { throw new Error('התשובה מהשירות לא הייתה תקינה. נסו שוב'); }
+  const blocks = (Array.isArray(j && j.blocks) ? j.blocks : []).filter(b => b && String(b.text || '').trim() && Array.isArray(b.box) && b.box.length === 4)
+    .map(b => { const [a0, b0, a1, b1] = b.box.map(Number); const y0 = Math.min(a0, a1), y1 = Math.max(a0, a1), x0 = Math.min(b0, b1), x1 = Math.max(b0, b1);
+      return { ...b, text: String(b.text).trim(), x0: Math.max(0, Math.floor(x0 / 1000 * W)), x1: Math.min(W - 1, Math.ceil(x1 / 1000 * W)), y0: Math.max(0, Math.floor(y0 / 1000 * H)), y1: Math.min(H - 1, Math.ceil(y1 / 1000 * H)) }; })
+    .filter(b => b.x1 - b.x0 > 3 && b.y1 - b.y0 > 3);
+  if (!blocks.length) return 0;
+  const img = g.getImageData(0, 0, W, H), D = img.data;
+  // 1. the colour of each block's letters: the pixels farthest from the background around it
+  for (const b of blocks) {
+    const bg = ringColor(D, W, H, b.x0, b.y0, b.x1, b.y1), far = [];
+    for (let y = b.y0; y <= b.y1; y += 1) for (let x = b.x0; x <= b.x1; x += 1) { const o = (y * W + x) * 4, d = Math.abs(D[o] - bg[0]) + Math.abs(D[o + 1] - bg[1]) + Math.abs(D[o + 2] - bg[2]); if (d > 90) far.push([d, D[o], D[o + 1], D[o + 2]]); }
+    far.sort((p, q) => q[0] - p[0]); const top = far.slice(0, Math.max(1, Math.round(far.length * 0.4)));
+    const avg = n => Math.round(top.reduce((t, p) => t + p[n], 0) / top.length);
+    b.color = far.length ? [avg(1), avg(2), avg(3)].map(v => v.toString(16).padStart(2, '0')).join('').toUpperCase() : (bg[0] + bg[1] + bg[2] > 380 ? '000000' : 'FFFFFF');
+  }
+  // 2. the words are taken out: each pixel of the box is filled from the edges around it (closest edges count most)
+  for (const b of blocks) {
+    const pad = Math.max(3, Math.round((b.y1 - b.y0) / Math.max(1, +b.lines || 1) * 0.18));
+    const X0 = Math.max(1, b.x0 - pad), X1 = Math.min(W - 2, b.x1 + pad), Y0 = Math.max(1, b.y0 - pad), Y1 = Math.min(H - 2, b.y1 + pad);
+    const at_ = (x, y) => (y * W + x) * 4, bw = X1 - X0 + 2, bh = Y1 - Y0 + 2;
+
+
+    const top0 = new Uint8ClampedArray(bw * 3), bot0 = new Uint8ClampedArray(bw * 3);
+    for (let x = X0; x <= X1; x++) { const a = at_(x, Y0 - 1), z = at_(x, Y1 + 1), kx = (x - X0) * 3; for (let ch = 0; ch < 3; ch++) { top0[kx + ch] = D[a + ch]; bot0[kx + ch] = D[z + ch]; } }
+    const left0 = new Uint8ClampedArray(bh * 3), right0 = new Uint8ClampedArray(bh * 3);
+    for (let y = Y0; y <= Y1; y++) { const a = at_(X0 - 1, y), z = at_(X1 + 1, y), ky = (y - Y0) * 3; for (let ch = 0; ch < 3; ch++) { left0[ky + ch] = D[a + ch]; right0[ky + ch] = D[z + ch]; } }
+    for (let y = Y0; y <= Y1; y++) {
+      const ty = (y - Y0 + 1) / (Y1 - Y0 + 2), ky = (y - Y0) * 3;
+      for (let x = X0; x <= X1; x++) {
+        const tx = (x - X0 + 1) / (X1 - X0 + 2), kx = (x - X0) * 3, o = at_(x, y);
+        const dv = Math.min(ty, 1 - ty) * bh, dh = Math.min(tx, 1 - tx) * bw, wv = 1 / (dv + 1), wh = 1 / (dh + 1);
+        for (let ch = 0; ch < 3; ch++) {
+          const v = top0[kx + ch] * (1 - ty) + bot0[kx + ch] * ty, hz = left0[ky + ch] * (1 - tx) + right0[ky + ch] * tx;
+          D[o + ch] = (v * wv + hz * wh) / (wv + wh);
+        }
+      }
+    }
+  }
+  g.putImageData(img, 0, 0);
+  const bytes = new Uint8Array(await (await new Promise(r => c.toBlob(r, mime === 'image/jpeg' ? 'image/jpeg' : 'image/png', 0.93))).arrayBuffer());
+  c.width = c.height = 0;
+  // the picture of this slide is replaced; a picture other slides use too is kept for them, and this slide gets its own
+  const shared = X.order.some(p => p !== path && [...rels(X.files, p).values()].some(r => r.target === media));
+  if (shared) { const rid = addMedia(X, path, bytes, mime === 'image/jpeg' ? 'jpg' : 'png', mime === 'image/jpeg' ? 'image/jpeg' : 'image/png'); P.blip.setAttributeNS(NS.r, 'r:embed', rid); }
+  else { X.files.set(media, bytes); const u = X.urls.get(media); if (u) URL.revokeObjectURL(u); X.urls.delete(media); }
+  // 3. a real text box for each block, where it was (the fonts are loaded first, so they are measured right)
+  try { await Promise.all(["400", "700"].flatMap(w => [`${w} 20px "FrankRuehl"`, `${w} 20px "Heebo"`].map(f => document.fonts.load(f)))); } catch (_) {}
+  const sx = P.box.w / W, sy = P.box.h / H;
+  for (const b of blocks) {
+    const lines = Math.max(1, +b.lines || String(b.text).split('\n').length);
+    // the box is tight around the letters: one line is about one letter-height, each further line adds the line spacing
+    // (the letters themselves fill about three quarters of the font size; one line of text should not come out wider than it was)
+    // the size is found by fitting: the largest size at which the words, wrapped in the block's own width,
+    // take no more height than the block had (the reader's line count is only a hint and is sometimes off)
+    const hPt = (b.y1 - b.y0) * sy, w0pt = (b.x1 - b.x0) * sx * 1.04;
+    const mc = (unpictureSlide.mc = unpictureSlide.mc || document.createElement('canvas').getContext('2d'));
+    const fam = b.serif ? '"FrankRuehl",serif' : '"Heebo",sans-serif', words = String(b.text).split(/\s+/).filter(Boolean);
+    const rows = sz => { mc.font = `${b.bold ? 700 : 400} ${sz}px ${fam}`; const sp = mc.measureText(' ').width; let n = 1, cur = 0;
+      for (const w of words) { const ww = mc.measureText(w).width; if (cur && cur + sp + ww > w0pt) { n++; cur = ww; } else cur += (cur ? sp : 0) + ww; } return n; };
+    const tall = sz => ((rows(sz) - 1) * 1.2 + 0.8) * sz;
+    let lo = 6, hi = Math.min(160, hPt / 0.78);
+    for (let k = 0; k < 18; k++) { const m = (lo + hi) / 2; if (tall(m) <= hPt * 1.06) lo = m; else hi = m; }
+    let size = Math.max(8, Math.round(lo * 2) / 2);
+    // alignment: as the reader said, or by where the block sits (in the middle of the slide = centred)
+    const cx = (b.x0 + b.x1) / 2 / W, heb = HEB.test(b.text);
+    const al = b.align === 'left' || b.align === 'right' || b.align === 'center' ? b.align : Math.abs(cx - 0.5) < 0.06 ? 'center' : heb ? 'right' : 'left';
+    const w0 = w0pt, extra = size * 0.4;   // a little room, so the same words wrap the same way
+    let x = P.box.x + b.x0 * sx; if (al === 'right') x -= extra; else if (al === 'center') x -= extra / 2;
+    const box = { x: Math.max(0, x), y: P.box.y + b.y0 * sy - size * 0.12, w: Math.min(X.size.w, w0 + extra), h: hPt };
+    const n = addTextBox(doc, box, b.text);
+    const bp = n.getElementsByTagNameNS(NS.a, 'bodyPr')[0]; if (bp) for (const [a, v] of [['lIns', '0'], ['rIns', '0'], ['tIns', '0'], ['bIns', '0']]) bp.setAttribute(a, v);
+    aiSetText(n, String(b.text).split('\n'));
+    aiFormat(n, { size, color: b.color, bold: !!b.bold, align: al, font: b.serif ? 'FrankRuehl' : 'Heebo' });
+  }
+  X.files.set(path, ser(doc));
+  if (i === X.cur) X.doc = parseXml(X.files.get(path));
+  return blocks.length;
+}
+async function unpicture(all) {
+  if (X.busyPic) return; if (X.editing) exitEdit();
+  const list = all ? picSlides() : [X.cur].filter(i => picOnly(X.doc, X.size));
+  if (!list.length) { say('אין כאן שקף שהוא תמונה'); return; }
+  X.busyPic = true; X.files.set(curPath(), ser(X.doc));
+  const bar = q('pePicBar'), msg = bar.querySelector('.m'); bar.classList.add('working');
+  let words = 0, done = 0, empty = 0, next = 0, stop = false; const failed = [];
+  const show = () => { msg.textContent = list.length > 1 ? `קורא את הטקסט שבשקפים… ${done + empty + failed.length} מתוך ${list.length} מוכנים` : 'קורא את הטקסט שבשקף ומכין אותו לעריכה… (חצי דקה בערך)'; };
+  show();
+  // three slides at a time (each takes half a minute or so)
+  await Promise.all(Array.from({ length: Math.min(3, list.length) }, async () => {
+    while (next < list.length && !stop && X) {
+      const i = list[next++];
+      try { const n = await unpictureSlide(i); if (n) { words += n; done++; thumbSoon(i); if (i === X.cur) renderStage(); } else empty++; }
+      catch (e) { console.warn('unpicture', i + 1, e); failed.push(i + 1); if (/מכסה|אין חיבור/.test(e.message || '')) { stop = true; say(e.message); } }
+      if (X) show();
+    }
+  }));
+  if (!X) return;
+  X.busyPic = false; bar.classList.remove('working');
+  X.parts.clear(); X.doc = parseXml(X.files.get(curPath())); X.sel = null;
+  if (done) { pushHist(); markDirty(); }
+  renderStage(); renderThumbs();
+  say(done ? `${done === 1 ? 'השקף הוכן' : `הוכנו ${done} שקפים`} לעריכה: ${words} קטעי טקסט. לוחצים פעמיים על טקסט כדי לשנות אותו${failed.length ? ` · בשקפים ${failed.join(', ')} זה לא הצליח` : ''}` : failed.length ? 'לא הצלחתי לקרוא את הטקסט. נסו שוב בעוד רגע' : 'לא נמצא טקסט בשקף');
+}
+function picBar() {
+  const bar = q('pePicBar'); if (!bar || X.busyPic) return;
+  const on = !!picOnly(X.doc, X.size); bar.hidden = !on; if (!on) return;
+  const n = picSlides().length;
+  bar.querySelector('.m').textContent = 'השקף הזה הוא תמונה אחת, ולכן אי אפשר לשנות בו מילים.';
+  bar.querySelector('[data-cmd=unpicAll]').hidden = n < 2; bar.querySelector('[data-cmd=unpicAll]').textContent = `כל ${n} השקפים`;
+}
+
 /* icons: the same set as the Word editor */
 const ICO={
   undo:'<path d="M7 5L3 9l4 4"/><path d="M3 9h9a5 5 0 0 1 0 10H8"/>',
@@ -1176,6 +1333,7 @@ function shellHtml() {
   <button type="button" role="tab" data-tab="show" aria-selected="false">הצגת שקפים</button>
 </div>
 <div class="pe-ribbon" id="peRibbon">${ribbonHtml()}</div>
+<div class="pe-picbar" id="pePicBar" role="status" hidden><span class="m"></span><button type="button" class="pri" data-cmd="unpic">להפוך לטקסט שאפשר לערוך</button><button type="button" data-cmd="unpicAll" hidden></button></div>
 <div class="pe-main">
   <div class="pe-slides" id="peSlides" role="listbox" aria-label="השקפים"></div>
   <div class="pe-stage" id="peStage"><div class="pe-zoom" id="peZoom"></div></div>
@@ -1187,6 +1345,15 @@ function shellHtml() {
 <input type="file" id="peImgFile" accept="image/*" hidden>`;
 }
 const CSS2 = `
+#ped .pe-picbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 14px;background:#FFF4D6;border-bottom:1px solid #F0D48A;color:#5A4300;font-size:14px}
+#ped .pe-picbar[hidden]{display:none}
+#ped .pe-picbar .m{flex:1 1 220px}
+#ped .pe-picbar button{font:inherit;font-weight:600;border:1px solid #D9B65A;background:#fff;color:#5A4300;border-radius:8px;padding:6px 12px;cursor:pointer}
+#ped .pe-picbar button.pri{background:#C43E1C;border-color:#C43E1C;color:#fff}
+#ped .pe-picbar button[hidden]{display:none}
+#ped .pe-picbar.working button{display:none}
+#ped .pe-picbar.working .m::before{content:"";display:inline-block;width:14px;height:14px;border:2px solid #E3C77A;border-top-color:#C43E1C;border-radius:50%;margin-inline-end:8px;vertical-align:-2px;animation:pespin .8s linear infinite}
+@keyframes pespin{to{transform:rotate(360deg)}}
 #ped .pe-mark{background:#C43E1C}
 #ped .pe-main{flex:1;display:flex;min-height:0}
 #ped .pe-slides{width:190px;flex:none;overflow-y:auto;background:#EEF1F6;border-inline-end:1px solid var(--wl);padding:10px 8px 40px;display:flex;flex-direction:column;gap:10px}
@@ -1288,10 +1455,12 @@ function pushHist() {
 function commit() { X.files.set(curPath(), ser(X.doc)); pushHist(); markDirty(); thumbSoon(X.cur); }
 function restore(s) {
   X.files = new Map(s.files); X.order = [...s.order]; X.cur = Math.min(s.cur, X.order.length - 1); X.parts.delete('ppt/presentation.xml');
+  // 6.6.5: a picture can change in place (a slide turned into text): its cached copy is dropped, so undo shows the right one
+  for (const u of X.urls.values()) if (u) URL.revokeObjectURL(u); X.urls.clear();
   X.doc = parseXml(X.files.get(curPath())); X.sel = null; X.editing = null; renderStage(); renderThumbs(); markDirty();
 }
-function undo() { commitText(); if (X.hi <= 0) return; X.hi--; restore(X.hist[X.hi]); }
-function redo() { commitText(); if (X.hi >= X.hist.length - 1) return; X.hi++; restore(X.hist[X.hi]); }
+function undo() { if (X.busyPic) return; commitText(); if (X.hi <= 0) return; X.hi--; restore(X.hist[X.hi]); }
+function redo() { if (X.busyPic) return; commitText(); if (X.hi >= X.hist.length - 1) return; X.hi++; restore(X.hist[X.hi]); }
 
 /* ---------- the stage */
 function fitZoom() {
@@ -1314,7 +1483,7 @@ function renderStage() {
   const sb = document.createElement('div'); sb.className = 'pe-sel'; sb.hidden = true; sb.innerHTML = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'].map(h => `<i data-h="${h}"></i>`).join('');
   el.append(sb); X.selBox = sb;
   if (X.sel && !findTop(X.sel)) X.sel = null;
-  drawSel(); updateUI();
+  drawSel(); updateUI(); picBar();
 }
 function findTop(key) { for (const e of X.slideEl.querySelectorAll(`.pe-layer.live [data-k="${key}"]`)) { const m = X.dom.get(e); if (m) return m.top; } return null; }
 const shapeEls = key => [...X.slideEl.querySelectorAll(`.pe-layer.live [data-k="${key}"]`)];
@@ -1723,7 +1892,7 @@ function wire() {
     front: () => reorder(true), back: () => reorder(false), delShape: deleteSel, dupShape: duplicateSel,
     textbox: () => { const n = insertCentered(b => addTextBox(X.doc, b, 'טקסט'), X.size.w * .5, 50); enterEdit(keyOfNode(n)); document.execCommand('selectAll'); },
     image: () => q('peImgFile').click(), dupSlide, delSlide, playStart: () => present(0), playHere: () => present(X.cur),
-    zin: () => setZoom(X.zoom * 1.15), zout: () => setZoom(X.zoom / 1.15), zfit: fitZoom };
+    zin: () => setZoom(X.zoom * 1.15), zout: () => setZoom(X.zoom / 1.15), zfit: fitZoom, unpic: () => unpicture(false), unpicAll: () => unpicture(true) };
   X.root.addEventListener('click', e => {
     if (!X) return;   // the editor closed during this click
     const b = e.target.closest('[data-cmd],[data-pop]'); if (!b || !X.root.contains(b)) { if (!e.target.closest('.pe-pop')) q('pePop').hidden = true; return; }
