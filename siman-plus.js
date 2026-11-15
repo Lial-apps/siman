@@ -698,12 +698,18 @@ async function ai(payload, { onWait, signal, timeout = 300000, once = false } = 
   if (window.cloudGate && !cloudGate('ai')) throw new Error(window.CLOUD_REG_MSG || 'צריך להירשם עם מייל');
   // 6.6.1: once = a quick helper request (the page edges): one try, no waiting, it is only a help
   const tries = once ? 1 : 4;
+  let bgRetries = 0;
   for (let attempt = 0; attempt < tries; attempt++) {
     // 5.9.6: with no internet at all there is nothing to wait for (before: three retries, 30 seconds of "working")
     if (navigator.onLine === false) throw new Error('אין חיבור לאינטרנט');
     let r, d, status;
     const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), timeout);
     if (signal) signal.addEventListener('abort', () => ctl.abort(), { once: true });
+    // 6.6.4: a phone stops the network of a page whose screen went off or that went to the background
+    // (a page of handwriting takes a minute or two). Such a drop is not "no internet": the request waits
+    // until the app is back on screen and is sent again, without counting as a failed try.
+    let hid = document.hidden; const onVis = () => { if (document.hidden) hid = true; };
+    document.addEventListener('visibilitychange', onVis);
     try {
       r = await fetch(AI, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload), signal: ctl.signal });
       // the server keeps the line open with spaces while Gemini works; the JSON comes at the end
@@ -711,7 +717,15 @@ async function ai(payload, { onWait, signal, timeout = 300000, once = false } = 
       try { d = JSON.parse(raw.trim() || '{}'); } catch (_) { d = {}; }
     } catch (e) {
       clearTimeout(timer);
+      document.removeEventListener('visibilitychange', onVis);
       if (signal && signal.aborted) throw e;
+      if (hid && bgRetries < 3 && !once) {
+        bgRetries++; attempt--;
+        if (document.hidden) await new Promise(res => { const f = () => { if (!document.hidden) { document.removeEventListener('visibilitychange', f); res(); } }; document.addEventListener('visibilitychange', f); });
+        if (signal && signal.aborted) throw new DOMException('stop', 'AbortError');
+        onWait && onWait(1); await sleep(800);
+        continue;
+      }
       if (e && e.name === 'AbortError') throw new Error('הבקשה לקחה יותר מדי זמן. נסו שוב, או צלמו את הדף קרוב יותר ובאור טוב');
       // a phone's connection drops for a moment (switching between Wi-Fi and mobile data, a long wait for a page):
       // the request is sent again a few times before giving up
@@ -719,9 +733,11 @@ async function ai(payload, { onWait, signal, timeout = 300000, once = false } = 
         for (let k = 5 * (attempt + 1); k > 0; k--) { onWait && onWait(k); await sleep(1000); if (signal && signal.aborted) throw new DOMException('stop', 'AbortError'); }
         continue;
       }
-      throw new Error(navigator.onLine === false ? 'אין חיבור לאינטרנט' : 'אין חיבור לשירות החכם. בדקו את האינטרנט ונסו שוב');
+      // 6.6.4: the internet is there but the line to the service broke: said so (before: "אין חיבור", which also
+      // stopped every other page as if the phone were offline)
+      throw new Error(navigator.onLine === false ? 'אין חיבור לאינטרנט' : 'החיבור לשירות החכם נקטע באמצע. נסו שוב, ועדיף להשאיר את המסך דלוק עד שהקריאה מסתיימת');
     }
-    clearTimeout(timer);
+    clearTimeout(timer); document.removeEventListener('visibilitychange', onVis);
     status = r.status;
     if (r.ok && d.error) { status = +d.error.status || 502; r = { ok: false, status }; }
     if (r.ok) {
@@ -1461,6 +1477,8 @@ const SC = {
     const start = append ? this.pages.length : 0;
     this.pages = append ? this.pages.concat(fresh) : fresh;
     this.running = true; this.stop = false; this.ctl = new AbortController();
+    // 6.6.4: the screen stays on while the pages are read (when it went off, the phone cut the line to the service)
+    let wake = null; try { if (navigator.wakeLock) wake = await navigator.wakeLock.request('screen'); } catch (_) {}
     const b = this.body();
     b.innerHTML = `<p class="sc-status" role="status" style="margin:0 0 14px;font-size:15px"></p><ul class="sc-prog">${fresh.map((p, i) => `<li><img alt="עמוד ${start + i + 1}" src="${p.url}"><span>ממתין</span></li>`).join('')}</ul>`;
     const f = this.foot(); f.classList.remove('hidden');
@@ -1497,6 +1515,7 @@ const SC = {
     };
     await Promise.all(Array.from({ length: par }, lane));
     this.running = false;
+    try { if (wake) await wake.release(); } catch (_) {}
     const done = this.pages.filter(p => p.blocks);
     if (!done.length && !append) {
       st.textContent = (this.pages.find(p => p.err) || {}).err || (this.stop ? 'הקריאה נעצרה' : 'לא זוהה טקסט');
