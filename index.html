@@ -1353,7 +1353,7 @@ body:has(#wed) .busy,body:has(#xed) .busy,body:has(#ped) .busy{z-index:1000}body
 </dialog>
 
 <header class="bar">
-  <div class="brand"><b title="גרסה 6.6.9">סימן</b><span class="ver">6.6.9</span><span class="fname" id="fname"></span></div>
+  <div class="brand"><b title="גרסה 6.6.10">סימן</b><span class="ver">6.6.10</span><span class="fname" id="fname"></span></div>
 
   <nav class="tools" id="tools" aria-label="כלים">
     <button class="tool" data-tool="select" aria-pressed="true" title="בחירה וגלילה (V)">
@@ -4098,7 +4098,7 @@ async function openLegacyDoc(file){
     await loadEditLibs('docx');
     if(!window.XLSX||!XLSX.CFB)await loadScript('xlsx.mini.min.js');
     const conv=await OFFICE_EDIT.docToDocx(new Uint8Array(await file.arrayBuffer()));
-    busy(false);const mode=await askDocMode(file.name);if(!mode)return;
+    busy(false);const mode=await askDocMode(file.name,'docx');if(!mode)return;
     if(mode==='edit'){await openWordEditor(conv.bytes,file.name.replace(/\.doc$/i,'')+'.docx');toast('קובץ DOC ישן: נפתחו הטקסט והטבלאות, בלי העיצוב והתמונות של המקור');return;}
     busy(true,'מכין את הקובץ לסימון…');
     const r=await OFFICE_EDIT.toPdf('docx',conv.bytes,m=>busy(true,m));
@@ -4246,7 +4246,7 @@ async function saveEditorFile(ctx,name,bytes,kind){
 }
 const fileCtx=(handle,name)=>({handle:handle&&FS&&handle.kind==='file'&&/\.(docx|xlsx|pptx)$/i.test(handle.name||'')&&(!name||handle.name===name)?handle:null});
 /* WORD EDITOR — a Word file opens for real editing, like in Word */
-function askDocMode(name,kind){return new Promise(res=>{
+function askDocMode(name,kind){kind=kind||'docx';return new Promise(res=>{
   const d=$('docModeDlg');$('docModeName').textContent=dispName(name);let done=false;const xl=kind==='xlsx',pp=kind==='pptx';
   $('docModeTitle').textContent=xl?'מה עושים עם הגיליון?':pp?'מה עושים עם המצגת?':'מה עושים עם המסמך?';
   $('docModeIco').textContent=kind.toUpperCase();$('docModeIco').className='of-ico '+kind;
