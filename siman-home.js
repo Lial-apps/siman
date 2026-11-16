@@ -358,6 +358,7 @@ function reportText() {
     out.push(`  ${x.dataset.x ? '×' : 'חזרה'} של #${x.dataset.x || x.dataset.t} · מקום ${Math.round(r.x)},${Math.round(r.y)} ${Math.round(r.width)}×${Math.round(r.height)} · מעליו: ${desc(top)}${top && (top === x || x.contains(top)) ? ' (הכפתור עצמו)' : ' ⚠'}`);
   }
   try { out.push('עסוק: ' + !$('busy').classList.contains('hidden') + ' · מסך הבית מוצג: ' + homeShown()); } catch (_) {}
+  try { if (window.SIMAN_SHARE_INFO) out.push(...window.SIMAN_SHARE_INFO()); } catch (e) { out.push('שגיאה בשיתוף: ' + e.message); }
   out.push('לחיצות אחרונות:'); for (const c of CLICKS) out.push('  ' + c);
   out.push('פעולות הכרטיס:'); for (const n of NOTES) out.push('  ' + n);
   return out.join('\n');

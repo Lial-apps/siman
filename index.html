@@ -1353,7 +1353,7 @@ body:has(#wed) .busy,body:has(#xed) .busy,body:has(#ped) .busy{z-index:1000}body
 </dialog>
 
 <header class="bar">
-  <div class="brand"><b title="גרסה 6.6.7">סימן</b><span class="ver">6.6.7</span><span class="fname" id="fname"></span></div>
+  <div class="brand"><b title="גרסה 6.6.8">סימן</b><span class="ver">6.6.8</span><span class="fname" id="fname"></span></div>
 
   <nav class="tools" id="tools" aria-label="כלים">
     <button class="tool" data-tool="select" aria-pressed="true" title="בחירה וגלילה (V)">
@@ -5393,6 +5393,18 @@ const WIN_DESK=/Windows/i.test(UA)&&!IS_TOUCH;
 // Windows: first try the name as written (Hebrew included); only if Windows refuses it, send it in Latin letters
 const WIN_LATIN_KEY='siman.winLatin';
 let winLatin=(()=>{try{return localStorage.getItem(WIN_LATIN_KEY)==='1';}catch(_){return false;}})();
+// 6.6.7: the last share attempts, for the check report ("מה לעשות?" / Ctrl K → "דוח בדיקה"). Kept on this device only,
+// so a report made after reopening the app still shows what happened
+const SHARE_LOG_KEY='siman.shareLog';
+function shareLog(s){try{const a=JSON.parse(localStorage.getItem(SHARE_LOG_KEY)||'[]');a.push(new Date().toLocaleTimeString('he-IL')+' '+s);localStorage.setItem(SHARE_LOG_KEY,JSON.stringify(a.slice(-12)));}catch(_){}}
+window.SIMAN_SHARE_INFO=()=>{
+  const out=[];let pdf=false,docx=false;
+  try{pdf=!!(navigator.canShare&&navigator.canShare({files:[new File([new Uint8Array(8)],'x.pdf',{type:'application/pdf'})]}));}catch(_){}
+  try{docx=!!(navigator.canShare&&navigator.canShare({files:[new File([new Uint8Array(8)],'x.docx',{type:OFFICE_MIME.docx})]}));}catch(_){}
+  out.push(`שיתוף: תפריט=${!!navigator.share} · PDF=${pdf} · Word=${docx} · קישור לוואטסאפ=${waLinkReady()} · וואטסאפ לא נפתח בעבר=${waMenuFailed()}`);
+  try{for(const l of JSON.parse(localStorage.getItem(SHARE_LOG_KEY)||'[]'))out.push('  '+l);}catch(_){}
+  return out;
+};
 async function nativeShare(f,extra){
   if(WIN_DESK&&/[^\x20-\x7E]/.test(f.name)){
     if(!winLatin){
@@ -5409,8 +5421,11 @@ async function nativeShare(f,extra){
   }
   const data={files:[f],title:f.name,...(extra||{})};
   const live=!navigator.userActivation||navigator.userActivation.isActive;
-  try{await navigator.share(data);return true;}
+  shareLog(`תפריט שיתוף: ${f.name} (${f.type||'בלי סוג'}, ${Math.round(f.size/1024)}KB)${live?'':' · בלי לחיצה פעילה'}`);
+  const t0=Date.now();
+  try{await navigator.share(data);shareLog(`התפריט החזיר: נבחרה אפליקציה (${((Date.now()-t0)/1000).toFixed(1)} שנ׳)`);return true;}
   catch(e){
+    shareLog('התפריט החזיר: '+(e&&e.name||'?')+(e&&e.message?' · '+String(e.message).slice(0,80):''));
     if(e&&e.name==='AbortError')return false;
     // only a lost click deserves a second try; a refused file type would just fail again
     if(!live&&needsGesture(e)&&await askToSave(f.name,'שיתוף')){
@@ -5561,13 +5576,14 @@ async function waViaLink(f,desk){
 const WA_FAIL_KEY='siman.waMenuFail';
 const waMenuFailed=()=>{try{return localStorage.getItem(WA_FAIL_KEY)==='1';}catch(_){return false;}};
 function waAfterMenu(f){
-  if(document.hidden){done('בוחרים את השיחה ושולחים');return;}
+  if(document.hidden){shareLog('וואטסאפ נפתח');done('בוחרים את השיחה ושולחים');return;}
   let gone=false;const on=()=>{if(document.hidden)gone=true;};
   document.addEventListener('visibilitychange',on);
   shStatus('פותח את וואטסאפ…');
   setTimeout(()=>{document.removeEventListener('visibilitychange',on);
     if(!$('shareDlg').open)return;
-    if(gone||document.hidden){try{localStorage.removeItem(WA_FAIL_KEY);}catch(_){}done('בוחרים את השיחה ושולחים');return;}
+    if(gone||document.hidden){shareLog('וואטסאפ נפתח (סימן עבר לרקע)');try{localStorage.removeItem(WA_FAIL_KEY);}catch(_){}done('בוחרים את השיחה ושולחים');return;}
+    shareLog('אחרי 2.5 שנ׳ סימן עדיין בחזית: וואטסאפ לא נפתח');
     waNotOpened(f,false);
   },2500);
 }
