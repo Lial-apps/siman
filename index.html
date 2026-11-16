@@ -1353,7 +1353,7 @@ body:has(#wed) .busy,body:has(#xed) .busy,body:has(#ped) .busy{z-index:1000}body
 </dialog>
 
 <header class="bar">
-  <div class="brand"><b title="גרסה 6.6.8">סימן</b><span class="ver">6.6.8</span><span class="fname" id="fname"></span></div>
+  <div class="brand"><b title="גרסה 6.6.9">סימן</b><span class="ver">6.6.9</span><span class="fname" id="fname"></span></div>
 
   <nav class="tools" id="tools" aria-label="כלים">
     <button class="tool" data-tool="select" aria-pressed="true" title="בחירה וגלילה (V)">
@@ -5256,7 +5256,10 @@ function fillShareName(){
   $('shNameHint').textContent=WIN_DESK&&winLatin&&/[^\x20-\x7E]/.test(n)?'Windows לא מקבל בתפריט השיתוף שם בעברית, ולכן שם כזה יישלח שם באותיות לועזיות. לשם מדויק כתבו אותו באנגלית, או בחרו "וואטסאפ ווב" או "מייל".':'';
 }
 function renameShareFile(){if(SH.file&&SH.file.name!==fileName())SH.file=new File([SH.file],fileName(),{type:SH.file.type});}
-function canShareFile(f){try{return !!(navigator.share&&navigator.canShare&&navigator.canShare({files:[f]}));}catch(_){return false;}}
+// 6.6.9: a phone browser that already refused a Word / Excel / PowerPoint file (see nativeShare) is not asked again
+const OFFICE_RX=/\.(docx|xlsx|pptx)$/i,NO_OFFICE_KEY='siman.shareNoOffice';
+const noOfficeShare=()=>{try{return IS_TOUCH&&localStorage.getItem(NO_OFFICE_KEY)==='1';}catch(_){return false;}};
+function canShareFile(f){if(f&&OFFICE_RX.test(f.name)&&noOfficeShare())return false;try{return !!(navigator.share&&navigator.canShare&&navigator.canShare({files:[f]}));}catch(_){return false;}}
 async function downloadFile(f){const href=await downloadHref(f);const a=document.createElement('a');a.href=href;a.download=f.name;document.body.append(a);a.click();setTimeout(()=>{a.remove();if(href.startsWith('blob:'))URL.revokeObjectURL(href);},180000);}
 function shStatus(msg,html){const s=$('shareStatus');if(html)s.innerHTML=msg;else s.textContent=msg;}
 function shareHints(){
@@ -5283,7 +5286,8 @@ function shareHints(){
 // {"error":"forbidden"} is worse than the computer's share menu. Set WA_LINK_ON=true once the server is updated.
 const WA_LINK_ON=true;
 const waLinkReady=()=>WA_LINK_ON&&!!(window.SIMAN_SEND&&typeof window.SIMAN_SEND.makeViewLink==='function');
-function preloadWaLink(){if(IS_TOUCH||waLinkReady())return;loadSend().then(()=>{if(waLinkReady())shareHints();}).catch(()=>{});}
+// 6.6.9: phones too (before, phones never loaded it, so the "link" choice was missing there)
+function preloadWaLink(){if(waLinkReady())return;loadSend().then(()=>{if(waLinkReady())shareHints();}).catch(()=>{});}
 function openShare(focusKey){
   if(!S.bytes)return;
   preloadWaLink();
@@ -5401,7 +5405,7 @@ window.SIMAN_SHARE_INFO=()=>{
   const out=[];let pdf=false,docx=false;
   try{pdf=!!(navigator.canShare&&navigator.canShare({files:[new File([new Uint8Array(8)],'x.pdf',{type:'application/pdf'})]}));}catch(_){}
   try{docx=!!(navigator.canShare&&navigator.canShare({files:[new File([new Uint8Array(8)],'x.docx',{type:OFFICE_MIME.docx})]}));}catch(_){}
-  out.push(`שיתוף: תפריט=${!!navigator.share} · PDF=${pdf} · Word=${docx} · קישור לוואטסאפ=${waLinkReady()} · וואטסאפ לא נפתח בעבר=${waMenuFailed()}`);
+  out.push(`שיתוף: תפריט=${!!navigator.share} · PDF=${pdf} · Word=${docx} · קישור לוואטסאפ=${waLinkReady()} · וואטסאפ לא נפתח בעבר=${waMenuFailed()} · Office נדחה בעבר=${noOfficeShare()}`);
   try{for(const l of JSON.parse(localStorage.getItem(SHARE_LOG_KEY)||'[]'))out.push('  '+l);}catch(_){}
   return out;
 };
@@ -5431,6 +5435,9 @@ async function nativeShare(f,extra){
     if(!live&&needsGesture(e)&&await askToSave(f.name,'שיתוף')){
       try{await navigator.share(data);return true;}catch(e2){if(e2&&e2.name==='AbortError')return false;e=e2;}}
     console.warn('share',e);
+    // 6.6.9: a fresh tap and still refused = this browser says "yes" to a Word / Excel / PowerPoint file but will not
+    // share it (Samsung Internet: NotAllowedError). Remembered: from now on such a file goes out as PDF at once
+    if(live&&IS_TOUCH&&OFFICE_RX.test(f.name)){try{localStorage.setItem(NO_OFFICE_KEY,'1');}catch(_){}shareLog('הדפדפן לא משתף קבצי Office: מעכשיו יישלח PDF');}
     throw Object.assign(new Error('תפריט השיתוף של המכשיר לא קיבל את הקובץ'),{shareFail:true,why:(e&&(e.name+(e.message?': '+e.message:'')))||''});
   }
 }
@@ -5542,7 +5549,8 @@ function refused(f){
 // by the browser, so preparing a Word / Excel file could stall and the empty about:blank window stayed.)
 // desk = on a computer, offer the computer's share menu if the link fails
 async function waViaLink(f,desk){
-  if(!waLinkReady()){shStatus('שליחה בקישור לא זמינה כרגע');return;}
+  if(!waLinkReady()){try{await loadSend();}catch(_){}}
+  if(!waLinkReady()){shStatus('שליחה בקישור לא זמינה כרגע. בודקים את החיבור לאינטרנט ומנסים שוב');return;}
   if(window.cloudGate&&!cloudGate('send'))return; // the link is kept on our server: an email first
   $('shareDlg').classList.add('wait');shStatus('מכין קישור לקובץ…');
   try{
@@ -5589,7 +5597,7 @@ function waAfterMenu(f){
 }
 // first = shown before trying the menu (it did not reach WhatsApp last time); otherwise shown after the menu
 function waNotOpened(f,first){
-  const link=waLinkReady();
+  const link=WA_LINK_ON; // waViaLink loads the link code itself if it is not here yet
   shStatus(`<div class="wa-choice"><b>${first?'בפעם הקודמת וואטסאפ לא נפתח מתפריט השיתוף. איך לשלוח?':'וואטסאפ לא נפתח? אפשר לשלוח אחרת:'}</b>
     ${link?'<button class="btn primary" type="button" data-w="link">🔗 שליחה בוואטסאפ כקישור לקובץ (נפתח ישר בוואטסאפ)</button>':''}
     <button class="btn${link?'':' primary'}" type="button" data-w="menu">📎 ${first?'הקובץ עצמו, דרך תפריט השיתוף':'שוב דרך תפריט השיתוף'}</button>
@@ -5611,7 +5619,7 @@ function waPhoneChoice(f,err){
   // there every file ends up as a download, so the link — which opens WhatsApp directly — comes first)
   let files=false;try{files=!!(navigator.share&&navigator.canShare&&navigator.canShare({files:[new File([new Uint8Array(8)],'x.pdf',{type:'application/pdf'})]}));}catch(_){}
   const pdfOk=files&&!(err&&f.type==='application/pdf');
-  const link=waLinkReady();
+  const link=WA_LINK_ON; // waViaLink loads the link code itself if it is not here yet
   const head=err?`תפריט השיתוף של הטלפון לא קיבל את הקובץ${err.why?` <small dir="ltr">(${esc(err.why).slice(0,120)})</small>`:''}. איך לשלוח?`
     :!files?'הדפדפן הזה לא מעביר קבצים לאפליקציות אחרות. איך לשלוח?'
     :`הטלפון לא מעביר קובץ ${kind||'מהסוג הזה'} ישירות לוואטסאפ. איך לשלוח?`;
