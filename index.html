@@ -1353,7 +1353,7 @@ body:has(#wed) .busy,body:has(#xed) .busy,body:has(#ped) .busy{z-index:1000}body
 </dialog>
 
 <header class="bar">
-  <div class="brand"><b title="גרסה 6.6.10">סימן</b><span class="ver">6.6.10</span><span class="fname" id="fname"></span></div>
+  <div class="brand"><b title="גרסה 6.6.11">סימן</b><span class="ver">6.6.11</span><span class="fname" id="fname"></span></div>
 
   <nav class="tools" id="tools" aria-label="כלים">
     <button class="tool" data-tool="select" aria-pressed="true" title="בחירה וגלילה (V)">
@@ -4099,14 +4099,14 @@ async function openLegacyDoc(file){
     if(!window.XLSX||!XLSX.CFB)await loadScript('xlsx.mini.min.js');
     const conv=await OFFICE_EDIT.docToDocx(new Uint8Array(await file.arrayBuffer()));
     busy(false);const mode=await askDocMode(file.name,'docx');if(!mode)return;
-    if(mode==='edit'){await openWordEditor(conv.bytes,file.name.replace(/\.doc$/i,'')+'.docx');toast('קובץ DOC ישן: נפתחו הטקסט והטבלאות, בלי העיצוב והתמונות של המקור');return;}
+    if(mode==='edit'){await openWordEditor(conv.bytes,file.name.replace(/\.doc$/i,'')+'.docx');toast(conv.formatted?'קובץ DOC ישן: נפתח עם העיצוב, הטבלאות והתמונות שלו. בשמירה נוצר קובץ Word חדש (DOCX)':'קובץ DOC ישן: נפתחו הטקסט והטבלאות, בלי העיצוב והתמונות של המקור');return;}
     busy(true,'מכין את הקובץ לסימון…');
     const r=await OFFICE_EDIT.toPdf('docx',conv.bytes,m=>busy(true,m));
     const base=file.name.replace(/\.doc$/i,'');
     S.pendingOffice={kind:'docx',bytes:conv.bytes,map:r.map,name:file.name,base,legacy:true};
     busy(false);setDirty(false);showOfficeView(false);
     await openFile(new File([r.pdf],base+'.pdf',{type:'application/pdf'}));
-    if(S.office)toast('קובץ DOC ישן: נפתחו הטקסט והטבלאות, בלי העיצוב והתמונות של המקור. בשמירה כ-Word נוצר קובץ DOCX חדש');
+    if(S.office)toast(conv.formatted?'קובץ DOC ישן: נפתח עם העיצוב, הטבלאות והתמונות שלו. בשמירה כ-Word נוצר קובץ DOCX חדש':'קובץ DOC ישן: נפתחו הטקסט והטבלאות, בלי העיצוב והתמונות של המקור. בשמירה כ-Word נוצר קובץ DOCX חדש');
   }catch(e){console.error(e);S.pendingOffice=null;toast('לא הצלחתי לפתוח את קובץ ה-DOC: '+(e.message||e));}
   finally{busy(false);}
 }
