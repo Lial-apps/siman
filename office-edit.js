@@ -118,10 +118,132 @@ function flipRtlTables(d,textW){
     }
   }
 }
+/* 6.6.12: right-to-left paragraphs in the page view (marking / signing), as in the Word editor (word-editor.js):
+   docx-preview reads jc literally, but in a right-to-left paragraph Word reads "left" as the start (the right side)
+   and "right" as the end; and Hebrew letters use the right-to-left ("cs") size, bold, italic and font. */
+// (W_NS: the Word namespace, declared further down)
+const wKid=(el,n)=>{if(!el)return null;for(const c of el.children)if(c.namespaceURI===W_NS&&c.localName===n)return c;return null;};
+const wVal=(el,a)=>el?(el.getAttributeNS(W_NS,a||'val')??el.getAttribute('w:'+(a||'val'))):null;
+const wSetA=(el,a,v)=>el.setAttributeNS(W_NS,'w:'+a,v);
+const onOffW=el=>!el||!/^(0|false|off)$/i.test(wVal(el)||'');
+function rtlStyleMap(sdoc){
+  const map={},st={};let defId=null,defBidi=false;
+  const ppd=sdoc&&sdoc.getElementsByTagNameNS(W_NS,'pPrDefault')[0];
+  if(ppd){const b=wKid(wKid(ppd,'pPr'),'bidi');if(b)defBidi=onOffW(b);}
+  if(sdoc)for(const s of sdoc.getElementsByTagNameNS(W_NS,'style')){if(wVal(s,'type')!=='paragraph')continue;const id=wVal(s,'styleId');st[id]=s;if(/^(1|true|on)$/.test(wVal(s,'default')||''))defId=id;}
+  const get=(id,seen=new Set())=>{if(id in map)return map[id];if(!id||!st[id]||seen.has(id))return defBidi;seen.add(id);
+    const b=wKid(wKid(st[id],'pPr'),'bidi');const v=b?onOffW(b):get(wVal(wKid(st[id],'basedOn')),seen);return(map[id]=v);};
+  return{of:id=>get(id||defId),st};
+}
+function swapJcW(pPr){const jc=wKid(pPr,'jc');if(!jc)return;const v=wVal(jc);
+  if(v==='left'||v==='start')wSetA(jc,'val','right');else if(v==='right'||v==='end')wSetA(jc,'val','left');}
+function csRunW(rPr){
+  if(!rPr)return;const d=rPr.ownerDocument;
+  for(const [cs,l] of [['szCs','sz'],['bCs','b'],['iCs','i']]){const c=wKid(rPr,cs);if(!c)continue;let e=wKid(rPr,l);
+    if(!e){e=d.createElementNS(W_NS,'w:'+l);rPr.insertBefore(e,c);}const v=wVal(c);if(v===null)e.removeAttributeNS(W_NS,'val');else wSetA(e,'val',v);}
+  const f=wKid(rPr,'rFonts');if(f){const cs=wVal(f,'cs'),th=wVal(f,'cstheme');
+    if(cs){wSetA(f,'ascii',cs);wSetA(f,'hAnsi',cs);f.removeAttributeNS(W_NS,'asciiTheme');f.removeAttributeNS(W_NS,'hAnsiTheme');}
+    else if(th){wSetA(f,'asciiTheme',th);wSetA(f,'hAnsiTheme',th);f.removeAttributeNS(W_NS,'ascii');}}
+}
+const wText=el=>{let t='';for(const x of el.getElementsByTagNameNS(W_NS,'t'))t+=x.textContent;return t;};
+function rtlParts(d,sb){
+  for(const p of d.getElementsByTagNameNS(W_NS,'p')){const pPr=wKid(p,'pPr');const b=wKid(pPr,'bidi');
+    if(b?onOffW(b):sb.of(wVal(wKid(pPr,'pStyle'))))swapJcW(pPr);}
+  for(const r of d.getElementsByTagNameNS(W_NS,'r'))if(HEB.test(wText(r)))csRunW(wKid(r,'rPr'));
+}
+// a picture placed on its own band (wrapTopAndBottom) at a set distance: docx-preview keeps only left / centre / right
+// and drops the distance (a letterhead logo on the right came out on the left). In the copy it becomes a picture in a
+// paragraph of its own, indented to the same place.
+function bandPictures(d,marginL){
+  const WP=NS.wp;
+  for(const an of [...d.getElementsByTagNameNS(WP,'anchor')]){
+    if(!an.getElementsByTagNameNS(WP,'wrapTopAndBottom').length)continue;
+    const ph=an.getElementsByTagNameNS(WP,'positionH')[0];if(!ph)continue;
+    const rel=ph.getAttribute('relativeFrom')||'column';
+    const off=ph.getElementsByTagNameNS(WP,'posOffset')[0],al=ph.getElementsByTagNameNS(WP,'align')[0];
+    const run=an.closest&&an.parentNode&&an.parentNode.parentNode;const p=run&&run.parentNode;
+    if(!run||run.localName!=='r'||!p||p.localName!=='p')continue;
+    const inl=d.createElementNS(WP,'wp:inline');for(const k of ['distT','distB','distL','distR'])inl.setAttribute(k,'0');
+    for(const n of ['extent','effectExtent','docPr','cNvGraphicFramePr']){const e=an.getElementsByTagNameNS(WP,n)[0];if(e)inl.appendChild(e);}
+    const g=an.getElementsByTagNameNS(NS.a,'graphic')[0];if(!g)continue;inl.appendChild(g);
+    an.replaceWith(inl);
+    const np=d.createElementNS(W_NS,'w:p'),pp=d.createElementNS(W_NS,'w:pPr');np.appendChild(pp);
+    // docx-preview puts an indent on the paragraph's start side (margin-inline-start); the paragraph is made
+    // right-to-left on purpose, so its end side is the physical left, where the distance is measured from
+    const bi=d.createElementNS(W_NS,'w:bidi');pp.appendChild(bi);
+    const sp=d.createElementNS(W_NS,'w:spacing');wSetA(sp,'before','0');wSetA(sp,'after','0');pp.appendChild(sp);
+    if(off){let tw=Math.round(+off.textContent/635);if(rel==='page')tw-=marginL||0;
+      const ind=d.createElementNS(W_NS,'w:ind');wSetA(ind,'right',String(Math.max(0,tw)));pp.appendChild(ind);}
+    const jc=d.createElementNS(W_NS,'w:jc');const a=al&&al.textContent;wSetA(jc,'val',a==='center'?'center':a==='right'||a==='outside'?'right':'left');pp.appendChild(jc);
+    np.appendChild(run);p.parentNode.insertBefore(np,p);
+  }
+}
+// an older-style picture (VML: <w:pict><v:shape><v:imagedata r:id>) is not drawn by docx-preview. In the copy it becomes
+// a regular picture: in its place when it sits in the line, or on a line of its own at the same distance when it floats
+// (only in headers / footers, or when the text goes above and below it, so text that flows around it is not moved)
+function vmlPictures(d,marginL,inHF){
+  const V='urn:schemas-microsoft-com:vml',R=NS.r;
+  const tw=s=>{const m=/^(-?[\d.]+)(in|pt|cm|mm|px|pc)?$/.exec(String(s||'').trim());if(!m)return null;const k={in:1440,pt:20,cm:567,mm:56.7,px:15,pc:240}[m[2]||'px'];return +m[1]*k;};
+  let id=9000;
+  for(const pict of [...d.getElementsByTagNameNS(W_NS,'pict')]){
+    const shapes=pict.getElementsByTagNameNS(V,'shape');if(shapes.length!==1)continue;const sh=shapes[0];
+    const im=sh.getElementsByTagNameNS(V,'imagedata')[0];if(!im)continue;
+    const rid=im.getAttributeNS(R,'id')||im.getAttribute('r:id');if(!rid)continue;
+    const st={};for(const kv of (sh.getAttribute('style')||'').split(';')){const i=kv.indexOf(':');if(i>0)st[kv.slice(0,i).trim().toLowerCase()]=kv.slice(i+1).trim();}
+    const w=tw(st.width),h=tw(st.height);if(!w||!h)continue;
+    const floating=st.position==='absolute';
+    const wrap=sh.getElementsByTagNameNS('urn:schemas-microsoft-com:office:word','wrap')[0];
+    if(floating&&!inHF&&!(wrap&&wrap.getAttribute('type')==='topAndBottom'))continue;
+    const run=pict.parentNode,p=run&&run.parentNode;if(!run||run.localName!=='r'||!p||p.localName!=='p')continue;
+    const cx=Math.round(w*635),cy=Math.round(h*635),n=++id;
+    const x=`<w:drawing xmlns:w="${W_NS}" xmlns:wp="${NS.wp}" xmlns:a="${NS.a}" xmlns:pic="${NS.pic}" xmlns:r="${R}"><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:docPr id="${n}" name="Picture ${n}"/><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="${n}" name="Picture ${n}"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="${rid}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing>`;
+    const dr=new DOMParser().parseFromString(x,'application/xml').documentElement;
+    pict.replaceWith(d.importNode(dr,true));
+    if(!floating)continue;
+    // floating: a line of its own, at the same distance from the left (see bandPictures about the direction)
+    let left=tw(st['margin-left'])||0;if(st['mso-position-horizontal-relative']==='page')left-=marginL||0;
+    const np=d.createElementNS(W_NS,'w:p'),pp=d.createElementNS(W_NS,'w:pPr');np.appendChild(pp);
+    pp.appendChild(d.createElementNS(W_NS,'w:bidi'));
+    const sp=d.createElementNS(W_NS,'w:spacing');wSetA(sp,'before','0');wSetA(sp,'after','0');pp.appendChild(sp);
+    const ind=d.createElementNS(W_NS,'w:ind');wSetA(ind,'right',String(Math.max(0,Math.round(left))));pp.appendChild(ind);
+    const jc=d.createElementNS(W_NS,'w:jc');wSetA(jc,'val','left');pp.appendChild(jc);
+    np.appendChild(run);p.parentNode.insertBefore(np,p);
+  }
+}
+// a table wider than the text (Word lets it run into the margins, by a negative indent) was cut off at the page edge:
+// docx-preview drops the indent. In the copy such a table is narrowed, all its columns in proportion, to the page width.
+function fitWideTables(d,textW){
+  if(!textW)return;
+  const num=el=>el?+(wVal(el,'w')||0):0;
+  for(const tbl of [...d.getElementsByTagNameNS(W_NS,'tbl')]){
+    if(tbl.parentNode&&tbl.parentNode.localName==='tc')continue; // only the outer tables
+    const pr=wKid(tbl,'tblPr'),grid=wKid(tbl,'tblGrid');if(!pr||!grid)continue;
+    const cols=[...grid.children].filter(c=>c.localName==='gridCol');const wd=cols.reduce((s,c)=>s+num(c),0);
+    const ind=wKid(pr,'tblInd');const x=num(ind);
+    // the room on the page: the text width, and up to most of the margins (pages are drawn whole, not cut)
+    if(wd<=textW+40&&x>=-40)continue;
+    const k=Math.min(1,textW/wd);
+    cols.forEach(c=>wSetA(c,'w',String(Math.round(num(c)*k))));
+    const tw=wKid(pr,'tblW');if(tw){wSetA(tw,'w',String(Math.round(Math.min(wd,textW))));wSetA(tw,'type','dxa');}
+    if(ind){wSetA(ind,'w','0');}
+    for(const tcW of tbl.getElementsByTagNameNS(W_NS,'tcW'))if((wVal(tcW,'type')||'dxa')==='dxa')wSetA(tcW,'w',String(Math.round(num(tcW)*k)));
+  }
+}
 async function docxForPreview(bytes){
   let zip;try{zip=await JSZip.loadAsync(bytes);}catch(_){return bytes;}
   const parts=Object.keys(zip.files).filter(n=>/^word\/(document|header\d*|footer\d*)\.xml$/.test(n));
   let changed=false,textW=null;
+  // styles: right-to-left paragraph styles get their alignment turned the same way; Hebrew documents use the cs values
+  let sdoc=null,sb=rtlStyleMap(null);
+  if(zip.file('word/styles.xml')){try{const sx=await zip.file('word/styles.xml').async('string');const d=new DOMParser().parseFromString(sx,'application/xml');
+    if(!d.getElementsByTagName('parsererror').length){sdoc=d;sb=rtlStyleMap(d);}}catch(_){}}
+  let hebDoc=false;
+  if(zip.file('word/document.xml')){const all=(await zip.file('word/document.xml').async('string')).replace(/<[^>]+>/g,'');hebDoc=(all.match(/[֐-׿]/g)||[]).length>=(all.match(/[A-Za-z]/g)||[]).length*0.5&&HEB.test(all);}
+  if(sdoc){const before=new XMLSerializer().serializeToString(sdoc);
+    for(const id in sb.st){const s=sb.st[id];if(sb.of(id))swapJcW(wKid(s,'pPr'));if(hebDoc)csRunW(wKid(s,'rPr'));}
+    if(hebDoc){for(const s of sdoc.getElementsByTagNameNS(W_NS,'style'))if(wVal(s,'type')==='character')csRunW(wKid(s,'rPr'));
+      const dflt=sdoc.getElementsByTagNameNS(W_NS,'rPrDefault')[0];if(dflt)csRunW(wKid(dflt,'rPr'));}
+    const after=new XMLSerializer().serializeToString(sdoc);if(after!==before){zip.file('word/styles.xml',after);changed=true;}}
   const dx=zip.file('word/document.xml')?await zip.file('word/document.xml').async('string'):'';
   const pw=/<w:pgSz\b[^>]*\bw:w="(\d+)"/.exec(dx),ml=/<w:pgMar\b[^>]*\bw:left="(-?\d+)"/.exec(dx),mr=/<w:pgMar\b[^>]*\bw:right="(-?\d+)"/.exec(dx);
   if(pw)textW=+pw[1]-(ml?+ml[1]:1440)-(mr?+mr[1]:1440);
@@ -130,8 +252,11 @@ async function docxForPreview(bytes){
     // the total of pages: its shown text is marked (filled in later); simple fields keep their runs
     x=x.replace(/(NUMPAGES\b[^<]*<\/w:instrText>[\s\S]*?<w:fldChar\b[^>]*w:fldCharType="separate"[^>]*\/>[\s\S]*?<w:t(?:\s[^>]*)?>)([^<]*)(<\/w:t>)/g,(m,a,t,b)=>a+NUMP+t+NUMP+b);
     x=x.replace(/<w:fldSimple\b[^>]*w:instr="\s*NUMPAGES[^"]*"[^>]*>([\s\S]*?)<\/w:fldSimple>/g,(m,inner)=>inner.replace(/(<w:t(?:\s[^>]*)?>)([^<]*)(<\/w:t>)/,(m2,a,t,b)=>a+NUMP+t+NUMP+b));
+    // the page number: the page view draws a header once, on the first page, so it shows 1 (not the number last kept in the file)
+    x=x.replace(/(<w:instrText(?:\s[^>]*)?>\s*PAGE\b[^<]*<\/w:instrText>[\s\S]*?<w:fldChar\b[^>]*w:fldCharType="separate"[^>]*\/>[\s\S]*?<w:t(?:\s[^>]*)?>)([^<]*)(<\/w:t>)/g,(m,a,t,b)=>a+'1'+b);
+    x=x.replace(/<w:fldSimple\b[^>]*w:instr="\s*PAGE\b[^"]*"[^>]*>([\s\S]*?)<\/w:fldSimple>/g,(m,inner)=>inner.replace(/(<w:t(?:\s[^>]*)?>)([^<]*)(<\/w:t>)/,(m2,a,t,b)=>a+'1'+b));
     x=x.replace(/<w:fldSimple\b[^>]*\/>/g,'').replace(/<w:fldSimple\b[^>]*>/g,'').replace(/<\/w:fldSimple>/g,'');
-    if(/bidiVisual/.test(x)){try{const d=new DOMParser().parseFromString(x,'application/xml');if(!d.getElementsByTagName('parsererror').length){flipRtlTables(d,textW);x=new XMLSerializer().serializeToString(d);}}catch(e){console.warn('rtl tables',e);}}
+    if(/bidiVisual|<w:bidi\b|wrapTopAndBottom|<w:pict\b|<w:tbl>|[֐-׿]/.test(x)||sdoc){try{const d=new DOMParser().parseFromString(x,'application/xml');if(!d.getElementsByTagName('parsererror').length){rtlParts(d,sb);flipRtlTables(d,textW);bandPictures(d,ml?+ml[1]:1440);fitWideTables(d,textW);vmlPictures(d,ml?+ml[1]:1440,!/document\.xml$/.test(n));x=new XMLSerializer().serializeToString(d);}}catch(e){console.warn('rtl preview',e);}}
     if(x!==before){zip.file(n,x);changed=true;}
   }
   return changed?await zip.generateAsync({type:'uint8array'}):bytes;
