@@ -1353,7 +1353,7 @@ body:has(#wed) .busy,body:has(#xed) .busy,body:has(#ped) .busy{z-index:1000}body
 </dialog>
 
 <header class="bar">
-  <div class="brand"><b title="גרסה 6.6.6">סימן</b><span class="ver">6.6.6</span><span class="fname" id="fname"></span></div>
+  <div class="brand"><b title="גרסה 6.6.7">סימן</b><span class="ver">6.6.7</span><span class="fname" id="fname"></span></div>
 
   <nav class="tools" id="tools" aria-label="כלים">
     <button class="tool" data-tool="select" aria-pressed="true" title="בחירה וגלילה (V)">
@@ -5449,7 +5449,10 @@ const ACTIONS={
   async whatsapp(f){
     // 6.2: when the phone's share menu refuses the file, the choices are shown (with the reason) instead of a download
     const fbTouch=e=>waPhoneChoice(f,e);
-    if(IS_TOUCH&&canShareFile(f)){if(await shareOr(f,null,fbTouch))done('בוחרים וואטסאפ ואת השיחה');return;}
+    // 6.6.7: on a phone where the share menu did not get the file into WhatsApp before, the choice comes first
+    // (a link opens the WhatsApp app itself); the file itself through the menu is still one tap away
+    if(IS_TOUCH&&canShareFile(f)&&waMenuFailed())return waNotOpened(f,true);
+    if(IS_TOUCH&&canShareFile(f)){shStatus('בתפריט השיתוף בוחרים WhatsApp');const r=await shareOr(f,null,fbTouch);if(r)waAfterMenu(f);else if(r===false)shStatus('');return;}
     // 6.2: a phone that will not hand this file to WhatsApp (phones share Word / Excel / PowerPoint files only as PDF):
     // instead of quietly downloading it, the person chooses — a PDF copy straight to WhatsApp, a link that keeps the
     // Word file, or downloading it
@@ -5536,8 +5539,12 @@ async function waViaLink(f,desk){
     const r=await window.SIMAN_SEND.makeViewLink({bytes,name:f.name,orig:await linkOrig(f),sender:{name:USER.name||'',mail:USER.mail||''}});
     const wa='https://wa.me/?text='+encodeURIComponent(r.text||(f.name+'\n'+r.url));
     $('shareDlg').classList.remove('wait');
-    // a new tab: on a phone wa.me opens the WhatsApp app, and the file stays open here in סימן
-    const go=()=>{const w=window.open(wa,'_blank');if(!w){S.noWarn=true;location.href=wa;setTimeout(()=>{S.noWarn=false;},2000);}done('בוחרים שיחה בוואטסאפ ושולחים');};
+    // Android (6.6.7): straight into the WhatsApp app (an installed app, Samsung Internet too, opened wa.me as a web page
+    // instead of WhatsApp). Elsewhere a new tab: the file stays open here in סימן
+    const go=()=>{
+      if(IS_ANDROID){S.noWarn=true;location.href='intent://send?text='+encodeURIComponent(r.text||(f.name+'\n'+r.url))+'#Intent;scheme=whatsapp;S.browser_fallback_url='+encodeURIComponent(wa)+';end';setTimeout(()=>{S.noWarn=false;},2000);}
+      else{const w=window.open(wa,'_blank');if(!w){S.noWarn=true;location.href=wa;setTimeout(()=>{S.noWarn=false;},2000);}}
+      done('בוחרים שיחה בוואטסאפ ושולחים');};
     // still within the tap (a small file): WhatsApp opens at once; otherwise one more tap, so it is not blocked
     if(navigator.userActivation&&navigator.userActivation.isActive){go();return;}
     shStatus('הקישור מוכן. <button class="btn primary" id="waOpen" type="button">פתיחת וואטסאפ ›</button>',true);
@@ -5547,6 +5554,39 @@ async function waViaLink(f,desk){
     if(desk){shStatus(`לא הצלחתי להכין קישור (${esc(e&&e.message||'שגיאה')}). <button class="btn" id="waOther" type="button">לשלוח את הקובץ עצמו</button>`,true);$('waOther').onclick=()=>ACTIONS.wadesk(f);}
     else shStatus(`לא הצלחתי להכין קישור (${esc(e&&e.message||'שגיאה')}). אפשר לנסות שוב, או לשלוח כ-PDF.`);
   }
+}
+// 6.6.7: the phone's share menu took the file, but did WhatsApp open? When it opens, this page goes to the background.
+// If it stays in front, WhatsApp did not open (some phones / browsers hand the file to WhatsApp and it never comes up):
+// instead of closing as if it was sent, the other ways are offered right there.
+const WA_FAIL_KEY='siman.waMenuFail';
+const waMenuFailed=()=>{try{return localStorage.getItem(WA_FAIL_KEY)==='1';}catch(_){return false;}};
+function waAfterMenu(f){
+  if(document.hidden){done('בוחרים את השיחה ושולחים');return;}
+  let gone=false;const on=()=>{if(document.hidden)gone=true;};
+  document.addEventListener('visibilitychange',on);
+  shStatus('פותח את וואטסאפ…');
+  setTimeout(()=>{document.removeEventListener('visibilitychange',on);
+    if(!$('shareDlg').open)return;
+    if(gone||document.hidden){try{localStorage.removeItem(WA_FAIL_KEY);}catch(_){}done('בוחרים את השיחה ושולחים');return;}
+    waNotOpened(f,false);
+  },2500);
+}
+// first = shown before trying the menu (it did not reach WhatsApp last time); otherwise shown after the menu
+function waNotOpened(f,first){
+  const link=waLinkReady();
+  shStatus(`<div class="wa-choice"><b>${first?'בפעם הקודמת וואטסאפ לא נפתח מתפריט השיתוף. איך לשלוח?':'וואטסאפ לא נפתח? אפשר לשלוח אחרת:'}</b>
+    ${link?'<button class="btn primary" type="button" data-w="link">🔗 שליחה בוואטסאפ כקישור לקובץ (נפתח ישר בוואטסאפ)</button>':''}
+    <button class="btn${link?'':' primary'}" type="button" data-w="menu">📎 ${first?'הקובץ עצמו, דרך תפריט השיתוף':'שוב דרך תפריט השיתוף'}</button>
+    <button class="btn" type="button" data-w="dl">⬇ הורדה לטלפון</button>
+    ${first?'':'<button class="btn" type="button" data-w="ok">✓ נשלח, סגירה</button>'}</div>`,true);
+  const box=$('shareStatus'),fail=()=>{try{localStorage.setItem(WA_FAIL_KEY,'1');}catch(_){}};
+  try{box.scrollIntoView({block:'nearest',behavior:'smooth'});}catch(_){}
+  const ln=box.querySelector('[data-w=link]');if(ln)ln.onclick=()=>{fail();waViaLink(f,false);};
+  box.querySelector('[data-w=menu]').onclick=async()=>{shStatus('בתפריט השיתוף בוחרים WhatsApp');
+    try{const r=await shareOr(f,null,e=>waPhoneChoice(f,e));if(r)waAfterMenu(f);else if(r===false)waNotOpened(f,first);}
+    catch(e){console.error(e);shStatus('השיתוף נכשל: '+(e.message||e));}};
+  box.querySelector('[data-w=dl]').onclick=()=>{fail();downloadFile(f);done('הקובץ ירד למכשיר. בוואטסאפ לוחצים על אטב ← מסמך, ובוחרים אותו מההורדות');};
+  const ok=box.querySelector('[data-w=ok]');if(ok)ok.onclick=()=>{try{localStorage.removeItem(WA_FAIL_KEY);}catch(_){}done('');};
 }
 // a phone that refuses this file in its share menu. err = why the share menu failed (when it was tried)
 function waPhoneChoice(f,err){
@@ -5565,7 +5605,7 @@ function waPhoneChoice(f,err){
   const tip=!files&&/SamsungBrowser/i.test(navigator.userAgent)?'<small class="wa-tip">טיפ: בדפדפן Chrome הטלפון מעביר לוואטסאפ את הקובץ עצמו. אפשר לפתוח שם את סימן ולהתקין אותו ממנו.</small>':'';
   shStatus(`<div class="wa-choice"><b>${head}</b>${pdfOk?bPdf+bLink:bLink+bPdf}
     <button class="btn" type="button" data-w="dl">⬇ הורדה לטלפון</button>${tip}</div>`,true);
-  const box=$('shareStatus');
+  const box=$('shareStatus');try{box.scrollIntoView({block:'nearest',behavior:'smooth'});}catch(_){}
   const bp=box.querySelector('[data-w=pdf]');if(bp)bp.onclick=async()=>{
     $('shareDlg').classList.add('wait');shStatus('מכין גרסת PDF…');
     try{
