@@ -110,6 +110,24 @@ body.ed-live #aiPanel{position:fixed;z-index:960;top:40px;bottom:0;inset-inline-
 .ai-qz button.wrong{background:color-mix(in srgb,#C2362B 15%,transparent);border-color:#C2362B;text-decoration:line-through}
 .ai-qz button:disabled{cursor:default;opacity:1}
 .ai-qz .why{margin:0;font-size:13.5px;color:var(--muted)}
+.ai-ck-form{border:1px solid var(--line);border-radius:14px;padding:12px;display:grid;gap:9px;background:var(--bar)}
+.ai-ck-form h4{margin:0;font-size:15px}
+.ai-ck-form p{margin:0;font-size:13px;color:var(--muted)}
+.ai-ck-form label{display:grid;gap:4px;font-size:13px;color:var(--muted)}
+.ai-ck-form label.ck{display:flex;align-items:center;gap:7px;color:var(--ink)}
+.ai-ck-form select,.ai-ck-form textarea{font:inherit;font-size:14px;color:var(--ink);background:var(--paper,#fff);border:1px solid var(--line);border-radius:10px;padding:7px 9px}
+.ai-ck-form textarea{min-height:80px;resize:vertical;direction:rtl;unicode-bidi:plaintext}
+.ai-ck-form .acts{display:flex;gap:8px;justify-content:flex-end}
+.ai-ck-sum{border-radius:12px;padding:10px 12px;background:color-mix(in srgb,var(--marker) 35%,transparent);font-weight:600;margin:0}
+.ai-ck-sec{display:grid;gap:5px}
+.ai-ck-sec h5{margin:4px 0 0;font-size:13.5px}
+.ai-ck-sec p{margin:0;padding:7px 10px;border-radius:10px;border:1px solid var(--line);background:var(--bar);font-size:14px}
+.ai-ck-sec.good p{border-inline-start:4px solid #1F9D55}
+.ai-ck-sec.fix p{border-inline-start:4px solid #C2362B}
+.ai-ck-sec.tip p{border-inline-start:4px solid #D99A00}
+.ai-ck-grade{display:flex;align-items:center;gap:10px;border:2px solid var(--ink);border-radius:12px;padding:8px 12px}
+.ai-ck-grade b{font-size:24px;line-height:1}
+.ai-ck-grade span{font-size:13.5px;color:var(--muted)}
 .ai-map details{margin-inline-start:4px}
 .ai-map summary{cursor:pointer;font-weight:700;padding:3px 0}
 .ai-map .kids{border-inline-start:2px solid color-mix(in srgb,var(--marker) 70%,var(--line));margin-inline-start:6px;padding-inline-start:12px;display:grid;gap:2px}
@@ -838,7 +856,7 @@ const CHIPS = [
   ['מה צריך לעשות?', 'מה המסמך מבקש ממני לעשות, למלא או לחתום, ועד מתי?'],
 ];
 // 6.0: study tools (shown under the questions, on any PDF or document)
-const STUDY_CHIPS = [['🗂 כרטיסיות לחזרה', 'cards'], ['✅ בוחן אמריקאי', 'quiz'], ['🧠 מפת חשיבה', 'map']];
+const STUDY_CHIPS = [['🗂 כרטיסיות לחזרה', 'cards'], ['✅ בוחן אמריקאי', 'quiz'], ['🧠 מפת חשיבה', 'map'], ['📝 בדיקת עבודה', 'check']];
 const FOLLOW_TAIL = '\n\n(After the answer, add one last line that starts with "❓" and holds 3 short follow-up questions the user may want to ask next about this document, separated by " | ", in the language of the question.)';
 function splitFollow(a) {
   const m = /^\s*❓\s*(.+)$/m.exec(a || '');
@@ -975,6 +993,17 @@ async function citeJump(n, line) {
 const STUDY = {
   cards: 'Make 10 to 15 study flashcards from the most important content of the document. Output ONLY lines, one per card, exactly in this format:\nQ: question || A: short answer [page cite]\nWrite in the language of the document. No other text.',
   quiz: 'Make a quiz of 6 multiple-choice questions that check understanding of the document. Output ONLY blocks separated by an empty line, each exactly in this format:\nQ: question\nA) option\nB) option\nC) option\nD) option\nANSWER: the correct letter | one short sentence why [page cite]\nWrite in the language of the document. No other text.',
+  // 6.7: checking a submitted work (an assignment, an exercise, an essay) — feedback the way a good teacher gives it
+  check: o => `You are a fair, encouraging and exact teacher. The document is a work someone submitted: an assignment, homework, exercises, an essay or a project. The writer is ${o.level}.
+${o.task ? 'The task, the questions or the rubric are given at the end of the document, after the line "##### המשימה / המחוון #####". That part is not the work: check the work against it, question by question or criterion by criterion.' : 'No task was given: work out from the document what it tries to do, and check it on its own terms.'}
+Check correctness (for math, science and exercises redo every step yourself and find the exact step that goes wrong), completeness, reasoning, structure and language.
+Output ONLY lines, each starting with one of these labels, in the language of the work:
+SUMMARY: one or two sentences with the overall impression
+GOOD: one strength [page cite]   (2 to 4 such lines)
+FIX: one mistake, gap or missing part, and exactly how to correct it [page cite]   (as many as needed, the most important first; write the correct answer or step)
+TIP: one way to make the work better   (2 to 4 such lines)
+${o.grade ? 'GRADE: a number from 0 to 100 | one sentence why' + (o.task ? ', by the rubric' : '') : ''}
+No other text, no markdown.`,
   map: 'Make a mind map of the document as an indented outline. The first line is the main subject. Every other line starts with "- " and is indented with 2 spaces per level (up to 3 levels under the subject). Short phrases, not sentences. Write in the language of the document. Output ONLY the outline.',
 };
 function studyEl(it, a) {
@@ -1011,6 +1040,20 @@ function studyEl(it, a) {
     };
     w.addEventListener('click', e => { const b = e.target.closest('.ai-qz button'); if (b) pick(b, true); });
     for (const [i, k] of Object.entries(it.picks)) { const b = [...w.querySelectorAll(`.ai-qz[data-i="${i}"] button`)].find(o => o.dataset.k === k); if (b) pick(b, false); }
+    return w;
+  }
+  if (it.kind === 'check') {
+    const L = { SUMMARY: [], GOOD: [], FIX: [], TIP: [], GRADE: [] };
+    for (const l of a.split(/\n+/)) { const m = /^\s*[-•*]?\s*(SUMMARY|GOOD|FIX|TIP|GRADE|סיכום|טוב|לתקן|טיפ|ציון)\s*[:：]\s*(.+)$/i.exec(l); if (!m) continue;
+      const k = { 'סיכום': 'SUMMARY', 'טוב': 'GOOD', 'לתקן': 'FIX', 'טיפ': 'TIP', 'ציון': 'GRADE' }[m[1]] || m[1].toUpperCase(); L[k].push(m[2].trim()); }
+    if (!L.GOOD.length && !L.FIX.length && !L.SUMMARY.length) { w.innerHTML = a.split(/\n+/).map(l => `<p dir="auto">${cite(l)}</p>`).join(''); return w; }
+    const sec = (cls, title, list) => list.length ? `<div class="ai-ck-sec ${cls}"><h5>${title}</h5>${list.map(x => `<p dir="auto">${cite(x)}</p>`).join('')}</div>` : '';
+    let grade = '';
+    if (L.GRADE.length) { const [n, why] = L.GRADE[0].split(/\s*\|\s*/); const num = parseInt(n, 10);
+      grade = `<div class="ai-ck-grade"><b dir="ltr">${Number.isFinite(num) ? num : esc(n)}</b><span dir="auto">ציון משוער מתוך 100${why ? ' · ' + esc(why) : ''}</span></div>`; }
+    w.innerHTML = `<div class="ai-st-h">בדיקת העבודה${it.taskName ? ' · מול ' + esc(it.taskName) : ''}</div>`
+      + (L.SUMMARY.length ? `<p class="ai-ck-sum" dir="auto">${cite(L.SUMMARY.join(' '))}</p>` : '') + grade
+      + sec('fix', `✗ מה לתקן (${L.FIX.length})`, L.FIX) + sec('good', '✓ מה טוב', L.GOOD) + sec('tip', '💡 איך לשפר', L.TIP);
     return w;
   }
   // the mind map: an outline that opens and closes, branch by branch
@@ -1113,8 +1156,33 @@ function renderLog() {
 }
 function studyChips() {
   const w = h('<div class="ai-chips study"><span class="ai-st-l">ללמוד מהמסמך:</span></div>');
-  for (const [l, k] of STUDY_CHIPS) { const b = h(`<button class="ai-chip" type="button">${esc(l)}</button>`); b.onclick = () => askQ(STUDY[k], l.replace(/^\S+\s/, ''), k); w.append(b); }
+  for (const [l, k] of STUDY_CHIPS) { const b = h(`<button class="ai-chip" type="button">${esc(l)}</button>`); b.onclick = () => k === 'check' ? checkForm() : askQ(STUDY[k], l.replace(/^\S+\s/, ''), k); w.append(b); }
   return w;
+}
+/* 6.7: checking a work — the open file is the work; the task or rubric can come from another open file or be pasted */
+function checkForm() {
+  const log = $('aiLog'); const old = log.querySelector('.ai-ck-form'); if (old) { old.scrollIntoView({ block: 'nearest' }); return; }
+  const others = pdfTabs().filter(t => t !== TB.cur);
+  const f = h(`<div class="ai-ck-form"><h4>📝 בדיקת עבודה</h4><p>הקובץ הפתוח הוא העבודה. מקבלים משוב: מה לתקן ואיך, מה טוב, ואיך לשפר.</p>
+    <label>מה המשימה, השאלות או המחוון?<select data-k="task"><option value="">בלי, לבדוק לפי מה שכתוב בעבודה</option>${others.map((t, i) => `<option value="t${i}">הקובץ "${esc(dispName(tabName(t)))}"</option>`).join('')}<option value="paste">להדביק או לכתוב את המשימה</option></select></label>
+    <textarea data-k="paste" hidden placeholder="מדביקים כאן את השאלות, ההנחיות או המחוון…" aria-label="המשימה או המחוון"></textarea>
+    <label>מי כתב את העבודה?<select data-k="level"><option value="a school student">תלמיד או תלמידה בבית ספר</option><option value="a university or college student" selected>סטודנט או סטודנטית</option><option value="a professional (a work report or document)">עבודה מקצועית</option></select></label>
+    <label class="ck"><input type="checkbox" data-k="grade" checked> לתת גם ציון משוער מתוך 100</label>
+    <div class="acts"><button class="btn" type="button" data-a="x">ביטול</button><button class="btn primary" type="button" data-a="go">לבדוק את העבודה</button></div></div>`);
+  const sel = f.querySelector('[data-k=task]'), ta = f.querySelector('[data-k=paste]');
+  sel.onchange = () => { ta.hidden = sel.value !== 'paste'; if (!ta.hidden) ta.focus(); };
+  f.querySelector('[data-a=x]').onclick = () => f.remove();
+  f.querySelector('[data-a=go]').onclick = async () => {
+    let extra = '', taskName = '';
+    if (sel.value === 'paste') { extra = ta.value.trim(); taskName = 'המשימה שהודבקה'; if (!extra) { toast('מדביקים את המשימה, או בוחרים "בלי"'); ta.focus(); return; } }
+    else if (sel.value) { const t = others[+sel.value.slice(1)]; if (!t || !TB.list.includes(t)) { toast('הקובץ הזה כבר לא פתוח'); return; }
+      f.querySelector('[data-a=go]').disabled = true; extra = (await pagesText(tabData(t).pages, 120000)).replace(/=====\s*עמוד\s*(\d+)\s*=====/g, '(עמוד $1 של המשימה)'); taskName = dispName(tabName(t));
+      if (!hasRealText(extra)) { f.querySelector('[data-a=go]').disabled = false; toast('לא מצאתי טקסט בקובץ המשימה. אפשר להדביק אותה'); return; } }
+    const o = { level: f.querySelector('[data-k=level]').value, grade: f.querySelector('[data-k=grade]').checked, task: !!extra };
+    f.remove();
+    askQ(STUDY.check(o), 'בדיקת עבודה' + (taskName ? ' מול ' + taskName : ''), 'check', { extra, taskName });
+  };
+  log.append(f); f.scrollIntoView({ block: 'nearest' });
 }
 function scannedHelp() {
   const w = h('<div><button class="btn" type="button">זיהוי טקסט בכל העמודים</button> <button class="btn" type="button">מדף למסמך</button></div>');
@@ -1122,13 +1190,14 @@ function scannedHelp() {
   w.children[1].onclick = () => SC.open('doc');
   return w;
 }
-async function askQ(q, label, kind) {
+async function askQ(q, label, kind, opt) {
   q = String(q || '').trim();
   const tabKey = AS.key();
   if (!q || AS.busySet.has(tabKey) || !hasDoc()) return;
   if (panel.classList.contains('hidden')) showAI();
   const list = AS.list();
-  const it = { q, label }; if (kind) { it.kind = kind; it.wait = kind === 'quiz' ? 'מכין בוחן מהמסמך…' : kind === 'map' ? 'מצייר מפת חשיבה…' : 'מכין כרטיסיות…'; } list.push(it);
+  const it = { q, label }; if (kind) { it.kind = kind; it.wait = kind === 'quiz' ? 'מכין בוחן מהמסמך…' : kind === 'map' ? 'מצייר מפת חשיבה…' : kind === 'check' ? 'קורא את העבודה ובודק אותה…' : 'מכין כרטיסיות…'; } list.push(it);
+  if (opt && opt.taskName) it.taskName = opt.taskName;
   AS.busySet.add(tabKey); renderLog(); renderTabs();
   try {
     if (onEditor() && window.OFFICE_AI && OFFICE_AI.available()) {
@@ -1158,6 +1227,8 @@ async function askQ(q, label, kind) {
     else text = await docText();
     const empty = it.plain ? !text.replace(/=====.*?=====/g, '').replace(/שורה \d+:/g, '').trim() : !hasRealText(text);
     if (empty) { if (it.plain) { it.err = 'הקובץ ריק, אין עדיין על מה לשאול'; return; } it.err = 'לא מצאתי טקסט במסמך. כנראה שהוא סרוק או מצולם — אפשר לזהות בו את הטקסט קודם:'; it.scanned = true; return; }
+    // 6.7: the task or rubric of a work being checked goes after the work, clearly apart from it
+    if (opt && opt.extra) text = text + '\n\n##### המשימה / המחוון #####\n' + String(opt.extra).slice(0, 120000);
     const history = list.filter(x => x.a && x !== it).slice(-4).map(x => ({ q: x.q, a: x.a }));
     const followOk = !kind && !it.plain;
     // 6.6.2: the same first question on the same text (a summary asked again, after clearing the chat or in another

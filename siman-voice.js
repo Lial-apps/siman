@@ -592,6 +592,34 @@ const CSS = `
 .vx-fc .a{display:none;color:var(--ink,#16213A);border-top:1px dashed var(--line,#D4DBE5);padding-top:6px;unicode-bidi:plaintext}
 .vx-fc[aria-expanded=true] .a{display:block}
 .vx-fc .a i{font-style:normal;color:var(--blue,#2E58CC);font-size:12.5px;text-decoration:underline}
+/* 6.7: a quiz from the recording, and course folders in the library */
+.vx-qz-h{font-size:13px;color:var(--muted,#5D6982);font-weight:600}.vx-qz-h b{color:var(--ink,#16213A)}
+.vx-qz{border:1px solid var(--line,#D4DBE5);border-radius:12px;padding:10px 12px;display:grid;gap:6px;background:var(--bar,#fff)}
+.vx-qz .q{margin:0;font-weight:700;unicode-bidi:plaintext}
+.vx-qz button.o{text-align:start;font:inherit;font-size:14px;color:inherit;background:none;border:1px solid var(--line,#D4DBE5);border-radius:9px;padding:7px 10px;cursor:pointer;unicode-bidi:plaintext}
+.vx-qz button.o:not(:disabled):hover{border-color:var(--ink,#16213A)}
+.vx-qz button.o.right{background:rgba(31,157,85,.16);border-color:#1F9D55;font-weight:700}
+.vx-qz button.o.wrong{background:rgba(194,54,43,.13);border-color:#C2362B;text-decoration:line-through}
+.vx-qz button.o:disabled{cursor:default;opacity:1;color:inherit}
+.vx-qz .why{margin:0;font-size:13.5px;color:var(--muted,#5D6982);unicode-bidi:plaintext}
+.vx-qz .why button{background:none;border:0;padding:0;font:inherit;color:var(--blue,#2E58CC);text-decoration:underline;cursor:pointer}
+.vx-fold{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px}
+.vx-fold button{font:inherit;font-size:13.5px;border:1px solid var(--line,#D4DBE5);background:var(--bar,#fff);color:inherit;border-radius:999px;padding:5px 12px;cursor:pointer}
+.vx-fold button[aria-pressed=true]{background:var(--ink,#16213A);color:#fff!important;border-color:var(--ink,#16213A);font-weight:700}
+.vx-fold button.add{border-style:dashed}
+.vx-fcard{border:1px solid var(--line,#D4DBE5);border-radius:14px;padding:12px 14px;margin:0 0 14px;background:var(--bar,#fff);display:grid;gap:10px}
+.vx-fcard .hd{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.vx-fcard .hd b{font-size:16px}.vx-fcard .hd span{color:var(--muted,#5D6982);font-size:13px}
+.vx-fcard .hd .sp{flex:1}
+.vx-fcard .ask{display:flex;gap:8px}
+.vx-fcard .ask input{flex:1;font:inherit;border:1px solid var(--line,#D4DBE5);border-radius:10px;padding:7px 10px;background:var(--paper,#fff);color:inherit}
+.vx-fcard .out{display:grid;gap:8px}
+.vx-fcard .out p{margin:0;unicode-bidi:plaintext}
+.vx-fcard .src{background:none;border:0;padding:0;font:inherit;font-size:12.5px;color:var(--blue,#2E58CC);text-decoration:underline;cursor:pointer}
+.vx-item .fo{background:none;border:0;padding:6px;cursor:pointer;color:var(--muted,#5D6982);border-radius:8px}
+.vx-item .fo:hover{background:var(--desk,#E2E7EE)}
+.vx-item .fo svg{width:18px;height:18px}
+.vx-item .tg{font-size:11.5px;background:var(--desk,#E2E7EE);border-radius:999px;padding:1px 8px;margin-inline-start:6px;font-weight:600}
 .vx-player .skp[aria-pressed=true],.vx-player .fol[aria-pressed=true]{background:rgba(255,255,255,.16)}
 @media (max-width:560px){.vx-player .skp{font-size:12px;padding:4px 6px}}
 /* side */
@@ -1458,8 +1486,13 @@ function renderIns() {
   ex.innerHTML = `<div class="vx-card"><h3>${ico.spark}פרקים</h3>${ch ? `<ol class="vx-chap">${ch.map((c, k) => `<li><button data-c="${k}"><b dir="ltr">${clock(c.t)}</b><span>${esc(c.title)}</span></button>${c.desc ? `<small>${esc(c.desc)}</small>` : ''}</li>`).join('')}</ol>` : '<p class="vx-hint">חלוקה לפי נושאים, עם קפיצה לכל פרק בלחיצה.</p>'}
       <div class="vx-acts"><button class="vx-btn sm" id="vxChapGo">${ch ? 'לחלק מחדש' : 'חלוקה לפרקים'}</button></div></div>
     <div class="vx-card"><h3>${ico.spark}כרטיסיות לחזרה</h3>${V.cards && V.cards.length ? `<div class="vx-cards" id="vxCards"></div>` : '<p class="vx-hint">שאלות ותשובות מתוך ההקלטה, לחזרה לפני מבחן או פגישה. לוחצים על כרטיס כדי לראות את התשובה.</p>'}
-      <div class="vx-acts"><button class="vx-btn sm" id="vxCardsGo">${V.cards && V.cards.length ? 'כרטיסיות חדשות' : 'הכנת כרטיסיות'}</button></div></div>`;
+      <div class="vx-acts"><button class="vx-btn sm" id="vxCardsGo">${V.cards && V.cards.length ? 'כרטיסיות חדשות' : 'הכנת כרטיסיות'}</button></div></div>
+    <div class="vx-card"><h3>${ico.spark}בוחן</h3>${V.quiz && V.quiz.length ? `<div class="vx-cards" id="vxQuiz"></div>` : '<p class="vx-hint">שאלות אמריקאיות מתוך ההקלטה, עם ציון. אחרי כל תשובה רואים למה, ואפשר לשמוע את הרגע בהקלטה שבו זה נאמר.</p>'}
+      <div class="vx-acts"><button class="vx-btn sm" id="vxQuizGo">${V.quiz && V.quiz.length ? 'בוחן חדש' : 'הכנת בוחן'}</button>${V.quiz && V.quiz.length && V.quizPicks && Object.keys(V.quizPicks).length ? '<button class="vx-btn sm" id="vxQuizAgain">לענות שוב</button>' : ''}</div></div>`;
   box.append(ex);
+  ex.querySelector('#vxQuizGo').onclick = makeQuiz;
+  const again = ex.querySelector('#vxQuizAgain'); if (again) again.onclick = () => { V.quizPicks = {}; save(); renderIns(); };
+  if (V.quiz && V.quiz.length) drawQuiz(ex.querySelector('#vxQuiz'), V.quiz, V.quizPicks || (V.quizPicks = {}), () => save(), t => playFrom(t));
   ex.querySelectorAll('[data-c]').forEach(b => b.onclick = () => { const c = V.chapters[+b.dataset.c]; if (audioEl) playFrom(c.t + 0.3); jumpToTime(c.t); });
   ex.querySelector('#vxChapGo').onclick = makeChapters;
   ex.querySelector('#vxCardsGo').onclick = makeCards;
@@ -1507,6 +1540,59 @@ async function makeCards() {
     }
     if (!cards.length) { say('לא הצלחתי להכין כרטיסיות. נסו שוב'); return; }
     V.cards = cards; save(); count('voice_cards');
+  } catch (e) { say(friendly(e)); }
+  renderIns();
+}
+/* 6.7: a quiz from the recording (and from a whole folder of recordings) */
+const QUIZ_ASK = (n, many) => `Make a quiz of ${n} multiple-choice questions that check understanding of the most important content${many ? ' of all the recordings' : ''}. Output ONLY blocks separated by an empty line, each exactly in this format:
+Q: question
+A) option
+B) option
+C) option
+D) option
+ANSWER: the correct letter | one short sentence why ${many ? '[recording number, mm:ss] — for example [2, 14:05] — where it is said' : '[mm:ss] where it is said'}
+Make the wrong options believable. Write in the language of the transcript. No other text.`;
+function parseQuiz(a) {
+  const qs = [];
+  for (const block of String(a || '').split(/\n\s*\n/)) {
+    const q = /(?:Q|ש)\s*[:：]\s*(.+)/i.exec(block); if (!q) continue;
+    const opts = [...block.matchAll(/^\s*([A-Dא-ד])[).]\s*(.+)$/gm)].map(m => ({ k: m[1].toUpperCase(), t: m[2].trim().slice(0, 300) }));
+    const an = /(?:ANSWER|תשובה)\s*[:：]\s*([A-Dא-ד])\s*\|?\s*(.*)/i.exec(block);
+    if (opts.length < 2 || !an) continue;
+    let why = an[2] || '', t = null, rec = null;
+    const tm = /\[\s*(?:(?:הקלטה|recording)?\s*(\d+)\s*[,،]\s*)?(\d{1,2}:\d{2}(?::\d{2})?)\s*\]/i.exec(why);
+    if (tm) { t = tsec(tm[2]); rec = tm[1] ? +tm[1] : null; why = why.replace(tm[0], '').trim(); }
+    qs.push({ q: q[1].trim().slice(0, 400), opts, right: an[1].toUpperCase(), why: why.slice(0, 400), t, rec });
+  }
+  return qs;
+}
+// picks: {question index: letter}, kept on the transcript so the quiz stays answered; onTime(t, rec) plays the moment
+function drawQuiz(box, qs, picks, onSave, onTime, recName) {
+  let got = 0, done = 0;
+  box.innerHTML = `<div class="vx-qz-h">${qs.length} שאלות · <b class="sc">לוחצים על התשובה הנכונה</b></div>` + qs.map((x, i) => `<div class="vx-qz" data-i="${i}"><p class="q">${i + 1}. ${esc(x.q)}</p>${x.opts.map(o => `<button type="button" class="o" data-k="${esc(o.k)}">${esc(o.t)}</button>`).join('')}<p class="why" hidden></p></div>`).join('');
+  const score = () => { box.querySelector('.sc').textContent = `${got} מתוך ${done} נכונות` + (done === qs.length ? (got === qs.length ? ' · מושלם!' : got >= qs.length * 0.7 ? ' · יפה מאוד' : ' · כדאי לעבור שוב על ההקלטה') : ''); };
+  const pick = (b, keep) => {
+    const card = b.closest('.vx-qz'); if (card.dataset.done) return; card.dataset.done = 1;
+    const x = qs[+card.dataset.i], ok = b.dataset.k === x.right; done++; if (ok) got++;
+    if (keep) { picks[card.dataset.i] = b.dataset.k; onSave && onSave(); }
+    card.querySelectorAll('button.o').forEach(o => { o.disabled = true; if (o.dataset.k === x.right) o.classList.add('right'); });
+    if (!ok) b.classList.add('wrong');
+    const w = card.querySelector('.why'); w.hidden = false;
+    w.innerHTML = (ok ? '✓ נכון. ' : '✗ לא נכון. ') + esc(x.why) + (x.t != null ? ` <button type="button" class="tm" dir="ltr">${x.rec && recName ? esc(recName(x.rec)) + ' · ' : ''}${clock(x.t)} ▶</button>` : '');
+    const tb = w.querySelector('.tm'); if (tb) tb.onclick = () => onTime && onTime(x.t, x.rec);
+    score();
+  };
+  box.addEventListener('click', e => { const b = e.target.closest('button.o'); if (b) pick(b, true); });
+  for (const [i, k] of Object.entries(picks || {})) { const b = box.querySelector(`.vx-qz[data-i="${i}"] button.o[data-k="${k}"]`); if (b) pick(b, false); }
+}
+async function makeQuiz() {
+  const b = root.querySelector('#vxQuizGo'); if (b) { b.disabled = true; b.textContent = 'מכין בוחן…'; }
+  try {
+    const a = await askRaw('בוחן', QUIZ_ASK(V.duration > 1800 ? 10 : 7, false));
+    if (a == null) return;
+    const qs = parseQuiz(a);
+    if (!qs.length) { say('לא הצלחתי להכין בוחן. נסו שוב'); return; }
+    V.quiz = qs; V.quizPicks = {}; save(); count('voice_quiz');
   } catch (e) { say(friendly(e)); }
   renderIns();
 }
@@ -1899,32 +1985,124 @@ async function finishRec() {
 }
 
 /* ---------------- library ---------------- */
+/* 6.7: course folders — recordings of one course together, and questions or a quiz on the whole folder before an exam.
+   A folder is a name on each transcript (it.folder); empty folders are kept in a short list on the device. */
+const FOLD_KEY = 'siman.voice.folders';
+const FOLD_ICO = '<svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>';
+let LIBF = '';                       // the folder shown in the library ('' = all)
+const FOLD_RES = new Map();          // folder name -> the last answer or quiz made for it (this session)
+const foldersOf = items => { const s = new Set(rd(FOLD_KEY, []) || []); for (const it of items) if (it.folder) s.add(it.folder); return [...s].sort((a, b) => a.localeCompare(b, 'he')); };
+const keepFolders = names => wr(FOLD_KEY, [...new Set(names)].slice(0, 200));
+function askName(title, val) { const n = prompt(title, val || ''); return n == null ? null : n.replace(/\s+/g, ' ').trim().slice(0, 60); }
 async function renderLib() {
   const s = root.querySelector('#vxLib');
   s.innerHTML = `<div class="vx-wrap vx-lib"><h2 style="margin-top:0">הספרייה</h2>
+    <div class="vx-fold" id="vxFold" role="group" aria-label="תיקיות"></div>
+    <div id="vxFCard"></div>
     <label class="vx-find" style="max-width:420px;margin-bottom:14px">${ico.search}<input type="search" id="vxLibQ" placeholder="חיפוש בכל התמלילים"></label>
     <div class="vx-items" id="vxLibList"><div class="vx-wait"><i></i>טוען…</div></div></div>`;
   let items = [];
   try { items = await DB.all(); } catch (_) {}
   items.sort((a, b) => (b.updated || b.created) - (a.updated || a.created));
   const list = s.querySelector('#vxLibList');
+  let folders = foldersOf(items);
+  if (LIBF && !folders.includes(LIBF)) LIBF = '';
+  const drawFolders = () => {
+    const box = s.querySelector('#vxFold'); folders = foldersOf(items);
+    const cnt = f => items.filter(it => it.folder === f).length;
+    box.innerHTML = `<button type="button" data-f="" aria-pressed="${!LIBF}">הכול · ${items.length}</button>` + folders.map(f => `<button type="button" data-f="${esc(f)}" aria-pressed="${LIBF === f}">${esc(f)} · ${cnt(f)}</button>`).join('') + '<button type="button" class="add" data-new="1">+ תיקייה חדשה</button>';
+    box.onclick = e => { const b = e.target.closest('button'); if (!b) return;
+      if (b.dataset.new) { const n = askName('שם התיקייה (למשל שם הקורס):'); if (!n) return; keepFolders([...folders, n]); LIBF = n; }
+      else LIBF = b.dataset.f;
+      drawFolders(); draw(s.querySelector('#vxLibQ').value); };
+    folderCard(s.querySelector('#vxFCard'), LIBF ? items.filter(it => it.folder === LIBF) : null, { rename, remove });
+  };
+  const rename = async () => { const n = askName('שם חדש לתיקייה:', LIBF); if (!n || n === LIBF) return;
+    for (const it of items.filter(x => x.folder === LIBF)) { it.folder = n; const full = await DB.get(it.id); if (full) { full.folder = n; await DB.put(full); } }
+    keepFolders(foldersOf(items).filter(f => f !== LIBF).concat(n)); FOLD_RES.delete(LIBF); LIBF = n; drawFolders(); draw(''); };
+  const remove = async () => { if (!confirm(`להסיר את התיקייה "${LIBF}"?\nההקלטות עצמן לא נמחקות: הן נשארות בספרייה, בלי תיקייה.`)) return;
+    for (const it of items.filter(x => x.folder === LIBF)) { delete it.folder; const full = await DB.get(it.id); if (full) { delete full.folder; await DB.put(full); } }
+    keepFolders((rd(FOLD_KEY, []) || []).filter(f => f !== LIBF)); FOLD_RES.delete(LIBF); LIBF = ''; drawFolders(); draw(''); };
   const draw = q => {
     list.innerHTML = '';
     const ql = q.trim().toLowerCase();
-    const got = !ql ? items : items.filter(it => (it.title || '').toLowerCase().includes(ql) || (it.segments || []).some(x => x.text.toLowerCase().includes(ql)) || ((it.analysis && it.analysis.summary) || '').toLowerCase().includes(ql));
-    if (!got.length) { list.innerHTML = `<p class="vx-empty">${items.length ? 'לא נמצא' : 'עוד אין תמלילים. בוחרים קובץ או מקליטים, והתמלילים נשמרים כאן, במכשיר.'}</p>`; return; }
-    got.forEach(it => list.append(itemRow(it, ql)));
+    const inF = LIBF ? items.filter(it => it.folder === LIBF) : items;
+    const got = !ql ? inF : inF.filter(it => (it.title || '').toLowerCase().includes(ql) || (it.segments || []).some(x => x.text.toLowerCase().includes(ql)) || ((it.analysis && it.analysis.summary) || '').toLowerCase().includes(ql));
+    if (!got.length) { list.innerHTML = `<p class="vx-empty">${LIBF && !inF.length ? 'התיקייה ריקה. מוסיפים אליה הקלטות בכפתור התיקייה שליד כל הקלטה בספרייה.' : items.length ? 'לא נמצא' : 'עוד אין תמלילים. בוחרים קובץ או מקליטים, והתמלילים נשמרים כאן, במכשיר.'}</p>`; return; }
+    got.forEach(it => list.append(itemRow(it, ql, () => { drawFolders(); draw(s.querySelector('#vxLibQ').value); }, () => foldersOf(items))));
   };
   s.querySelector('#vxLibQ').oninput = e => draw(e.target.value);
-  draw('');
+  drawFolders(); draw('');
 }
-function itemRow(it, q) {
+// the card at the top of a folder: what is in it, and questions / a quiz / a summary of all its recordings together
+function folderCard(box, its, act) {
+  if (!its) { box.innerHTML = ''; return; }
+  const ready = its.filter(it => it.segments && it.segments.length).sort((a, b) => (a.created || 0) - (b.created || 0)); // a course in order: lesson 1 first
+  const total = ready.reduce((s, it) => s + (it.duration || 0), 0);
+  box.innerHTML = `<div class="vx-fcard"><div class="hd">${FOLD_ICO.replace('<svg', '<svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8"')}<b>${esc(LIBF)}</b><span>${its.length} הקלטות${total ? ' · ' + longDur(total) : ''}</span><span class="sp"></span>
+      <button class="vx-btn sm" data-a="ren">שינוי שם</button><button class="vx-btn sm" data-a="del">הסרת התיקייה</button></div>
+    ${SMART_CLOUD && ready.length ? `<div class="vx-acts" style="margin:0"><button class="vx-btn sm pri" data-a="quiz">${ico.spark}בוחן על כל התיקייה</button><button class="vx-btn sm" data-a="sum">${ico.spark}סיכום לקראת מבחן</button></div>
+    <div class="ask"><input type="text" placeholder="שאלה על כל ההקלטות בתיקייה…" aria-label="שאלה על כל ההקלטות בתיקייה"><button class="vx-btn sm" data-a="ask">שאלה</button></div>
+    <div class="out" aria-live="polite"></div>` : `<p class="vx-hint" style="margin:0">${ready.length ? '' : 'מוסיפים לתיקייה הקלטות מתומללות, ואז אפשר לשאול על כולן יחד ולהכין בוחן לקראת מבחן.'}</p>`}</div>`;
+  box.querySelector('[data-a=ren]').onclick = act.rename;
+  box.querySelector('[data-a=del]').onclick = act.remove;
+  const out = box.querySelector('.out'); if (!out) return;
+  const name = LIBF;
+  const recName = n => ready[n - 1] ? `${n}. ${ready[n - 1].title || 'הקלטה'}` : 'הקלטה ' + n;
+  const goRec = async (t, n) => { const it = ready[(n || 1) - 1]; if (!it) return; await openItem(it.id); setTimeout(() => { if (t != null) { jumpToTime(t); if (audioEl) playFrom(t); } }, 350); };
+  const show = r => {
+    out.innerHTML = '';
+    if (!r) return;
+    if (r.busy) { out.innerHTML = `<div class="vx-wait"><i></i>${esc(r.busy)}</div>`; return; }
+    if (r.err) { out.innerHTML = `<p style="color:#C2362B">${esc(r.err)}</p>`; return; }
+    if (r.quiz) { const w = el('div', 'vx-cards'); out.append(w); drawQuiz(w, r.quiz, r.picks || (r.picks = {}), null, (t, n) => goRec(t, n), recName); return; }
+    if (r.q) out.append(el('p', '', `<b>${esc(r.q)}</b>`));
+    // [2, 14:05] in an answer opens that recording at that moment
+    for (const line of r.a.split(/\n+/).filter(l => l.trim())) {
+      const p = el('p', ''); p.dir = 'auto';
+      p.innerHTML = esc(line).replace(/\[\s*(?:הקלטה\s*)?(\d+)\s*[,،]\s*(\d{1,2}:\d{2}(?::\d{2})?)\s*\]/g, (m, n, tm) => `<button type="button" class="src" data-n="${n}" data-t="${tsec(tm)}" dir="ltr">${esc(recName(+n))} · ${tm}</button>`);
+      out.append(p);
+    }
+    out.querySelectorAll('.src').forEach(b => b.onclick = () => goRec(+b.dataset.t, +b.dataset.n));
+  };
+  show(FOLD_RES.get(name));
+  const text = () => { let total = 0; const parts = [];
+    ready.forEach((it, i) => { if (total > 560000) return; const p = `##### הקלטה ${i + 1}: ${it.title || 'הקלטה'} (${dayStr(it.created)}) #####\n${forAi(it)}`; parts.push(p.slice(0, 560000 - total)); total += p.length; });
+    return parts.join('\n\n'); };
+  const TAIL = '\n\n(Several recordings are given, each starting with a line like "##### הקלטה 2: title #####". Use all of them. Cite every fact as [recording number, mm:ss] — for example [2, 14:05].)';
+  const run = async (busy, question, done) => {
+    if (FOLD_RES.get(name) && FOLD_RES.get(name).busy) return;
+    if (!cloudOk(busy)) return;
+    const r = { busy }; FOLD_RES.set(name, r); show(r);
+    try { const a = await call('ask', { transcript: text(), question: question + TAIL, history: [] }); delete r.busy; done(r, String((a && a.answer) || '')); }
+    catch (e) { delete r.busy; r.err = friendly(e); }
+    if (LIBF === name && box.isConnected) show(r);
+  };
+  box.querySelector('[data-a=quiz]').onclick = () => run('מכין בוחן מכל ההקלטות בתיקייה…', QUIZ_ASK(ready.length > 2 ? 12 : 8, true), (r, a) => { const qs = parseQuiz(a); if (qs.length) { r.quiz = qs; count('voice_folder_quiz'); } else r.err = 'לא הצלחתי להכין בוחן. נסו שוב'; });
+  box.querySelector('[data-a=sum]').onclick = () => run('מסכם את כל ההקלטות בתיקייה…', 'Write a study summary of all the recordings for an exam: the main topics in order, the key ideas, definitions and examples under each topic, as short lines that start with "• ", each with its citation. End with a line that starts with "לחזור על:" listing the 3 to 6 things most worth reviewing.', (r, a) => { r.a = a; r.q = 'סיכום לקראת מבחן'; count('voice_folder_sum'); });
+  const inp = box.querySelector('.ask input'), go = () => { const q = inp.value.trim(); if (!q) return; run('קורא את כל ההקלטות ועונה…', q, (r, a) => { r.a = a; r.q = q; count('voice_folder_ask'); }); };
+  box.querySelector('[data-a=ask]').onclick = go; inp.onkeydown = e => { if (e.key === 'Enter') go(); };
+}
+// the folder of a transcript: pick one, make a new one, or take it out
+function folderMenu(anchor, it, names, after) {
+  const m = menu(anchor);
+  m.innerHTML = `<div style="padding:6px 12px;font-size:12.5px;color:#5D6982">העברה לתיקייה</div>` + names.map(f => `<button data-f="${esc(f)}">${it.folder === f ? '✓ ' : ''}${esc(f)}</button>`).join('') + `<button data-new="1">+ תיקייה חדשה…</button>${it.folder ? '<button data-out="1">בלי תיקייה</button>' : ''}`;
+  m.onclick = async e => { const b = e.target.closest('button'); if (!b) return; closeMenu();
+    let f = b.dataset.f;
+    if (b.dataset.new) { f = askName('שם התיקייה (למשל שם הקורס):'); if (!f) return; keepFolders([...names, f]); }
+    const full = await DB.get(it.id); if (!full) return;
+    if (b.dataset.out) { delete it.folder; delete full.folder; } else { it.folder = f; full.folder = f; }
+    if (V && V.id === it.id) { if (full.folder) V.folder = full.folder; else delete V.folder; }
+    await DB.put(full); after && after(); };
+}
+function itemRow(it, q, after, names) {
   const b = el('div', 'vx-item'); b.setAttribute('role', 'button'); b.tabIndex = 0;
   const k = it.kind === 'voice' ? ico.wa : it.kind === 'dictation' ? ico.file : ico.mic;
   let sub = [dayStr(it.created), it.duration ? longDur(it.duration) : '', it.status === 'failed' ? 'נכשל' : it.status === 'working' ? 'בעבודה…' : ''].filter(Boolean).join(' · ');
   if (q) { const hit = (it.segments || []).find(x => x.text.toLowerCase().includes(q)); if (hit) sub = '“' + hit.text.slice(0, 90) + '”'; }
-  b.innerHTML = `<span class="k">${k}</span><span class="t"><b>${esc(it.title || 'תמליל')}</b><span>${esc(sub)}</span></span><button class="x" title="מחיקה" aria-label="מחיקה">${ico.trash}</button>`;
-  b.onclick = e => { if (e.target.closest('.x')) return; openItem(it.id); };
+  b.innerHTML = `<span class="k">${k}</span><span class="t"><b>${esc(it.title || 'תמליל')}${it.folder && !LIBF ? `<span class="tg">${esc(it.folder)}</span>` : ''}</b><span>${esc(sub)}</span></span><button class="fo" title="תיקייה" aria-label="העברה לתיקייה">${FOLD_ICO.replace('<svg', '<svg fill="none" stroke="currentColor" stroke-width="1.8"')}</button><button class="x" title="מחיקה" aria-label="מחיקה">${ico.trash}</button>`;
+  b.querySelector('.fo').onclick = e => { e.stopPropagation(); folderMenu(e.currentTarget, it, names ? names() : foldersOf([]), after); };
+  b.onclick = e => { if (e.target.closest('.x,.fo')) return; openItem(it.id); };
   b.onkeydown = e => { if (e.key === 'Enter') openItem(it.id); };
   b.querySelector('.x').onclick = async () => { if (!confirm('למחוק את "' + (it.title || 'התמליל') + '" ואת השמע שלו מהמכשיר?')) return; await DB.del(it.id); b.remove(); refreshCount(); };
   return b;
