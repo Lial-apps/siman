@@ -335,16 +335,22 @@
     });
     var s = $('v7Search');
     if (s) {
+      // 6.7.2: on a phone the letters typed while the search window opens landed here and were lost
+      // (the window showed the full list, and a tap there could miss): everything typed so far is carried over
+      var going = false;
       var go = function () {
-        var v = s.value;
         var cb = $('cmdBtn');
-        if (!cb) return;
-        cb.click();
+        if (!cb || going) return;
+        var dlg = $('cmdDlg');
+        if (!(dlg && dlg.open)) cb.click();
+        going = true;
         setTimeout(function () {
+          going = false;
           var ci = $('cmdIn');
           if (!ci) return;
-          ci.value = v; ci.dispatchEvent(new Event('input', { bubbles: true })); ci.focus();
-          s.value = '';
+          var v = s.value; s.value = '';
+          if (v) { ci.value = (dlg && dlg.open && ci.value && ci.value !== v ? ci.value : '') + v; ci.dispatchEvent(new Event('input', { bubbles: true })); }
+          ci.focus();
         }, 30);
       };
       s.addEventListener('input', function () { if (s.value.trim()) go(); });

@@ -118,6 +118,43 @@ body.ed-live #aiPanel{position:fixed;z-index:960;top:40px;bottom:0;inset-inline-
 .ckd .ck-opts label{display:grid;gap:4px;font-size:13px;color:var(--muted)}
 .ckd .ck-opts label.ck{display:flex;align-items:center;gap:7px;color:var(--ink);font-size:14px}
 .ckd .ck-opts input[type=text],.ckd .ck-opts select{font:inherit;font-size:14px;color:var(--ink);background:var(--bar);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+.ck-class{display:flex;align-items:center;gap:10px;flex-wrap:wrap;border:1px dashed var(--line);border-radius:12px;padding:10px 12px;margin:0 0 18px;background:color-mix(in srgb,var(--marker) 22%,transparent)}
+.ck-class span{flex:1;min-width:180px;font-size:14px}
+.grd .gr-steps{margin:0 0 14px;color:var(--muted);font-size:13.5px}.grd .gr-steps b{color:var(--ink)}
+.grd .gr-help{margin:4px 0 10px;color:var(--muted);font-size:13.5px;line-height:1.5}
+.grd .gr-nopic{height:150px;display:grid;place-items:center;background:var(--bar);border-radius:8px;margin-bottom:6px;color:#1F9D55;font-weight:700}
+.grd .gr-tbl{display:grid;gap:6px;margin:0 0 10px}
+.grd .gr-row{display:grid;grid-template-columns:64px 76px 1fr 34px;gap:6px;align-items:start}
+.grd .gr-row.gr-h span{font-size:12.5px;color:var(--muted);font-weight:600}
+.grd .gr-row input,.grd .gr-row textarea{font:inherit;font-size:14px;color:var(--ink);background:var(--bar);border:1px solid var(--line);border-radius:9px;padding:6px 8px;min-width:0;box-sizing:border-box;width:100%}
+.grd .gr-row textarea{resize:vertical;unicode-bidi:plaintext}
+.grd .gr-del{border:0;background:none;color:var(--muted);font-size:20px;cursor:pointer;padding:4px;line-height:1}
+.grd .gr-sum{font-weight:700;margin-inline-start:8px}
+.grd .gr-cur{border:2px solid var(--ink);border-radius:14px;padding:12px;margin:0 0 18px}
+.grd .gr-cur h3,.grd .gr-list h3{margin:0 0 8px;font-size:18px}
+.grd .gr-name{display:grid;gap:4px;font-size:13px;color:var(--muted);max-width:420px}
+.grd .gr-name input{font:inherit;font-size:16px;color:var(--ink);background:var(--bar);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+.grd .gr-list ol{margin:0;padding:0;list-style:none;display:grid;gap:6px}
+.grd .gr-list li{border:1px solid var(--line);border-radius:12px;padding:8px 10px;background:var(--bar)}
+.grd .gr-li{display:flex;align-items:center;gap:10px}
+.grd .gr-nm{flex:1;text-align:start;background:none;border:0;font:inherit;font-weight:700;color:var(--ink);cursor:pointer;padding:4px 0}
+.grd .gr-nm:disabled{cursor:default;color:var(--ink)}
+.grd .gr-g{font-size:20px;min-width:44px;text-align:center}
+.grd .gr-st{font-size:13px;color:var(--muted)}.grd .gr-st.bad,.grd .gr-unc{color:#C2362B}
+.grd .gr-unc{font-size:13px;margin:6px 0 0}
+.grd .gr-det{display:none;margin-top:8px}.grd li.open .gr-det{display:block}
+.grd .gr-det p{margin:0 0 6px;font-size:14px}
+.grd table{border-collapse:collapse;width:100%;font-size:13.5px}
+.grd th,.grd td{border:1px solid var(--line);padding:5px 7px;text-align:start;vertical-align:top}
+.grd th{background:color-mix(in srgb,var(--marker) 30%,transparent);font-weight:700}
+.grd td input{width:56px;font:inherit;font-size:13.5px;border:1px solid var(--line);border-radius:6px;padding:2px 4px;background:var(--bar);color:var(--ink)}
+.grd .gr-sumbox{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:0 0 14px}
+.grd .gr-sumbox div{border:1px solid var(--line);border-radius:12px;padding:10px;text-align:center;display:grid;gap:2px}
+.grd .gr-sumbox b{font-size:24px}.grd .gr-sumbox span{font-size:12.5px;color:var(--muted)}
+.grd .gr-final{display:block;overflow:auto;max-width:100%}
+.grd .gr-final th small{color:var(--muted);font-weight:400}
+.grd .gr-final tr.avg td{font-weight:700;background:var(--bar)}
+@media (max-width:560px){.grd .gr-row{grid-template-columns:52px 64px 1fr 28px}.grd .gr-sumbox b{font-size:19px}}
 .ai-ck-form{border:1px solid var(--line);border-radius:14px;padding:12px;display:grid;gap:9px;background:var(--bar)}
 .ai-ck-form h4{margin:0;font-size:15px}
 .ai-ck-form p{margin:0;font-size:13px;color:var(--muted)}
@@ -1119,7 +1156,7 @@ function renderLog() {
   const log = $('aiLog'); log.innerHTML = '';
   if (!hasDoc()) {
     log.append(h(`<div class="ai-hello"><b>פתחו קובץ ואשאל, אסכם ואקריא אותו.</b><br>בלי קובץ פתוח אפשר כבר עכשיו להפוך דף בכתב יד או סריקה למסמך מודפס.</div>`));
-    { const b = h('<button class="btn ck-photo" type="button">📝 בדיקת עבודה מצילומים: דפי תלמיד, מבחן ומחוון</button>'); b.onclick = () => CK.open(); log.append(b); }
+    { const b = h('<button class="btn ck-photo" type="button">📝 בדיקת עבודה מצילומים: דפי תלמיד, מבחן ומחוון</button>'); b.onclick = () => CK.open(); log.append(b); const c = h('<button class="btn ck-photo" type="button">🏫 בדיקת מבחנים לכיתה: תלמיד אחרי תלמיד, וקובץ ציונים</button>'); c.onclick = () => GR.open(); log.append(c); }
     $('aiQ').disabled = $('aiSend').disabled = true; $('aiRead').disabled = true;
     return;
   }
@@ -1741,8 +1778,12 @@ const CK = {
   body: () => ckDlg.querySelector('.sc-body'), foot: () => ckDlg.querySelector('.sc-foot'),
   open() {
     if (typeof needReg === 'function' && needReg()) { showReg(); return; }
-    if (!ckDlg.open) { this.work = []; this.task = []; this.taskText = ''; this.who = ''; ckDlg.showModal(); }
-    this.draw();
+    try {
+      if (!ckDlg.open) { this.work = []; this.task = []; this.taskText = ''; this.who = '';
+        // 6.7.2: some phone browsers refuse a modal right after another window closed: then it opens as a plain one
+        try { ckDlg.showModal(); } catch (_) { ckDlg.setAttribute('open', ''); } }
+      this.draw();
+    } catch (e) { console.error(e); toast('לא הצלחתי לפתוח את בדיקת העבודה: ' + (e.message || e)); }
   },
   close() {
     if (this.busy) { this.stop = true; if (this.ctl) this.ctl.abort(); return; }
@@ -1759,7 +1800,8 @@ const CK = {
   },
   draw() {
     const b = this.body(), f = this.foot();
-    b.innerHTML = `<div class="ck-sec"><div class="sc-trayhead"><h3>1. העבודה</h3><p>הדפים של התלמיד או הסטודנט: מצלמים דף אחרי דף (גם כתב יד), סורקים, או בוחרים קבצים.</p></div>${this.trayHtml(this.work, 'work')}</div>
+    b.innerHTML = `<div class="ck-class"><span>🏫 <b>מבחנים של כיתה שלמה?</b> מעלים מבחן ומחוון, ואז תלמיד אחרי תלמיד, ובסוף מקבלים קובץ עם כל הציונים והפירוט.</span><button class="btn" type="button" data-a="class">בדיקת מבחנים לכיתה</button></div>
+      <div class="ck-sec"><div class="sc-trayhead"><h3>1. העבודה</h3><p>הדפים של התלמיד או הסטודנט: מצלמים דף אחרי דף (גם כתב יד), סורקים, או בוחרים קבצים.</p></div>${this.trayHtml(this.work, 'work')}</div>
       <div class="ck-sec"><div class="sc-trayhead"><h3>2. המבחן, המשימה או המחוון <small>(לא חובה)</small></h3><p>מצלמים את דף השאלות או המחוון, או מדביקים אותם בתיבה.</p></div>${this.trayHtml(this.task, 'task')}
         <textarea class="ck-txt" placeholder="או מדביקים או כותבים כאן את השאלות, ההנחיות או המחוון…" aria-label="המשימה בטקסט"></textarea></div>
       <div class="ck-sec ck-opts"><label>שם התלמיד או העבודה <input type="text" data-o="who" placeholder="לא חובה, נכנס לשם הקובץ" dir="auto"></label>
@@ -1768,6 +1810,7 @@ const CK = {
         <label class="ck"><input type="checkbox" data-o="grade"> ציון משוער מתוך 100</label>
         <label>כתב היד והדפים <select data-o="quality"><option value="auto">זיהוי אוטומטי (מומלץ)</option><option value="accurate">כתב יד: הכי מדויק (עד שתי דקות לעמוד)</option><option value="print">מודפס בלבד: הכי מהיר</option></select></label></div>
       <p class="sc-fine">דפים מצולמים נקראים אצל Google Gemini (כתב יד לוקח חצי דקה עד שתי דקות לעמוד) ולא נשמרים אצלנו. כל הדפים מתאחדים לקובץ PDF אחד שנפתח בסימן, ואפשר לסמן ולחתום עליו ולשלוח אותו.</p>`;
+    b.querySelector('[data-a=class]').onclick = () => { if ((this.work.length || this.task.length) && !confirm('לעבור לבדיקת כיתה? הדפים שצולמו כאן לא יישמרו')) return; this.work = []; this.task = []; ckDlg.close(); GR.open(); };
     const ta = b.querySelector('.ck-txt'); ta.value = this.taskText; ta.oninput = () => { this.taskText = ta.value; this.foot().querySelector('[data-a=check]') && this.btns(); };
     const who = b.querySelector('[data-o=who]'); who.value = this.who; who.oninput = () => { this.who = who.value; };
     const lv = b.querySelector('[data-o=level]'); lv.value = this.level; lv.onchange = () => { this.level = lv.value; };
@@ -1929,6 +1972,271 @@ ckCam.onchange = e => { const f = [...e.target.files]; e.target.value = ''; CK.a
 ckImg.onchange = e => { const f = [...e.target.files]; e.target.value = ''; CK.addImages(f); };
 ckFile.onchange = e => { const f = [...e.target.files]; e.target.value = ''; CK.addFiles(f); };
 window.SIMAN_CHECK = CK;
+
+/* =====================================================================
+   6.7.2: CHECKING A WHOLE CLASS — like a chat with a teacher's assistant:
+   1. the exam and its answer key (photographed, scanned, files or typed) → a points table the teacher approves
+   2. student after student: name + photos of the pages → "next student" (the checking runs in the background,
+      so the next one can be photographed at once)
+   3. "that was the last one" → one file with every grade, the class summary and, for every student,
+      what earned points, what lost points and why. Word, PDF or Excel.
+   The work in progress is kept on the device (without the photos), so closing the app loses nothing.
+   ===================================================================== */
+const grDlg = h(`<dialog class="scan ckd grd" id="grDlg" aria-label="בדיקת מבחנים לכיתה">
+  <div class="sc-head"><h2>🏫 בדיקת מבחנים לכיתה</h2><button class="icon-btn" type="button" data-a="close" aria-label="סגירה">×</button></div>
+  <div class="sc-body"></div><div class="sc-foot"></div></dialog>`);
+document.body.append(grDlg);
+const grCam = h('<input type="file" accept="image/*" capture="environment" hidden>');
+const grImg = h('<input type="file" accept="image/*" multiple hidden>');
+const grFile = h('<input type="file" accept="application/pdf,.pdf,.docx,image/*" multiple hidden>');
+grDlg.append(grCam, grImg, grFile);
+const GR_KEY = 'siman.grade.v1';
+const jsonOf = a => { const s = String(a || ''); const i = s.indexOf('{'), j = s.lastIndexOf('}'); if (i < 0 || j <= i) return null; try { return JSON.parse(s.slice(i, j + 1)); } catch (_) { return null; } };
+const GR_SCHEME = total => `From the exam and the answer key make the points table for checking it.
+Use the points written in the exam or in the key. If there are none, split ${total} points between the questions by their weight and difficulty. A question with parts (א, ב, ג or a, b, c) becomes one row per part, like "2א".
+Output ONLY JSON, in the language of the exam:
+{"title":"the exam's name","total":${total},"questions":[{"q":"1","max":10,"topic":"what the question asks, in a few words","expect":"the correct answer or what must appear in it, taken from the key"}]}`;
+const GR_GRADE = `Check the student's answers (the last part of the document) against the exam, the answer key and the points table.
+For EVERY row of the points table give the points earned (from 0 to the row's max; halves are allowed), what earned the points, and what lost points and why.
+Be exact and fair, and consistent: the same mistake loses the same points for every student. Partial credit for a right method with a small slip. A question with no answer gets 0 with "לא נענתה". If a word could not be read, say so instead of guessing against the student.
+Output ONLY JSON, in the language of the exam:
+{"questions":[{"q":"1","max":10,"got":7,"plus":"what was right","minus":"what was wrong and why the points were taken (empty if full marks)"}],"summary":"two sentences for the teacher about this student","unclear":"anything that was hard to read, or empty"}`;
+const GR = {
+  s: null, part: 'exam', queue: [], working: false, draft: { name: '', pages: [] },
+  body: () => grDlg.querySelector('.sc-body'), foot: () => grDlg.querySelector('.sc-foot'),
+  fresh() { return { id: Date.now(), name: '', level: 'a school student', total: 100, exam: { pages: [], text: '' }, key: { pages: [], text: '' }, scheme: null, students: [], step: 'setup' }; },
+  keep() { try { const s = this.s; if (!s) return; const strip = p => ({ text: p.text || '', read: !!p.read });
+    localStorage.setItem(GR_KEY, JSON.stringify({ ...s, exam: { text: s.exam.text, pages: s.exam.pages.map(strip) }, key: { text: s.key.text, pages: s.key.pages.map(strip) },
+      students: s.students.map(st => ({ ...st, pages: [], status: st.status === 'done' || st.status === 'err' ? st.status : 'lost' })) })); } catch (_) {} },
+  open() {
+    if (typeof needReg === 'function' && needReg()) { showReg(); return; }
+    if (!this.s) { let old = null; try { old = JSON.parse(localStorage.getItem(GR_KEY) || 'null'); } catch (_) {}
+      if (old && old.students && (old.students.length || old.scheme) && confirm(`להמשיך את הבדיקה של "${old.name || 'המבחן'}"${old.students.length ? ` (${old.students.length} תלמידים)` : ''}?\n\nביטול = להתחיל בדיקה חדשה`)) { this.s = old; }
+      else this.s = this.fresh(); }
+    if (!grDlg.open) { try { grDlg.showModal(); } catch (_) { grDlg.setAttribute('open', ''); } }
+    this.draw();
+  },
+  close() { grDlg.close(); if (this.working) toast('הבדיקה ממשיכה ברקע. פותחים שוב את "בדיקת מבחנים לכיתה" כדי לראות'); },
+  draw() { const st = this.s.step; if (st === 'setup') this.setup(); else if (st === 'scheme') this.schemeView(); else if (st === 'students') this.studentsView(); else this.report(); },
+  wait(msg) { this.body().innerHTML = `<p class="ai-wait" style="font-size:15px">${esc(msg)}</p>`; this.foot().innerHTML = '<span class="hint" style="margin-inline-end:auto"></span>'; },
+  note(m) { const n = this.foot().querySelector('.hint'); if (n) n.textContent = m; else toast(m); },
+  tray(list, part) {
+    const add = list.length < 30 ? `<li class="add" role="button" tabindex="0" data-add="cam" data-p="${part}">${ICON.scan}צילום עמוד</li><li class="add" role="button" tabindex="0" data-add="img" data-p="${part}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M21 16l-5-5-8 8"/></svg>תמונות</li><li class="add" role="button" tabindex="0" data-add="file" data-p="${part}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4"/></svg>קבצים</li>` : '';
+    return `<ul class="sc-tray">${list.map((p, i) => `<li>${p.url ? `<img alt="עמוד ${i + 1}" src="${p.url}">` : '<div class="gr-nopic">✓ נקרא</div>'}עמוד ${i + 1}<button type="button" class="x" data-del="${i}" data-p="${part}" aria-label="הסרת עמוד ${i + 1}">×</button></li>`).join('')}${add}</ul>`;
+  },
+  wire(b) {
+    b.querySelectorAll('[data-del]').forEach(x => x.onclick = () => { this.pagesOf(x.dataset.p).splice(+x.dataset.del, 1); this.draw(); });
+    b.querySelectorAll('[data-add]').forEach(x => { const go = () => { this.part = x.dataset.p; ({ cam: grCam, img: grImg, file: grFile })[x.dataset.add].click(); };
+      x.onclick = go; x.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } }; });
+  },
+  pagesOf(part) { return part === 'exam' ? this.s.exam.pages : part === 'key' ? this.s.key.pages : this.draft.pages; },
+  // photos and files become pages (the same tools as one work check)
+  async add(files, cam) {
+    const list = this.pagesOf(this.part), back = () => this.draw();
+    CK.target = '__gr'; CK.__gr = list;
+    const keepDraw = CK.draw, keepWait = CK.wait, keepBody = CK.body, keepFoot = CK.foot;
+    CK.draw = back; CK.wait = m => this.wait(m); CK.body = () => this.body(); CK.foot = () => this.foot();
+    try { if (cam !== undefined) await CK.addImages(files, false); else await CK.addFiles(files); }
+    finally { CK.draw = keepDraw; CK.wait = keepWait; CK.body = keepBody; CK.foot = keepFoot; delete CK.__gr; CK.target = 'work'; }
+    this.draw();
+  },
+  setup() {
+    const s = this.s, b = this.body(), f = this.foot();
+    b.innerHTML = `<p class="gr-steps"><b>1. המבחן והמחוון</b> › 2. חלוקת הנקודות › 3. התלמידים › 4. קובץ הציונים</p>
+      <div class="ck-sec ck-opts"><label>שם המבחן והכיתה <input type="text" data-o="name" placeholder="למשל: מבחן בחשבון – ח'2" dir="auto"></label>
+        <label>הכיתה <select data-o="level"><option value="a school student">בית ספר</option><option value="a university or college student">סטודנטים</option></select></label>
+        <label>סך הנקודות <input type="number" data-o="total" min="1" max="1000" dir="ltr"></label></div>
+      <div class="ck-sec"><div class="sc-trayhead"><h3>המבחן</h3><p>דפי השאלות: מצלמים, סורקים או בוחרים קובץ. אפשר גם להקליד או להדביק.</p></div>${this.tray(s.exam.pages, 'exam')}<textarea class="ck-txt" data-t="exam" placeholder="או מדביקים כאן את שאלות המבחן…"></textarea></div>
+      <div class="ck-sec"><div class="sc-trayhead"><h3>המחוון או הפתרון</h3><p>הפתרון הנכון והניקוד. בלי מחוון הבדיקה נעשית לפי מה שנכון, אבל עם מחוון היא מדויקת ועקבית.</p></div>${this.tray(s.key.pages, 'key')}<textarea class="ck-txt" data-t="key" placeholder="או מדביקים כאן את הפתרון והניקוד…"></textarea></div>`;
+    const nm = b.querySelector('[data-o=name]'); nm.value = s.name; nm.oninput = () => { s.name = nm.value; this.keep(); };
+    const lv = b.querySelector('[data-o=level]'); lv.value = s.level; lv.onchange = () => { s.level = lv.value; this.keep(); };
+    const tt = b.querySelector('[data-o=total]'); tt.value = s.total; tt.oninput = () => { s.total = Math.max(1, +tt.value || 100); this.keep(); };
+    b.querySelectorAll('[data-t]').forEach(t => { t.value = s[t.dataset.t].text; t.oninput = () => { s[t.dataset.t].text = t.value; this.keep(); }; });
+    this.wire(b);
+    f.innerHTML = `<span class="hint" style="margin-inline-end:auto"></span>${s.scheme ? '<button class="btn" type="button" data-a="skip">לטבלת הנקודות הקיימת</button>' : ''}<button class="btn primary" type="button" data-a="go">המשך: חלוקת הנקודות</button>`;
+    const sk = f.querySelector('[data-a=skip]'); if (sk) sk.onclick = () => { s.step = 'scheme'; this.draw(); };
+    f.querySelector('[data-a=go]').onclick = () => this.makeScheme();
+  },
+  textOf(part) { const x = this.s[part]; return [x.pages.map(p => p.text || '').join('\n\n'), x.text].filter(t => t && t.trim()).join('\n\n').trim(); },
+  async readPages(pages, onStep) {
+    for (const [i, p] of pages.entries()) {
+      if (p.text || p.read) continue;
+      onStep && onStep(i, pages.length);
+      const raw = await readPage(p, SC.hint, ['auto', 'accurate', 'print'].includes(SC.quality) ? SC.quality : 'auto', {});
+      p.text = parseBlocks(raw).map(blockText).join('\n'); p.read = true;
+    }
+  },
+  async makeScheme() {
+    const s = this.s;
+    if (!s.exam.pages.length && !s.exam.text.trim()) { this.note('מוסיפים קודם את המבחן'); return; }
+    try {
+      await this.readPages([...s.exam.pages, ...s.key.pages], (i, n) => this.wait(`קורא את דפי המבחן והמחוון… (${i + 1} מתוך ${n})`));
+      this.wait('מכין את טבלת הנקודות מהמבחן ומהמחוון…');
+      const ex = this.textOf('exam'), key = this.textOf('key');
+      if (!ex.replace(/\s/g, '')) throw new Error('לא הצלחתי לקרוא את המבחן. נסו לצלם שוב באור טוב, או להדביק את השאלות');
+      const a = await ai({ mode: 'ask', text: `===== המבחן =====\n${ex}\n\n===== המחוון / הפתרון =====\n${key || '(אין מחוון: לבדוק לפי מה שנכון)'}`, question: GR_SCHEME(s.total), history: [] });
+      const j = jsonOf(a); if (!j || !Array.isArray(j.questions) || !j.questions.length) throw new Error('לא הצלחתי לבנות את טבלת הנקודות. נסו שוב');
+      s.scheme = j.questions.map(q => ({ q: String(q.q ?? '').slice(0, 12), max: Math.max(0, +q.max || 0), topic: String(q.topic || '').slice(0, 200), expect: String(q.expect || '').slice(0, 600) }));
+      if (!s.name && j.title) s.name = String(j.title).slice(0, 80);
+      s.step = 'scheme'; this.keep(); this.draw();
+    } catch (e) { this.setup(); this.note(e.message || String(e)); }
+  },
+  schemeView() {
+    const s = this.s, b = this.body(), f = this.foot();
+    const sum = () => s.scheme.reduce((t, q) => t + (+q.max || 0), 0);
+    b.innerHTML = `<p class="gr-steps">1. המבחן והמחוון › <b>2. חלוקת הנקודות</b> › 3. התלמידים › 4. קובץ הציונים</p>
+      <p class="gr-help">זו החלוקה שמצאתי במבחן ובמחוון. אפשר לתקן ניקוד או את מה שנדרש בכל שאלה. ככה ייבדק כל תלמיד, באותה מידה.</p>
+      <div class="gr-tbl" role="table"><div class="gr-row gr-h" role="row"><span>שאלה</span><span>ניקוד</span><span>מה נדרש</span><span></span></div>
+      ${s.scheme.map((q, i) => `<div class="gr-row" role="row" data-i="${i}"><input data-k="q" value="${esc(q.q)}" aria-label="מספר השאלה" dir="auto"><input data-k="max" type="number" min="0" step="0.5" value="${q.max}" aria-label="ניקוד" dir="ltr"><textarea data-k="expect" rows="2" aria-label="מה נדרש" dir="auto">${esc(q.expect || q.topic)}</textarea><button type="button" class="gr-del" data-del="${i}" aria-label="מחיקת השורה">×</button></div>`).join('')}</div>
+      <button class="btn" type="button" data-a="row">+ שאלה</button> <span class="gr-sum"></span>`;
+    const upd = () => { const n = sum(); b.querySelector('.gr-sum').textContent = `סך הכול: ${n} נקודות${n !== s.total ? ` (המבחן מתוך ${s.total})` : ''}`; };
+    b.querySelectorAll('.gr-row[data-i]').forEach(r => { const q = s.scheme[+r.dataset.i];
+      r.querySelectorAll('[data-k]').forEach(inp => inp.oninput = () => { q[inp.dataset.k] = inp.dataset.k === 'max' ? Math.max(0, +inp.value || 0) : inp.value; upd(); this.keep(); }); });
+    b.querySelectorAll('[data-del]').forEach(x => x.onclick = () => { s.scheme.splice(+x.dataset.del, 1); this.keep(); this.draw(); });
+    b.querySelector('[data-a=row]').onclick = () => { s.scheme.push({ q: String(s.scheme.length + 1), max: 0, topic: '', expect: '' }); this.keep(); this.draw(); };
+    upd();
+    f.innerHTML = '<span class="hint" style="margin-inline-end:auto"></span><button class="btn" type="button" data-a="back">חזרה למבחן</button><button class="btn primary" type="button" data-a="go">התחלת בדיקת התלמידים</button>';
+    f.querySelector('[data-a=back]').onclick = () => { s.step = 'setup'; this.draw(); };
+    f.querySelector('[data-a=go]').onclick = () => { if (!s.scheme.length) { this.note('אין שאלות בטבלה'); return; } s.step = 'students'; this.keep(); this.draw(); };
+  },
+  studentsView() {
+    const s = this.s, b = this.body(), f = this.foot(), d = this.draft;
+    const n = s.students.length, done = s.students.filter(x => x.status === 'done').length;
+    b.innerHTML = `<p class="gr-steps">1. המבחן והמחוון › 2. חלוקת הנקודות › <b>3. התלמידים</b> › 4. קובץ הציונים</p>
+      <div class="gr-cur"><h3>תלמיד ${n + 1}</h3>
+        <label class="gr-name">שם התלמיד או התלמידה <input type="text" data-o="sname" placeholder="למשל: דנה לוי" dir="auto"></label>
+        <p class="gr-help">מצלמים את כל דפי התשובות של התלמיד, דף אחרי דף. אחר כך לוחצים "לבדוק ולעבור לתלמיד הבא": הבדיקה רצה ברקע, ואפשר לצלם מיד את התלמיד הבא.</p>
+        ${this.tray(d.pages, 'draft')}</div>
+      <div class="gr-list"><h3>התלמידים שנבדקו${n ? ` (${done} מתוך ${n} מוכנים)` : ''}</h3>${n ? '' : '<p class="gr-help">עוד אין. התלמיד הראשון יופיע כאן.</p>'}<ol>${s.students.map((st, i) => this.rowHtml(st, i)).join('')}</ol></div>`;
+    const nm = b.querySelector('[data-o=sname]'); nm.value = d.name; nm.oninput = () => { d.name = nm.value; };
+    this.wire(b);
+    b.querySelectorAll('[data-again]').forEach(x => x.onclick = () => { const st = s.students[+x.dataset.again]; if (!st.pages.length && !st.text) { toast('הצילומים של התלמיד הזה כבר לא שמורים. מצלמים אותו שוב כתלמיד חדש'); return; } st.status = 'wait'; st.err = ''; this.queue.push(st); this.pump(); this.draw(); });
+    b.querySelectorAll('[data-open]').forEach(x => x.onclick = () => { const li = x.closest('li'); li.classList.toggle('open'); });
+    b.querySelectorAll('[data-pts]').forEach(inp => inp.onchange = () => { const [i, k] = inp.dataset.pts.split(':').map(Number); const q = s.students[i].res.questions[k]; q.got = Math.max(0, Math.min(+q.max || 0, +inp.value || 0)); this.total(s.students[i]); this.keep(); this.draw(); });
+    b.querySelectorAll('[data-rm]').forEach(x => x.onclick = () => { const i = +x.dataset.rm; if (!confirm(`להסיר את "${s.students[i].name}" מהרשימה?`)) return; s.students.splice(i, 1); this.keep(); this.draw(); });
+    f.innerHTML = `<span class="hint" style="margin-inline-end:auto"></span><button class="btn" type="button" data-a="scheme">טבלת הנקודות</button><button class="btn" type="button" data-a="next" ${d.pages.length ? '' : 'disabled'}>לבדוק ולעבור לתלמיד הבא</button><button class="btn primary" type="button" data-a="last" ${n || d.pages.length ? '' : 'disabled'}>זה היה האחרון: קובץ ציונים</button>`;
+    f.querySelector('[data-a=scheme]').onclick = () => { s.step = 'scheme'; this.draw(); };
+    f.querySelector('[data-a=next]').onclick = () => this.next();
+    f.querySelector('[data-a=last]').onclick = () => { if (d.pages.length) this.next(); s.step = 'report'; this.keep(); this.draw(); };
+    this.note(this.working ? `בודק ברקע… ${this.queue.length ? `(${this.queue.length} ממתינים)` : ''}` : d.pages.length ? `${d.pages.length} עמודים לתלמיד הזה` : 'מצלמים את דפי התלמיד');
+  },
+  rowHtml(st, i) {
+    const r = st.res, stt = { wait: 'ממתין בתור', read: 'קורא את הדפים…', check: 'בודק…', done: '', err: 'הבדיקה נכשלה', lost: 'לא הסתיים (האפליקציה נסגרה)' }[st.status] || '';
+    const g = st.status === 'done' ? `<b class="gr-g">${fmtN(st.grade)}</b>` : `<span class="gr-st${st.status === 'err' || st.status === 'lost' ? ' bad' : ''}">${stt}</span>`;
+    const det = r ? `<div class="gr-det">${r.summary ? `<p>${esc(r.summary)}</p>` : ''}${r.unclear ? `<p class="gr-unc">לא היה ברור לקריאה: ${esc(r.unclear)}</p>` : ''}
+      <table><thead><tr><th>שאלה</th><th>נקודות</th><th>מה היה נכון</th><th>למה ירדו נקודות</th></tr></thead><tbody>${r.questions.map((q, k) => `<tr><td>${esc(q.q)}</td><td dir="ltr"><input type="number" min="0" max="${q.max}" step="0.5" value="${q.got}" data-pts="${i}:${k}" aria-label="נקודות בשאלה ${esc(q.q)}"> / ${q.max}</td><td>${esc(q.plus || '')}</td><td>${esc(q.minus || '')}</td></tr>`).join('')}</tbody></table></div>` : '';
+    return `<li class="${st.status}"><div class="gr-li"><button type="button" class="gr-nm" data-open="${i}" ${r ? '' : 'disabled'}>${esc(st.name || 'תלמיד ' + (i + 1))}</button>${g}${st.status === 'err' || st.status === 'lost' ? `<button type="button" class="btn" data-again="${i}">לנסות שוב</button>` : ''}<button type="button" class="gr-del" data-rm="${i}" aria-label="הסרה">×</button></div>${st.err ? `<p class="gr-unc">${esc(st.err)}</p>` : ''}${det}</li>`;
+  },
+  total(st) { const qs = st.res.questions; const got = qs.reduce((t, q) => t + (+q.got || 0), 0), max = qs.reduce((t, q) => t + (+q.max || 0), 0) || 1;
+    st.points = got; st.max = max; st.grade = Math.round(got / max * this.s.total * 10) / 10; },
+  next() {
+    const d = this.draft, s = this.s; if (!d.pages.length) { this.note('מצלמים קודם את דפי התלמיד'); return; }
+    const st = { name: d.name.trim() || `תלמיד ${s.students.length + 1}`, pages: d.pages, status: 'wait', res: null };
+    s.students.push(st); this.queue.push(st); this.draft = { name: '', pages: [] };
+    this.keep(); this.pump(); this.draw();
+    toast(`"${st.name}" נשלח לבדיקה. אפשר לצלם את התלמיד הבא`);
+    const nm = this.body().querySelector('[data-o=sname]'); if (nm && matchMedia('(pointer:fine)').matches) nm.focus();
+  },
+  // the students are checked one after another, in the background
+  async pump() {
+    if (this.working) return; this.working = true;
+    let wake = null; try { if (navigator.wakeLock) wake = await navigator.wakeLock.request('screen'); } catch (_) {}
+    try {
+      while (this.queue.length) {
+        const st = this.queue.shift(), s = this.s, redraw = () => { if (grDlg.open && s.step === 'students') this.draw(); };
+        try {
+          st.status = 'read'; redraw();
+          await this.readPages(st.pages);
+          st.text = st.pages.map((p, i) => `===== עמוד ${i + 1} =====\n${p.text || ''}`).join('\n\n');
+          if (!st.pages.some(p => (p.text || '').replace(/\s/g, '').length > 3)) throw new Error('לא הצלחתי לקרוא את הדפים. נסו לצלם שוב, ישר ובאור טוב');
+          st.status = 'check'; redraw();
+          const table = s.scheme.map(q => `${q.q} | ${q.max} נקודות | ${q.expect || q.topic}`).join('\n');
+          const a = await ai({ mode: 'ask', text: `===== המבחן =====\n${this.textOf('exam')}\n\n===== המחוון / הפתרון =====\n${this.textOf('key') || '(אין מחוון)'}\n\n===== טבלת הנקודות (שאלה | ניקוד מרבי | מה נדרש) =====\n${table}\n\n===== התשובות של ${st.name} =====\n${st.text}`, question: GR_GRADE + `\nThe writer is ${s.level}.`, history: [] });
+          const j = jsonOf(a); if (!j || !Array.isArray(j.questions)) throw new Error('התשובה מהשירות לא הייתה תקינה');
+          // every row of the table, in its order, even if the answer skipped one
+          const by = new Map(j.questions.map(q => [String(q.q).trim(), q]));
+          st.res = { summary: String(j.summary || ''), unclear: String(j.unclear || ''), questions: s.scheme.map((q, k) => { const g = by.get(String(q.q).trim()) || j.questions[k] || {}; return { q: q.q, max: +q.max || 0, got: Math.max(0, Math.min(+q.max || 0, +g.got || 0)), plus: String(g.plus || ''), minus: String(g.minus || (g.got == null ? 'לא נבדקה' : '')) }; }) };
+          this.total(st); st.status = 'done'; st.pages = st.pages.map(p => ({ text: p.text, read: true }));
+        } catch (e) { st.status = 'err'; st.err = e.message || String(e); if (/מכסה|אין חיבור|חוסם|לא הוקם/.test(st.err)) { for (const x of this.queue) { x.status = 'err'; x.err = st.err; } this.queue = []; } }
+        this.keep(); redraw();
+      }
+    } finally { this.working = false; try { if (wake) await wake.release(); } catch (_) {} if (grDlg.open && this.s.step === 'students') this.draw(); if (grDlg.open && this.s.step === 'report') this.draw(); }
+  },
+  stats() {
+    const s = this.s, ok = s.students.filter(x => x.status === 'done');
+    const avg = ok.length ? ok.reduce((t, x) => t + x.grade, 0) / ok.length : 0;
+    const perQ = s.scheme.map((q, k) => { const v = ok.map(x => +x.res.questions[k].got || 0); return { q: q.q, max: +q.max || 0, avg: v.length ? v.reduce((a, b) => a + b, 0) / v.length : 0 }; });
+    return { ok, avg, hi: ok.length ? Math.max(...ok.map(x => x.grade)) : 0, lo: ok.length ? Math.min(...ok.map(x => x.grade)) : 0, perQ };
+  },
+  report() {
+    const s = this.s, b = this.body(), f = this.foot(), S2 = this.stats();
+    const left = s.students.filter(x => x.status !== 'done');
+    b.innerHTML = `<p class="gr-steps">1. המבחן והמחוון › 2. חלוקת הנקודות › 3. התלמידים › <b>4. קובץ הציונים</b></p>
+      ${this.working ? `<p class="ai-wait">עוד בודק ${s.students.filter(x => ['wait', 'read', 'check'].includes(x.status)).length} תלמידים… הקובץ יהיה מוכן כשהם יסתיימו.</p>` : ''}
+      ${left.length && !this.working ? `<p class="gr-unc">${left.length} תלמידים לא נבדקו (${left.map(x => esc(x.name)).join(', ')}). אפשר לחזור לרשימה ולנסות שוב, או להפיק את הקובץ בלעדיהם.</p>` : ''}
+      <div class="gr-sumbox"><div><b>${S2.ok.length}</b><span>תלמידים</span></div><div><b>${fmtN(S2.avg)}</b><span>ממוצע</span></div><div><b>${fmtN(S2.hi)}</b><span>הכי גבוה</span></div><div><b>${fmtN(S2.lo)}</b><span>הכי נמוך</span></div></div>
+      <table class="gr-final"><thead><tr><th>תלמיד</th><th>ציון</th>${s.scheme.map(q => `<th>${esc(q.q)}<small>/${q.max}</small></th>`).join('')}</tr></thead><tbody>${S2.ok.map(x => `<tr><td>${esc(x.name)}</td><td><b>${fmtN(x.grade)}</b></td>${x.res.questions.map(q => `<td>${fmtN(q.got)}</td>`).join('')}</tr>`).join('')}
+      <tr class="avg"><td>ממוצע</td><td>${fmtN(S2.avg)}</td>${S2.perQ.map(q => `<td>${fmtN(q.avg)}</td>`).join('')}</tr></tbody></table>
+      <p class="gr-help">בקובץ: טבלת הציונים, סיכום הכיתה (כולל השאלות הקשות), ולכל תלמיד עמוד עם הניקוד בכל שאלה, מה היה נכון ולמה ירדו נקודות.</p>`;
+    f.innerHTML = `<span class="hint" style="margin-inline-end:auto"></span><button class="btn" type="button" data-a="back">חזרה לתלמידים</button><button class="btn" type="button" data-a="xlsx" ${S2.ok.length ? '' : 'disabled'}>Excel</button><button class="btn" type="button" data-a="pdf" ${S2.ok.length ? '' : 'disabled'}>PDF</button><button class="btn primary" type="button" data-a="docx" ${S2.ok.length ? '' : 'disabled'}>שמירה כ-Word</button>`;
+    f.querySelector('[data-a=back]').onclick = () => { s.step = 'students'; this.keep(); this.draw(); };
+    f.querySelectorAll('[data-a=docx],[data-a=pdf],[data-a=xlsx]').forEach(x => x.onclick = () => this.save(x.dataset.a));
+    f.insertAdjacentHTML('afterbegin', '');
+    const nw = h('<button class="btn" type="button">בדיקה חדשה</button>'); nw.onclick = () => { if (!confirm('להתחיל בדיקה חדשה? הציונים של הבדיקה הזו יימחקו מהמכשיר (קובץ שכבר נשמר נשאר)')) return; localStorage.removeItem(GR_KEY); this.s = this.fresh(); this.queue = []; this.draft = { name: '', pages: [] }; this.draw(); };
+    f.querySelector('[data-a=back]').before(nw);
+  },
+  blocks() {
+    const s = this.s, S2 = this.stats(), d = new Date().toLocaleDateString('he-IL');
+    const pages = [];
+    const hard = [...S2.perQ].filter(q => q.max).sort((a, b) => a.avg / a.max - b.avg / b.max).slice(0, 3);
+    // numbers stand in their own table cells and are written with words ("מתוך", "אחוז"): mixed with Hebrew,
+    // signs like % / ( ) come out in the wrong place in some programs
+    const pct = q => q.max ? Math.round(q.avg / q.max * 100) : 0;
+    pages.push([{ t: 'h1', text: `${s.name || 'מבחן'} – ציונים` },
+      { t: 'table', rows: [['תאריך', 'תלמידים', 'ממוצע', 'הכי גבוה', 'הכי נמוך'], [d, String(S2.ok.length), fmtN(S2.avg), fmtN(S2.hi), fmtN(S2.lo)]] },
+      { t: 'h2', text: 'הציונים' },
+      { t: 'table', rows: [['מספר', 'תלמיד', 'ציון', 'נקודות'], ...S2.ok.map((x, i) => [String(i + 1), x.name, fmtN(x.grade), `${fmtN(x.points)} מתוך ${fmtN(x.max)}`])] },
+      { t: 'h2', text: 'לפי שאלה' }, { t: 'table', rows: [['שאלה', 'ניקוד', 'ממוצע הכיתה', 'הצלחה'], ...S2.perQ.map(q => [q.q, fmtN(q.max), fmtN(q.avg), q.max ? `${pct(q)} אחוז` : '–'])] },
+      ...(hard.length ? [{ t: 'h2', text: 'השאלות הקשות ביותר לכיתה' }, ...hard.map(q => ({ t: 'li', text: `שאלה ${q.q}: הצליחו בה ${pct(q)} אחוז מהכיתה` }))] : [])]);
+    for (const x of S2.ok) {
+      const pg = [{ t: 'h1', text: `${x.name} – ${fmtN(x.grade)}` }, { t: 'p', text: `${fmtN(x.points)} נקודות מתוך ${fmtN(x.max)}` }, ...(x.res.summary ? [{ t: 'p', text: x.res.summary }] : []),
+        { t: 'table', rows: [['שאלה', 'נקודות', 'מה היה נכון', 'למה ירדו נקודות'], ...x.res.questions.map(q => [q.q, `${fmtN(q.got)} מתוך ${fmtN(q.max)}`, q.plus || '–', q.got >= q.max ? '–' : (q.minus || '–')])] }];
+      if (x.res.unclear) pg.push({ t: 'p', text: 'לא היה ברור לקריאה: ' + x.res.unclear });
+      pages.push(pg);
+    }
+    return pages;
+  },
+  async save(kind) {
+    const s = this.s, base = cleanBase(`${s.name || 'מבחן'} - ציונים`) || 'ציונים';
+    try {
+      if (kind === 'xlsx') {
+        await loadEditLibs('xlsx'); const S2 = this.stats();
+        const head = ['תלמיד', 'ציון', 'נקודות', 'מתוך', ...s.scheme.map(q => `שאלה ${q.q} (${q.max})`)];
+        const rows = S2.ok.map(x => [x.name, x.grade, x.points, x.max, ...x.res.questions.map(q => q.got)]);
+        rows.push(['ממוצע', +S2.avg.toFixed(2), '', '', ...S2.perQ.map(q => +q.avg.toFixed(2))]);
+        const det = [['תלמיד', 'שאלה', 'נקודות', 'מתוך', 'מה היה נכון', 'למה ירדו נקודות']];
+        for (const x of S2.ok) for (const q of x.res.questions) det.push([x.name, q.q, q.got, q.max, q.plus, q.got >= q.max ? '' : q.minus]);
+        const wb = XLSX.utils.book_new(); const a = XLSX.utils.aoa_to_sheet([head, ...rows]), bsh = XLSX.utils.aoa_to_sheet(det);
+        a['!cols'] = [{ wch: 22 }, { wch: 8 }, { wch: 8 }, { wch: 7 }, ...s.scheme.map(() => ({ wch: 11 }))]; bsh['!cols'] = [{ wch: 20 }, { wch: 7 }, { wch: 7 }, { wch: 6 }, { wch: 45 }, { wch: 55 }];
+        XLSX.utils.book_append_sheet(wb, a, 'ציונים'); XLSX.utils.book_append_sheet(wb, bsh, 'פירוט');
+        wb.Workbook = { Views: [{ RTL: true }] };
+        const bytes = new Uint8Array(XLSX.write(wb, { type: 'array', bookType: 'xlsx' }));
+        if (await saveBytes(base + '.xlsx', bytes, 'xlsx')) toast('נשמר: ' + base + '.xlsx');
+        return;
+      }
+      const pages = this.blocks();
+      if (kind === 'pdf') { this.note('בונה PDF…'); const bytes = await blocksPdf(pages); if (await saveBytes(base + '.pdf', bytes, 'pdf')) { toast('נשמר: ' + base + '.pdf'); const o = h('<button class="btn" type="button">פתיחה בסימן</button>'); o.onclick = () => { grDlg.close(); openFile(new File([bytes], base + '.pdf', { type: 'application/pdf' })); }; this.foot().prepend(o); } return; }
+      const bytes = blocksDocx(pages); if (await saveBytes(base + '.docx', bytes, 'docx')) toast('נשמר: ' + base + '.docx');
+    } catch (e) { console.error(e); this.note('השמירה נכשלה: ' + (e.message || e)); }
+  },
+};
+const fmtN = v => { const n = +v || 0; return Number.isInteger(n) ? String(n) : n.toFixed(1).replace(/\.0$/, ''); };
+grDlg.querySelector('[data-a=close]').onclick = () => GR.close();
+grDlg.addEventListener('cancel', e => { e.preventDefault(); GR.close(); });
+grCam.onchange = e => { const f = [...e.target.files]; e.target.value = ''; GR.add(f, true); };
+grImg.onchange = e => { const f = [...e.target.files]; e.target.value = ''; GR.add(f, false); };
+grFile.onchange = e => { const f = [...e.target.files]; e.target.value = ''; GR.add(f); };
+window.SIMAN_GRADE = GR;
 
 /* The writer's own words: names, places and work terms the person typed when fixing a reading.
    Kept on this device only, and sent with the next readings as a hint (used only when the letters fit). */
