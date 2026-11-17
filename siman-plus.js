@@ -110,6 +110,14 @@ body.ed-live #aiPanel{position:fixed;z-index:960;top:40px;bottom:0;inset-inline-
 .ai-qz button.wrong{background:color-mix(in srgb,#C2362B 15%,transparent);border-color:#C2362B;text-decoration:line-through}
 .ai-qz button:disabled{cursor:default;opacity:1}
 .ai-qz .why{margin:0;font-size:13.5px;color:var(--muted)}
+.ck-photo{width:100%;justify-content:center;margin-top:8px;white-space:normal;height:auto;min-height:40px;padding:8px 12px}
+.ckd .ck-sec{margin:0 0 22px}
+.ckd .sc-trayhead small{font-weight:400;color:var(--muted);font-size:14px}
+.ckd .ck-txt{width:100%;min-height:70px;resize:vertical;font:inherit;font-size:14.5px;border:1px solid var(--line);border-radius:12px;padding:9px 12px;background:var(--bar);color:var(--ink);direction:rtl;unicode-bidi:plaintext;box-sizing:border-box}
+.ckd .ck-opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px 14px;align-items:end}
+.ckd .ck-opts label{display:grid;gap:4px;font-size:13px;color:var(--muted)}
+.ckd .ck-opts label.ck{display:flex;align-items:center;gap:7px;color:var(--ink);font-size:14px}
+.ckd .ck-opts input[type=text],.ckd .ck-opts select{font:inherit;font-size:14px;color:var(--ink);background:var(--bar);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
 .ai-ck-form{border:1px solid var(--line);border-radius:14px;padding:12px;display:grid;gap:9px;background:var(--bar)}
 .ai-ck-form h4{margin:0;font-size:15px}
 .ai-ck-form p{margin:0;font-size:13px;color:var(--muted)}
@@ -1111,6 +1119,7 @@ function renderLog() {
   const log = $('aiLog'); log.innerHTML = '';
   if (!hasDoc()) {
     log.append(h(`<div class="ai-hello"><b>פתחו קובץ ואשאל, אסכם ואקריא אותו.</b><br>בלי קובץ פתוח אפשר כבר עכשיו להפוך דף בכתב יד או סריקה למסמך מודפס.</div>`));
+    { const b = h('<button class="btn ck-photo" type="button">📝 בדיקת עבודה מצילומים: דפי תלמיד, מבחן ומחוון</button>'); b.onclick = () => CK.open(); log.append(b); }
     $('aiQ').disabled = $('aiSend').disabled = true; $('aiRead').disabled = true;
     return;
   }
@@ -1163,7 +1172,7 @@ function studyChips() {
 function checkForm() {
   const log = $('aiLog'); const old = log.querySelector('.ai-ck-form'); if (old) { old.scrollIntoView({ block: 'nearest' }); return; }
   const others = pdfTabs().filter(t => t !== TB.cur);
-  const f = h(`<div class="ai-ck-form"><h4>📝 בדיקת עבודה</h4><p>הקובץ הפתוח הוא העבודה. מקבלים משוב: מה לתקן ואיך, מה טוב, ואיך לשפר.</p>
+  const f = h(`<div class="ai-ck-form"><h4>📝 בדיקת עבודה</h4><p>הקובץ הפתוח הוא העבודה. מקבלים משוב: מה לתקן ואיך, מה טוב, ואיך לשפר.</p><button class="btn ck-photo" type="button" data-a="photo">📷 העבודה או המבחן על נייר? צילום וסריקה של דפים (גם כתב יד)</button>
     <label>מה המשימה, השאלות או המחוון?<select data-k="task"><option value="">בלי, לבדוק לפי מה שכתוב בעבודה</option>${others.map((t, i) => `<option value="t${i}">הקובץ "${esc(dispName(tabName(t)))}"</option>`).join('')}<option value="paste">להדביק או לכתוב את המשימה</option></select></label>
     <textarea data-k="paste" hidden placeholder="מדביקים כאן את השאלות, ההנחיות או המחוון…" aria-label="המשימה או המחוון"></textarea>
     <label>מי כתב את העבודה?<select data-k="level"><option value="a school student">תלמיד או תלמידה בבית ספר</option><option value="a university or college student" selected>סטודנט או סטודנטית</option><option value="a professional (a work report or document)">עבודה מקצועית</option></select></label>
@@ -1172,6 +1181,7 @@ function checkForm() {
   const sel = f.querySelector('[data-k=task]'), ta = f.querySelector('[data-k=paste]');
   sel.onchange = () => { ta.hidden = sel.value !== 'paste'; if (!ta.hidden) ta.focus(); };
   f.querySelector('[data-a=x]').onclick = () => f.remove();
+  f.querySelector('[data-a=photo]').onclick = () => { f.remove(); CK.open(); };
   f.querySelector('[data-a=go]').onclick = async () => {
     let extra = '', taskName = '';
     if (sel.value === 'paste') { extra = ta.value.trim(); taskName = 'המשימה שהודבקה'; if (!extra) { toast('מדביקים את המשימה, או בוחרים "בלי"'); ta.focus(); return; } }
@@ -1224,7 +1234,7 @@ async function askQ(q, label, kind, opt) {
     const multi = !it.plain && MULTI.on && pdfTabs().length > 1;
     let text;
     if (multi) { it.wait = 'קורא את כל הקבצים הפתוחים…'; renderLog(); const r = await allText(); text = r.text; it.tabs = r.tabs; it.label = (it.label || q) + ` · ${r.tabs.length} קבצים`; }
-    else text = await docText();
+    else text = opt && opt.text ? opt.text : await docText();   // 6.7.1: pages read from photos come with their text
     const empty = it.plain ? !text.replace(/=====.*?=====/g, '').replace(/שורה \d+:/g, '').trim() : !hasRealText(text);
     if (empty) { if (it.plain) { it.err = 'הקובץ ריק, אין עדיין על מה לשאול'; return; } it.err = 'לא מצאתי טקסט במסמך. כנראה שהוא סרוק או מצולם — אפשר לזהות בו את הטקסט קודם:'; it.scanned = true; return; }
     // 6.7: the task or rubric of a work being checked goes after the work, clearly apart from it
@@ -1711,6 +1721,214 @@ imgIn.onchange = e => { const f = [...e.target.files]; e.target.value = ''; SC.f
 pdfIn.onchange = e => { const f = e.target.files[0]; e.target.value = ''; SC.fromPdf(f); };
 window.SIMAN_SCAN = SC;
 window.SIMAN_AI = ai;
+
+/* =====================================================================
+   6.7.1: CHECKING A WORK FROM PHOTOS — the student's pages (also handwriting) and the exam or task
+   are photographed, scanned or picked as files; the pages are read, gathered into ONE PDF that opens
+   in Siman, and the work is checked there. "Gather only" makes the one file without a check.
+   ===================================================================== */
+const ckDlg = h(`<dialog class="scan ckd" id="ckDlg" aria-label="בדיקת עבודה">
+  <div class="sc-head"><h2>📝 בדיקת עבודה מצילומים וקבצים</h2><button class="icon-btn" type="button" data-a="close" aria-label="סגירה">×</button></div>
+  <div class="sc-body"></div><div class="sc-foot"></div></dialog>`);
+document.body.append(ckDlg);
+const ckCam = h('<input type="file" accept="image/*" capture="environment" hidden>');
+const ckImg = h('<input type="file" accept="image/*" multiple hidden>');
+const ckFile = h('<input type="file" accept="application/pdf,.pdf,.docx,image/*" multiple hidden>');
+ckDlg.append(ckCam, ckImg, ckFile);
+const CK_MAX = 30;
+const CK = {
+  work: [], task: [], taskText: '', target: 'work', busy: false, stop: false, level: 'a school student', grade: true, order: 'task', who: '',
+  body: () => ckDlg.querySelector('.sc-body'), foot: () => ckDlg.querySelector('.sc-foot'),
+  open() {
+    if (typeof needReg === 'function' && needReg()) { showReg(); return; }
+    if (!ckDlg.open) { this.work = []; this.task = []; this.taskText = ''; this.who = ''; ckDlg.showModal(); }
+    this.draw();
+  },
+  close() {
+    if (this.busy) { this.stop = true; if (this.ctl) this.ctl.abort(); return; }
+    if ((this.work.length || this.task.length) && !confirm('לסגור? הדפים שצולמו לא יישמרו')) return;
+    ckDlg.close();
+  },
+  note(m) { const n = this.foot().querySelector('.hint'); if (n) n.textContent = m; else toast(m); },
+  trayHtml(list, part) {
+    const add = list.length < CK_MAX ? `<li class="add" role="button" tabindex="0" data-add="cam" data-p="${part}">${ICON.scan}צילום עמוד</li>
+      <li class="add" role="button" tabindex="0" data-add="img" data-p="${part}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M21 16l-5-5-8 8"/></svg>תמונות או סריקות</li>
+      <li class="add" role="button" tabindex="0" data-add="file" data-p="${part}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4"/></svg>קבצים (PDF, Word)</li>
+      ${S.doc && part === 'work' && !list.some(x => x.fromDoc) ? `<li class="add" role="button" tabindex="0" data-add="doc" data-p="${part}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="1.5"/><path d="M9 8h6M9 12h6M9 16h3"/></svg>הקובץ הפתוח</li>` : ''}` : '';
+    return `<ul class="sc-tray">${list.map((p, i) => `<li><img alt="${part === 'work' ? 'עבודה' : 'משימה'}, עמוד ${i + 1}" src="${p.url}">${esc(p.label || 'עמוד ' + (i + 1))}${p.text ? ' · יש טקסט' : ''}<button type="button" class="x" data-del="${i}" data-p="${part}" aria-label="הסרת עמוד ${i + 1}">×</button>${p.srcBlob ? `<button type="button" class="fr" data-frame="${i}" data-p="${part}">${ICON.crop} מסגרת</button>` : ''}</li>`).join('')}${add}</ul>`;
+  },
+  draw() {
+    const b = this.body(), f = this.foot();
+    b.innerHTML = `<div class="ck-sec"><div class="sc-trayhead"><h3>1. העבודה</h3><p>הדפים של התלמיד או הסטודנט: מצלמים דף אחרי דף (גם כתב יד), סורקים, או בוחרים קבצים.</p></div>${this.trayHtml(this.work, 'work')}</div>
+      <div class="ck-sec"><div class="sc-trayhead"><h3>2. המבחן, המשימה או המחוון <small>(לא חובה)</small></h3><p>מצלמים את דף השאלות או המחוון, או מדביקים אותם בתיבה.</p></div>${this.trayHtml(this.task, 'task')}
+        <textarea class="ck-txt" placeholder="או מדביקים או כותבים כאן את השאלות, ההנחיות או המחוון…" aria-label="המשימה בטקסט"></textarea></div>
+      <div class="ck-sec ck-opts"><label>שם התלמיד או העבודה <input type="text" data-o="who" placeholder="לא חובה, נכנס לשם הקובץ" dir="auto"></label>
+        <label>מי כתב את העבודה? <select data-o="level"><option value="a school student">תלמיד או תלמידה בבית ספר</option><option value="a university or college student">סטודנט או סטודנטית</option><option value="a professional (a work report or document)">עבודה מקצועית</option></select></label>
+        <label>סדר הדפים בקובץ <select data-o="order"><option value="task">המשימה ואחריה העבודה</option><option value="work">העבודה ואחריה המשימה</option><option value="only">העבודה בלבד</option></select></label>
+        <label class="ck"><input type="checkbox" data-o="grade"> ציון משוער מתוך 100</label>
+        <label>כתב היד והדפים <select data-o="quality"><option value="auto">זיהוי אוטומטי (מומלץ)</option><option value="accurate">כתב יד: הכי מדויק (עד שתי דקות לעמוד)</option><option value="print">מודפס בלבד: הכי מהיר</option></select></label></div>
+      <p class="sc-fine">דפים מצולמים נקראים אצל Google Gemini (כתב יד לוקח חצי דקה עד שתי דקות לעמוד) ולא נשמרים אצלנו. כל הדפים מתאחדים לקובץ PDF אחד שנפתח בסימן, ואפשר לסמן ולחתום עליו ולשלוח אותו.</p>`;
+    const ta = b.querySelector('.ck-txt'); ta.value = this.taskText; ta.oninput = () => { this.taskText = ta.value; this.foot().querySelector('[data-a=check]') && this.btns(); };
+    const who = b.querySelector('[data-o=who]'); who.value = this.who; who.oninput = () => { this.who = who.value; };
+    const lv = b.querySelector('[data-o=level]'); lv.value = this.level; lv.onchange = () => { this.level = lv.value; };
+    const od = b.querySelector('[data-o=order]'); od.value = this.order; od.onchange = () => { this.order = od.value; };
+    const gr = b.querySelector('[data-o=grade]'); gr.checked = this.grade; gr.onchange = () => { this.grade = gr.checked; };
+    const qu = b.querySelector('[data-o=quality]'); qu.value = ['auto', 'accurate', 'print'].includes(SC.quality) ? SC.quality : 'auto'; qu.onchange = () => { SC.quality = qu.value; };
+    b.querySelectorAll('[data-del]').forEach(x => x.onclick = () => { this[x.dataset.p].splice(+x.dataset.del, 1); this.draw(); });
+    b.querySelectorAll('[data-frame]').forEach(x => x.onclick = () => this.frame(x.dataset.p, +x.dataset.frame));
+    b.querySelectorAll('[data-add]').forEach(x => { const go = () => { this.target = x.dataset.p; if (x.dataset.add === 'doc') return this.fromDoc(); ({ cam: ckCam, img: ckImg, file: ckFile })[x.dataset.add].click(); };
+      x.onclick = go; x.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } }; });
+    f.classList.remove('hidden');
+    f.innerHTML = '<span class="hint" style="margin-inline-end:auto"></span><button class="btn" type="button" data-a="merge">רק לרכז לקובץ אחד</button><button class="btn primary" type="button" data-a="check">בדיקת העבודה</button>';
+    f.querySelector('[data-a=merge]').onclick = () => this.go(false);
+    f.querySelector('[data-a=check]').onclick = () => this.go(true);
+    this.btns();
+  },
+  btns() { const f = this.foot(), n = this.work.length; const c = f.querySelector('[data-a=check]'), m = f.querySelector('[data-a=merge]'); if (!c) return;
+    c.disabled = !n; m.disabled = !n && !this.task.length;
+    const t = this.task.length + (this.taskText.trim() ? 1 : 0); f.querySelector('.hint').textContent = n ? `עבודה: ${n} ${n === 1 ? 'עמוד' : 'עמודים'}${t ? ' · יש משימה' : ''}` : 'מוסיפים את דפי העבודה כדי להתחיל'; },
+  wait(msg) { this.body().innerHTML = `<p class="ai-wait" style="font-size:15px">${esc(msg)}</p>`; this.foot().innerHTML = '<span class="hint" style="margin-inline-end:auto"></span>'; },
+  room(part) { return Math.max(0, CK_MAX - this[part].length); },
+  async addImages(files, cam) {
+    const part = this.target, list = this[part], take = files.slice(0, this.room(part)), bad = [];
+    for (const [i, f] of take.entries()) {
+      this.wait(take.length > 1 ? `מכין את הדפים… (${i + 1} מתוך ${take.length})` : 'מזהה את הדף ומכין אותו…');
+      try { const it = await imgToJpeg(f); it.label = ''; list.push(it); } catch (e) { bad.push(f.name); }
+    }
+    if (cam && take.length === 1 && !bad.length) { this.frame(part, list.length - 1); return; }
+    this.draw(); if (bad.length) this.note('לא הצלחתי לקרוא: ' + bad.join(', '));
+  },
+  async addFiles(files) {
+    const part = this.target, list = this[part], bad = [];
+    for (const f of files) {
+      if (!this.room(part)) { this.note(`אפשר עד ${CK_MAX} עמודים בכל חלק`); break; }
+      try {
+        if (/^image\//.test(f.type)) { this.wait('מכין את התמונה…'); const it = await imgToJpeg(f); it.label = f.name; list.push(it); continue; }
+        let bytes = new Uint8Array(await f.arrayBuffer()), wordText = null;
+        if (/\.docx$/i.test(f.name)) {
+          this.wait(`מכין את "${f.name}"…`); await loadEditLibs('docx');
+          try { const z = await JSZip.loadAsync(bytes); const x = await z.file('word/document.xml').async('string');
+            wordText = x.replace(/<w:p[ >][\s\S]*?<\/w:p>/g, p => (p.match(/<w:t[^>]*>([^<]*)<\/w:t>/g) || []).map(t => t.replace(/<[^>]+>/g, '')).join('') + '\n').replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').trim(); } catch (_) {}
+          const r = await OFFICE_EDIT.toPdf('docx', bytes, m => this.wait(m)); bytes = r.pdf instanceof Uint8Array ? r.pdf : new Uint8Array(r.pdf);
+        }
+        const d = await pdfjs.getDocument({ data: bytes, isEvalSupported: false }).promise;
+        const n = Math.min(this.room(part), d.numPages);
+        for (let i = 1; i <= n; i++) {
+          this.wait(`מכין את "${f.name}": עמוד ${i} מתוך ${n}…`);
+          const pg = await d.getPage(i);
+          let text = '';
+          if (wordText != null) text = i === 1 ? wordText : '(המשך)';
+          else { try { const tc = await pg.getTextContent(); text = tc.items.map(t => t.str + (t.hasEOL ? '\n' : '')).join(''); } catch (_) {} }
+          const it = await pageToJpeg(pg); it.label = `${f.name.replace(/\.[a-z0-9]+$/i, '')}${n > 1 ? ' · ' + i : ''}`;
+          if (text.replace(/\s/g, '').length > 30) it.text = text.trim();
+          list.push(it);
+        }
+        d.destroy();
+      } catch (e) { console.warn(e); bad.push(f.name); }
+    }
+    this.draw(); if (bad.length) this.note('לא הצלחתי לפתוח: ' + bad.join(', '));
+  },
+  async fromDoc() {
+    if (!S.doc) return; const list = this.work, n = Math.min(this.room('work'), S.pages.length);
+    for (let i = 0; i < n; i++) {
+      this.wait(`מכין את הקובץ הפתוח: עמוד ${i + 1} מתוך ${n}…`);
+      const P = S.pages[i]; const it = await pageToJpeg(P.page); let t = ''; try { t = await pageText(i); } catch (_) {}
+      it.label = 'הקובץ הפתוח · ' + (i + 1); it.fromDoc = true; if (t && t.replace(/\s/g, '').length > 30) it.text = t; list.push(it);
+    }
+    this.draw();
+  },
+  // the frame of a photo (four corners) — the same tool as in the scanner
+  frame(part, i) {
+    const it = this[part][i]; if (!it) return this.draw();
+    SC.tray = [it]; const back = () => { SC.tray = []; this.draw(); };
+    // the scanner draws its frame inside its own dialog: here it is drawn in ours
+    const keep = SC.body, keepF = SC.foot, keepShow = SC.showTray;
+    SC.body = () => this.body(); SC.foot = () => this.foot();
+    SC.showTray = () => { SC.body = keep; SC.foot = keepF; SC.showTray = keepShow; back(); };
+    SC.frame(0);
+  },
+  // reads every page that has no text yet; returns false when stopped
+  async readAll(pages) {
+    const todo = pages.filter(p => !p.text && !p.read);
+    if (!todo.length) return true;
+    this.busy = true; this.stop = false; this.ctl = new AbortController();
+    let wake = null; try { if (navigator.wakeLock) wake = await navigator.wakeLock.request('screen'); } catch (_) {}
+    const b = this.body();
+    b.innerHTML = `<p class="sc-status" role="status" style="margin:0 0 14px;font-size:15px">קורא את הדפים…</p><ul class="sc-prog">${todo.map((p, i) => `<li><img alt="עמוד ${i + 1}" src="${p.url}"><span>ממתין</span></li>`).join('')}</ul>`;
+    this.foot().innerHTML = '<span class="hint" style="margin-inline-end:auto"></span><button class="btn" type="button" data-a="stop">עצירה</button>';
+    this.foot().querySelector('[data-a=stop]').onclick = () => { this.stop = true; this.ctl.abort(); };
+    const st = b.querySelector('.sc-status'), lis = [...b.querySelectorAll('.sc-prog li')], t00 = Date.now();
+    let ok = true;
+    for (const [i, p] of todo.entries()) {
+      if (this.stop) { ok = false; break; }
+      const li = lis[i], sp = li.querySelector('span'); li.className = 'now'; sp.textContent = 'קורא…';
+      const t0 = Date.now(); let hand = false;
+      const clock = setInterval(() => { sp.textContent = `${hand ? 'כתב יד: קורא בזהירות…' : 'קורא…'} ${Math.round((Date.now() - t0) / 1000)} שנ׳`; st.textContent = `קורא את הדפים: ${i} מתוך ${todo.length} מוכנים · ${Math.round((Date.now() - t00) / 1000)} שניות`; }, 1000);
+      try {
+        const raw = await readPage(p, SC.hint, SC.quality === 'fast' ? 'auto' : SC.quality, { signal: this.ctl.signal, onHand: () => { hand = true; }, onWait: s => { st.textContent = `השירות עמוס, ממשיך בעוד ${s} שניות…`; }, onLines: (d, n) => { sp.textContent = `שורה ${d} מתוך ${n}`; } });
+        const bl = parseBlocks(raw); p.text = bl.map(blockText).join('\n'); p.read = true;
+        li.className = 'ok'; sp.textContent = p.text ? `נקרא · ${Math.round((Date.now() - t0) / 1000)} שנ׳` : 'עמוד ריק';
+      } catch (e) {
+        if (this.stop) { ok = false; break; }
+        p.read = true; p.text = ''; li.className = 'bad'; sp.textContent = 'לא נקרא';
+        if (/מכסה|לא הוקם|חוסם|אין חיבור/.test(e.message || '')) { st.textContent = e.message; ok = false; break; }
+      } finally { clearInterval(clock); }
+      if (i < todo.length - 1 && hand) await sleep(1200);
+    }
+    try { if (wake) await wake.release(); } catch (_) {}
+    this.busy = false;
+    return ok;
+  },
+  // the pages in their order in the one file, with where each part starts
+  layout() {
+    const task = this.order === 'only' ? [] : this.task;
+    const pages = this.order === 'work' ? [...this.work, ...task] : [...task, ...this.work];
+    const workStart = this.order === 'work' ? 1 : task.length + 1;
+    return { pages, task, workStart };
+  },
+  async buildPdf(pages) {
+    const pdf = await PDFLib.PDFDocument.create();
+    for (const p of pages) {
+      const img = await pdf.embedJpg(Uint8Array.from(atob(p.b64), c => c.charCodeAt(0)));
+      const W = 595.28, H = Math.min(1400, W * p.h / p.w);
+      const pg = pdf.addPage([W, H]); pg.drawImage(img, { x: 0, y: 0, width: W, height: H });
+    }
+    return pdf.save();
+  },
+  async go(check) {
+    if (this.busy) return;
+    if (check && !this.work.length) { this.note('מוסיפים קודם את דפי העבודה'); return; }
+    const all = [...this.work, ...this.task];
+    if (!all.length) { this.note('אין עדיין דפים'); return; }
+    // for a check every page is read first (the task too); gathering only keeps the pages as they are
+    if (check && !(await this.readAll(all))) { this.draw(); this.note(this.stop ? 'הקריאה נעצרה' : 'לא הצלחתי לקרוא את כל הדפים'); return; }
+    this.wait('מאחד את הדפים לקובץ אחד…');
+    const { pages, task, workStart } = this.layout();
+    let bytes; try { bytes = await this.buildPdf(pages); } catch (e) { console.error(e); this.draw(); this.note('איחוד הדפים נכשל: ' + (e.message || e)); return; }
+    const d = new Date(), z = n => String(n).padStart(2, '0');
+    const name = cleanBase(`${check ? 'בדיקת עבודה' : 'קובץ מאוחד'}${this.who.trim() ? ' - ' + this.who.trim() : ''} ${z(d.getDate())}-${z(d.getMonth() + 1)} ${z(d.getHours())}-${z(d.getMinutes())}`) + '.pdf';
+    // the text of every page of the one file, for the check and for every later question about it
+    const full = pages.map((p, i) => `===== עמוד ${i + 1} =====\n${p.text || ''}`).join('\n\n');
+    const workText = this.work.map((p, i) => `===== עמוד ${workStart + i} =====\n${p.text || ''}`).join('\n\n');
+    const pasted = this.taskText.trim();
+    const taskText = [task.length ? task.map((p, i) => `(עמוד ${(this.order === 'work' ? this.work.length : 0) + i + 1} בקובץ)\n${p.text || ''}`).join('\n\n') : this.order === 'only' && this.task.length ? this.task.map(p => p.text || '').join('\n\n') : '', pasted].filter(Boolean).join('\n\n');
+    const o = { level: this.level, grade: this.grade, task: !!taskText.trim() };
+    this.work = []; this.task = []; this.taskText = '';
+    ckDlg.close();
+    await openFile(new File([bytes], name, { type: 'application/pdf' }));
+    // the pages are pictures: the text read from them is kept for this file, so the assistant can answer about it
+    if (S.doc) textCache.set(S.doc, { sig: S.pages.map(P => P.ocr ? 1 : 0).join('') + '|' + S.pages.length, text: full });
+    if (!check) { toast(`הקובץ המאוחד נפתח: ${pages.length} עמודים`); return; }
+    await sleep(300);
+    askQ(STUDY.check(o), 'בדיקת עבודה' + (o.task ? ' מול המשימה' : ''), 'check', { text: workText, extra: taskText, taskName: o.task ? 'המשימה' : '' });
+  },
+};
+ckDlg.querySelector('[data-a=close]').onclick = () => CK.close();
+ckDlg.addEventListener('cancel', e => { if (CK.busy || CK.work.length || CK.task.length) { e.preventDefault(); CK.close(); } });
+ckCam.onchange = e => { const f = [...e.target.files]; e.target.value = ''; CK.addImages(f, true); };
+ckImg.onchange = e => { const f = [...e.target.files]; e.target.value = ''; CK.addImages(f); };
+ckFile.onchange = e => { const f = [...e.target.files]; e.target.value = ''; CK.addFiles(f); };
+window.SIMAN_CHECK = CK;
 
 /* The writer's own words: names, places and work terms the person typed when fixing a reading.
    Kept on this device only, and sent with the next readings as a hint (used only when the letters fit). */

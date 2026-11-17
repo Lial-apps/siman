@@ -1353,7 +1353,7 @@ body:has(#wed) .busy,body:has(#xed) .busy,body:has(#ped) .busy{z-index:1000}body
 </dialog>
 
 <header class="bar">
-  <div class="brand"><b title="גרסה 6.7.0">סימן</b><span class="ver">6.7.0</span><span class="fname" id="fname"></span></div>
+  <div class="brand"><b title="גרסה 6.7.1">סימן</b><span class="ver">6.7.1</span><span class="fname" id="fname"></span></div>
 
   <nav class="tools" id="tools" aria-label="כלים">
     <button class="tool" data-tool="select" aria-pressed="true" title="בחירה וגלילה (V)">
@@ -5175,6 +5175,7 @@ const CMDS=[
   {l:'הדפסה',k:'הדפס הדפסה מדפסת print',key:'Ctrl P',doc:1,run:()=>printDoc()},
   {l:'השחרה של מידע רגיש',k:'השחר השחרה הסתר הסתרה צנזור מחק פרטים redact',key:'D',doc:1,run:()=>setTool('redact')},
   {l:'חיפוש והשחרה אוטומטית של מידע רגיש (ת.ז, טלפון, מייל, אשראי)',k:'השחרה אוטומטית מידע רגיש תעודת זהות ת.ז טלפון מייל אשראי פרטיות auto redact',doc:1,run:()=>{setTool('redact');window.SIMAN_PRO&&SIMAN_PRO.autoRedact();}},
+  {l:'בדיקת עבודה מצילומים: דפי תלמיד, מבחן ומחוון',k:'בדיקת עבודה בדיקה מבחן מבחנים מחוון ציון תלמיד סטודנט כתב יד צילום סריקה משוב תיקון שיעורי בית עבודות לרכז לאחד קבצים',run:()=>window.SIMAN_CHECK&&SIMAN_CHECK.open()},
   {l:'דוח בדיקה (לשליחה כשמשהו לא עובד)',k:'דוח בדיקה תקלה באג לא עובד תמיכה עזרה debug report',run:()=>window.SIMAN_HOME&&SIMAN_HOME.report()},
   {l:'מסך הבית (הקובץ נשאר פתוח, חוזרים לאותו מקום)',k:'בית מסך הבית ראשי מסך ראשי התחלה חזרה הביתה home start main',run:()=>window.SIMAN_HOME&&SIMAN_HOME.go()},
   {l:'הפרטים שלי (למילוי אוטומטי של טפסים)',k:'הפרטים שלי פרופיל פרטים אישיים ילד ילדים תעודת זהות מילוי אוטומטי טפסים profile autofill my details',run:()=>window.SIMAN_FILL&&SIMAN_FILL.profile()},
@@ -5748,7 +5749,7 @@ if('launchQueue' in window){
 }
 </script>
 <script src="siman-guard.js?v=6.4"></script>
-<script src="siman-plus.js?v=6.7.0"></script>
+<script src="siman-plus.js?v=6.7.1"></script>
 <script>
 /* =====================================================================
    4.7 — launch period (4 months per user) + feature-use counting
