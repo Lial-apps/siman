@@ -9,8 +9,8 @@
   "scope": "./",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#EAFBF3",
-  "theme_color": "#EAFBF3",
+  "background_color": "#F6F8FC",
+  "theme_color": "#F6F8FC",
   "categories": [
     "productivity",
     "business",
@@ -62,11 +62,11 @@
       "sizes": "1366x820",
       "type": "image/png",
       "form_factor": "wide",
-      "label": "שורת הפקודה: כותבים מה לעשות"
+      "label": "המרקר מסמן כל כלי במעבר עכבר"
     },
     {
       "src": "screenshot-narrow-3.png",
-      "sizes": "923x1876",
+      "sizes": "780x1688",
       "type": "image/png",
       "form_factor": "narrow",
       "label": "סימן בטלפון"

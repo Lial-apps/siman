@@ -321,7 +321,7 @@ footer nav{display:flex;flex-wrap:wrap;gap:8px 20px}
       </ul>
     </div>
     <div class="frame">
-      <video id="vid" src="siman-video-595.mp4?v=595" poster="siman-video-595.jpg?v=595" controls muted loop playsinline preload="metadata" aria-label="סרטון הדגמה של סימן, כדקה"></video>
+      <video id="vid" src="siman-video-690.mp4?v=690" poster="siman-video-690.jpg?v=690" controls muted loop playsinline preload="metadata" aria-label="סרטון הדגמה של סימן, כדקה"></video>
       <button class="sound" id="sound" type="button">🔊 להפעלה עם סאונד</button>
       <span class="label">סרטון של דקה</span>
     </div>
@@ -478,7 +478,7 @@ footer nav{display:flex;flex-wrap:wrap;gap:8px 20px}
 (function(){
   var v=document.getElementById('vid'),s=document.getElementById('sound');
   // computers get the wide (16:9) cut: it fills a wide frame and the whole screen in full-screen view. Phones keep the vertical one
-  if(window.matchMedia&&matchMedia('(min-width:900px)').matches){document.getElementById('video').classList.add('wide');v.poster='siman-video-595-wide.jpg?v=595';v.src='siman-video-595-wide.mp4?v=595';}
+  if(window.matchMedia&&matchMedia('(min-width:900px)').matches){document.getElementById('video').classList.add('wide');v.poster='siman-video-690-wide.jpg?v=690';v.src='siman-video-690-wide.mp4?v=690';}
   var calm=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
   function dropBtn(){if(s&&s.parentNode)s.remove();}
   s.addEventListener('click',function(){v.muted=false;v.loop=false;v.currentTime=0;v.play();dropBtn();});
