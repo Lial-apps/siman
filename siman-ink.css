@@ -156,3 +156,6 @@ html.v7.nb.ink .tab[aria-selected="true"] .nm::after{background:color-mix(in srg
 /* בשפות האחרות הכותרת ארוכה (משפט שלם): אותו כתב יד, בגודל שמשאיר מקום לשאר המסך */
 html.v7.nb.ink .v7-home:not([lang="he"]) h1{font-size:clamp(56px,5.6vw,96px);line-height:.94}
 @media (max-width:720px){html.v7.nb.ink .v7-home:not([lang="he"]) h1{font-size:clamp(46px,14vw,64px)}}
+
+/* מצב כהה: דף האייקון שליד "או גוררים קובץ לכאן" מקבל את צבע המשטח, כדי שהחץ שבתוכו ייראה (קודם הדף היה לבן והחץ לבן) */
+html.v7.nb.ink .nb-dt svg path[fill="#fff"]{fill:var(--v7-surface)}
