@@ -120,7 +120,9 @@ async function saveDraft(){
   if(S.bytes.length>MAX_FILE)return;
   let anns='';try{anns=histStr();}catch(_){return;}
   // the big strings (signature / image data) travel with the draft
-  const big={};try{for(const m of anns.matchAll(/"(\u0001b\d+)"/g)){const v=BIG.get(m[1]);if(v)big[m[1]]=v;}}catch(_){}
+  // 6.8: in the saved text the id is written as the six characters \u0001 (JSON), not as the sign itself: nothing
+  // matched, so a restored draft came back without its signatures and pictures
+  const big={};try{for(const m of anns.matchAll(/"\\u0001(b\d+)"/g)){const k='\u0001'+m[1],v=BIG.get(k);if(v)big[k]=v;}}catch(_){}
   await DB.set(DRAFT,{name:S.name,bytes:S.bytes,anns,big,time:Date.now()});
 }
 function schedule(){clearTimeout(saveT);saveT=setTimeout(saveDraft,2500);}
@@ -144,7 +146,7 @@ async function resume(d){
     const f=new File([d.bytes],d.name,{type:'application/pdf'});
     suppress=true;await openFile(f);
     if(S.name!==d.name){suppress=false;return;}
-    try{for(const k in d.big||{}){BIG.set(k,d.big[k]);BIG_ID.set(d.big[k],k);}}catch(_){}
+    try{for(const k in d.big||{}){BIG.set(k,d.big[k]);BIG_ID.set(d.big[k],k);const n=+String(k).slice(2);if(n>bigN)bigN=n;}}catch(_){}
     S.anns=histParse(d.anns||'[]');let mx=0;for(const a of S.anns)if(a.id>mx)mx=a.id;S.nextId=Math.max(S.nextId||1,mx+1);
     S.pages.forEach(P=>{try{drawAnns(P);}catch(_){}});
     suppress=false;setDirty(true);toast(L().restored);

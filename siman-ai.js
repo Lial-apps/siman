@@ -19,10 +19,10 @@ const MAX_IMAGE = 7 * 1024 * 1024;  // base64 characters of one page picture
 // Cloudflare cuts a request that sends nothing back for 100 seconds (error 524). Reading a page of
 // handwriting can take longer, so "scan" and "ask" answer at once and keep the line open with spaces
 // until Gemini is done. The app reads the JSON at the end (JSON allows spaces before it).
-const STREAM_MODES = ['slideText', 'print', 'scan', 'scanAccurate', 'ask', 'lines', 'linesFast', 'linesCheck', 'table', 'tableCheck'];
+const STREAM_MODES = ['slideText', 'print', 'scan', 'scanAccurate', 'ask', 'check', 'lines', 'linesFast', 'linesCheck', 'table', 'tableCheck'];
 // the whole request has one time budget (the app gives up after 150 s): each model gets what is left
-const BUDGET = { slideText: 100000, print: 90000, tableCheck: 100000, orient: 30000, table: 120000, linesCheck: 80000, lines: 110000, linesFast: 60000, scan: 70000, scanAccurate: 125000, ask: 85000, translate: 85000, corners: 30000 };
-const MODEL_TIMEOUT = { slideText: 60000, print: 55000, tableCheck: 80000, orient: 20000, table: 90000, linesCheck: 70000, lines: 75000, linesFast: 45000, scan: 60000, scanAccurate: 90000, scanCheck: 45000, ask: 80000, translate: 80000, corners: 30000 }; // ms per model before trying the next one
+const BUDGET = { slideText: 100000, print: 90000, tableCheck: 100000, orient: 30000, table: 120000, linesCheck: 80000, lines: 110000, linesFast: 60000, scan: 70000, scanAccurate: 125000, ask: 85000, check: 125000, translate: 85000, corners: 30000 };
+const MODEL_TIMEOUT = { slideText: 60000, print: 55000, tableCheck: 80000, orient: 20000, table: 90000, linesCheck: 70000, lines: 75000, linesFast: 45000, scan: 60000, scanAccurate: 90000, scanCheck: 45000, ask: 80000, check: 100000, translate: 80000, corners: 30000 }; // ms per model before trying the next one
 // reading a page: "accurate" = the main model, thinking a little (best for handwriting, ~20–90 s);
 // "fast" = the light model, no thinking (a few seconds, guesses more)
 // lines: on the ivrit.ai Hebrew handwriting benchmark the main model reads single lines best of all models
@@ -48,6 +48,8 @@ const THINKING = {
   scanAccurate: [{ thinkingLevel: 'low' }, { thinkingBudget: 1024 }, null],
   scanCheck: [{ thinkingLevel: 'low' }, { thinkingBudget: 1024 }, null],
   ask: [{ thinkingBudget: 512 }, { thinkingLevel: 'low' }, null],
+  // 6.8: checking a work or an exam: redoing the steps needs real thinking (the answer itself is short)
+  check: [{ thinkingBudget: 4096 }, { thinkingLevel: 'medium' }, { thinkingLevel: 'low' }, null],
   translate: [{ thinkingBudget: 0 }, { thinkingLevel: 'minimal' }, null],
   corners: [{ thinkingLevel: 'minimal' }, { thinkingBudget: 0 }, null],
 };
@@ -85,6 +87,13 @@ Rules:
 Answer the user's question only from the document. If the answer is not in it, say so in one short sentence.
 After every fact, cite the page it came from: [עמ' 3] when you answer in Hebrew, [p. 3] in any other language.
 Answer in the language the question is written in. Be clear and short: plain short paragraphs, or lines that start with "• ". No markdown headings, no bold, no tables.`,
+  // 6.8: checking a submitted work, or one student's exam against the answer key. The app's own request (the
+  // "question") says what to check and the exact shape of the answer; this only sets the role.
+  check: () => `You are an experienced, exact and fair teacher who checks submitted works and exams inside סימן, a document app.
+The material comes in <document>: the work or the student's answers, and with them the task, the exam, the answer key or the points table when there are any. Pages start with a line like "===== עמוד 3 =====".
+Check the way a careful teacher does: work every exercise through yourself before judging it, compare with the answer key when there is one, and judge only what is really written. Text read from handwriting can hold reading mistakes: a word or a number that makes no sense is probably a reading mistake, so do not take points for it — say that it was unclear.
+Be consistent: the same answer always gets the same judgment and the same points.
+Follow the output format of the request exactly, with no other text. Write in the language of the work.`,
 };
 
 // 6.6: printed pages — fast and exact. The answer also says whether the page is really handwriting,
@@ -551,6 +560,18 @@ function build(body) {
       systemInstruction: { parts: [{ text: PROMPTS.ask() }] },
       contents,
       generationConfig: { temperature: 0.3, maxOutputTokens: 4096 },
+    };
+  }
+  // 6.8: checking a work or an exam. temperature 0 = the same answers get the same points; "json" = the answer
+  // is one JSON object (a points table, one student's points), with room for an exam of many questions
+  if (mode === 'check') {
+    const text = String(body.text || '').slice(0, MAX_TEXT);
+    const q = String(body.question || '').slice(0, 8000);
+    if (!text.trim() || !q.trim()) return { err: 'document text or question missing' };
+    return {
+      systemInstruction: { parts: [{ text: PROMPTS.check() }] },
+      contents: [{ role: 'user', parts: [{ text: `<document>\n${text}\n</document>` }] }, { role: 'model', parts: [{ text: 'קראתי הכול. מה לבדוק?' }] }, { role: 'user', parts: [{ text: q }] }],
+      generationConfig: { temperature: 0, maxOutputTokens: 12000, ...(body.json ? { responseMimeType: 'application/json' } : {}) },
     };
   }
   return { err: 'unknown mode' };

@@ -828,6 +828,22 @@ async function ai(payload, { onWait, signal, timeout = 300000, once = false } = 
   }
   throw new Error('השירות עמוס כרגע. נסו שוב בעוד דקה');
 }
+// 6.8: checking a work or an exam has its own mode on the server: a teacher's role, more thinking, and the same
+// points for the same answer. A server that does not know the mode yet answers "unknown mode": then the check
+// goes the way it did before, as a question about the document.
+let CHECK_OK = true;
+async function aiCheck(text, question, { json = false, onWait } = {}) {
+  if (CHECK_OK) {
+    try { return await ai({ mode: 'check', text, question, json }, { onWait }); }
+    catch (e) { if (!/unknown mode/i.test((e && e.message) || '')) throw e; CHECK_OK = false; }
+  }
+  return ai({ mode: 'ask', text, question, history: [] }, { onWait });
+}
+// an answer that must be JSON of a known shape: asked once more if it came back broken or cut
+async function aiCheckJson(text, question, ok) {
+  for (let k = 0; k < 2; k++) { const j = jsonOf(await aiCheck(text, question, { json: true })); if (j && ok(j)) return j; }
+  return null;
+}
 
 /* =====================================================================
    3. THE ASSISTANT — questions, summaries, key points
@@ -1048,6 +1064,8 @@ GOOD: one strength [page cite]   (2 to 4 such lines)
 FIX: one mistake, gap or missing part, and exactly how to correct it [page cite]   (as many as needed, the most important first; write the correct answer or step)
 TIP: one way to make the work better   (2 to 4 such lines)
 ${o.grade ? 'GRADE: a number from 0 to 100 | one sentence why' + (o.task ? ', by the rubric' : '') : ''}
+Where a line says [page cite], end it with the page the point is on, written like [עמ' 3] (or [p. 3] when the work is not in Hebrew). The pages start with lines like "===== עמוד 3 =====".
+If a word or a number looks like a mistake of reading the handwriting and not of the writer, do not count it as a mistake: say in a TIP line that it was not clear.
 No other text, no markdown.`,
   map: 'Make a mind map of the document as an indented outline. The first line is the main subject. Every other line starts with "- " and is indented with 2 spaces per level (up to 3 levels under the subject). Short phrases, not sentences. Write in the language of the document. Output ONLY the outline.',
 };
@@ -1283,7 +1301,10 @@ async function askQ(q, label, kind, opt) {
     const ck = !history.length ? `${multi ? 'M' : ''}${followOk ? 'F' : ''}${q}\u0001${textSig(text)}` : null;
     if (ck && ASK_CACHE.has(ck)) it.a = ASK_CACHE.get(ck);
     else {
-      it.a = await ai({ mode: 'ask', text, question: (multi ? q + MULTI_TAIL : q) + (followOk ? FOLLOW_TAIL : ''), history: history.map(x => ({ q: x.q, a: x.a.replace(/^❓.*$/gm, '').trim() })) }, { onWait: s => { it.wait = `השירות עמוס, מנסה שוב בעוד ${s} שניות…`; const w = document.getElementById('aiWait'); if (w && AS.key() === tabKey) w.textContent = it.wait; } });
+      const onWait = s => { it.wait = `השירות עמוס, מנסה שוב בעוד ${s} שניות…`; const w = document.getElementById('aiWait'); if (w && AS.key() === tabKey) w.textContent = it.wait; };
+      // 6.8: a work is checked in the server's own checking mode (see aiCheck)
+      it.a = kind === 'check' ? await aiCheck(text, q, { onWait })
+        : await ai({ mode: 'ask', text, question: (multi ? q + MULTI_TAIL : q) + (followOk ? FOLLOW_TAIL : ''), history: history.map(x => ({ q: x.q, a: x.a.replace(/^❓.*$/gm, '').trim() })) }, { onWait });
       if (ck && it.a) { ASK_CACHE.set(ck, it.a); if (ASK_CACHE.size > 60) ASK_CACHE.delete(ASK_CACHE.keys().next().value); }
     }
     if (followOk) { const f = splitFollow(it.a); it.a = f.a; it.follow = f.follow; }
@@ -1851,7 +1872,8 @@ const CK = {
         if (/\.docx$/i.test(f.name)) {
           this.wait(`מכין את "${f.name}"…`); await loadEditLibs('docx');
           try { const z = await JSZip.loadAsync(bytes); const x = await z.file('word/document.xml').async('string');
-            wordText = x.replace(/<w:p[ >][\s\S]*?<\/w:p>/g, p => (p.match(/<w:t[^>]*>([^<]*)<\/w:t>/g) || []).map(t => t.replace(/<[^>]+>/g, '')).join('') + '\n').replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').trim(); } catch (_) {}
+            // 6.8: also the text of equations (m:t): a math work written in Word lost every formula
+            wordText = x.replace(/<w:p[ >][\s\S]*?<\/w:p>/g, p => (p.match(/<(w|m):t(?: [^>]*)?>([^<]*)<\/\1:t>/g) || []).map(t => t.replace(/<[^>]+>/g, '')).join('') + '\n').replace(/<[^>]+>/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&').trim(); } catch (_) {}
           const r = await OFFICE_EDIT.toPdf('docx', bytes, m => this.wait(m)); bytes = r.pdf instanceof Uint8Array ? r.pdf : new Uint8Array(r.pdf);
         }
         const d = await pdfjs.getDocument({ data: bytes, isEvalSupported: false }).promise;
@@ -1860,10 +1882,13 @@ const CK = {
           this.wait(`מכין את "${f.name}": עמוד ${i} מתוך ${n}…`);
           const pg = await d.getPage(i);
           let text = '';
-          if (wordText != null) text = i === 1 ? wordText : '(המשך)';
+          // 6.8: the whole text of a Word file sits on its first page; its other pages are not read again from
+          // their pictures (before: each of them went to the reading service — slow, and the text came twice)
+          const word = wordText != null && wordText.replace(/\s/g, '').length > 30;
+          if (word) text = i === 1 ? wordText : '';
           else { try { const tc = await pg.getTextContent(); text = tc.items.map(t => t.str + (t.hasEOL ? '\n' : '')).join(''); } catch (_) {} }
           const it = await pageToJpeg(pg); it.label = `${f.name.replace(/\.[a-z0-9]+$/i, '')}${n > 1 ? ' · ' + i : ''}`;
-          if (text.replace(/\s/g, '').length > 30) it.text = text.trim();
+          if (text.replace(/\s/g, '').length > 30) it.text = text.trim(); else if (word) it.read = true;
           list.push(it);
         }
         d.destroy();
@@ -1913,7 +1938,9 @@ const CK = {
         li.className = 'ok'; sp.textContent = p.text ? `נקרא · ${Math.round((Date.now() - t0) / 1000)} שנ׳` : 'עמוד ריק';
       } catch (e) {
         if (this.stop) { ok = false; break; }
-        p.read = true; p.text = ''; li.className = 'bad'; sp.textContent = 'לא נקרא';
+        // 6.8: a page that failed stays "not read" (before: it counted as an empty page, and the work was
+        // checked without it, as if the student had not answered)
+        p.text = ''; li.className = 'bad'; sp.textContent = 'לא נקרא';
         if (/מכסה|לא הוקם|חוסם|אין חיבור/.test(e.message || '')) { st.textContent = e.message; ok = false; break; }
       } finally { clearInterval(clock); }
       if (i < todo.length - 1 && hand) await sleep(1200);
@@ -1945,6 +1972,11 @@ const CK = {
     if (!all.length) { this.note('אין עדיין דפים'); return; }
     // for a check every page is read first (the task too); gathering only keeps the pages as they are
     if (check && !(await this.readAll(all))) { this.draw(); this.note(this.stop ? 'הקריאה נעצרה' : 'לא הצלחתי לקרוא את כל הדפים'); return; }
+    if (check) { const miss = all.filter(p => !p.text && !p.read);
+      if (miss.length) {
+        const where = miss.map(p => `${this.work.includes(p) ? 'העבודה' : 'המשימה'}, עמוד ${(this.work.includes(p) ? this.work : this.task).indexOf(p) + 1}`).join(' · ');
+        if (!confirm(`${miss.length === 1 ? 'דף אחד לא נקרא' : miss.length + ' דפים לא נקראו'} (${where}).\n\nאישור = לבדוק בלעדי${miss.length === 1 ? 'ו' : 'הם'}\nביטול = לחזור, ולנסות שוב או לצלם מחדש`)) { this.draw(); this.note('לוחצים שוב על "בדיקת העבודה" כדי לקרוא שוב את הדפים שלא נקראו'); return; }
+        for (const p of miss) p.read = true; } }
     this.wait('מאחד את הדפים לקובץ אחד…');
     const { pages, task, workStart } = this.layout();
     let bytes; try { bytes = await this.buildPdf(pages); } catch (e) { console.error(e); this.draw(); this.note('איחוד הדפים נכשל: ' + (e.message || e)); return; }
@@ -2001,8 +2033,11 @@ For EVERY row of the points table give the points earned (from 0 to the row's ma
 Be exact and fair, and consistent: the same mistake loses the same points for every student. Partial credit for a right method with a small slip. A question with no answer gets 0 with "לא נענתה". If a word could not be read, say so instead of guessing against the student.
 Output ONLY JSON, in the language of the exam:
 {"questions":[{"q":"1","max":10,"got":7,"plus":"what was right","minus":"what was wrong and why the points were taken (empty if full marks)"}],"summary":"two sentences for the teacher about this student","unclear":"anything that was hard to read, or empty"}`;
+// 6.8: "שאלה 2 א." and "2א" are the same row; "7.5", "7,5" and "7/10" are all 7.5 or 7 points
+const qKey = v => String(v ?? '').replace(/שאלה|סעיף|question|[\s.:,;()\[\]\-–—'"׳״]/gi, '').toLowerCase();
+const numOf = v => { const n = parseFloat(String(v ?? '').replace(',', '.')); return Number.isFinite(n) ? n : 0; };
 const GR = {
-  s: null, part: 'exam', queue: [], working: false, draft: { name: '', pages: [] },
+  s: null, part: 'exam', queue: [], working: false, draft: { name: '', pages: [] }, openRows: new Set(), later: false,
   body: () => grDlg.querySelector('.sc-body'), foot: () => grDlg.querySelector('.sc-foot'),
   fresh() { return { id: Date.now(), name: '', level: 'a school student', total: 100, exam: { pages: [], text: '' }, key: { pages: [], text: '' }, scheme: null, students: [], step: 'setup' }; },
   keep() { try { const s = this.s; if (!s) return; const strip = p => ({ text: p.text || '', read: !!p.read });
@@ -2011,7 +2046,13 @@ const GR = {
   open() {
     if (typeof needReg === 'function' && needReg()) { showReg(); return; }
     if (!this.s) { let old = null; try { old = JSON.parse(localStorage.getItem(GR_KEY) || 'null'); } catch (_) {}
-      if (old && old.students && (old.students.length || old.scheme) && confirm(`להמשיך את הבדיקה של "${old.name || 'המבחן'}"${old.students.length ? ` (${old.students.length} תלמידים)` : ''}?\n\nביטול = להתחיל בדיקה חדשה`)) { this.s = old; }
+      if (old && old.students && old.exam && old.key && (old.students.length || old.scheme) && confirm(`להמשיך את הבדיקה של "${old.name || 'המבחן'}"${old.students.length ? ` (${old.students.length} תלמידים)` : ''}?\n\nביטול = להתחיל בדיקה חדשה`)) {
+        // 6.8: the photos are not kept: a page that was not read before the app closed is gone (it was shown as
+        // "read" and then failed the whole reading)
+        for (const k of ['exam', 'key']) old[k].pages = (old[k].pages || []).filter(p => p && p.read);
+        for (const st of old.students) st.pages = [];
+        if (!old.scheme && old.step !== 'setup') old.step = 'setup';
+        this.s = old; }
       else this.s = this.fresh(); }
     if (!grDlg.open) { try { grDlg.showModal(); } catch (_) { grDlg.setAttribute('open', ''); } }
     this.draw();
@@ -2074,9 +2115,9 @@ const GR = {
       this.wait('מכין את טבלת הנקודות מהמבחן ומהמחוון…');
       const ex = this.textOf('exam'), key = this.textOf('key');
       if (!ex.replace(/\s/g, '')) throw new Error('לא הצלחתי לקרוא את המבחן. נסו לצלם שוב באור טוב, או להדביק את השאלות');
-      const a = await ai({ mode: 'ask', text: `===== המבחן =====\n${ex}\n\n===== המחוון / הפתרון =====\n${key || '(אין מחוון: לבדוק לפי מה שנכון)'}`, question: GR_SCHEME(s.total), history: [] });
-      const j = jsonOf(a); if (!j || !Array.isArray(j.questions) || !j.questions.length) throw new Error('לא הצלחתי לבנות את טבלת הנקודות. נסו שוב');
-      s.scheme = j.questions.map(q => ({ q: String(q.q ?? '').slice(0, 12), max: Math.max(0, +q.max || 0), topic: String(q.topic || '').slice(0, 200), expect: String(q.expect || '').slice(0, 600) }));
+      const j = await aiCheckJson(`===== המבחן =====\n${ex}\n\n===== המחוון / הפתרון =====\n${key || '(אין מחוון: לבדוק לפי מה שנכון)'}`, GR_SCHEME(s.total), x => Array.isArray(x.questions) && x.questions.length);
+      if (!j) throw new Error('לא הצלחתי לבנות את טבלת הנקודות. נסו שוב');
+      s.scheme = j.questions.map(q => ({ q: String(q.q ?? '').slice(0, 12), max: Math.max(0, numOf(q.max)), topic: String(q.topic || '').slice(0, 200), expect: String(q.expect || '').slice(0, 600) }));
       if (!s.name && j.title) s.name = String(j.title).slice(0, 80);
       s.step = 'scheme'; this.keep(); this.draw();
     } catch (e) { this.setup(); this.note(e.message || String(e)); }
@@ -2097,7 +2138,23 @@ const GR = {
     upd();
     f.innerHTML = '<span class="hint" style="margin-inline-end:auto"></span><button class="btn" type="button" data-a="back">חזרה למבחן</button><button class="btn primary" type="button" data-a="go">התחלת בדיקת התלמידים</button>';
     f.querySelector('[data-a=back]').onclick = () => { s.step = 'setup'; this.draw(); };
-    f.querySelector('[data-a=go]').onclick = () => { if (!s.scheme.length) { this.note('אין שאלות בטבלה'); return; } s.step = 'students'; this.keep(); this.draw(); };
+    f.querySelector('[data-a=go]').onclick = () => { if (!s.scheme.length) { this.note('אין שאלות בטבלה'); return; }
+      // 6.8: the table was changed after students were checked. Their rows are fitted to the new table (before:
+      // the grades file showed points under the wrong question, or did not open at all), and they can be checked again
+      const sg = this.sig(), stale = s.students.filter(x => x.status === 'done' && x.sig && x.sig !== sg);
+      for (const x of s.students) if (x.res) this.align(x);
+      if (stale.length && confirm(`טבלת הנקודות השתנתה. לבדוק שוב את ${stale.length === 1 ? 'התלמיד שכבר נבדק' : stale.length + ' התלמידים שכבר נבדקו'} לפי הטבלה החדשה?\n\nביטול = להשאיר את הנקודות כמו שהן`)) {
+        for (const x of stale) { x.status = 'wait'; x.err = ''; if (!this.queue.includes(x)) this.queue.push(x); } this.pump(); }
+      else for (const x of stale) x.sig = sg;
+      s.step = 'students'; this.keep(); this.draw(); };
+  },
+  sig() { return this.s.scheme.map(q => `${q.q}|${q.max}|${q.expect || q.topic}`).join('\n'); },
+  // a checked student's rows, fitted to the table as it is now
+  align(st) {
+    const by = new Map(st.res.questions.map(q => [qKey(q.q), q]));
+    st.res.questions = this.s.scheme.map((q, k) => { const o = by.get(qKey(q.q)) || (st.res.questions.length === this.s.scheme.length ? st.res.questions[k] : null), max = +q.max || 0;
+      return o ? { ...o, q: q.q, max, got: Math.max(0, Math.min(max, +o.got || 0)) } : { q: q.q, max, got: 0, plus: '', minus: 'לא נבדקה' }; });
+    this.total(st);
   },
   studentsView() {
     const s = this.s, b = this.body(), f = this.foot(), d = this.draft;
@@ -2107,25 +2164,44 @@ const GR = {
         <label class="gr-name">שם התלמיד או התלמידה <input type="text" data-o="sname" placeholder="למשל: דנה לוי" dir="auto"></label>
         <p class="gr-help">מצלמים את כל דפי התשובות של התלמיד, דף אחרי דף. אחר כך לוחצים "לבדוק ולעבור לתלמיד הבא": הבדיקה רצה ברקע, ואפשר לצלם מיד את התלמיד הבא.</p>
         ${this.tray(d.pages, 'draft')}</div>
-      <div class="gr-list"><h3>התלמידים שנבדקו${n ? ` (${done} מתוך ${n} מוכנים)` : ''}</h3>${n ? '' : '<p class="gr-help">עוד אין. התלמיד הראשון יופיע כאן.</p>'}<ol>${s.students.map((st, i) => this.rowHtml(st, i)).join('')}</ol></div>`;
+      <div class="gr-list">${this.listHtml()}</div>`;
     const nm = b.querySelector('[data-o=sname]'); nm.value = d.name; nm.oninput = () => { d.name = nm.value; };
-    this.wire(b);
-    b.querySelectorAll('[data-again]').forEach(x => x.onclick = () => { const st = s.students[+x.dataset.again]; if (!st.pages.length && !st.text) { toast('הצילומים של התלמיד הזה כבר לא שמורים. מצלמים אותו שוב כתלמיד חדש'); return; } st.status = 'wait'; st.err = ''; this.queue.push(st); this.pump(); this.draw(); });
-    b.querySelectorAll('[data-open]').forEach(x => x.onclick = () => { const li = x.closest('li'); li.classList.toggle('open'); });
-    b.querySelectorAll('[data-pts]').forEach(inp => inp.onchange = () => { const [i, k] = inp.dataset.pts.split(':').map(Number); const q = s.students[i].res.questions[k]; q.got = Math.max(0, Math.min(+q.max || 0, +inp.value || 0)); this.total(s.students[i]); this.keep(); this.draw(); });
-    b.querySelectorAll('[data-rm]').forEach(x => x.onclick = () => { const i = +x.dataset.rm; if (!confirm(`להסיר את "${s.students[i].name}" מהרשימה?`)) return; s.students.splice(i, 1); this.keep(); this.draw(); });
+    this.wire(b.querySelector('.gr-cur'));
+    this.wireList(b.querySelector('.gr-list'));
     f.innerHTML = `<span class="hint" style="margin-inline-end:auto"></span><button class="btn" type="button" data-a="scheme">טבלת הנקודות</button><button class="btn" type="button" data-a="next" ${d.pages.length ? '' : 'disabled'}>לבדוק ולעבור לתלמיד הבא</button><button class="btn primary" type="button" data-a="last" ${n || d.pages.length ? '' : 'disabled'}>זה היה האחרון: קובץ ציונים</button>`;
     f.querySelector('[data-a=scheme]').onclick = () => { s.step = 'scheme'; this.draw(); };
     f.querySelector('[data-a=next]').onclick = () => this.next();
     f.querySelector('[data-a=last]').onclick = () => { if (d.pages.length) this.next(); s.step = 'report'; this.keep(); this.draw(); };
-    this.note(this.working ? `בודק ברקע… ${this.queue.length ? `(${this.queue.length} ממתינים)` : ''}` : d.pages.length ? `${d.pages.length} עמודים לתלמיד הזה` : 'מצלמים את דפי התלמיד');
+    this.hintNow();
+  },
+  hintNow() { const d = this.draft; this.note(this.working ? `בודק ברקע… ${this.queue.length ? `(${this.queue.length} ממתינים)` : ''}` : d.pages.length ? `${d.pages.length} עמודים לתלמיד הזה` : 'מצלמים את דפי התלמיד'); },
+  listHtml() { const s = this.s, n = s.students.length, done = s.students.filter(x => x.status === 'done').length;
+    return `<h3>התלמידים שנבדקו${n ? ` (${done} מתוך ${n} מוכנים)` : ''}</h3>${n ? '' : '<p class="gr-help">עוד אין. התלמיד הראשון יופיע כאן.</p>'}<ol>${s.students.map((st, i) => this.rowHtml(st, i)).join('')}</ol>`; },
+  wireList(l) {
+    const s = this.s;
+    l.querySelectorAll('[data-again]').forEach(x => x.onclick = () => { const st = s.students[+x.dataset.again]; if (!st.pages.length && !st.text) { toast('הצילומים של התלמיד הזה כבר לא שמורים. מצלמים אותו שוב כתלמיד חדש'); return; } st.status = 'wait'; st.err = ''; if (!this.queue.includes(st)) this.queue.push(st); this.pump(); this.listDraw(true); });
+    l.querySelectorAll('[data-open]').forEach(x => x.onclick = () => { const li = x.closest('li'), st = s.students[+x.dataset.open]; const on = li.classList.toggle('open'); if (on) this.openRows.add(st); else this.openRows.delete(st); });
+    l.querySelectorAll('[data-pts]').forEach(inp => { inp.onchange = () => { const [i, k] = inp.dataset.pts.split(':').map(Number); const q = s.students[i].res.questions[k]; q.got = Math.max(0, Math.min(+q.max || 0, numOf(inp.value))); inp.value = q.got; this.total(s.students[i]); this.keep();
+        const g = inp.closest('li').querySelector('.gr-g'); if (g) g.textContent = fmtN(s.students[i].grade); };
+      inp.onblur = () => { if (this.later) setTimeout(() => this.listDraw(), 0); }; });
+    l.querySelectorAll('[data-rm]').forEach(x => x.onclick = () => { const i = +x.dataset.rm, st = s.students[i]; if (!confirm(`להסיר את "${st.name}" מהרשימה?`)) return; s.students.splice(i, 1); this.queue = this.queue.filter(q => q !== st); this.openRows.delete(st); st.gone = true; this.keep(); this.draw(); });
+  },
+  // 6.8: a student finishing in the background redraws only the list. Before, the whole window was drawn again:
+  // the name being typed for the next student lost the cursor (on a phone the keyboard closed), and an open
+  // student's details closed in the middle of fixing points
+  listDraw(force) {
+    const l = grDlg.open && this.s.step === 'students' ? this.body().querySelector('.gr-list') : null; if (!l) return;
+    this.hintNow();
+    if (!force && l.contains(document.activeElement) && document.activeElement.matches('input')) { this.later = true; return; }
+    this.later = false; l.innerHTML = this.listHtml(); this.wireList(l); this.hintNow();
+    const last = this.foot().querySelector('[data-a=last]'); if (last) last.disabled = !(this.s.students.length || this.draft.pages.length);
   },
   rowHtml(st, i) {
     const r = st.res, stt = { wait: 'ממתין בתור', read: 'קורא את הדפים…', check: 'בודק…', done: '', err: 'הבדיקה נכשלה', lost: 'לא הסתיים (האפליקציה נסגרה)' }[st.status] || '';
     const g = st.status === 'done' ? `<b class="gr-g">${fmtN(st.grade)}</b>` : `<span class="gr-st${st.status === 'err' || st.status === 'lost' ? ' bad' : ''}">${stt}</span>`;
     const det = r ? `<div class="gr-det">${r.summary ? `<p>${esc(r.summary)}</p>` : ''}${r.unclear ? `<p class="gr-unc">לא היה ברור לקריאה: ${esc(r.unclear)}</p>` : ''}
-      <table><thead><tr><th>שאלה</th><th>נקודות</th><th>מה היה נכון</th><th>למה ירדו נקודות</th></tr></thead><tbody>${r.questions.map((q, k) => `<tr><td>${esc(q.q)}</td><td dir="ltr"><input type="number" min="0" max="${q.max}" step="0.5" value="${q.got}" data-pts="${i}:${k}" aria-label="נקודות בשאלה ${esc(q.q)}"> / ${q.max}</td><td>${esc(q.plus || '')}</td><td>${esc(q.minus || '')}</td></tr>`).join('')}</tbody></table></div>` : '';
-    return `<li class="${st.status}"><div class="gr-li"><button type="button" class="gr-nm" data-open="${i}" ${r ? '' : 'disabled'}>${esc(st.name || 'תלמיד ' + (i + 1))}</button>${g}${st.status === 'err' || st.status === 'lost' ? `<button type="button" class="btn" data-again="${i}">לנסות שוב</button>` : ''}<button type="button" class="gr-del" data-rm="${i}" aria-label="הסרה">×</button></div>${st.err ? `<p class="gr-unc">${esc(st.err)}</p>` : ''}${det}</li>`;
+      <table><thead><tr><th>שאלה</th><th>נקודות</th><th>מה היה נכון</th><th>למה ירדו נקודות</th></tr></thead><tbody>${r.questions.map((q, k) => `<tr><td>${esc(q.q)}</td><td dir="ltr"><input type="number" min="0" max="${q.max}" step="0.5" value="${q.got}" data-pts="${i}:${k}" aria-label="נקודות בשאלה ${esc(q.q)}"> / ${q.max}</td><td>${esc(q.plus || '')}</td><td>${esc(q.minus || '')}</td></tr>`).join('')}</tbody></table>${st.status === 'done' && st.text ? `<p style="margin:8px 0 0"><button type="button" class="btn" data-again="${i}">לבדוק שוב את התלמיד הזה</button></p>` : ''}</div>` : '';
+    return `<li class="${st.status}${r && this.openRows.has(st) ? ' open' : ''}"><div class="gr-li"><button type="button" class="gr-nm" data-open="${i}" ${r ? '' : 'disabled'}>${esc(st.name || 'תלמיד ' + (i + 1))}</button>${g}${st.status === 'err' || st.status === 'lost' ? `<button type="button" class="btn" data-again="${i}">לנסות שוב</button>` : ''}<button type="button" class="gr-del" data-rm="${i}" aria-label="הסרה">×</button></div>${st.err ? `<p class="gr-unc">${esc(st.err)}</p>` : ''}${det}</li>`;
   },
   total(st) { const qs = st.res.questions; const got = qs.reduce((t, q) => t + (+q.got || 0), 0), max = qs.reduce((t, q) => t + (+q.max || 0), 0) || 1;
     st.points = got; st.max = max; st.grade = Math.round(got / max * this.s.total * 10) / 10; },
@@ -2143,29 +2219,39 @@ const GR = {
     let wake = null; try { if (navigator.wakeLock) wake = await navigator.wakeLock.request('screen'); } catch (_) {}
     try {
       while (this.queue.length) {
-        const st = this.queue.shift(), s = this.s, redraw = () => { if (grDlg.open && s.step === 'students') this.draw(); };
+        const st = this.queue.shift(), s = this.s, redraw = () => { if (!grDlg.open || this.s !== s) return; if (s.step === 'students') this.listDraw(); else if (s.step === 'report') this.draw(); };
+        if (st.gone || !s.students.includes(st)) continue;   // removed from the list, or a new check was started
         try {
-          st.status = 'read'; redraw();
-          await this.readPages(st.pages);
-          st.text = st.pages.map((p, i) => `===== עמוד ${i + 1} =====\n${p.text || ''}`).join('\n\n');
-          if (!st.pages.some(p => (p.text || '').replace(/\s/g, '').length > 3)) throw new Error('לא הצלחתי לקרוא את הדפים. נסו לצלם שוב, ישר ובאור טוב');
+          // 6.8: a check that is tried again after the app was closed has its text but no photos: it is
+          // checked from the text (before: the text was wiped and the check failed with "could not read")
+          if (st.pages.length) {
+            st.status = 'read'; redraw();
+            await this.readPages(st.pages);
+            st.text = st.pages.map((p, i) => `===== עמוד ${i + 1} =====\n${p.text || ''}`).join('\n\n');
+            if (!st.pages.some(p => (p.text || '').replace(/\s/g, '').length > 3)) throw new Error('לא הצלחתי לקרוא את הדפים. נסו לצלם שוב, ישר ובאור טוב');
+          } else if (!st.text) throw new Error('הצילומים של התלמיד הזה כבר לא שמורים. מצלמים אותו שוב כתלמיד חדש');
           st.status = 'check'; redraw();
-          const table = s.scheme.map(q => `${q.q} | ${q.max} נקודות | ${q.expect || q.topic}`).join('\n');
-          const a = await ai({ mode: 'ask', text: `===== המבחן =====\n${this.textOf('exam')}\n\n===== המחוון / הפתרון =====\n${this.textOf('key') || '(אין מחוון)'}\n\n===== טבלת הנקודות (שאלה | ניקוד מרבי | מה נדרש) =====\n${table}\n\n===== התשובות של ${st.name} =====\n${st.text}`, question: GR_GRADE + `\nThe writer is ${s.level}.`, history: [] });
-          const j = jsonOf(a); if (!j || !Array.isArray(j.questions)) throw new Error('התשובה מהשירות לא הייתה תקינה');
+          const scheme = s.scheme.map(q => ({ ...q })), sig = this.sig();
+          const table = scheme.map(q => `${q.q} | ${q.max} נקודות | ${q.expect || q.topic}`).join('\n');
+          // the student's name stays on the device: the check does not need it
+          const j = await aiCheckJson(`===== המבחן =====\n${this.textOf('exam')}\n\n===== המחוון / הפתרון =====\n${this.textOf('key') || '(אין מחוון)'}\n\n===== טבלת הנקודות (שאלה | ניקוד מרבי | מה נדרש) =====\n${table}\n\n===== התשובות של התלמיד =====\n${st.text}`, GR_GRADE + `\nThe writer is ${s.level}.`, x => Array.isArray(x.questions) && x.questions.length);
+          if (!j) throw new Error('התשובה מהשירות לא הייתה תקינה. לוחצים "לנסות שוב"');
           // every row of the table, in its order, even if the answer skipped one
-          const by = new Map(j.questions.map(q => [String(q.q).trim(), q]));
-          st.res = { summary: String(j.summary || ''), unclear: String(j.unclear || ''), questions: s.scheme.map((q, k) => { const g = by.get(String(q.q).trim()) || j.questions[k] || {}; return { q: q.q, max: +q.max || 0, got: Math.max(0, Math.min(+q.max || 0, +g.got || 0)), plus: String(g.plus || ''), minus: String(g.minus || (g.got == null ? 'לא נבדקה' : '')) }; }) };
-          this.total(st); st.status = 'done'; st.pages = st.pages.map(p => ({ text: p.text, read: true }));
-        } catch (e) { st.status = 'err'; st.err = e.message || String(e); if (/מכסה|אין חיבור|חוסם|לא הוקם/.test(st.err)) { for (const x of this.queue) { x.status = 'err'; x.err = st.err; } this.queue = []; } }
+          const by = new Map(j.questions.map(q => [qKey(q.q), q])), same = j.questions.length === scheme.length;
+          st.res = { summary: String(j.summary || ''), unclear: String(j.unclear || ''), questions: scheme.map((q, k) => { const g = by.get(qKey(q.q)) || (same ? j.questions[k] : null) || {}, max = +q.max || 0; return { q: q.q, max, got: Math.max(0, Math.min(max, numOf(g.got))), plus: String(g.plus || ''), minus: String(g.minus || (g.got == null ? 'לא נבדקה' : '')) }; }) };
+          const miss = st.res.questions.filter(q => q.minus === 'לא נבדקה').map(q => q.q);
+          if (miss.length) st.res.unclear = [st.res.unclear, `הבדיקה דילגה על ${miss.length === 1 ? 'שאלה' : 'השאלות'} ${miss.join(', ')}: כדאי לבדוק ${miss.length === 1 ? 'אותה' : 'אותן'} ביד, או ללחוץ "לבדוק שוב את התלמיד הזה"`].filter(Boolean).join(' · ');
+          st.sig = sig; this.total(st); st.status = 'done'; st.err = ''; st.pages = st.pages.map(p => ({ text: p.text, read: true }));
+        } catch (e) { st.status = 'err'; st.err = e.message || String(e); if (/מכסה|אין חיבור|חוסם|לא הוקם|להירשם/.test(st.err)) { for (const x of this.queue) { x.status = 'err'; x.err = st.err; } this.queue = []; } }
         this.keep(); redraw();
       }
-    } finally { this.working = false; try { if (wake) await wake.release(); } catch (_) {} if (grDlg.open && this.s.step === 'students') this.draw(); if (grDlg.open && this.s.step === 'report') this.draw(); }
+    } finally { this.working = false; try { if (wake) await wake.release(); } catch (_) {} if (grDlg.open && this.s.step === 'students') { this.later = false; this.listDraw(); } if (grDlg.open && this.s.step === 'report') this.draw(); }
   },
   stats() {
     const s = this.s, ok = s.students.filter(x => x.status === 'done');
+    for (const x of ok) if (x.res.questions.length !== s.scheme.length) this.align(x);   // the columns are the table's rows
     const avg = ok.length ? ok.reduce((t, x) => t + x.grade, 0) / ok.length : 0;
-    const perQ = s.scheme.map((q, k) => { const v = ok.map(x => +x.res.questions[k].got || 0); return { q: q.q, max: +q.max || 0, avg: v.length ? v.reduce((a, b) => a + b, 0) / v.length : 0 }; });
+    const perQ = s.scheme.map((q, k) => { const v = ok.map(x => +(x.res.questions[k] || {}).got || 0); return { q: q.q, max: +q.max || 0, avg: v.length ? v.reduce((a, b) => a + b, 0) / v.length : 0 }; });
     return { ok, avg, hi: ok.length ? Math.max(...ok.map(x => x.grade)) : 0, lo: ok.length ? Math.min(...ok.map(x => x.grade)) : 0, perQ };
   },
   report() {

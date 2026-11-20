@@ -1450,6 +1450,7 @@ function markDirty() {
   X.root.dispatchEvent(new Event('input', { bubbles: true }));   // the app's tab shows the unsaved-changes dot
 }
 function pushHist() {
+  if (X.cleanHi > X.hi) X.cleanHi = -1;   // 6.8: the saved state was undone and written over: nothing in the history is "saved" any more (the file showed as saved and closed without asking)
   X.hist = X.hist.slice(0, X.hi + 1); X.hist.push({ files: new Map(X.files), order: [...X.order], cur: X.cur }); X.hi++;
   if (X.hist.length > 80) { X.hist.shift(); X.hi--; X.cleanHi--; }
 }

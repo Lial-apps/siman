@@ -44,7 +44,7 @@ function rels(files,part){const s=txt(files,relsPathOf(part));if(!s)return[];ret
 function addRel(files,part,type,target){
   const rp=relsPathOf(part);let s=txt(files,rp)||(XML_HEAD+`<Relationships xmlns="${NS.rel}"></Relationships>`);
   const used=new Set([...s.matchAll(/Id="([^"]+)"/g)].map(m=>m[1]));let n=1,id;do id='rIdSm'+(n++);while(used.has(id));
-  s=s.replace('</Relationships>',`<Relationship Id="${id}" Type="${type}" Target="${esc(target)}"/></Relationships>`);put(files,rp,s);return id;
+  s=s.replace('</Relationships>',()=>`<Relationship Id="${id}" Type="${type}" Target="${esc(target)}"/></Relationships>`);put(files,rp,s);return id;
 }
 function ctOverride(files,part,mime){let s=txt(files,'[Content_Types].xml');if(!s||s.includes(`PartName="/${part}"`))return;s=s.replace('</Types>',`<Override PartName="/${part}" ContentType="${mime}"/></Types>`);put(files,'[Content_Types].xml',s);}
 function ctRemove(files,part){let s=txt(files,'[Content_Types].xml');if(!s)return;s=s.replace(new RegExp(`<Override PartName="/${part.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}"[^>]*/>`),'');put(files,'[Content_Types].xml',s);}
@@ -312,7 +312,8 @@ function parseFormula(src){
     if(t.t==='num'||t.t==='str'||t.t==='bool')return{lit:t.v};
     if(t.t==='err')return{lit:ERR(t.v)};
     if(t.t==='ref')return{ref:t};
-    if(t.t==='name')return{lit:ERR('#NAME?')};
+    // 6.8: a named range is not worked out here: the value Excel saved stays (before: #NAME? was shown and written into the file on save)
+    if(t.t==='name')throw new NoFn(t.v);
     if(t.t==='fn'){const args=[];if(peek()&&peek().t===')'){next();return{fn:t.v,args};}
       for(;;){if(peek()&&(peek().t===','||peek().t===')'))args.push({lit:null});else args.push(cmp());const n=next();if(!n)throw new Error('paren');if(n.t===')')break;if(n.t!==',')throw new Error('sep');}
       return{fn:t.v,args};}
@@ -864,7 +865,8 @@ const BSTY={thin:'1px solid',medium:'2px solid',thick:'3px solid',dashed:'1px da
 function cssOf(s){
   const st=X.st.st;const c=st.css||(st.css=new Map());if(c.has(s))return c.get(s);
   const d=descOf(st,s),f=d.font;let td='';
-  td+=`font-family:'${f.name.replace(/'/g,'')}',Arial,sans-serif;font-size:${f.sz}pt;`;if(f.b)td+='font-weight:700;';if(f.i)td+='font-style:italic;';
+  // 6.8: only letters, digits, spaces and hyphens of the font name go into the page (a crafted workbook could put HTML there)
+  td+=`font-family:'${String(f.name).replace(/[^\w \-֐-׿]/g,'')}',Arial,sans-serif;font-size:${f.sz}pt;`;if(f.b)td+='font-weight:700;';if(f.i)td+='font-style:italic;';
   const dec=[f.u&&'underline',f.strike&&'line-through'].filter(Boolean);if(dec.length)td+=`text-decoration:${dec.join(' ')}${f.u==='double'?' double':''};`;
   if(f.color&&f.color!=='000000')td+=`color:#${f.color};`;if(d.bg)td+=`background:#${d.bg};`;
   // Excel draws "left" and "right" borders mirrored in a right-to-left sheet
@@ -2323,7 +2325,7 @@ async function buildXlsx(){
   if(newStrs.length){
     let s=sst.doc?ser(sst.doc):XML_HEAD+`<sst xmlns="${S}" count="0" uniqueCount="0"></sst>`;
     const add=newStrs.map(t=>`<si><t xml:space="preserve">${esc(t).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,'')}</t></si>`).join('');
-    s=/<sst\b[^>]*\/>\s*$/.test(s)?s.replace(/<sst\b([^>]*)\/>\s*$/,`<sst$1>${add}</sst>`):s.replace(/<\/sst>\s*$/,add+'</sst>');
+    s=/<sst\b[^>]*\/>\s*$/.test(s)?s.replace(/<sst\b([^>]*)\/>\s*$/,(m,a)=>`<sst${a}>${add}</sst>`):s.replace(/<\/sst>\s*$/,()=>add+'</sst>');   // 6.8: as a function: typed text with "$&" or "$1" was read as a replacement pattern and broke the file
     const n=sst.list.length+newStrs.length;s=s.replace(/uniqueCount="\d+"/,`uniqueCount="${n}"`);if(!/uniqueCount=/.test(s))s=s.replace(/<sst\b/,`<sst uniqueCount="${n}"`);
     put(files,sst.path,s);
     if(!sst.hadPart){ctOverride(files,sst.path,OX+'spreadsheetml.sharedStrings+xml');if(!rels(files,st.wbPart).some(r=>r.type===RT_SST))addRel(files,st.wbPart,RT_SST,sst.path.replace(/^xl\//,''));}

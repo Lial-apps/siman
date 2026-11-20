@@ -15,7 +15,9 @@
   const VIDEO_EXT = /^(mp4|m4v|mov|webm|ogv|avi|wmv|flv|mkv|3gp|mpg|mpeg|swf|f4v)$/i;
   const PLAYABLE = /^(mp4|m4v|mov|webm|ogv|mp3|wav|m4a|aac|oga|ogg|opus|flac)$/i;
   const MIME = { mp4: 'video/mp4', m4v: 'video/mp4', mov: 'video/quicktime', webm: 'video/webm', ogv: 'video/ogg', mp3: 'audio/mpeg', wav: 'audio/wav', m4a: 'audio/mp4', aac: 'audio/aac', ogg: 'audio/ogg', oga: 'audio/ogg', opus: 'audio/ogg', flac: 'audio/flac', pdf: 'application/pdf' };
-  const BLOCKED = /^(javascript|data|vbscript|file|blob|about):/i;
+  // 6.8: a browser drops spaces, tabs and line breaks from an address before it reads the scheme, so " javascript:"
+  // and "java\tscript:" inside a PDF button got past a plain test and could run a script in the app
+  const BLOCKED = { test: u => /^(javascript|data|vbscript|file|blob|about):/i.test([...String(u || '')].filter(c => { const n = c.charCodeAt(0); return n > 32 && !(n >= 127 && n <= 160) && !(n >= 8203 && n <= 8207) && n !== 8232 && n !== 8233 && n !== 65279; }).join('')) };
 
   const $$ = id => document.getElementById(id);
   const say = m => { try { toast(m); } catch (_) { } };

@@ -83,7 +83,7 @@ const DB = (() => {
     r.onupgradeneeded = () => { const d = r.result; d.createObjectStore('items', { keyPath: 'id' }); d.createObjectStore('audio'); };
     r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
   }));
-  const tx = async (store, mode, fn) => { const d = await open(); return new Promise((res, rej) => { const t = d.transaction(store, mode); const s = t.objectStore(store); const q = fn(s); t.oncomplete = () => res(q && q.result); t.onerror = () => rej(t.error); }); };
+  const tx = async (store, mode, fn) => { const d = await open(); return new Promise((res, rej) => { const t = d.transaction(store, mode); const s = t.objectStore(store); const q = fn(s); t.oncomplete = () => res(q && q.result); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error || new Error('אין מספיק מקום פנוי במכשיר')); }); };
   return {
     put: it => tx('items', 'readwrite', s => s.put(it)),
     get: id => tx('items', 'readonly', s => s.get(id)),
@@ -104,10 +104,13 @@ async function call(op, body, tries = 2) {
       const r = await fetch(VOICE_URL + '?op=' + op, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
       const t = (await r.text()).trim();
       let d; try { d = JSON.parse(t); } catch (_) { throw Object.assign(new Error('תשובה לא תקינה מהשרת'), { status: r.status }); }
-      if (!r.ok || d.error) throw Object.assign(new Error((d.error && d.error.message) || 'שגיאת שרת'), { status: (d.error && d.error.status) || r.status });
+      if (!r.ok || d.error) throw Object.assign(new Error((d.error && d.error.message) || 'שגיאת שרת'), { status: (d.error && d.error.status) || r.status, cloud: true, code: (d.error && d.error.code) || '' });
       return d;
     } catch (e) {
       last = e;
+      if (e && !e.status && !e.cloud && e.name === 'TypeError') { e.cloud = true; e.net = true; }
+      // 6.8: the daily share is over, or the pass was refused: trying again does not help, and the server's own words are shown
+      if (e && /^(DAY|ALL|PASS|PASSDAY)$/.test(e.code || '')) break;
       if (k + 1 < tries && (!e.status || [429, 500, 502, 503, 504].includes(e.status))) { await sleep(e.status === 429 ? 6000 : 2500); continue; }
     }
   }
@@ -124,7 +127,14 @@ function cloudOk(what) {
 const friendly = e => {
   const m = String(e && e.message || e);
   if (e && e.name === 'AbortError') return 'התמלול בוטל';
-  if (e && e.status === 429 || /quota|exhausted|rate/i.test(m)) return 'השרת עמוס כרגע. נסו שוב בעוד כמה דקות';
+  // 6.8: an answer of the smart server (summary, questions, translation) is not "the transcription failed"
+  if (e && e.cloud) {
+    if (e.net) return navigator.onLine === false ? 'אין חיבור לאינטרנט' : 'לא הצלחתי להגיע לשירות החכם. בדקו את החיבור ונסו שוב';
+    if (/^(DAY|ALL|PASS|PASSDAY)$/.test(e.code || '') && /[֐-׿]/.test(m)) return m;
+    if (e.status === 429 || /quota|exhausted|rate.?limit/i.test(m)) return 'השירות החכם עמוס כרגע. נסו שוב בעוד כמה דקות';
+    return /[֐-׿]/.test(m) ? m : 'השירות החכם לא הצליח: ' + m;
+  }
+  if (e && e.status === 429 || /quota|exhausted|rate.?limit/i.test(m)) return 'השרת עמוס כרגע. נסו שוב בעוד כמה דקות';
   if (/could not decode|decode/i.test(m)) return 'לא הצלחתי לקרוא את השמע בקובץ. נסו קובץ MP3, M4A או WAV';
   if (/memory|allocation|Array buffer/i.test(m)) return 'אין למכשיר מספיק זיכרון להקלטה הזו. נסו במחשב, או קובץ קצר יותר';
   if (e && e.space) return e.message;
@@ -440,7 +450,7 @@ let V = null;              // the open transcript
 let audioEl = null, audioUrl = '';
 let saveT = 0;
 const prefs = Object.assign({ kind: 'lesson', lang: 'he', spk: 'auto', quality: 'fast' }, rd(PREF_KEY, {}));
-const save = (now) => { if (!V) return; clearTimeout(saveT); const go = () => { V.updated = Date.now(); DB.put(stripForDb(V)).catch(e => console.error(e)); }; if (now) go(); else saveT = setTimeout(go, 700); };
+const save = (now) => { if (!V) return; clearTimeout(saveT); const v = V; const go = () => { if (V && V !== v && V.id === v.id) return; v.updated = Date.now(); DB.put(stripForDb(v)).catch(e => console.error(e)); }; if (now) go(); else saveT = setTimeout(go, 700); };
 const stripForDb = v => { const o = Object.assign({}, v); delete o.blob; return o; };
 
 /* ---------------- styles ---------------- */
@@ -1189,12 +1199,12 @@ function dropFillers() {
   if (!n) { say('לא נמצאו מילות מילוי (אממ, אהה…)'); return; }
   if (!confirm(`נמצאו ${n} מילות מילוי (אממ, אהה וכדומה). להסיר אותן מהתמליל?`)) return;
   V.undoSegs = JSON.stringify(V.segments);
-  V.segments = V.segments.map(s => { const t = s.text.replace(FILLER, '$1').replace(/\s{2,}/g, ' ').replace(/^\s*[,.]\s*/, '').trim(); if (t === s.text) return s; const c = { ...s, text: t }; delete c.words; return c; }).filter(s => s.text);
+  V.segments = V.segments.map(s => { const t = s.text.replace(FILLER, '$1').replace(/\s{2,}/g, ' ').replace(/^\s*[,.]\s*/, '').trim(); if (t === s.text) return s; const c = { ...s, text: t }; delete c.words; return c; }).filter(s => s.text); if (V.undoSegs && JSON.parse(V.undoSegs).length !== V.segments.length) V.tr = {};   // 6.8: lines were removed: the translations no longer fit them
   save(); renderLines(); drawLine(); say(`הוסרו ${n} מילות מילוי. אפשר לבטל בתפריט "כלים"`);
 }
 function undoTools() {
   if (!V.undoSegs) return;
-  V.segments = JSON.parse(V.undoSegs); delete V.undoSegs; save(); renderLines(); drawLine(); renderSpeakers(); say('השינוי האחרון בוטל');
+  { const back = JSON.parse(V.undoSegs); if (back.length !== V.segments.length) V.tr = {}; V.segments = back; } delete V.undoSegs; save(); renderLines(); drawLine(); renderSpeakers(); say('השינוי האחרון בוטל');
 }
 // 6.0: find & replace in the whole transcript, and remembering the fix for the next transcripts
 function replaceMenu(anchor) {
@@ -1436,7 +1446,7 @@ function wireLines() {
     const tx = e.target.closest('.vx-tx'); if (!tx || FIND.q) return; const i = +tx.closest('.vx-ln').dataset.i;
     const t = tx.innerText.replace(/\s+/g, ' ').trim();
     if (t !== V.segments[i].text) {
-      if (!t) { V.segments.splice(i, 1); renderLines(); }
+      if (!t) { V.segments.splice(i, 1); for (const k in V.tr) if (Array.isArray(V.tr[k])) V.tr[k].splice(i, 1); /* 6.8: the translations move with their lines */ renderLines(); }
       else { V.segments[i].text = t; delete V.segments[i].words; for (const k in V.tr) if (V.tr[k]) V.tr[k][i] = null; }
       save();
     }
@@ -1456,7 +1466,7 @@ function splitLine(i, tx) {
   const s = V.segments[i];
   let mid = null;
   if (s.start != null && s.end != null) mid = s.start + (s.end - s.start) * (a.length / (a.length + b.length));
-  V.segments.splice(i, 1, { spk: s.spk, start: s.start, end: mid, text: a }, { spk: s.spk, start: mid, end: s.end, text: b });
+  V.segments.splice(i, 1, { spk: s.spk, start: s.start, end: mid, text: a }, { spk: s.spk, start: mid, end: s.end, text: b }); for (const k in V.tr) if (Array.isArray(V.tr[k])) V.tr[k].splice(i, 1, null, null);   // 6.8: before, every translation below a split line sat under the wrong line
   save(); renderLines();
   const nx = root.querySelector(`.vx-ln[data-i="${i + 1}"] .vx-tx`); if (nx) nx.focus();
 }
@@ -1955,32 +1965,37 @@ function stopRec() {
   if (REC.mr.state !== 'inactive') REC.mr.stop(); else finishRec();
 }
 async function finishRec() {
-  clearInterval(REC.timer); clearInterval(REC.cutT); removeEventListener('beforeunload', recGuard);
+  // 6.8: the "do not close" guard stays until the recording is really saved (before: it was dropped at once, and closing the app while the last sentences were written lost the whole recording without a word)
+  clearInterval(REC.timer); clearInterval(REC.cutT); const unguard = () => removeEventListener('beforeunload', recGuard);
   try { REC.stream.getTracks().forEach(t => t.stop()); } catch (_) {}
   try { REC.node && (REC.node.onaudioprocess = null); REC.ac && REC.ac.close(); } catch (_) {} REC.an = null; REC.node = null;
   try { REC.lock && REC.lock.release(); } catch (_) {} REC.lock = null;
   const mime = (REC.mr && REC.mr.mimeType) || REC.mime || 'audio/webm';
   const chunks = REC.chunks; REC.chunks = []; REC.mr = null;
-  if (REC.cancel) { REC.cancel = false; REC.pend = []; REC.pendLen = 0; show('new'); return; }
-  if (!chunks.length) { say('לא הוקלט כלום'); show('new'); return; }
+  if (REC.cancel) { unguard(); REC.cancel = false; REC.pend = []; REC.pendLen = 0; show('new'); return; }
+  if (!chunks.length) { unguard(); say('לא הוקלט כלום'); show('new'); return; }
   const x = /mp4/.test(mime) ? 'm4a' : /ogg/.test(mime) ? 'ogg' : 'webm';
   const d = new Date(), name = `הקלטה ${d.toLocaleDateString('he-IL')} ${d.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}.${x}`.replace(/[\\/:]/g, '-');
   const f = new File(chunks, name, { type: mime.split(';')[0] });
   count('voice_record');
   // the engine never loaded (e.g. no internet the first time): the file is transcribed later, like any file
-  if (!REC.engineOk || REC.spk !== '1') { REC.abandon = true; REC.pend = []; REC.pendLen = 0; JOB.queue.push({ file: f, opts: { duration: REC.dur || null, kind: REC.kind, lang: REC.lang, spk: REC.spk, marks: REC.marks.slice() } }); if (!JOB.busy) run(); return; }
+  if (!REC.engineOk || REC.spk !== '1') { unguard(); REC.abandon = true; REC.pend = []; REC.pendLen = 0; JOB.queue.push({ file: f, opts: { duration: REC.dur || null, kind: REC.kind, lang: REC.lang, spk: REC.spk, marks: REC.marks.slice() } }); if (!JOB.busy) run(); return; }
+  // 6.8: if saving fails (no room on the device), the recording is handed to the person as a file instead of being lost behind a spinner
+  const rescue = e => { console.error(e); unguard(); try { const a = document.createElement('a'); a.href = URL.createObjectURL(f); a.download = name; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 60000); } catch (_) {} say('לא הצלחתי לשמור את ההקלטה באפליקציה (אולי אין מקום במכשיר). היא ירדה כקובץ: אפשר לתמלל אותו מ"קובץ"'); show('new'); };
+  try {
   liveCut(true);
   show('work');
   const w = root.querySelector('#vxWork');
   w.innerHTML = `<div class="vx-work"><h2>מסיים לתמלל</h2><div class="f">${esc(name)}</div><div class="vx-wait" style="justify-content:center"><i></i>כותב את המשפטים האחרונים…</div></div>`;
   await REC.chain;
-  if (!REC.segs.length && (REC.dur || 0) > 3) { JOB.queue.push({ file: f, opts: { duration: REC.dur || null, kind: REC.kind, lang: REC.lang, spk: REC.spk, marks: REC.marks.slice() } }); if (!JOB.busy) run(); return; }
+  if (!REC.segs.length && (REC.dur || 0) > 3) { unguard(); JOB.queue.push({ file: f, opts: { duration: REC.dur || null, kind: REC.kind, lang: REC.lang, spk: REC.spk, marks: REC.marks.slice() } }); if (!JOB.busy) run(); return; }
   const id = uid();
   const segs = normalize(REC.segs.sort((a, b) => a.start - b.start));
   const item = { id, title: name.replace(/\.[a-z0-9]+$/i, ''), fileName: name, created: Date.now(), updated: Date.now(), kind: REC.kind, lang: REC.lang, duration: REC.dur || null,
     segments: segs, speakers: speakersOf(segs, {}), analysis: null, tr: {}, chat: [], tasksDone: {}, status: segs.length ? 'ready' : 'failed', error: segs.length ? '' : 'לא נשמע דיבור בהקלטה', engine: 'local', marks: REC.marks.slice() };
   starMarks(item);
-  await DB.putAudio(id, f); await DB.put(item); refreshCount();
+  await DB.putAudio(id, f); await DB.put(item); unguard(); refreshCount();
+  } catch (e) { rescue(e); return; }
   await openItem(id);
 }
 
@@ -2104,7 +2119,10 @@ function itemRow(it, q, after, names) {
   b.querySelector('.fo').onclick = e => { e.stopPropagation(); folderMenu(e.currentTarget, it, names ? names() : foldersOf([]), after); };
   b.onclick = e => { if (e.target.closest('.x,.fo')) return; openItem(it.id); };
   b.onkeydown = e => { if (e.key === 'Enter') openItem(it.id); };
-  b.querySelector('.x').onclick = async () => { if (!confirm('למחוק את "' + (it.title || 'התמליל') + '" ואת השמע שלו מהמכשיר?')) return; await DB.del(it.id); b.remove(); refreshCount(); };
+  b.querySelector('.x').onclick = async () => { if (!confirm('למחוק את "' + (it.title || 'התמליל') + '" ואת השמע שלו מהמכשיר?')) return;
+    // 6.8: the deleted transcript may be the one still open behind the library: closing the window saved it again, and it came back
+    if (V && V.id === it.id) { clearTimeout(saveT); V = null; }
+    await DB.del(it.id); b.remove(); refreshCount(); };
   return b;
 }
 
@@ -2183,7 +2201,7 @@ function mdExport() {
   return L.join('\n');
 }
 function subs(kind) {
-  const ts = (s, sep) => { s = Math.max(0, s); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = Math.floor(s % 60), ms = Math.round((s % 1) * 1000); return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(x).padStart(2, '0')}${sep}${String(ms).padStart(3, '0')}`; };
+  const ts = (s, sep) => { const tot = Math.round(Math.max(0, s) * 1000); s = Math.floor(tot / 1000); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60, ms = tot % 1000; /* 6.8: 7.9996 s was written "07,1000" */ return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(x).padStart(2, '0')}${sep}${String(ms).padStart(3, '0')}`; };
   const cues = [];
   V.segments.forEach((s, i) => {
     if (s.start == null) return;

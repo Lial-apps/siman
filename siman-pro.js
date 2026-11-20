@@ -386,7 +386,9 @@ async function autoRedact() {
   hits = hits.filter((x, i) => !x.rects.every(r => covered({ x1: r.x1, x2: r.x2, y1: r.y1, y2: r.y2 })));
   if (!hits.length) {
     const any = S.pages.some(P => P.ocr) || (await Promise.all(S.pages.slice(0, 3).map(P => P.page.getTextContent().then(t => t.items.length)))).some(Boolean);
-    toast(any ? 'לא נמצאו מספרי זהות, טלפונים, מיילים או כרטיסי אשראי בקובץ' : 'לא נמצא טקסט בקובץ. אם הוא סרוק: "עמודים" ← "זיהוי טקסט (OCR)" קודם');
+    // 6.8: pages whose text came from OCR are not searched here: saying "nothing found" about them was not true
+    const scanned = S.pages.filter(P => P.ocr).length;
+    toast(scanned ? `${scanned === S.pages.length ? 'העמודים בקובץ הזה סרוקים' : scanned + ' עמודים בקובץ סרוקים'}, והחיפוש לא בודק עמודים סרוקים. עוברים עליהם בעין ומשחירים ביד` : any ? 'לא נמצאו מספרי זהות, טלפונים, מיילים או כרטיסי אשראי בקובץ' : 'לא נמצא טקסט בקובץ. אם הוא סרוק: "עמודים" ← "זיהוי טקסט (OCR)" קודם');
     return;
   }
   const by = {}; hits.forEach((x, i) => { (by[x.kind] = by[x.kind] || []).push(i); });

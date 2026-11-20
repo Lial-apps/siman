@@ -36,7 +36,7 @@ function cleanValues(v, allowed) {
   const out = {}; let size = 0;
   for (const [id, x] of Object.entries(v && typeof v === 'object' ? v : {})) {
     if (!allowed.has(id) || !x || typeof x !== 'object') continue;
-    if (typeof x.png === 'string' && /^data:image\/(png|jpeg);base64,/.test(x.png)) {
+    if (typeof x.png === 'string' && /^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(x.png)) {
       if (x.png.length > MAX_IMG) throw new Error('החתימה גדולה מדי. אפשר לחתום שוב, קצת יותר קטן.');
       out[id] = { png: x.png }; size += x.png.length;
     } else if (x.text != null) out[id] = { text: clip(x.text, 200) };

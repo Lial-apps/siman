@@ -197,7 +197,9 @@ function drawFields(){
     const val=s.status==='signed'&&s.values?s.values[f.id]:(me&&s.n===me.n?VALS[f.id]:null);
     if(me&&s.n===me.n&&active){el.classList.add('mine');el.tabIndex=0;el.setAttribute('role','button');el.dataset.id=f.id;if(val)el.classList.add('done');if(f.type==='check'){el.setAttribute('role','checkbox');el.setAttribute('aria-checked',!!val);el.title='תיבת סימון: הקשה מסמנת, הקשה נוספת מנקה';}}
     else if(!val){el.classList.add('other');el.textContent=f.type==='check'?'':s.status==='declined'?'סירב/ה':`${SS.TYPES[f.type].l}: ${s.name}`;if(f.type==='check')el.title=`${SS.TYPES.check.l}: ${s.name}`;}
-    if(val){if(val.png)el.innerHTML=`<img alt="" src="${val.png}">`;else el.innerHTML=`<span class="tx" dir="auto">${esc(val.text)}</span>`;}
+    // 6.8: the picture comes from another signer: it is set as a picture address, never written as HTML (a crafted
+    // "picture" could run a script on this page)
+    if(val){if(val.png){if(/^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(val.png)){const im=document.createElement('img');im.alt='';im.src=val.png;el.replaceChildren(im);}}else el.innerHTML=`<span class="tx" dir="auto">${esc(val.text)}</span>`;}
     else if(el.classList.contains('mine'))el.textContent=f.type==='check'?'':f.type==='sig'?'✍️ כאן חותמים':f.type==='initials'?'ראשי תיבות':f.type==='name'?'השם שלך':f.type==='text'&&f.label?f.label:SS.TYPES[f.type].l;
     pg.append(el);
   }
@@ -304,7 +306,7 @@ async function submitGroup(){
   b.disabled=true;b.textContent='שולח…';
   try{M=await SS.api(`/${ID}/sign?g=${encodeURIComponent(AUTH.g)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({agree:true,name:name.value.trim(),extra:ex?ex.value.trim():'',values:VALS,tz:Intl.DateTimeFormat().resolvedOptions().timeZone})});
     const me=M.signers[0];try{const l=gPrev();l.push({r:M.rid,name:name.value.trim()});localStorage.setItem(GKEY,JSON.stringify(l.slice(-20)));}catch(_){}
-    const pics=[...new Set(Object.values(me.values||{}).filter(v=>v.png).map(v=>v.png))];
+    const pics=[...new Set(Object.values(me.values||{}).filter(v=>v.png&&/^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(v.png)).map(v=>v.png))];
     $('main').querySelector('.card').innerHTML=`<div class="center"><div class="big">✅</div><h1 style="margin-top:8px">תודה ${esc(name.value.trim())}, המסמך נחתם</h1>
       ${pics.length?`<div class="mysig">${pics.map(p=>`<img alt="החתימה שלך" src="${p}">`).join('')}</div>`:''}
       <p>${M.from&&M.from.name?esc(M.from.name)+' יראה/תראה שחתמת.':'השולח יראה שחתמת.'} אפשר להוריד עותק חתום.</p>
@@ -316,7 +318,7 @@ async function submit(){
   if(M.mode==='open')return submitGroup();
   const b=$('finish');b.disabled=true;b.textContent='שולח…';
   try{M=await SS.api(`/${ID}/sign?t=${encodeURIComponent(AUTH.t)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({agree:true,values:VALS,tz:Intl.DateTimeFormat().resolvedOptions().timeZone})});
-    const me=M.signers[M.me];const pics=[...new Set(Object.values(me.values||{}).filter(v=>v.png).map(v=>v.png))];
+    const me=M.signers[M.me];const pics=[...new Set(Object.values(me.values||{}).filter(v=>v.png&&/^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(v.png)).map(v=>v.png))];
     $('main').querySelector('.card').innerHTML=`<div class="center"><div class="big">✅</div><h1 style="margin-top:8px">תודה ${esc(me.name)}, המסמך נחתם</h1>
       ${pics.length?`<div class="mysig">${pics.map(p=>`<img alt="החתימה שלך" src="${p}">`).join('')}</div>`:''}
       <p>${M.from&&M.from.name?esc(M.from.name)+' יראה/תראה שחתמת.':'השולח יראה שחתמת.'} החתימה מופיעה במסמך, ואפשר להוריד עותק חתום.</p>

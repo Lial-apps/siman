@@ -1353,7 +1353,7 @@ body:has(#wed) .busy,body:has(#xed) .busy,body:has(#ped) .busy{z-index:1000}body
 </dialog>
 
 <header class="bar">
-  <div class="brand"><b title="גרסה 6.7.2">סימן</b><span class="ver">6.7.2</span><span class="fname" id="fname"></span></div>
+  <div class="brand"><b title="גרסה 6.8.0">סימן</b><span class="ver">6.8.0</span><span class="fname" id="fname"></span></div>
 
   <nav class="tools" id="tools" aria-label="כלים">
     <button class="tool" data-tool="select" aria-pressed="true" title="בחירה וגלילה (V)">
@@ -2642,6 +2642,10 @@ async function buildPdf(){
     pg.pushOperators(PDFLib.pushGraphicsState(),PDFLib.setTextRenderingMode(PDFLib.TextRenderingMode.Invisible));
     for(const L of P.lines){
       if(S.anns.some(a=>a.type==='edit'&&a.page===P.i-1&&a.rects.some(r=>Math.abs(r[0]-L.x0)<.5&&Math.abs(r[1]-L.y0)<.5)))continue;
+      // 6.8: a line under a black box (or the eraser) is not written back as hidden text: before, the number
+      // under the box could still be found by search and copied out of the saved file
+      {const ly0=Math.min(L.y0,L.y1==null?L.base:L.y1),ly1=Math.max(L.y0,L.y1==null?L.base+L.size:L.y1);
+        if((rm[P.i-1]||[]).some(r=>L.x0<r[2]&&L.x1>r[0]&&ly0<r[3]&&ly1>r[1]))continue;}
       const tw=f.widthOfTextAtSize(L.text,L.size)||1,sz=Math.max(1,Math.min(L.size,L.size*(L.x1-L.x0)/tw));
       drawAligned(pg,L.text,{x0:L.x0,w:L.x1-L.x0,y:L.base,font:f,size:sz,color:PDFLib.rgb(0,0,0),dir:L.dir,align:L.dir==='R'?'right':'left'});
     }
@@ -3146,7 +3150,7 @@ async function callTranslate0(text,target){
 }
 // 5.9.6: a translation request that hangs (a weak phone connection) ends after 90 seconds, and "עצירה" ends it at once
 function fetchT(u,o={},ms=90000){
-  const c=new AbortController(),t=setTimeout(()=>c.abort(),ms),iv=setInterval(()=>{if(TR.stop)c.abort();},300);
+  const c=new AbortController(),t=setTimeout(()=>c.abort(),ms),iv=setInterval(()=>{if(TR.running&&TR.stop)c.abort();},300);   // 6.8: "stop" belongs to a translation that runs here; left on from an earlier file it cut every translation inside the Word, Excel and PowerPoint editors
   return fetch(u,{...o,signal:c.signal}).finally(()=>{clearTimeout(t);clearInterval(iv);});
 }
 async function callTranslateOnce(text,target,second){
@@ -3177,8 +3181,8 @@ async function callTranslateOnce(text,target,second){
         const info=((d.error&&d.error.details)||[]).find(x=>x.retryDelay);
         const wait=info?Math.min(60,parseFloat(info.retryDelay)||10):10*(attempt+1);
         status(`שירות התרגום עמוס, ממתין ${Math.round(wait)} שניות…`);
-        for(let w=wait*1000+500;w>0&&!TR.stop;w-=500)await sleep(500);
-        if(TR.stop)return{error:'STOPPED'};
+        for(let w=wait*1000+500;w>0&&!(TR.running&&TR.stop);w-=500)await sleep(500);
+        if(TR.running&&TR.stop)return{error:'STOPPED'};
         continue;
       }
       if(!r.ok){const msg=(d.error&&d.error.message)||('HTTP '+r.status);return{error:msg,status:/API key not valid|API_KEY_INVALID/i.test(msg)?401:r.status};}
@@ -3282,7 +3286,7 @@ async function runTranslate(){
   if(TR.running||!S.doc)return;
   const st=await getSettingsSafe();
   if(TR.target==='none'){await loadOwnText();return;}
-  if(!st.hasKey){openSettings(true);status('צריך להזין מפתח API לפני התרגום.',true);return;}
+  if(!st.hasKey){openTrSettings(true);status('צריך להזין מפתח API לפני התרגום.',true);return;}
   if(S.office&&S.office.kind==='docx'){await translateOfficeDocx();return;}
   if(S.office){status('תרגום קובצי Excel עוד לא נתמך. אפשר לשמור כ-PDF, לפתוח אותו ולתרגם.',true);return;}
   if($('tpMode').value==='inplace'){await translateInPlace();return;}
@@ -3314,7 +3318,7 @@ async function runTranslate(){
   try{await Promise.all(Array.from({length:st.provider==='claude'?3:1},worker));}
   catch(e){console.error(e);failed=failed||{error:String(e&&e.message||e)};}
   finally{TR.running=false;$('tpGo').disabled=false;$('tpStop').classList.add('hidden');}
-  if(failed){status(errText(failed),true);if(failed.error==='NO_KEY'||failed.status===401)openSettings(true);}
+  if(failed){status(errText(failed),true);if(failed.error==='NO_KEY'||failed.status===401)openTrSettings(true);}
   else if(TR.stop)status(`נעצר. תורגמו ${done} עמודים.`);
   else status(`התרגום הושלם (${done} עמודים).`);
   $('tpFoot').classList.toggle('hidden',!TR.pages.some(p=>p&&p.text));$('tpFmt').classList.toggle('hidden',!TR.pages.some(p=>p&&p.text));
@@ -3403,7 +3407,7 @@ async function translateOfficeDocx(){
     const R=await trLines(units.map(u=>u.text),target,{intro:'This is a Word document.',stop:()=>TR.stop,progress:f=>status(`מתרגם את המסמך… ${Math.round(f*100)}%`)});
     if(R.error&&!R.res)failed=R.error;else if(R.error)status(errText(R.error)+' — חלק מהמסמך תורגם.',true);
     if(R.res)units.forEach((u,k)=>{if(R.res[k])u.tr=R.res[k];});
-    if(failed){status(errText(failed),true);if(failed.error==='NO_KEY'||failed.status===401)openSettings(true);return;}
+    if(failed){status(errText(failed),true);if(failed.error==='NO_KEY'||failed.status===401)openTrSettings(true);return;}
     if(TR.stop){status('התרגום נעצר. הקובץ לא שונה.');return;}
     let n=0;
     for(const u of units){
@@ -3614,7 +3618,7 @@ function showProvider(pv){
   $('tpModel').innerHTML=P.models.map(([v,t])=>`<option value="${v}">${t}</option>`).join('');
   if(pv===ST.provider&&P.models.some(m=>m[0]===ST.model))$('tpModel').value=ST.model;
 }
-async function openSettings(show){
+async function openTrSettings(show){
   $('tpSettings').classList.toggle('hidden',!show);
   if(show){await getSettingsSafe();showProvider(ST.provider);setTimeout(()=>$('tpKey').focus(),0);}
 }
@@ -3626,9 +3630,9 @@ $('tpSaveKey').onclick=async()=>{
   if(!key&&!has){status('הדביקו מפתח API לפני השמירה.',true);return;}
   const patch={provider:uiProvider,model};if(key)patch.apiKey=key;
   ST=saveST(patch);
-  openSettings(false);status('ההגדרות נשמרו. אפשר לתרגם.');
+  openTrSettings(false);status('ההגדרות נשמרו. אפשר לתרגם.');
 };
-$('tpSettingsBtn').onclick=()=>openSettings($('tpSettings').classList.contains('hidden'));
+$('tpSettingsBtn').onclick=()=>openTrSettings($('tpSettings').classList.contains('hidden'));
 bindExt(document);
 $('trBtn').onclick=()=>{const p=$('tpanel');const show=p.classList.contains('hidden');p.classList.toggle('hidden',!show);
   if(show&&$('tpLang').textContent==='בודק…')detect();setTimeout(fitWidth,0);};
@@ -4037,6 +4041,9 @@ async function rebuild(order,extra){
   try{
     const{PDFDocument,degrees}=PDFLib;
     const docs=[await PDFDocument.load(S.bytes,{ignoreEncryption:true})];
+    // 6.8: what was typed into the form's fields is written into the pages before they are copied (before: the
+    // fields came back empty after turning, moving or deleting a page, although the message promised the text stays)
+    if(S.hasForm){try{await applyFormValues(docs[0]);docs[0].getForm().flatten();}catch(e){console.warn('form flatten',e);}}
     for(const b of extra)docs.push(await PDFDocument.load(b,{ignoreEncryption:true}));
     const out=await PDFDocument.create();
     // 6.6.1: the pages of each file are copied in one go, so fonts and pictures shared between pages are copied
@@ -4084,7 +4091,7 @@ async function exportPages(indices,mode,names){
     else for(const i of indices){$('busyMsg').textContent=`מכין עמוד ${i+1}…`;files.push({name:(names&&names[i])||`${base} - עמוד ${i+1}.pdf`,data:await one([i])});}
     busy(false);
     if(files.length===1){if(await saveBytes(files[0].name,files[0].data,'pdf'))toast('נשמר');return;}
-    if(window.showDirectoryPicker){
+    if(FS&&window.showDirectoryPicker){
       let dir;try{dir=await showDirectoryPicker({mode:'readwrite'});}catch(e){if(e&&e.name==='AbortError')return;dir=null;}
       if(dir){busy(true,'שומר…');for(const f of files){const h=await dir.getFileHandle(f.name,{create:true});await writeHandle(h,f.data);}busy(false);toast(`נשמרו ${files.length} קבצים בתיקייה ${dir.name}`);return;}
     }
@@ -5060,7 +5067,7 @@ $('setForm').addEventListener('submit',e=>{
   const changed=mail!==USER.mail;
   USER={...USER,name,mail,cc:$('setCc').checked};
   try{localStorage.setItem(USER_KEY,JSON.stringify(USER));}catch(_){}
-  if(gTok&&mail!==gTokMail){gTok=null;}
+  if(gTok&&mail!==gTokMail){gTok=null;if(typeof gFolder!=="undefined")gFolder=null;}
   applyUser();toast('ההגדרות נשמרו');if(changed&&mail)registerUser('update');
   const f=setAfter;setAfter=null;if(f)setTimeout(f,0);
 });
@@ -5750,7 +5757,7 @@ if('launchQueue' in window){
 }
 </script>
 <script src="siman-guard.js?v=6.4"></script>
-<script src="siman-plus.js?v=6.7.2"></script>
+<script src="siman-plus.js?v=6.8.0"></script>
 <script>
 /* =====================================================================
    4.7 — launch period (4 months per user) + feature-use counting
@@ -5849,18 +5856,18 @@ if('launchQueue' in window){
 <link rel="stylesheet" href="siman-phone.css?v=5.9.3">
 <script src="siman-phone.js?v=5.9.3" defer></script>
 <script src="a11y.js?v=5.9.3" defer></script>
-<script src="siman-voice.js?v=6.7.0" defer></script>
+<script src="siman-voice.js?v=6.8.0" defer></script>
 <script src="siman-back.js?v=6.6.2" defer></script>
 <!-- 5.9.3: one design for everyone (the ?beta=1 shell and the classic design were removed) -->
 <link rel="stylesheet" href="siman-v7.css?v=5.9.6">
 <script src="siman-v7.js?v=6.7.2" defer></script>
-<script src="siman-media.js?v=6.6.2" defer></script>
-<script src="siman-scan.js?v=6.6.2" defer></script>
-<script src="siman-merge.js?v=5.9.6" defer></script>
-<script src="siman-ux.js?v=6.6.2" defer></script>
+<script src="siman-media.js?v=6.8.0" defer></script>
+<script src="siman-scan.js?v=6.8.0" defer></script>
+<script src="siman-merge.js?v=6.8.0" defer></script>
+<script src="siman-ux.js?v=6.8.0" defer></script>
 <script src="siman-fill.js?v=6.4.1" defer></script>
-<script src="siman-convert.js?v=6.4.1" defer></script>
-<script src="siman-pro.js?v=6.6.2" defer></script>
+<script src="siman-convert.js?v=6.8.0" defer></script>
+<script src="siman-pro.js?v=6.8.0" defer></script>
 <script src="siman-home.js?v=6.4.2" defer></script>
 <link rel="stylesheet" href="siman-nb.css?v=5.9.5">
 <script src="siman-nb.js?v=5.9.5" defer></script>

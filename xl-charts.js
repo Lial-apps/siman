@@ -46,7 +46,7 @@ function colorIn(el,acc){
   if(c.localName==='srgbClr')h=c.getAttribute('val');
   else if(c.localName==='schemeClr'){const v=c.getAttribute('val');const m=/^accent(\d)$/.exec(v);h=m?acc[+m[1]-1]:v==='tx1'||v==='dk1'?'000000':v==='bg1'||v==='lt1'?'FFFFFF':null;}
   else if(c.localName==='sysClr')h=c.getAttribute('lastClr');
-  if(!h)return null;
+  if(!h||!/^[0-9a-f]{6}$/i.test(h))return null;   // 6.8: a colour is six hex digits, nothing else goes into the drawing
   const mod=chs(c,NA,'lumMod')[0],off=chs(c,NA,'lumOff')[0],sh=chs(c,NA,'shade')[0],ti=chs(c,NA,'tint')[0];
   if(mod||off)h=lum(h,mod?+mod.getAttribute('val')/1e5:1,off?+off.getAttribute('val')/1e5:0);
   if(sh)h=toHex(hx(h).map(x=>x*(+sh.getAttribute('val')/1e5)));

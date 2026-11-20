@@ -195,7 +195,8 @@ function ensureStyles(files){
 function addRel(files,part,type,target,mode){
   const rp=relsPathOf(part);let s=txt(files,rp)||(XML_HEAD+'<Relationships xmlns="'+NS.rel+'"></Relationships>');
   const used=new Set([...s.matchAll(/Id="([^"]+)"/g)].map(m=>m[1]));let n=1,id;do id='rIdSm'+(n++);while(used.has(id));
-  s=s.replace('</Relationships>',`<Relationship Id="${id}" Type="${type}" Target="${esc(target)}"${mode?` TargetMode="${mode}"`:''}/></Relationships>`);
+  // 6.8: as a function: a link with "$&" in it (…?max=$&sort=…) was read as a replacement pattern and the file no longer opened
+  s=s.replace('</Relationships>',()=>`<Relationship Id="${id}" Type="${type}" Target="${esc(target)}"${mode?` TargetMode="${mode}"`:''}/></Relationships>`);
   put(files,rp,s);return id;
 }
 
@@ -1556,7 +1557,7 @@ function wire(){
   E.onDrag=e=>{if(!E)return;e.stopImmediatePropagation();if(e.dataTransfer&&[...e.dataTransfer.types].includes('Files'))e.preventDefault();};
   E.onDrop=e=>{if(!E)return;e.stopImmediatePropagation();const dt=e.dataTransfer;if(!dt||![...dt.types].includes('Files'))return;e.preventDefault();
     const imgs=[...dt.files].filter(f=>/^image\//.test(f.type));if(!imgs.length){E.opts.toast('אפשר לגרור לכאן תמונות');return;}
-    const cr=document.caretRangeFromPoint&&document.caretRangeFromPoint(e.clientX,e.clientY);if(cr&&body.contains(cr.startContainer)){const s=getSelection();s.removeAllRanges();s.addRange(cr);E.lastRange=cr.cloneRange();}
+    const cr=document.caretRangeFromPoint&&document.caretRangeFromPoint(e.clientX,e.clientY);if(cr&&E.body.contains(cr.startContainer)){const s=getSelection();s.removeAllRanges();s.addRange(cr);E.lastRange=cr.cloneRange();}
     (async()=>{for(const f of imgs)await insertImageFile(f);})();};
   window.addEventListener('dragover',E.onDrag,true);window.addEventListener('drop',E.onDrop,true);
   E.onUnload=e=>{if(E&&E.dirty){e.preventDefault();e.returnValue='';}};window.addEventListener('beforeunload',E.onUnload);
@@ -2301,7 +2302,7 @@ const DRAFT={db:null,
   async del(k){try{const db=await this.open();await new Promise(r=>{const t=db.transaction('d','readwrite');t.objectStore('d').delete(k);t.oncomplete=t.onerror=r;});}catch(_){}}
 };
 const draftKey=()=>'w:'+(E.opts.name||'new');
-function startDrafts(){E.draftT=setInterval(async()=>{if(!E||!E.dirty||E.saving||E.draftAt===E.edits)return;E.draftAt=E.edits;try{const{bytes}=await buildDocx();if(E)await DRAFT.put(draftKey(),{bytes,time:Date.now(),name:fileName()});}catch(_){}},40000);}
+function startDrafts(){E.draftT=setInterval(async()=>{if(!E||!E.dirty||E.saving||E.hf||E.draftAt===E.edits)return;/* 6.8: not while a header or footer is being typed: the draft closed it under the cursor */E.draftAt=E.edits;try{const{bytes}=await buildDocx();if(E)await DRAFT.put(draftKey(),{bytes,time:Date.now(),name:fileName()});}catch(_){}},40000);}
 
 /* ------------------------------------------------------------ opening */
 function mapContainer(domC,xmlC,prefix){

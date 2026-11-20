@@ -863,7 +863,9 @@ const CAM = {
     if (root.hidden || this.view !== 'cam') { this.stopCam(); return; }
     this.track = this.stream.getVideoTracks()[0];
     const v = this.video; v.srcObject = this.stream;
-    await new Promise(r => { if (v.readyState >= 1) r(); else v.onloadedmetadata = () => r(); });
+    // 6.8: a camera closed before its picture arrived never sent "loadedmetadata": the wait never ended and the camera could not be started again until the app was reloaded
+    await new Promise(r => { if (v.readyState >= 1) r(); else { v.onloadedmetadata = () => r(); setTimeout(r, 4000); } });
+    if (!this.stream) return;
     try { await v.play(); } catch (_) {}
     this.vf.hidden = false; this.fit(); setTimeout(() => this.fit(), 120);
     let caps = {}; try { caps = this.track.getCapabilities ? this.track.getCapabilities() : {}; } catch (_) {}
@@ -1521,7 +1523,8 @@ const CAM = {
       if (dir === 'h') { free(c); return; }
       const u = c.toDataURL('image/jpeg', 0.8); free(c);
       const AI = window.SIMAN_AI; if (!AI) return;
-      const raw = await AI({ mode: 'orient', image: u.split(',')[1], mime: 'image/jpeg' }, { timeout: 40000 });
+      const rot0 = p.rot; const raw = await AI({ mode: 'orient', image: u.split(',')[1], mime: 'image/jpeg' }, { timeout: 40000 });
+      if (p.rot !== rot0) return;   // 6.8: the page was turned by hand while the answer was on its way: the answer no longer fits it
       const r = parseInt(JSON.parse(String(raw).replace(/^\s*```(?:json)?|```\s*$/g, '')).rotate, 10);
       if ([90, 180, 270].includes(r)) { p.rot = (p.rot + r) % 360; await refreshThumb(p); this.updateStack(); }
     } catch (e) { console.warn('orient', e); }
@@ -1722,7 +1725,9 @@ async function tablePic(p) {
 }
 // תא: מספר רגיל נשמר כמספר (כדי שאפשר יהיה לחשב איתו), כל השאר כטקסט כמו שנכתב
 function cellValue(c) {
-  const t = String(c).trim(), n = t.replace(/,/g, '');
+  // 6.8: commas are dropped only when they group thousands ("1,250"); "3,4" stays text. "5.10" and "12.30" (a date, an hour) stay text too: as numbers they became 5.1 and 12.3
+  const t = String(c).trim(), n = /^-?\d{1,3}(,\d{3})+(\.\d+)?$/.test(t) ? t.replace(/,/g, '') : t;
+  if (/^-?\d{1,2}\.\d0$/.test(n)) return t;
   if (/^-?\d+(\.\d+)?$/.test(n) && !(/^-?0\d/.test(n)) && n.length < 16) return Number(n);
   return t;
 }

@@ -195,7 +195,7 @@ async function addFiles(list){
   const L=T2();busy(true,'…');
   try{
     for(const f of list){let bytes;try{bytes=new Uint8Array(await f.arrayBuffer());}catch(_){toast(L.bad);continue;}let count=0;
-      try{const d=await PDFLib.PDFDocument.load(bytes,{ignoreEncryption:true});count=d.getPageCount();}catch(_){toast(L.bad);continue;}
+      try{const d=await PDFLib.PDFDocument.load(bytes,{ignoreEncryption:true});if(d.isEncrypted){toast(L.bad);continue;}/* 6.8: a protected file joined as blank or broken pages */count=d.getPageCount();}catch(_){toast(L.bad);continue;}
       st.extra.push({name:f.name,bytes,count});st.order.push(st.extra.length);}
   }finally{busy(false);}
   render();
