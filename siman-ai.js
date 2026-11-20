@@ -49,7 +49,7 @@ const THINKING = {
   scanCheck: [{ thinkingLevel: 'low' }, { thinkingBudget: 1024 }, null],
   ask: [{ thinkingBudget: 512 }, { thinkingLevel: 'low' }, null],
   // 6.8: checking a work or an exam: redoing the steps needs real thinking (the answer itself is short)
-  check: [{ thinkingBudget: 4096 }, { thinkingLevel: 'medium' }, { thinkingLevel: 'low' }, null],
+  check: [{ thinkingBudget: 8192 }, { thinkingLevel: 'high' }, { thinkingLevel: 'medium' }, null],
   translate: [{ thinkingBudget: 0 }, { thinkingLevel: 'minimal' }, null],
   corners: [{ thinkingLevel: 'minimal' }, { thinkingBudget: 0 }, null],
 };
@@ -89,7 +89,9 @@ After every fact, cite the page it came from: [עמ' 3] when you answer in Hebre
 Answer in the language the question is written in. Be clear and short: plain short paragraphs, or lines that start with "• ". No markdown headings, no bold, no tables.`,
   // 6.8: checking a submitted work, or one student's exam against the answer key. The app's own request (the
   // "question") says what to check and the exact shape of the answer; this only sets the role.
-  check: () => `You are an experienced, exact and fair teacher who checks submitted works and exams inside סימן, a document app.
+  check: pics => `${pics ? `The pages are attached as pictures. THE PICTURES ARE THE SOURCE OF TRUTH: read the handwriting from them yourself, slowly, the way a teacher who knows the subject reads a student's page. Any typed transcription inside <document> is only a helper and may hold reading mistakes.
+Make a real effort with handwriting that is hard to read — Hebrew cursive (כתב רהוט), crowded lines, crossed-out words, arrows, answers squeezed into margins, digits and signs in math: use the question, the answer key and the rest of the answer to work out what the student most probably wrote, as a patient teacher does. Read digits, signs, exponents and fractions with special care, and follow the calculation line by line. When two readings are possible, take the one that makes sense as an answer to the question. Only when a word truly cannot be worked out, do not take points for it and name it as unclear.
+` : ''}You are an experienced, exact and fair teacher who checks submitted works and exams inside סימן, a document app.
 The material comes in <document>: the work or the student's answers, and with them the task, the exam, the answer key or the points table when there are any. Pages start with a line like "===== עמוד 3 =====".
 Check the way a careful teacher does: work every exercise through yourself before judging it, compare with the answer key when there is one, and judge only what is really written. Text read from handwriting can hold reading mistakes: a word or a number that makes no sense is probably a reading mistake, so do not take points for it — say that it was unclear.
 Be consistent: the same answer always gets the same judgment and the same points.
@@ -568,10 +570,25 @@ function build(body) {
     const text = String(body.text || '').slice(0, MAX_TEXT);
     const q = String(body.question || '').slice(0, 8000);
     if (!text.trim() || !q.trim()) return { err: 'document text or question missing' };
+    // 6.8.1: the pages themselves come along as pictures, so the handwriting is read while checking, with the
+    // question and the answer key in view (the way a chat reads a photographed exam). Before, only a typed
+    // transcription was checked, and every word it had misread counted against the student.
+    const pics = (Array.isArray(body.images) ? body.images : []).filter(x => x && typeof x.data === 'string' && x.data.length > 100).slice(0, 24);
+    let total = 0;
+    for (const x of pics) { if (x.data.length > MAX_IMAGE) return { err: 'image too large' }; total += x.data.length; }
+    if (total > 18 * 1024 * 1024) return { err: 'images too large' };
+    const NAME = { work: 'The pages of the work / the student\'s answer pages', key: 'The pages of the answer key or the solution', task: 'The pages of the exam or the task' };
+    const parts = [{ text: `<document>\n${text}\n</document>` }];
+    for (const tag of ['task', 'key', 'work']) {
+      const g = pics.filter(x => (NAME[x.tag] ? x.tag : 'work') === tag); if (!g.length) continue;
+      parts.push({ text: `\n${NAME[tag]}, as photographed, in order (${g.length}):` });
+      g.forEach((x, i) => { parts.push({ text: `${tag} page ${i + 1}:` }, { inlineData: { mimeType: x.mime === 'image/png' ? 'image/png' : 'image/jpeg', data: x.data } }); });
+    }
     return {
-      systemInstruction: { parts: [{ text: PROMPTS.check() }] },
-      contents: [{ role: 'user', parts: [{ text: `<document>\n${text}\n</document>` }] }, { role: 'model', parts: [{ text: 'קראתי הכול. מה לבדוק?' }] }, { role: 'user', parts: [{ text: q }] }],
-      generationConfig: { temperature: 0, maxOutputTokens: 12000, ...(body.json ? { responseMimeType: 'application/json' } : {}) },
+      systemInstruction: { parts: [{ text: PROMPTS.check(pics.length > 0) }] },
+      contents: [{ role: 'user', parts }, { role: 'model', parts: [{ text: 'קראתי הכול. מה לבדוק?' }] }, { role: 'user', parts: [{ text: q }] }],
+      // thinking is counted inside the output limit: there must be room for both
+      generationConfig: { temperature: 0, maxOutputTokens: 32000, ...(pics.length ? { mediaResolution: 'MEDIA_RESOLUTION_HIGH' } : {}), ...(body.json ? { responseMimeType: 'application/json' } : {}) },
     };
   }
   return { err: 'unknown mode' };
@@ -593,7 +610,8 @@ export default {
     if (g.err) return fail(g.err, 400, origin);
     const mode = body.mode === 'scan' && body.quality !== 'fast' ? 'scanAccurate' : body.mode === 'lines' && body.quality === 'fast' ? 'linesFast' : body.mode;
     // 6.4: a pass, and a fair daily share (or the person's own key)
-    const gd = await guard(req, env, WEIGHT[mode] ?? 1);
+    // a check with page pictures weighs 2: it replaces the separate reading of every page (about 6 a page)
+    const gd = await guard(req, env, mode === 'check' && Array.isArray(body.images) && body.images.length ? 2 : (WEIGHT[mode] ?? 1));
     if (!gd.ok) return json(gd.body, gd.status, origin);
     env = gd.env;
 
@@ -612,6 +630,11 @@ export default {
       let res;
       const t0 = Date.now();
       try { res = await callGemini(g, mode, env, deadline); } catch (e) { res = { status: 502, d: { error: { message: String(e && e.message || e) } } }; }
+      // 6.8.1: a model that does not take the "sharp pictures" setting refuses the whole request: asked again without it
+      if (res.status === 400 && g.generationConfig && g.generationConfig.mediaResolution && deadline - Date.now() > 30000) {
+        const { mediaResolution, ...gc } = g.generationConfig;
+        try { res = await callGemini({ ...g, generationConfig: gc }, mode, env, deadline); } catch (_) {}
+      }
       // 6.6.6: Hebrew written in Arabic letters → asked once more (if there is time); the answer with fewer Arabic letters wins
       if (needsHebrewRetry(mode, res) && deadline - Date.now() > 20000) {
         try {
