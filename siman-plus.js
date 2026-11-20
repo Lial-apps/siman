@@ -2041,6 +2041,13 @@ const GR_SCHEME = total => `From the exam and the answer key make the points tab
 Use the points written in the exam or in the key. If there are none, split ${total} points between the questions by their weight and difficulty. A question with parts (א, ב, ג or a, b, c) becomes one row per part, like "2א".
 Output ONLY JSON, in the language of the exam:
 {"title":"the exam's name","total":${total},"questions":[{"q":"1","max":10,"topic":"what the question asks, in a few words","expect":"the correct answer or what must appear in it, taken from the key"}]}`;
+// 6.8.1: reading a student's pages. Only reading: the answer key is not sent with it.
+const GR_READ = `This step is ONLY reading, not checking. Copy out what the student wrote on the attached answer pages, for every question of the list (the last part of the document).
+Copy exactly what is on the page: the student's own words, numbers, signs and steps, including mistakes, wrong results and unfinished sentences. Do not correct, do not complete, do not improve and do not add anything that is not written, even if you know the right answer.
+Make a real effort with handwriting that is hard to read (Hebrew cursive, crowded or faint lines, small digits, exponents and fractions): the questions are given to help you tell unclear letters and digits apart and to find where each answer is — also when the answers are not in the order of the questions, are numbered differently, or continue on another page. Skip crossed-out text. Describe a drawing, a graph or a table in a few words inside [ ].
+Output ONLY JSON, in the language of the page:
+{"answers":[{"q":"1","answer":"everything the student wrote for this question, line after line","unclear":"words or digits you could not read with confidence, or empty"}]}
+Use the question names of the list. A question with no answer on the pages gets "answer":"".`;
 const GR_GRADE = `Check the student's answers (the last part of the document) against the exam, the answer key and the points table.
 For EVERY row of the points table give the points earned (from 0 to the row's max; halves are allowed), what earned the points, and what lost points and why.
 Be exact and fair, and consistent: the same mistake loses the same points for every student. Partial credit for a right method with a small slip. A question with no answer gets 0 with "לא נענתה". If a word could not be read, say so instead of guessing against the student.
@@ -2213,7 +2220,7 @@ const GR = {
     const last = this.foot().querySelector('[data-a=last]'); if (last) last.disabled = !(this.s.students.length || this.draft.pages.length);
   },
   rowHtml(st, i) {
-    const r = st.res, stt = { wait: 'ממתין בתור', read: 'קורא את הדפים…', check: 'קורא את הדפים ובודק…', done: '', err: 'הבדיקה נכשלה', lost: 'לא הסתיים (האפליקציה נסגרה)' }[st.status] || '';
+    const r = st.res, stt = { wait: 'ממתין בתור', read: 'קורא את הדפים…', check: 'בודק…', done: '', err: 'הבדיקה נכשלה', lost: 'לא הסתיים (האפליקציה נסגרה)' }[st.status] || '';
     const g = st.status === 'done' ? `<b class="gr-g">${fmtN(st.grade)}</b>` : `<span class="gr-st${st.status === 'err' || st.status === 'lost' ? ' bad' : ''}">${stt}</span>`;
     const det = r ? `<div class="gr-det">${r.summary ? `<p>${esc(r.summary)}</p>` : ''}${r.unclear ? `<p class="gr-unc">לא היה ברור לקריאה: ${esc(r.unclear)}</p>` : ''}
       <table><thead><tr><th>שאלה</th><th>נקודות</th><th>מה התלמיד כתב (כפי שנקרא)</th><th>מה היה נכון</th><th>למה ירדו נקודות</th></tr></thead><tbody>${r.questions.map((q, k) => `<tr><td>${esc(q.q)}</td><td dir="ltr"><input type="number" min="0" max="${q.max}" step="0.5" value="${q.got}" data-pts="${i}:${k}" aria-label="נקודות בשאלה ${esc(q.q)}"> / ${q.max}</td><td dir="auto">${esc(q.answer || '')}</td><td>${esc(q.plus || '')}</td><td>${esc(q.minus || '')}</td></tr>`).join('')}</tbody></table>${st.status === 'done' && st.text ? `<p style="margin:8px 0 0"><button type="button" class="btn" data-again="${i}">לבדוק שוב את התלמיד הזה</button></p>` : ''}</div>` : '';
@@ -2250,14 +2257,21 @@ const GR = {
           // word that was read wrong counted against the student). The typed reading stays as the way back
           // when there are no pictures (a check tried again after the app was closed) or the pictures fail.
           const pics = st.pages.length && st.pages.every(p => p.b64) ? picsOf(st.pages, 'work', 14) : [];
+          let read = null;
           if (pics.length === st.pages.length && pics.length) {
-            st.status = 'check'; redraw();
-            const room = PICS_MAX - pics.reduce((t, x) => t + x.data.length, 0);
-            const keyPics = picsOf(s.key.pages, 'key', 4, room);
-            const known = st.pages.some(p => p.text) ? st.pages.map((p, i) => `===== עמוד ${i + 1} =====\n${p.text || ''}`).join('\n\n') : '(התשובות של התלמיד נמצאות בתמונות הדפים המצורפות)';
-            try { j = await aiCheckJson(head + known, ask, okJ, { images: [...keyPics, ...pics] }); st.fromPics = !!j; }
-            catch (e) { if (/מכסה|אין חיבור|חוסם|לא הוקם|להירשם/.test(e.message || '')) throw e; console.warn('check from pictures', e); }
-            if (j) st.text = j.questions.map(q => `שאלה ${q.q}: ${String(q.answer || '').trim() || '(אין תשובה)'}`).join('\n');
+            // step 1 — reading only: the pages, with the questions and WITHOUT the answer key. In a live test, a
+            // check that saw the key and the page together wrote words of the key into the student's answer
+            // ("ופולט חמצן") and gave points for them. Step 2 checks what was read against the key.
+            st.status = 'read'; redraw();
+            try {
+              const r = await aiCheckJson(`===== המבחן =====\n${this.textOf('exam')}\n\n===== השאלות (לפי טבלת הנקודות) =====\n${scheme.map(q => `${q.q}${q.topic ? ' | ' + q.topic : ''}`).join('\n')}`, GR_READ, x => Array.isArray(x.answers) && x.answers.length, { images: pics });
+              if (r) { read = new Map(r.answers.map(a => [qKey(a.q), a]));
+                st.text = scheme.map(q => { const a = read.get(qKey(q.q)) || {}; return `===== שאלה ${q.q} =====\n${String(a.answer || '').trim() || '(אין תשובה)'}${a.unclear ? `\n(לא היה ברור בקריאה: ${a.unclear})` : ''}`; }).join('\n\n');
+                st.fromPics = true; }
+            } catch (e) { if (/מכסה|אין חיבור|חוסם|לא הוקם|להירשם/.test(e.message || '')) throw e; console.warn('reading from pictures', e); }
+            if (read) { st.status = 'check'; redraw(); j = await aiCheckJson(head + st.text, ask, okJ);
+              if (j) { const hard = [...read.values()].map(a => String(a.unclear || '').trim()).filter(Boolean); if (hard.length) j.unclear = [j.unclear, ...hard].filter(Boolean).join(' · ');
+                for (const q of j.questions) { const a = read.get(qKey(q.q)); if (a) q.answer = a.answer; } } }
           }
           if (!j) {
             if (st.pages.length) {
