@@ -159,3 +159,17 @@ html.v7.nb.ink .v7-home:not([lang="he"]) h1{font-size:clamp(56px,5.6vw,96px);lin
 
 /* מצב כהה: דף האייקון שליד "או גוררים קובץ לכאן" מקבל את צבע המשטח, כדי שהחץ שבתוכו ייראה (קודם הדף היה לבן והחץ לבן) */
 html.v7.nb.ink .nb-dt svg path[fill="#fff"]{fill:var(--v7-surface)}
+
+/* 6.9.2 — החלק העליון של מסך הבית נכנס במסך בלי גלילה: שורת החיפוש "מה תרצו לעשות?" עולה אל מתחת למשפט הפתיחה
+   (לפני עיגול "פותחים קובץ"), והכותרת והעיגול מתכווצים במסך נמוך (מחשב נייד, חלון קטן). */
+html.v7.nb.ink .v7-home > *{order:2}
+html.v7.nb.ink .v7-home > h1,html.v7.nb.ink .v7-home > .v7-sub,html.v7.nb.ink .v7-home > .v7-search{order:1}
+html.v7.nb.ink .v7-home h1{font-size:clamp(64px,min(10.5vw,calc(34vh - 157px)),176px)}
+html.v7.nb.ink .v7-home h1::after{height:clamp(14px,2.6vh,22px)}
+html.v7.nb.ink .nb-open{width:clamp(118px,19vh,186px);height:clamp(118px,19vh,186px);padding:0 clamp(16px,3vh,30px);font-size:clamp(28px,4.3vh,40px)}
+html.v7.nb.ink .v7-home:not([lang="he"]) h1{font-size:clamp(44px,min(5.6vw,calc(16vh - 50px)),96px)}
+@media (max-width:720px){
+  html.v7.nb.ink .v7-home h1{font-size:clamp(60px,min(25vw,14vh),112px)}
+  html.v7.nb.ink .nb-open{width:clamp(128px,22vh,168px);height:clamp(128px,22vh,168px);font-size:clamp(30px,4.6vh,36px)}
+  html.v7.nb.ink .v7-home:not([lang="he"]) h1{font-size:clamp(40px,min(14vw,8.5vh),64px)}
+}
