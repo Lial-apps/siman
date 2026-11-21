@@ -173,3 +173,15 @@ html.v7.nb.ink .v7-home:not([lang="he"]) h1{font-size:clamp(44px,min(5.6vw,calc(
   html.v7.nb.ink .nb-open{width:clamp(128px,22vh,168px);height:clamp(128px,22vh,168px);font-size:clamp(30px,4.6vh,36px)}
   html.v7.nb.ink .v7-home:not([lang="he"]) h1{font-size:clamp(40px,min(14vw,8.5vh),64px)}
 }
+
+/* 6.9.3 — סרגל הכלים בשורה אחת גם בחלון צר (מחשב נייד, חלון שאינו מוגדל): הכפתורים מצטופפים במקום לרדת לשורה שנייה,
+   ואם עדיין אין מקום הסרגל נגלל הצידה. */
+@media (min-width:721px) and (max-width:1340px){
+  html.v7.nb.ink:not(#_) .nb-case{flex-wrap:nowrap;justify-content:safe center;gap:2px;padding:6px;overflow-x:auto;scrollbar-width:none}
+  html.v7.nb.ink:not(#_) .nb-case::-webkit-scrollbar{display:none}
+  html.v7.nb.ink:not(#_) .nb-case > .group,html.v7.nb.ink:not(#_) .nb-case .tools{flex:none;flex-wrap:nowrap;gap:2px}
+  html.v7.nb.ink:not(#_) .nb-case .btn{padding:0 clamp(5px,calc((100vw - 900px)/36),12px);font-size:clamp(13.5px,1.2vw,15.5px);white-space:nowrap}
+  html.v7.nb.ink:not(#_) .nb-case .icon-btn{width:34px}
+  html.v7.nb.ink:not(#_) .nb-case .tool{min-width:0;padding-inline:clamp(3px,calc((100vw - 900px)/50),8px)}
+  html.v7.nb.ink .nb-sep{margin:6px 2px}
+}
