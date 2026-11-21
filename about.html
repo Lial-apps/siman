@@ -5,16 +5,16 @@
 <script>if(/\.github\.io$/.test(location.hostname))location.replace('https://siman.siman-app.workers.dev/about.html'+location.hash);</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>סימן — המדריך המלא</title>
-<meta name="description" content="המדריך המלא לסימן: איך פותחים קובץ, מה עושה כל מדבקה במסך הבית, כל כלי בקלמר, הטלפון, ההגדרות והפרטיות. צעד אחר צעד, בעברית.">
+<meta name="description" content="המדריך המלא לסימן: איך פותחים קובץ, מה עושה כל כלי במסך הבית, כל כלי בסרגל, הטלפון, ההגדרות והפרטיות. צעד אחר צעד, בעברית.">
 <meta property="og:type" content="article">
 <meta property="og:url" content="https://siman.siman-app.workers.dev/about.html">
 <meta property="og:title" content="סימן — המדריך המלא">
 <meta property="og:description" content="כל פעולה בסימן, צעד אחר צעד: תרגום, תמלול, חתימה, עריכת וורד, אקסל ומצגות, המרה, שליחה לחתימה ועוד.">
-<meta property="og:image" content="https://siman.siman-app.workers.dev/siman-share.jpg">
+<meta property="og:image" content="https://siman.siman-app.workers.dev/siman-share-692.jpg">
 <meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="theme-color" content="#EAFBF3" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#17112E" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#F6F8FC" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#12142E" media="(prefers-color-scheme: dark)">
 <meta name="color-scheme" content="light dark">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" sizes="180x180" href="icon-180.png">
@@ -242,13 +242,115 @@ footer nav{display:flex;flex-wrap:wrap;gap:8px 20px}
   html{scroll-behavior:auto}
 }
 @media print{.toc,.nav,.ctas,.final{display:none}body{background:#fff}.act,.card,.tl{box-shadow:none;break-inside:avoid}}
+
+@font-face{font-family:"SF-amatic";font-weight:700;font-display:swap;src:url(font-amatic-he.woff2) format("woff2");unicode-range:U+0307-0308,U+0590-05FF,U+200C-2010,U+20AA,U+25CC,U+FB1D-FB4F}
+@font-face{font-family:"SF-amatic";font-weight:700;font-display:swap;src:url(font-amatic-lat.woff2) format("woff2");unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:"SF-assistant";font-weight:400 600;font-display:swap;src:url(font-assistant-he.woff2) format("woff2");unicode-range:U+0307-0308,U+0590-05FF,U+200C-2010,U+20AA,U+25CC,U+FB1D-FB4F}
+@font-face{font-family:"SF-assistant";font-weight:400 600;font-display:swap;src:url(font-assistant-lat.woff2) format("woff2");unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+:root{
+  --ink-wash:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1400 900' preserveAspectRatio='xMidYMin slice'%3E%3Cfilter id='w' x='-30%25' y='-30%25' width='160%25' height='160%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.008' numOctaves='3' seed='7'/%3E%3CfeDisplacementMap in='SourceGraphic' scale='120'/%3E%3CfeGaussianBlur stdDeviation='20'/%3E%3C/filter%3E%3Cg filter='url(%23w)'%3E%3Cellipse cx='1160' cy='250' rx='300' ry='220' fill='%233A3FC0' fill-opacity='.30'/%3E%3Cellipse cx='800' cy='430' rx='220' ry='190' fill='%2317A89F' fill-opacity='.30'/%3E%3Cellipse cx='330' cy='90' rx='190' ry='160' fill='%23F2A90F' fill-opacity='.42'/%3E%3Cellipse cx='130' cy='520' rx='200' ry='180' fill='%23C0318F' fill-opacity='.24'/%3E%3C/g%3E%3C/svg%3E");
+  --ink-stroke:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 26' preserveAspectRatio='none'%3E%3Cfilter id='r' x='-5%25' y='-80%25' width='110%25' height='260%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.035' numOctaves='2' seed='3'/%3E%3CfeDisplacementMap in='SourceGraphic' scale='7'/%3E%3C/filter%3E%3Cpath d='M630 12C520 5 420 19 310 12S110 7 12 15' fill='none' stroke='%23F0624A' stroke-opacity='.88' stroke-width='11' stroke-linecap='round' filter='url(%23r)'/%3E%3C/svg%3E");
+  --ink-wash-d:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1400 900' preserveAspectRatio='xMidYMin slice'%3E%3Cfilter id='w' x='-30%25' y='-30%25' width='160%25' height='160%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.008' numOctaves='3' seed='7'/%3E%3CfeDisplacementMap in='SourceGraphic' scale='120'/%3E%3CfeGaussianBlur stdDeviation='20'/%3E%3C/filter%3E%3Cg filter='url(%23w)'%3E%3Cellipse cx='1160' cy='250' rx='300' ry='220' fill='%235A60E8' fill-opacity='.26'/%3E%3Cellipse cx='800' cy='430' rx='220' ry='190' fill='%2317A89F' fill-opacity='.20'/%3E%3Cellipse cx='330' cy='90' rx='190' ry='160' fill='%23F2A90F' fill-opacity='.16'/%3E%3Cellipse cx='130' cy='520' rx='200' ry='180' fill='%23C0318F' fill-opacity='.20'/%3E%3C/g%3E%3C/svg%3E");
+}
+
+/* ---------- 6.9.3: the guide in the app's current look (watercolour washes, handwritten headings, flat cards).
+   Everything above stays as the base layout; this block only repaints it. ---------- */
+:root{
+  --ink:#1B1E5A;--violet:#3A3FC0;--sun:#F6CF6E;--rose:#F6AE9F;--sky:#B3B6EE;--mint:#8ED6CF;--lilac:#DCDDF6;--cream:#FBEBC2;
+  --paper:#F6F8FC;--grid:rgba(27,30,90,.14);--surface:rgba(255,255,255,.78);--text:#1B1E5A;--soft:#4B4F7E;--edge:rgba(27,30,90,.16);--shadow:transparent;--link:#3A3FC0;--logo:#1B1E5A;
+  --hfont:"SF-amatic","SF-secular","SF-rubik","Segoe UI",Arial,sans-serif;--bfont:"SF-assistant","SF-rubik",system-ui,"Segoe UI",Arial,sans-serif;
+  --tipbg:rgba(246,207,110,.3);--notebg:rgba(179,182,238,.26);--card-sh:0 1px 0 var(--edge),0 18px 40px -30px rgba(27,30,90,.5);
+}
+@media (prefers-color-scheme:dark){
+  :root{--paper:#12142E;--grid:rgba(238,240,255,.16);--surface:rgba(28,31,69,.8);--text:#EEF0FF;--soft:#B9BDE6;--edge:rgba(238,240,255,.18);--link:#A9ACFF;--logo:#EEF0FF;
+    --tipbg:rgba(242,169,15,.16);--notebg:rgba(90,96,232,.2);--ink-wash:var(--ink-wash-d)}
+}
+body{position:relative;isolation:isolate;font-family:var(--bfont);font-size:19px;background:var(--paper);background-image:none}
+body::before{content:"";position:absolute;inset:0 0 auto 0;height:1100px;z-index:-1;background:var(--ink-wash) top center/cover no-repeat;-webkit-mask-image:linear-gradient(#000 68%,transparent);mask-image:linear-gradient(#000 68%,transparent);pointer-events:none}
+h1,h2,h3{font-weight:700;line-height:1}
+h1{font-size:clamp(84px,10.5vw,160px);line-height:.86;margin:4px 0 26px}
+h1::after{content:"";display:block;width:min(100%,520px);height:20px;margin-top:8px;background:var(--ink-stroke) no-repeat 0 0/100% 100%}
+h1 .tilt{display:inline;transform:none;background:none;color:inherit;padding:0;border-radius:0}
+h2{font-size:clamp(54px,6.2vw,80px)}
+.u svg{display:none}
+.u::after{content:"";position:absolute;inset-inline:-2%;bottom:-.14em;height:.18em;background:var(--ink-stroke) no-repeat 0 0/100% 100%}
+:focus-visible{outline:2.5px solid var(--text);outline-offset:4px}
+kbd{border:1px solid var(--edge);background:transparent;color:inherit}
+.skip{border:0;background:var(--sun)}
+.taped::before{display:none}
+.hi{color:var(--soft)}
+
+.logo{font-weight:700;font-size:46px;transform:none}
+.logo::after{height:5px;margin-top:4px;background:#F0624A;opacity:.85;border-radius:5px 3px 6px 2px}
+.nav a{border:0;background:transparent;box-shadow:none;font-size:17px}
+.nav a:hover{transform:none;background:rgba(242,169,15,.3);color:var(--text)}
+.btn{font-family:var(--bfont);font-weight:600;font-size:19px;border:1.5px solid var(--text);border-radius:999px;padding:13px 26px;box-shadow:none}
+.btn-main,.nav a.btn{background:var(--violet);border-color:transparent;color:#fff;box-shadow:none}
+.btn-main:hover,.btn-main:active{transform:none;box-shadow:none;filter:brightness(.92)}
+.btn-soft,.final-card .btn-soft{background:transparent;color:var(--text);border-color:var(--text);box-shadow:none}
+.btn-soft:hover{background:rgba(242,169,15,.34);color:var(--text);border-color:var(--text)}
+.btn-soft:active,.btn-sm:active{transform:scale(.97);box-shadow:none}
+.btn-sm{font-size:17px;padding:10px 20px;border-radius:999px;box-shadow:none}
+.final-card .btn-main{box-shadow:none}
+.label{font-family:var(--bfont);font-weight:600;border:0;box-shadow:none;transform:none;border-radius:999px;background:rgba(242,169,15,.4);color:var(--text)}
+.tag{border:0;font-weight:600}
+
+.sheet,.card,.act,.tl,.faq details,.newbox .row div,.dock{border:0;border-radius:22px 16px 24px 14px;box-shadow:var(--card-sh);transform:none}
+.sheet{background:var(--surface);color:var(--text)}
+.sheet .ttl{font-weight:700;font-size:40px;line-height:1}
+.sheet li b{font-family:var(--bfont);font-weight:600;font-size:19px}
+.sheet .n,.num,.steps li::before{font-family:var(--bfont);font-weight:600;border:0;box-shadow:none}
+.card h3{font-size:40px}
+.act h3{font-size:42px}
+.badge{border:0;box-shadow:none;border-radius:52% 48% 55% 45%/47% 54% 46% 53%;transform:none!important}
+.tip{border:0}
+.tip b,.note b{font-family:var(--bfont);font-weight:600}
+.note{border:0}
+.newbox{border:0;border-radius:26px 18px 28px 16px;box-shadow:none;transform:none;background:rgba(179,182,238,.4);color:var(--text)}
+.newbox h3{font-size:clamp(40px,4.4vw,52px)}
+.newbox .row div{background:var(--surface);color:var(--text)}
+.newbox .row b{font-family:var(--bfont);font-weight:600;font-size:19px}
+.kit h3{font-size:clamp(40px,4.4vw,54px)}
+.kit h3 small{font-family:var(--bfont);font-weight:400}
+.tl-h b{font-family:var(--bfont);font-weight:600;font-size:20px}
+.tl-h .ic{border:0;border-radius:52% 48% 55% 45%/47% 54% 46% 53%}
+.legend i{border-width:1.5px}
+.chip{border:1.5px solid var(--edge);box-shadow:none;background:transparent}
+.chip i{border:0}
+.chip.def{background:rgba(242,169,15,.4);color:var(--text);border-color:transparent}
+.dock{background:var(--surface);color:var(--text)}
+.dock span:first-child{background:rgba(242,169,15,.45)}
+.priv .card li::before{border:0}
+
+.toc{border-block:1.5px solid var(--edge)}
+.toc b{font-weight:700;font-size:28px;line-height:1;color:var(--text)}
+.toc a{border:1.5px solid var(--edge);box-shadow:none;background:transparent}
+.toc a:hover,.toc a[aria-current="true"]{background:rgba(242,169,15,.45);color:var(--text);border-color:transparent}
+
+.faq{gap:0}
+.faq details{background:none;box-shadow:none;border-radius:0;border-bottom:1.5px solid var(--edge)}
+.faq summary{font-family:var(--bfont);font-weight:600;padding:18px 0}
+.faq summary::after{border:0;background:rgba(242,169,15,.45);color:var(--text)}
+.faq details p{padding:0 0 20px}
+
+.final-card{background:none;color:var(--text);border:0;box-shadow:none;transform:none;padding:20px 0 0}
+.final-card h2{max-width:12em}
+footer .wrap{border-top:1.5px solid var(--edge)}
+footer .brand{font-weight:700;font-size:30px;line-height:1}
+@media (max-width:560px){
+  body{font-size:18px}
+  h1{font-size:clamp(72px,23vw,104px)}
+  .act h3{font-size:36px}
+  .card h3{font-size:36px}
+  .logo{font-size:40px}
+}
+@media print{body::before{display:none}}
 </style>
 </head>
 <body>
 <a class="skip" href="#top">דילוג לתוכן</a>
 <header class="wrap head">
   <a class="logo" href="start.html" aria-label="סימן, לדף הבית">סימן</a>
-  <span class="ver ltr">5.9.5</span>
   <nav class="nav" aria-label="ניווט">
     <a href="start.html">דף הבית</a>
     <a href="#faq">שאלות</a>
@@ -263,7 +365,7 @@ footer nav{display:flex;flex-wrap:wrap;gap:8px 20px}
     <div>
       <p class="hi">כל מה שסימן יודע לעשות 📖</p>
       <h1 id="h-hero">המדריך <span class="tilt">המלא</span></h1>
-      <p class="lead">כל מדבקה במסך הבית, כל כלי בקלמר וכל כפתור, צעד אחר צעד. מה כל דבר עושה, איך מגיעים אליו ומה כדאי לדעת.</p>
+      <p class="lead">כל כלי במסך הבית, כל כלי בסרגל וכל כפתור, צעד אחר צעד. מה כל דבר עושה, איך מגיעים אליו ומה כדאי לדעת.</p>
       <div class="ctas">
         <a class="btn btn-main" href="https://siman.siman-app.workers.dev/">פותחים את סימן ✦</a>
         <a class="btn btn-soft" href="start.html">→ לדף הבית</a>
@@ -288,7 +390,7 @@ footer nav{display:flex;flex-wrap:wrap;gap:8px 20px}
       <li><a href="#start">איך מתחילים</a></li>
       <li><a href="#actions">הפעולות במסך הבית</a></li>
       <li><a href="#new">ליצור חדש</a></li>
-      <li><a href="#tools">קלמר הכלים</a></li>
+      <li><a href="#tools">סרגל הכלים</a></li>
       <li><a href="#buttons">כפתורי הפעולה</a></li>
       <li><a href="#phone">בטלפון</a></li>
       <li><a href="#install">התקנה</a></li>
@@ -312,7 +414,7 @@ footer nav{display:flex;flex-wrap:wrap;gap:8px 20px}
         <p>שלוש דרכים, ואותה תוצאה:</p>
         <ul>
           <li>לוחצים על <b>"פותחים קובץ ✦"</b> ובוחרים מהמכשיר, מהדרייב או מהמייל.</li>
-          <li><b>גוררים</b> קובץ לחלון. האזור נצבע בצהוב וכתוב "משחררים כאן".</li>
+          <li><b>גוררים</b> קובץ לחלון. האזור נצבע וכתוב "משחררים כאן".</li>
           <li><b>מדביקים</b> קובץ שהעתקתם: במחשב <kbd>Ctrl V</kbd> בכל מקום במסך הבית, ובטלפון כפתור "הדבקה".</li>
         </ul>
       </div>
@@ -352,8 +454,8 @@ footer nav{display:flex;flex-wrap:wrap;gap:8px 20px}
 <!-- 4. the actions -->
 <section id="actions" aria-labelledby="h-actions">
   <div class="wrap">
-    <div class="sec-h"><h2 id="h-actions">הפעולות <span class="u">במסך הבית<svg viewBox="0 0 200 14" preserveAspectRatio="none" aria-hidden="true"><path d="M3 9 C 50 2, 120 14, 197 5" stroke="var(--violet)"/></svg></span></h2><span class="label">12 מדבקות</span></div>
-    <p class="sub">כל מדבקה במסך הבית היא פעולה. לוחצים עליה, בוחרים קובץ אם צריך, וסימן פותח בדיוק את הכלי הנכון. אותן פעולות זמינות גם מתוך מסמך פתוח.</p>
+    <div class="sec-h"><h2 id="h-actions">הפעולות <span class="u">במסך הבית<svg viewBox="0 0 200 14" preserveAspectRatio="none" aria-hidden="true"><path d="M3 9 C 50 2, 120 14, 197 5" stroke="var(--violet)"/></svg></span></h2><span class="label">12 כלים</span></div>
+    <p class="sub">כל כלי במסך הבית הוא פעולה. לוחצים עליו, בוחרים קובץ אם צריך, וסימן פותח בדיוק את הכלי הנכון. אותן פעולות זמינות גם מתוך מסמך פתוח.</p>
 
     <div class="acts">
 
@@ -513,7 +615,7 @@ footer nav{display:flex;flex-wrap:wrap;gap:8px 20px}
 
     <div class="newbox taped" id="new">
       <h3>ליצור חדש</h3>
-      <p>מתחת למדבקות יש שלושה כפתורים שפותחים קובץ ריק, ישר בעורך:</p>
+      <p>מתחת לכלים יש שלושה כפתורים שפותחים קובץ ריק, ישר בעורך:</p>
       <div class="row">
         <div><b>📝 מסמך Word</b>מסמך חדש לכתיבה ולעיצוב.</div>
         <div><b>📊 גיליון Excel</b>גיליון חדש לטבלה ולחישובים.</div>
@@ -526,8 +628,8 @@ footer nav{display:flex;flex-wrap:wrap;gap:8px 20px}
 <!-- 5. toolbar -->
 <section id="tools" aria-labelledby="h-tools">
   <div class="wrap">
-    <div class="sec-h"><h2 id="h-tools">קלמר <span class="u">הכלים<svg viewBox="0 0 200 14" preserveAspectRatio="none" aria-hidden="true"><path d="M3 9 C 50 2, 120 14, 197 5" stroke="var(--mint)"/></svg></span></h2></div>
-    <p class="sub">במחשב הסרגל העליון בשתי שורות. למעלה הלוגו מימין, ומשמאל "מה לעשות?", שיתוף, שפה, צבע והגדרות (וכשמסמך פתוח גם הזום). מתחת "קלמר" אחד עם כל הכלים, קו מפריד, ואחריו כפתורי הפעולה.</p>
+    <div class="sec-h"><h2 id="h-tools">סרגל <span class="u">הכלים<svg viewBox="0 0 200 14" preserveAspectRatio="none" aria-hidden="true"><path d="M3 9 C 50 2, 120 14, 197 5" stroke="var(--mint)"/></svg></span></h2></div>
+    <p class="sub">במחשב הסרגל העליון בשתי שורות. למעלה הלוגו מימין, ומשמאל "מה לעשות?", שיתוף, שפה, צבע והגדרות (וכשמסמך פתוח גם הזום). מתחת סרגל אחד עם כל הכלים, קו מפריד, ואחריו כפתורי הפעולה.</p>
     <div class="legend" aria-label="מקרא">
       <span><i class="on" aria-hidden="true"></i>הכלי הפעיל צבוע בצהוב</span>
       <span><i class="off" aria-hidden="true"></i>כפתור מקווקו עדיין לא זמין (למשל לפני שפותחים קובץ)</span>
@@ -642,10 +744,10 @@ footer nav{display:flex;flex-wrap:wrap;gap:8px 20px}
         <h3>🎨 מראה וצבע</h3>
         <p>בכפתור הצבע בסרגל העליון בוחרים אחד משבעה צבעים:</p>
         <div class="chips">
-          <span class="chip def"><i style="background:linear-gradient(135deg,#6B2BD9 0 50%,#2ED3A0 50% 100%)" aria-hidden="true"></i>מחברת</span>
+          <span class="chip def"><i style="background:linear-gradient(135deg,#3A3FC0 0 50%,#17A89F 50% 100%)" aria-hidden="true"></i>דיו ומים</span>
           <span class="chip">שמיים</span><span class="chip">ים</span><span class="chip">לבנדר</span><span class="chip">שקיעה</span><span class="chip">פטל</span><span class="chip">יער</span>
         </div>
-        <p style="margin-top:12px">"מחברת" (סגול ומנטה) היא ברירת המחדל, עם מצב כהה משלה בכחול־לילה. ואז בוחרים מראה: <b>בהיר</b>, <b>כהה</b> או <b>אוטומטי</b>, שמתחלף לפי ההגדרה של המכשיר.</p>
+        <p style="margin-top:12px">"דיו ומים" (כחול דיו וטורקיז) היא ברירת המחדל, עם מצב כהה משלה. ואז בוחרים מראה: <b>בהיר</b>, <b>כהה</b> או <b>אוטומטי</b>, שמתחלף לפי ההגדרה של המכשיר.</p>
       </div>
       <div class="card">
         <h3>🌐 שפת הממשק</h3>
@@ -743,7 +845,7 @@ footer nav{display:flex;flex-wrap:wrap;gap:8px 20px}
   <div class="wrap">
     <div class="final-card taped">
       <h2>עכשיו אתם יודעים הכול</h2>
-      <p>פותחים קובץ, בוחרים מדבקה, וזהו. ואם שכחתם משהו, <kbd>Ctrl K</kbd> ומקלידים מה רוצים.</p>
+      <p>פותחים קובץ, בוחרים כלי, וזהו. ואם שכחתם משהו, <kbd>Ctrl K</kbd> ומקלידים מה רוצים.</p>
       <div class="ctas">
         <a class="btn btn-main" href="https://siman.siman-app.workers.dev/">פותחים את סימן ✦</a>
         <a class="btn btn-soft" href="start.html">→ לדף הבית</a>

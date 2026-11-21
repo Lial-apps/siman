@@ -239,7 +239,7 @@ footer nav{display:flex;flex-wrap:wrap;gap:8px 20px}
       </ul>
     </div>
     <div class="frame">
-      <video id="vid" src="siman-video-692.mp4?v=692" poster="siman-video-692.jpg?v=692" controls muted loop playsinline preload="metadata" aria-label="סרטון הדגמה של סימן"></video>
+      <video id="vid" src="siman-video-692.mp4?v=693" poster="siman-video-692.jpg?v=693" controls muted loop playsinline preload="metadata" aria-label="סרטון הדגמה של סימן"></video>
       <button class="sound" id="sound" type="button">🔊 להפעלה עם סאונד</button>
     </div>
   </div>
@@ -262,7 +262,7 @@ footer nav{display:flex;flex-wrap:wrap;gap:8px 20px}
       <article class="lp-t"><h3>וורד, אקסל ומצגות</h3><p>עורכים את הקובץ, מוסיפים תרשים באקסל, ואומרים לעוזר מה לעשות, למשל <q>סדר את הטבלה לפי מק״ט</q>.</p></article>
       <article class="lp-t"><h3>מאחדים, מפצלים, ממירים</h3><p>מחברים קבצים, מפצלים לפי טווחי עמודים, וממירים PDF לוורד, לאקסל או לפאוורפוינט.</p></article>
       <article class="lp-t"><h3>שולחים בלחיצה</h3><p>בוואטסאפ, במייל או לענן, ישר מתוך סימן. הטיוטה נשמרת לבד, והקבצים האחרונים מחכים במסך הבית.</p></article>
-      <a class="lp-t more" href="about.html?v=595"><h3>ויש עוד ←</h3><p>המדריך המלא: הסבר לכל פעולה</p></a>
+      <a class="lp-t more" href="about.html?v=693"><h3>ויש עוד ←</h3><p>המדריך המלא: הסבר לכל פעולה</p></a>
     </div>
   </div>
 </section>
@@ -341,7 +341,7 @@ footer nav{display:flex;flex-wrap:wrap;gap:8px 20px}
     <div class="faq">
       <details>
         <summary>הקבצים שלי עולים לאיזשהו מקום?</summary>
-        <p>רוב העבודה נשארת אצלכם: פתיחה, סימון, עריכה, חתימה ושמירה נעשים במכשיר שלכם, וגם התמלול, כך שההקלטה לא יוצאת ממנו. תרגום, העוזר, "מדף למסמך", בדיקת עבודות ושליחה בקישור שולחים לשרת רק את מה שצריך, ורק כשלוחצים עליהם. מסמך שנשלח בקישור נמחק אוטומטית אחרי 30 יום. כל הפרטים ב<a href="about.html?v=595#privacy">מדריך</a> וב<a href="privacy.html">מדיניות הפרטיות</a>.</p>
+        <p>רוב העבודה נשארת אצלכם: פתיחה, סימון, עריכה, חתימה ושמירה נעשים במכשיר שלכם, וגם התמלול, כך שההקלטה לא יוצאת ממנו. תרגום, העוזר, "מדף למסמך", בדיקת עבודות ושליחה בקישור שולחים לשרת רק את מה שצריך, ורק כשלוחצים עליהם. מסמך שנשלח בקישור נמחק אוטומטית אחרי 30 יום. כל הפרטים ב<a href="about.html?v=693#privacy">מדריך</a> וב<a href="privacy.html">מדיניות הפרטיות</a>.</p>
       </details>
       <details>
         <summary>כמה זה עולה?</summary>
@@ -373,7 +373,7 @@ footer nav{display:flex;flex-wrap:wrap;gap:8px 20px}
   <div class="wrap">
     <span class="brand">סימן</span><span>של Almos Apps</span>
     <nav aria-label="קישורים">
-      <a href="about.html?v=595">המדריך המלא</a>
+      <a href="about.html?v=693">המדריך המלא</a>
       <a href="privacy.html">פרטיות</a>
       <a href="terms.html">תנאי שימוש</a>
       <a href="accessibility.html">הצהרת נגישות</a>
@@ -386,7 +386,9 @@ footer nav{display:flex;flex-wrap:wrap;gap:8px 20px}
 (function(){
   var v=document.getElementById('vid'),s=document.getElementById('sound');
   // computers get the wide (16:9) cut: it fills a wide frame and the whole screen in full-screen view. Phones keep the vertical one
-  if(window.matchMedia&&matchMedia('(min-width:900px)').matches){document.getElementById('video').classList.add('wide');v.poster='siman-video-692-wide.jpg?v=692';v.src='siman-video-692-wide.mp4?v=692';}
+  if(window.matchMedia&&matchMedia('(min-width:900px)').matches){document.getElementById('video').classList.add('wide');v.poster='siman-video-692-wide.jpg?v=693';v.src='siman-video-692-wide.mp4?v=693';}
+  // Hebrew subtitles, off until the viewer turns them on in the player's menu (added after the source is chosen, so they load with it)
+  var tr=document.createElement('track');tr.kind='subtitles';tr.srclang='he';tr.label='עברית';tr.src='siman-video-692.vtt?v=693';v.appendChild(tr);
   var calm=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
   function dropBtn(){if(s&&s.parentNode)s.remove();}
   s.addEventListener('click',function(){v.muted=false;v.loop=false;v.currentTime=0;v.play();dropBtn();});
