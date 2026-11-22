@@ -169,7 +169,7 @@ let LW=null;
 const HOOK={
   ready:()=>!!window.Tesseract||typeof TESS_URL!=='undefined',
   async ocrLine(c){
-    if(!LW){if(!window.Tesseract)await loadScript(TESS_URL);LW=await Tesseract.createWorker('heb',1);await LW.setParameters({tessedit_pageseg_mode:'7'});}
+    if(!LW){if(!window.Tesseract)await loadScript(TESS_URL);LW=await Tesseract.createWorker('heb',1,typeof TESS_OPT!=='undefined'?TESS_OPT:{});await LW.setParameters({tessedit_pageseg_mode:'7'});}
     const{data}=await LW.recognize(c);return data.text||'';},
   async done(){if(LW){try{await LW.terminate();}catch(_){}LW=null;}}
 };

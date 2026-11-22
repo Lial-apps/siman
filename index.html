@@ -1353,7 +1353,7 @@ body:has(#wed) .busy,body:has(#xed) .busy,body:has(#ped) .busy{z-index:1000}body
 </dialog>
 
 <header class="bar">
-  <div class="brand"><b title="גרסה 6.9.5">סימן</b><span class="ver">6.9.5</span><span class="fname" id="fname"></span></div>
+  <div class="brand"><b title="גרסה 6.9.6">סימן</b><span class="ver">6.9.6</span><span class="fname" id="fname"></span></div>
 
   <nav class="tools" id="tools" aria-label="כלים">
     <button class="tool" data-tool="select" aria-pressed="true" title="בחירה וגלילה (V)">
@@ -3744,13 +3744,17 @@ setTool('select');
 /* =====================================================================
    OCR — Hebrew + English text recognition for scanned pages (tesseract.js, loaded on demand)
    ===================================================================== */
-const TESS_URL='https://cdn.jsdelivr.net/npm/tesseract.js@7.0.0/dist/tesseract.min.js';
+// 6.9.6: the text-recognition engine is served from סימן's own site (./ocr/), not from cdn.jsdelivr.net: one outside
+// site less to depend on, and after the first use it also works with no internet (kept by the service worker)
+const TESS_BASE=new URL('./ocr',location.href).href;
+const TESS_URL=TESS_BASE+'/tesseract.min.js';
+const TESS_OPT={workerPath:TESS_BASE+'/worker.min.js',corePath:TESS_BASE,langPath:TESS_BASE};
 let tessWorker=null,tessLog=null;
 function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=()=>rej(new Error('הטעינה נכשלה'));document.head.append(s);});}
 async function getTess(){
   if(!window.Tesseract)await loadScript(TESS_URL);
   // 5.9.6: the download of the engine shows how far it got; a failed start is not kept (the next try starts clean)
-  if(!tessWorker)tessWorker=Tesseract.createWorker(['heb','eng'],1,{logger:m=>{if(tessLog&&m.status==='recognizing text')tessLog(m);else if(/load|download|init/i.test(m.status||'')&&m.progress!=null){const b=$('busyMsg');if(b&&!$('busy').classList.contains('hidden'))b.textContent=`מוריד את מנוע זיהוי הטקסט (פעם אחת)… ${Math.round(m.progress*100)}%`;}}}).catch(e=>{tessWorker=null;throw e;});
+  if(!tessWorker)tessWorker=Tesseract.createWorker(['heb','eng'],1,{...TESS_OPT,logger:m=>{if(tessLog&&m.status==='recognizing text')tessLog(m);else if(/load|download|init/i.test(m.status||'')&&m.progress!=null){const b=$('busyMsg');if(b&&!$('busy').classList.contains('hidden'))b.textContent=`מוריד את מנוע זיהוי הטקסט (פעם אחת)… ${Math.round(m.progress*100)}%`;}}}).catch(e=>{tessWorker=null;throw e;});
   return tessWorker;
 }
 function resetTess(){const w=tessWorker;tessWorker=null;if(w)Promise.resolve(w).then(x=>x.terminate()).catch(()=>{});}
@@ -5757,7 +5761,7 @@ if('launchQueue' in window){
 }
 </script>
 <script src="siman-guard.js?v=6.4"></script>
-<script src="siman-plus.js?v=6.9.5"></script>
+<script src="siman-plus.js?v=6.9.6"></script>
 <script>
 /* =====================================================================
    4.7 — launch period (4 months per user) + feature-use counting

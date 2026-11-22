@@ -3086,7 +3086,7 @@ getTess = async function () {
   if (tessWorker && tessWorker._siman !== ocrPref) { const old = tessWorker; tessWorker = null; try { (await old).terminate(); } catch (_) {} }
   if (!tessWorker) {
     const lang = ocrPref;
-    tessWorker = Tesseract.createWorker(OCR_SETS[lang], 1, { logger: m => {
+    tessWorker = Tesseract.createWorker(OCR_SETS[lang], 1, { ...TESS_OPT, logger: m => {
       if (tessLog && m.status === 'recognizing text') tessLog(m);
       else if (/load|download|init/i.test(m.status || '') && m.progress != null) { const b = $('busyMsg'); if (b && !$('busy').classList.contains('hidden')) b.textContent = `מוריד את מנוע זיהוי הטקסט (פעם אחת)… ${Math.round(m.progress * 100)}%`; }
     } }).catch(e => { tessWorker = null; throw e; });
