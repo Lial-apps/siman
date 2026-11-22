@@ -1487,9 +1487,21 @@ const SC = {
     if (!dlg.open) dlg.showModal();
     if (src === 'doc' && S.doc) this.fromDoc();
   },
+  // 6.9.5: a reading kept on the device (pages that waited for the service): offered before a new one starts
+  kept() { return !!Q.job; },
+  openKept(onNew) {
+    if (typeof needReg === 'function' && needReg()) { showReg(); return; }
+    this.pages = []; this.tray = []; this.stop = false; this.running = false; this.onFail = this.onOk = null;
+    const b = this.body(); this.foot().classList.add('hidden');
+    b.innerHTML = '<div class="sc-pick"><h3>יש קריאה שמורה במכשיר</h3></div>';
+    Q.banner(b.firstChild, onNew);
+    if (!dlg.open) dlg.showModal();
+  },
   close() {
     // 5.9.6: closing while a page is being read stops the request itself (before, the window waited for it)
     if (this.running) { this.stop = true; if (this.ctl) this.ctl.abort(); }
+    // 6.9.5: pages that wait in the queue are kept on the device with the text read so far: nothing is lost by closing
+    else if (Q.live()) { this.keepEdits(); Q.save(); toast('העמודים נשמרו במכשיר. הקריאה תמשיך לבד כשהשירות החכם יחזור, ואפשר לחזור אליהם מ"מדף למסמך"'); }
     else if ((this.pages.some(p => p.blocks) || this.tray.length) && !confirm('לסגור? הטקסט שזוהה לא יישמר')) return;
     dlg.close();
     if (this.onFail && !this.pages.some(p => p.blocks)) { const f = this.onFail; this.onFail = this.onOk = null; f(); }
@@ -1512,6 +1524,7 @@ const SC = {
       <p class="sc-fine">התמונות נשלחות לזיהוי אצל Google Gemini ולא נשמרות אצלנו. בשירות החינמי Google עשויה להשתמש בהן לשיפור השירות שלה, לכן לא כדאי לסרוק כך מסמכים רגישים במיוחד (תעודות זהות, מסמכים רפואיים). דף מודפס נקרא בכמה שניות; כתב יד לוקח יותר.</p>
     </div>`;
     if (docN) b.querySelector('[data-s=doc] span').textContent = `${dispName(S.office ? S.office.name : S.name)} · ${docN} ${docN === 1 ? 'עמוד' : 'עמודים'}`;
+    Q.banner(b.querySelector('.sc-pick'));
     const sel = b.querySelector('[data-o=hint]'); sel.value = this.hint; sel.onchange = () => { this.hint = sel.value; };
     const q = b.querySelector('[data-o=quality]'); q.value = this.quality; q.onchange = () => { this.quality = q.value; try { localStorage.setItem('siman.scan.q', q.value); } catch (_) {} };
     b.querySelector('[data-s=cam]').onclick = () => camIn.click();
@@ -1623,9 +1636,11 @@ const SC = {
   async run(pics, pre = '', append = false) {
     this.keepEdits();
     const fresh = pics.map(p => ({ ...p, blocks: null, err: null }));
+    const wasLive = Q.live();
     if (append) this.pages = this.pages.filter(p => p.blocks || p.err);
     const start = append ? this.pages.length : 0;
     this.pages = append ? this.pages.concat(fresh) : fresh;
+    if (wasLive && append) Q.job.pages = this.pages;      // pages added to a kept reading stay part of it
     this.running = true; this.stop = false; this.ctl = new AbortController();
     // 6.6.4: the screen stays on while the pages are read (when it went off, the phone cut the line to the service)
     let wake = null; try { if (navigator.wakeLock) wake = await navigator.wakeLock.request('screen'); } catch (_) {}
@@ -1637,7 +1652,7 @@ const SC = {
     const st = b.querySelector('.sc-status'), lis = [...b.querySelectorAll('.sc-prog li')];
     // 6.6: printed pages are read two at a time (each is one quick request); handwriting stays one page at a time
     const par = (this.quality === 'auto' || this.quality === 'print') && fresh.length > 1 ? 2 : 1;
-    let nextI = 0, t00 = Date.now();
+    let nextI = 0, t00 = Date.now(), svcStop = '';
     const one = async i => {
       const p = fresh[i], li = lis[i], sp = li.querySelector('span');
       li.className = 'now'; sp.textContent = 'קורא…';
@@ -1651,9 +1666,11 @@ const SC = {
         li.className = 'ok'; sp.textContent = (p.blocks.length ? `${p.blocks.length} קטעים · ${Math.round((Date.now() - t0) / 1000)} שנ׳` : 'עמוד ריק') + (p.local ? ' · נקרא במכשיר' : '');
       } catch (e) {
         if (this.stop && e && e.name === 'AbortError') { li.className = ''; sp.textContent = 'נעצר'; return false; }
-        p.err = e.message || String(e); li.className = 'bad'; sp.textContent = 'לא נקרא';
+        p.err = e.message || String(e); li.className = 'bad';
+        // 6.9.5: the service could not take the page now: it waits in the queue and is read when the service is back
+        p.wait = Q.down(p.err); sp.textContent = p.wait ? 'מחכה בתור' : 'לא נקרא';
         // 6.9.4: a page the device tried too and could not read does not stop the other pages (they may be print)
-        if (/מכסה|לא הוקם|חוסם|אין חיבור/.test(p.err) && !p.localTried) { st.textContent = p.err; this.stop = true; if (this.ctl) this.ctl.abort(); return false; }
+        if (/מכסה|לא הוקם|חוסם|אין חיבור/.test(p.err) && !p.localTried) { st.textContent = p.err; if (p.wait) svcStop = p.err; this.stop = true; if (this.ctl) this.ctl.abort(); return false; }
       }
       return true;
     };
@@ -1667,8 +1684,13 @@ const SC = {
     await Promise.all(Array.from({ length: par }, lane));
     this.running = false;
     try { if (wake) await wake.release(); } catch (_) {}
+    // 6.9.5: the reading stopped because the service is out (not by the user): the pages it never got to wait too
+    if (svcStop) for (const p of fresh) if (!p.blocks && !p.err) { p.err = svcStop; p.wait = true; }
+    const waiting = this.pages.filter(p => p.wait && !p.blocks).length;
+    const queued = waiting ? await Q.keep(this) : false;
+    if (!waiting && Q.live()) Q.save();
     const done = this.pages.filter(p => p.blocks);
-    if (!done.length && !append) {
+    if (!done.length && !append && !queued) {
       st.textContent = (this.pages.find(p => p.err) || {}).err || (this.stop ? 'הקריאה נעצרה' : 'לא זוהה טקסט');
       f.innerHTML = '<span class="hint" style="margin-inline-end:auto"></span>' + (this.onFail ? '<button class="btn primary" type="button" data-a="back">חזרה לעמודים שצילמתי</button> ' : '') + '<button class="btn" type="button" data-a="again">התחלה מחדש</button>';
       f.querySelector('[data-a=again]').onclick = () => { this.onFail = this.onOk = null; this.pick(); };
@@ -1678,7 +1700,10 @@ const SC = {
     }
     if (this.onOk) { const fn = this.onOk; this.onFail = this.onOk = null; try { fn(); } catch (_) {} }
     const nLoc = fresh.filter(p => p.blocks && p.local).length;
-    if (nLoc) toast(`השירות החכם לא היה זמין, אז ${nLoc === 1 ? 'עמוד אחד נקרא' : nLoc + ' עמודים נקראו'} במכשיר עצמו. מילים לא בטוחות מסומנות, ואפשר לקרוא שוב בשירות החכם אחר כך`);
+    // (said inside the window: the app's own toasts are covered by it)
+    if (queued) this.msg = (`${waiting === 1 ? 'עמוד אחד מחכה' : waiting + ' עמודים מחכים'} בתור: השירות החכם לא זמין כרגע. העמודים נשמרו במכשיר וייקראו לבד כשהשירות יחזור, כל עוד סימן פתוח. אין צורך לצלם שוב`);
+    else if (waiting) this.msg = 'השירות החכם לא זמין כרגע. העמודים האלה לא נכנסו לתור, כי קריאה שמורה קודמת עדיין מחכה במכשיר (או שלא נשאר בו מקום). אפשר ללחוץ "לקרוא את העמוד שוב" מאוחר יותר, בלי לסגור את החלון';
+    else if (nLoc) this.msg = (`השירות החכם לא היה זמין, אז ${nLoc === 1 ? 'עמוד אחד נקרא' : nLoc + ' עמודים נקראו'} במכשיר עצמו. מילים לא בטוחות מסומנות, ואפשר לקרוא שוב בשירות החכם אחר כך`);
     this.review();
   },
   keepEdits() { for (const p of this.pages) if (p.ed && p.ed.isConnected) p.html = p.ed.innerHTML; },
@@ -1687,11 +1712,12 @@ const SC = {
     const b = this.body();
     b.innerHTML = '<div class="sc-rev"></div>';
     const rev = b.firstChild;
+    if (this.msg) { const n = h('<p class="sc-note" role="status"></p>'); n.textContent = this.msg; b.prepend(n); this.msg = ''; }
     this.pages.forEach((p, i) => {
       if (!p.blocks && !p.err) return;
-      const row = h(`<section class="sc-pg" aria-label="עמוד ${i + 1}"><figure><img alt="המקור, עמוד ${i + 1}" src="${p.url}"><figcaption>המקור · עמוד ${i + 1}${p.err ? ' · לא נקרא: ' + esc(p.err) : ''}${p.local ? '<span class="sc-local"> · נקרא במכשיר, כי השירות החכם לא היה זמין</span>' : ''} · <button type="button" class="sc-again">${p.local ? 'לקרוא שוב בשירות החכם' : 'לקרוא את העמוד שוב במצב מדויק'}</button></figcaption></figure><div class="sc-ed" contenteditable="true" spellcheck="true"></div></section>`);
+      const row = h(`<section class="sc-pg" aria-label="עמוד ${i + 1}"><figure><img alt="המקור, עמוד ${i + 1}" src="${p.url}"><figcaption>המקור · עמוד ${i + 1}${p.err ? `<span class="sc-state" title="${esc(p.err)}"> · ${p.wait && Q.has(p) ? 'מחכה בתור: ייקרא לבד כשהשירות החכם יחזור' : 'לא נקרא: ' + esc(p.err)}</span>` : ''}${p.local ? '<span class="sc-local"> · נקרא במכשיר, כי השירות החכם לא היה זמין</span>' : ''} · <button type="button" class="sc-again">${p.local ? 'לקרוא שוב בשירות החכם' : 'לקרוא את העמוד שוב במצב מדויק'}</button></figcaption></figure><div class="sc-ed" contenteditable="true" spellcheck="true"></div></section>`);
       const ed = row.querySelector('.sc-ed');
-      ed.innerHTML = p.html != null ? p.html : p.blocks && p.blocks.length ? blocksHtml(p.blocks) : '<p class="empty">לא זוהה טקסט בעמוד הזה. אפשר להקליד כאן.</p>';
+      ed.innerHTML = p.html != null ? p.html : p.blocks && p.blocks.length ? blocksHtml(p.blocks) : p.wait && Q.has(p) ? '<p class="empty" style="position:static;display:block;padding:0">העמוד מחכה בתור. הטקסט יופיע כאן כשהשירות החכם יחזור. אפשר גם להקליד כאן.</p>' : '<p class="empty" style="position:static;display:block;padding:0">לא זוהה טקסט בעמוד הזה. אפשר להקליד כאן.</p>';
       ed.dir = p.blocks && p.blocks.length ? (blocksRtl(p.blocks) ? 'rtl' : 'ltr') : 'rtl';
       ed.addEventListener('focus', () => { try { document.execCommand('defaultParagraphSeparator', false, 'p'); } catch (_) {} });
       ed.addEventListener('input', () => { ed.querySelectorAll('mark').forEach(m => { if (!m.textContent.trim()) m.remove(); }); this.count(); });
@@ -1701,7 +1727,7 @@ const SC = {
       row.querySelector('.sc-again').onclick = () => this.again(i, row);
       if (this.pages.filter(x => x.blocks || x.err).length > 1) {
         const del = h('<button type="button" class="sc-del">הסרת העמוד</button>');
-        del.onclick = () => { if (!confirm(`להסיר את עמוד ${i + 1} מהקובץ?`)) return; this.keepEdits(); this.pages.splice(i, 1); this.review(); };
+        del.onclick = () => { if (!confirm(`להסיר את עמוד ${i + 1} מהקובץ?`)) return; this.keepEdits(); this.pages.splice(i, 1); Q.save(); this.review(); };
         row.querySelector('figcaption').append(' · ', del);
       }
       rev.append(row);
@@ -1726,13 +1752,14 @@ const SC = {
   async again(i, row) {
     const p = this.pages[i], btn = row.querySelector('.sc-again'), ed = row.querySelector('.sc-ed');
     if (this.running) return;
+    if (Q.busy) { btn.textContent = 'העמודים שבתור נקראים עכשיו, עוד רגע…'; return; }
     this.running = true; btn.disabled = true;
     const t0 = Date.now(), clock = setInterval(() => { btn.textContent = `קורא שוב… ${Math.round((Date.now() - t0) / 1000)} שנ׳`; }, 1000);
     try {
       // 6.9.4: a page that was read on the device is print: the service reads it again as print (handwriting is still found)
       const raw = await readPage(p, this.hint, p.local ? 'auto' : 'accurate', {});
       const bl = parseBlocks(raw);
-      if (bl.length) { const lc = row.querySelector('.sc-local'); if (lc) lc.remove(); p.blocks = bl; p.html = null; ed.innerHTML = blocksHtml(bl); ed.dir = blocksRtl(bl) ? 'rtl' : 'ltr'; this.count(); btn.textContent = 'נקרא שוב ✓'; }
+      if (bl.length) { row.querySelectorAll('.sc-local, .sc-state').forEach(x => x.remove()); p.err = null; p.wait = false; p.lang = bl.lang; p.blocks = bl; p.html = null; Q.save(); ed.innerHTML = blocksHtml(bl); ed.dir = blocksRtl(bl) ? 'rtl' : 'ltr'; this.count(); btn.textContent = 'נקרא שוב ✓'; }
       else btn.textContent = 'לא זוהה טקסט';
     } catch (e) { btn.textContent = 'נכשל: ' + (e.message || e); btn.disabled = false; }
     finally { clearInterval(clock); this.running = false; }
@@ -1751,6 +1778,7 @@ const SC = {
   },
   // after saving: where the file went, and two ways out if the phone did not keep it
   saved(name, bytes, k, n) {
+    Q.saved();
     const f = this.foot(); f.querySelectorAll('.sc-saved').forEach(x => x.remove());
     const box = h(`<div class="sc-saved" role="status"><b></b><span></span><div class="sc-saved-a"><button class="btn" type="button" data-s="open">פתיחת הקובץ עכשיו</button></div></div>`);
     box.querySelector('b').textContent = savedNote(k, n);
@@ -1780,7 +1808,7 @@ const SC = {
         return;
       }
       const bytes = blocksDocx(pages);
-      if (kind === 'edit') { dlg.close(); await openWordEditor(bytes, base + '.docx'); return; }
+      if (kind === 'edit') { this.keepEdits(); Q.save(); Q.saved(); dlg.close(); await openWordEditor(bytes, base + '.docx'); return; }
       if (await saveBytes(base + '.docx', bytes, 'docx')) this.saved(base + '.docx', bytes, 'Word', pages.length); else this.count();
     } catch (e) { console.error(e); this.note('השמירה נכשלה: ' + (e.message || e)); }
   },
@@ -1792,7 +1820,119 @@ dlg.addEventListener('cancel', e => { if (SC.running || SC.pages.some(p => p.blo
 camIn.onchange = e => { const f = [...e.target.files]; e.target.value = ''; SC.fromImages(f, true); };
 imgIn.onchange = e => { const f = [...e.target.files]; e.target.value = ''; SC.fromImages(f); };
 pdfIn.onchange = e => { const f = e.target.files[0]; e.target.value = ''; SC.fromPdf(f); };
+/* 6.9.5: THE QUEUE. Pages the smart service could not take (its daily share is used up, it is busy, no internet)
+   are not lost and need not be photographed again: the whole reading (the pictures, the text read so far, the
+   corrections) is kept on this device (IndexedDB "siman-scanq", nothing is sent anywhere), and the waiting pages
+   are tried again by themselves while סימן is open: 5 minutes after "busy", 30 after "daily share", at once
+   when the internet is back. Each round starts with one page: while the service is still out, nothing more is
+   sent. The reading is offered again on the first screen of מדף למסמך until it is saved or deleted.
+   One reading at a time: Q.job.pages is the same list the review screen shows while it is open (Q.live). */
+const Q = {
+  job: null, busy: false, next: 0,
+  down: m => /מכסה|עמוס|אין חיבור|נקטע|יותר מדי זמן|שגיאה מהשרת/.test(m || ''),
+  has(p) { return !!this.job && this.job.pages.includes(p); },
+  live() { return !!this.job && this.job.pages === SC.pages; },
+  left() { return this.job ? this.job.pages.filter(p => p.wait && !p.blocks).length : 0; },
+  db() {
+    return new Promise((res, rej) => {
+      const r = indexedDB.open('siman-scanq', 1);
+      r.onupgradeneeded = () => r.result.createObjectStore('job');
+      r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+    });
+  },
+  async store(val) {
+    const d = await this.db();
+    try { await new Promise((res, rej) => { const t = d.transaction('job', 'readwrite'); if (val) t.objectStore('job').put(val, 'job'); else t.objectStore('job').delete('job'); t.oncomplete = res; t.onerror = t.onabort = () => rej(t.error); }); }
+    finally { d.close(); }
+  },
+  // the reading as plain data (the review screen's own elements stay out)
+  async save() {
+    const j = this.job; if (!j) return true;
+    if (this.live()) { j.name = SC.name; j.hint = SC.hint; }
+    const pages = j.pages.map(p => ({ url: p.url, b64: p.b64, w: p.w, h: p.h, strips: p.strips || [], lines: p.lines || null, lines2: p.lines2 || null, kind: p.kind || null, local: !!p.local, err: p.err || null, wait: !!p.wait, tries: p.tries || 0, html: p.ed && p.ed.isConnected ? p.ed.innerHTML : p.html != null ? p.html : null, blocks: p.blocks ? [...p.blocks] : null, lang: (p.blocks && p.blocks.lang) || p.lang || null }));
+    try { await this.store({ t: j.t, hint: j.hint, quality: j.quality, name: j.name, pages }); return true; }
+    catch (e) { console.warn('queue: not kept', e); return false; }
+  },
+  // called when a reading ended with pages that wait; false = they could not be kept (said in the page's own line)
+  async keep(sc) {
+    if (this.job && !this.live()) return false;            // an older reading still waits: it is not written over
+    const had = this.job;
+    this.job = { t: Date.now(), hint: sc.hint, quality: sc.quality, name: sc.name, pages: sc.pages };
+    if (!(await this.save())) { this.job = had || null; return false; }
+    if (!had || !this.next) this.next = Date.now() + (sc.pages.some(p => p.wait && /מכסה/.test(p.err || '')) ? 30 : 5) * 60000;
+    return true;
+  },
+  async drop() { this.job = null; try { await this.store(null); } catch (_) {} },
+  // the document was saved: with nothing left to wait for, the kept reading has done its work
+  saved() { if (this.live() && !this.left()) this.drop(); },
+  async load() {
+    try {
+      const d = await this.db(); let j;
+      try { j = await new Promise((res, rej) => { const r = d.transaction('job').objectStore('job').get('job'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); } finally { d.close(); }
+      if (!j || !Array.isArray(j.pages) || !j.pages.length) return;
+      for (const p of j.pages) if (p.blocks) p.blocks.lang = p.lang || null;
+      this.job = j;
+      if (this.left()) this.next = Date.now() + 20000;
+    } catch (e) { console.warn('queue: not loaded', e); }
+  },
+  // the first screen of מדף למסמך: the kept reading, to go on with or to delete
+  banner(box, onNew) {
+    const j = this.job; if (!j || !box) return;
+    const n = j.pages.length, w = this.left(), day = (() => { try { return new Date(j.t).toLocaleDateString('he-IL', { day: 'numeric', month: 'long' }); } catch (_) { return ''; } })();
+    const el = h(`<div class="sc-queue" role="status" style="border:1.5px solid currentColor;border-radius:12px;padding:12px 14px;margin:0 0 14px;display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center"><span style="flex:1 1 240px"></span><button class="btn primary" type="button" data-q="open"></button><button class="btn" type="button" data-q="del">מחיקה</button></div>`);
+    el.querySelector('span').textContent = `קריאה שמורה${day ? ' מ-' + day : ''}: ${n === 1 ? 'עמוד אחד' : n + ' עמודים'}. ` + (w ? `${w === 1 ? 'עמוד אחד מחכה' : w + ' עמודים מחכים'} לשירות החכם וייקראו לבד כשהוא יחזור.` : 'כל העמודים נקראו. אפשר לבדוק ולשמור.');
+    el.querySelector('[data-q=open]').textContent = w ? 'לפתיחה ולהמשך' : 'לבדיקה ולשמירה';
+    el.querySelector('[data-q=open]').onclick = () => { SC.pages = j.pages; SC.tray = []; SC.hint = j.hint || ''; SC.name = j.name || ''; SC.review(); if (w && navigator.onLine !== false) this.next = Math.min(this.next || Infinity, Date.now() + 3000); };
+    el.querySelector('[data-q=del]').onclick = async () => { if (!confirm('למחוק את הקריאה השמורה? העמודים והטקסט שנקרא יימחקו מהמכשיר')) return; await this.drop(); el.remove(); if (onNew) { dlg.close(); onNew(); } };
+    if (onNew) { const nb = h('<button class="btn" type="button">קריאה חדשה</button>'); nb.title = 'הקריאה השמורה נשארת במכשיר'; nb.onclick = () => { dlg.close(); onNew(); }; el.append(nb); box.append(el); return; }
+    box.prepend(el);
+  },
+  // one round: the waiting pages one after another; the first one that the service cannot take ends the round
+  async tick() {
+    const j = this.job;
+    if (this.busy || SC.running || !j || !this.left() || navigator.onLine === false || Date.now() < this.next) return;
+    this.busy = true; let got = 0, wait = 5;
+    try {
+      for (const p of j.pages.filter(x => x.wait && !x.blocks)) {
+        if (this.job !== j || !j.pages.includes(p)) break;
+        try {
+          const raw = await readPage(p, j.hint, j.quality, {});
+          const bl = parseBlocks(raw);
+          p.blocks = bl; p.lang = bl.lang; p.err = null; p.wait = false; got++;
+          this.show(p);
+        } catch (e) {
+          const m = (e && e.message) || String(e);
+          p.err = m;
+          if (!this.down(m)) { p.wait = false; this.show(p); continue; }       // not the service: this page itself is not readable
+          if (/מכסה/.test(m)) wait = 30;
+          else if (!/אין חיבור/.test(m) && (p.tries = (p.tries || 0) + 1) >= 6) { p.wait = false; this.show(p); }
+          break;
+        } finally { if (this.job === j) await this.save(); }
+        await sleep(1200);
+      }
+    } finally { this.busy = false; this.next = Date.now() + wait * 60000; }
+    if (got && this.job === j) {
+      const w = this.left(), open = dlg.open && this.live();
+      const msg = `${got === 1 ? 'עמוד אחד שחיכה בתור נקרא' : got + ' עמודים שחיכו בתור נקראו'}${w ? ` · עוד ${w} מחכים` : ''}${open ? '' : ' · פותחים את "מדף למסמך" כדי לבדוק ולשמור'}`;
+      if (!dlg.open) toast(msg);
+      else if (open) { let n = dlg.querySelector('.sc-body > .sc-note'); if (!n) { n = h('<p class="sc-note" role="status"></p>'); SC.body().prepend(n); } n.textContent = msg; SC.count(); }
+    }
+  },
+  // the page's row on the review screen, when it is on screen (text the user typed meanwhile is never written over)
+  show(p) {
+    const ed = p.ed; if (!ed || !ed.isConnected || !this.live()) return;
+    const row = ed.closest('.sc-pg'), st = row && row.querySelector('.sc-state');
+    if (p.blocks) {
+      if (st) st.remove();
+      if (p.blocks.length && (ed.querySelector('.empty') || !ed.textContent.trim())) { p.html = null; ed.innerHTML = blocksHtml(p.blocks); ed.dir = blocksRtl(p.blocks) ? 'rtl' : 'ltr'; }
+    } else if (st) st.textContent = ' · לא נקרא: ' + (p.err || '');
+  },
+};
+Q.load();
+setInterval(() => { Q.tick().catch(e => console.warn('queue', e)); }, 30000);
+window.addEventListener('online', () => { if (Q.left()) Q.next = Date.now() + 4000; });
 window.SIMAN_SCAN = SC;
+window.SIMAN_SCAN_Q = Q;
 window.SIMAN_AI = ai;
 
 /* =====================================================================

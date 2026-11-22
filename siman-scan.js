@@ -2028,7 +2028,8 @@ function hook() {
   if (SC.openReader) return true;
   const orig = SC.open.bind(SC);
   SC.openReader = orig;
-  SC.open = function (src) { if (src === 'doc') return orig(src); CAM.open(); };
+  // 6.9.5: pages that waited for the smart service are kept on the device: they are offered before a new reading
+  SC.open = function (src) { if (src === 'doc') return orig(src); if (SC.kept && SC.kept()) return SC.openKept(() => CAM.open()); CAM.open(); };
   return true;
 }
 if (!hook()) { let n = 0; const t = setInterval(() => { if (hook() || ++n > 40) clearInterval(t); }, 250); }
