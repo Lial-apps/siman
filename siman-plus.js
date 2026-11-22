@@ -756,11 +756,11 @@ window.SIMAN_TABS = { TB, switchTo, closeTab, mergeAll, zipAll, openMany, tabInf
 // 6.6.2: answers already given in this session (see askQ), keyed by a short fingerprint of the document text
 const ASK_CACHE = new Map();
 const textSig = t => { let h = 2166136261; for (let i = 0; i < t.length; i++) { h ^= t.charCodeAt(i); h = Math.imul(h, 16777619); } return t.length + ':' + (h >>> 0).toString(36); };
-async function ai(payload, { onWait, signal, timeout = 300000, once = false } = {}) {
+async function ai(payload, { onWait, signal, timeout = 300000, once = false, tries: maxTries = 4 } = {}) {
   // 6.2: the smart services run on our server: they ask for an email first (the tools on the device do not)
   if (window.cloudGate && !cloudGate('ai')) throw new Error(window.CLOUD_REG_MSG || 'צריך להירשם עם מייל');
   // 6.6.1: once = a quick helper request (the page edges): one try, no waiting, it is only a help
-  const tries = once ? 1 : 4;
+  const tries = once ? 1 : (maxTries || 4);
   let bgRetries = 0;
   for (let attempt = 0; attempt < tries; attempt++) {
     // 5.9.6: with no internet at all there is nothing to wait for (before: three retries, 30 seconds of "working")
@@ -1643,16 +1643,17 @@ const SC = {
       li.className = 'now'; sp.textContent = 'קורא…';
       const t0 = Date.now(), lineOf = () => `${pre}קורא ${fresh.length > 1 ? `את העמודים: ${fresh.filter(x => x.blocks || x.err).length} מתוך ${fresh.length} מוכנים` : 'את העמוד'}`;
       let line = lineOf(); st.textContent = line + '…';
-      let hand = false;
-      const clock = setInterval(() => { const sec = Math.round((Date.now() - t0) / 1000); if (!/שורה|בודק/.test(sp.textContent)) sp.textContent = `${hand ? 'כתב יד: קורא בזהירות…' : 'קורא…'} ${sec} שנ׳`; line = lineOf(); st.textContent = `${line} · ${Math.round((Date.now() - t00) / 1000)} שניות${hand && sec > 45 ? ' (דף כתב יד צפוף לוקח לפעמים עד שתי דקות)' : ''}`; }, 1000);
+      let hand = false, loc = false;
+      const clock = setInterval(() => { const sec = Math.round((Date.now() - t0) / 1000); if (!/שורה|בודק/.test(sp.textContent)) sp.textContent = `${loc ? 'קורא במכשיר…' : hand ?'כתב יד: קורא בזהירות…' : 'קורא…'} ${sec} שנ׳`; line = lineOf(); st.textContent = `${line} · ${Math.round((Date.now() - t00) / 1000)} שניות${hand && sec > 45 ? ' (דף כתב יד צפוף לוקח לפעמים עד שתי דקות)' : ''}`; }, 1000);
       try {
-        const raw = await readPage(p, this.hint, this.quality, { signal: this.ctl.signal, onHand: () => { hand = true; sp.textContent = 'כתב יד: קורא בזהירות…'; }, onWait: s => { st.textContent = `השירות עמוס, ממשיך בעוד ${s} שניות…`; }, onLines: (d, n) => { sp.textContent = `שורה ${d} מתוך ${n}`; }, onCheck: () => { sp.textContent = 'בודק את כל הדף שוב…'; } }).finally(() => clearInterval(clock));
+        const raw = await readPage(p, this.hint, this.quality, { signal: this.ctl.signal, local: true, onLocal: () => { loc = true; sp.textContent = 'קורא במכשיר…'; }, onHand: () => { hand = true; sp.textContent = 'כתב יד: קורא בזהירות…'; }, onWait: s => { st.textContent = `השירות עמוס, ממשיך בעוד ${s} שניות…`; }, onLines: (d, n) => { sp.textContent = `שורה ${d} מתוך ${n}`; }, onCheck: () => { sp.textContent = 'בודק את כל הדף שוב…'; } }).finally(() => clearInterval(clock));
         p.blocks = parseBlocks(raw); p.lang = p.blocks.lang;
-        li.className = 'ok'; sp.textContent = p.blocks.length ? `${p.blocks.length} קטעים · ${Math.round((Date.now() - t0) / 1000)} שנ׳` : 'עמוד ריק';
+        li.className = 'ok'; sp.textContent = (p.blocks.length ? `${p.blocks.length} קטעים · ${Math.round((Date.now() - t0) / 1000)} שנ׳` : 'עמוד ריק') + (p.local ? ' · נקרא במכשיר' : '');
       } catch (e) {
         if (this.stop && e && e.name === 'AbortError') { li.className = ''; sp.textContent = 'נעצר'; return false; }
         p.err = e.message || String(e); li.className = 'bad'; sp.textContent = 'לא נקרא';
-        if (/מכסה|לא הוקם|חוסם|אין חיבור/.test(p.err)) { st.textContent = p.err; this.stop = true; if (this.ctl) this.ctl.abort(); return false; }
+        // 6.9.4: a page the device tried too and could not read does not stop the other pages (they may be print)
+        if (/מכסה|לא הוקם|חוסם|אין חיבור/.test(p.err) && !p.localTried) { st.textContent = p.err; this.stop = true; if (this.ctl) this.ctl.abort(); return false; }
       }
       return true;
     };
@@ -1676,6 +1677,8 @@ const SC = {
       return;
     }
     if (this.onOk) { const fn = this.onOk; this.onFail = this.onOk = null; try { fn(); } catch (_) {} }
+    const nLoc = fresh.filter(p => p.blocks && p.local).length;
+    if (nLoc) toast(`השירות החכם לא היה זמין, אז ${nLoc === 1 ? 'עמוד אחד נקרא' : nLoc + ' עמודים נקראו'} במכשיר עצמו. מילים לא בטוחות מסומנות, ואפשר לקרוא שוב בשירות החכם אחר כך`);
     this.review();
   },
   keepEdits() { for (const p of this.pages) if (p.ed && p.ed.isConnected) p.html = p.ed.innerHTML; },
@@ -1686,7 +1689,7 @@ const SC = {
     const rev = b.firstChild;
     this.pages.forEach((p, i) => {
       if (!p.blocks && !p.err) return;
-      const row = h(`<section class="sc-pg" aria-label="עמוד ${i + 1}"><figure><img alt="המקור, עמוד ${i + 1}" src="${p.url}"><figcaption>המקור · עמוד ${i + 1}${p.err ? ' · לא נקרא: ' + esc(p.err) : ''} · <button type="button" class="sc-again">לקרוא את העמוד שוב במצב מדויק</button></figcaption></figure><div class="sc-ed" contenteditable="true" spellcheck="true"></div></section>`);
+      const row = h(`<section class="sc-pg" aria-label="עמוד ${i + 1}"><figure><img alt="המקור, עמוד ${i + 1}" src="${p.url}"><figcaption>המקור · עמוד ${i + 1}${p.err ? ' · לא נקרא: ' + esc(p.err) : ''}${p.local ? '<span class="sc-local"> · נקרא במכשיר, כי השירות החכם לא היה זמין</span>' : ''} · <button type="button" class="sc-again">${p.local ? 'לקרוא שוב בשירות החכם' : 'לקרוא את העמוד שוב במצב מדויק'}</button></figcaption></figure><div class="sc-ed" contenteditable="true" spellcheck="true"></div></section>`);
       const ed = row.querySelector('.sc-ed');
       ed.innerHTML = p.html != null ? p.html : p.blocks && p.blocks.length ? blocksHtml(p.blocks) : '<p class="empty">לא זוהה טקסט בעמוד הזה. אפשר להקליד כאן.</p>';
       ed.dir = p.blocks && p.blocks.length ? (blocksRtl(p.blocks) ? 'rtl' : 'ltr') : 'rtl';
@@ -1726,9 +1729,10 @@ const SC = {
     this.running = true; btn.disabled = true;
     const t0 = Date.now(), clock = setInterval(() => { btn.textContent = `קורא שוב… ${Math.round((Date.now() - t0) / 1000)} שנ׳`; }, 1000);
     try {
-      const raw = await readPage(p, this.hint, 'accurate', {});
+      // 6.9.4: a page that was read on the device is print: the service reads it again as print (handwriting is still found)
+      const raw = await readPage(p, this.hint, p.local ? 'auto' : 'accurate', {});
       const bl = parseBlocks(raw);
-      if (bl.length) { p.blocks = bl; p.html = null; ed.innerHTML = blocksHtml(bl); ed.dir = blocksRtl(bl) ? 'rtl' : 'ltr'; this.count(); btn.textContent = 'נקרא שוב ✓'; }
+      if (bl.length) { const lc = row.querySelector('.sc-local'); if (lc) lc.remove(); p.blocks = bl; p.html = null; ed.innerHTML = blocksHtml(bl); ed.dir = blocksRtl(bl) ? 'rtl' : 'ltr'; this.count(); btn.textContent = 'נקרא שוב ✓'; }
       else btn.textContent = 'לא זוהה טקסט';
     } catch (e) { btn.textContent = 'נכשל: ' + (e.message || e); btn.disabled = false; }
     finally { clearInterval(clock); this.running = false; }
@@ -2402,10 +2406,10 @@ window.SIMAN_VOCAB = VOCAB;
    goes on to the careful handwriting reading. An older server that does not know "print" answers "unknown
    mode": then the reading goes on as before. */
 let PRINT_OK = true;
-async function readPrinted(p, hint, { onWait, signal } = {}) {
+async function readPrinted(p, hint, { onWait, signal, tries } = {}) {
   if (!PRINT_OK) return null;
   try {
-    const raw = await ai({ mode: 'print', image: p.b64, strips: p.strips || [], mime: 'image/jpeg', hint }, { timeout: 100000, onWait, signal });
+    const raw = await ai({ mode: 'print', image: p.b64, strips: p.strips || [], mime: 'image/jpeg', hint }, { timeout: 100000, onWait, signal, tries });
     let hand = false;
     try { hand = !!JSON.parse(String(raw).replace(/^\s*```(?:json)?|```\s*$/g, '')).hand; } catch (_) {}
     return { raw, hand };
@@ -2414,9 +2418,91 @@ async function readPrinted(p, hint, { onWait, signal } = {}) {
     throw e;
   }
 }
+/* 6.9.4: a printed page is read on the device itself when the smart service cannot take it (its daily share is
+   used up, it is busy, there is no internet). The engine is the one of the scanned-PDF tool (Tesseract); it
+   reads clean print well, and not handwriting. So the page is kept only when the engine is sure enough of
+   what it read: a page it is not sure of (handwriting, a blurred photo) fails with the service's own message,
+   as before. Words it is less sure of are marked for checking, like the service's. Asked for with
+   opts.local (מדף למסמך); checking works and exams never read on the device. */
+let AI_DOWN = 0, localChain = Promise.resolve();
+const LOCAL_BUL = /^\s*[•·▪●■○◆◦‣*\-–—]\s+/, LOCAL_NUM = /^\s*\(?(?:\d{1,2}|[א-ת])[.)]\s+/;
+function readLocal(p, hint, { signal, onLocal, min = 60 } = {}) {
+  const job = localChain.then(async () => {
+    if (signal && signal.aborted) throw new DOMException('stop', 'AbortError');
+    onLocal && onLocal();
+    const keep = ocrPref; if (OCR_SETS[hint]) ocrPref = hint;
+    let w; try { w = await getTess(); } finally { ocrPref = keep; }
+    const { data } = await w.recognize(p.url || 'data:image/jpeg;base64,' + p.b64, {}, { blocks: true, text: false });
+    if (signal && signal.aborted) throw new DOMException('stop', 'AbortError');
+    const paras = [], heights = []; let sum = 0, n = 0;
+    for (const b of data.blocks || []) for (const para of b.paragraphs || []) {
+      const lines = [];
+      for (const l of para.lines || []) {
+        const text = String(l.text || '').replace(/\s+/g, ' ').trim();
+        if (!text || (l.confidence != null && l.confidence < 25)) continue;
+        // the words the engine is not sure of are marked for checking (the line's own text keeps the reading order)
+        const low = new Map();
+        for (const x of l.words || []) {
+          const t = String(x.text || '').trim(); if (!t) continue;
+          sum += (x.confidence || 0) * t.length; n += t.length;
+          if (x.confidence < 62 && t.length > 1) low.set(t, (low.get(t) || 0) + 1);
+        }
+        const out = text.split(' ').map(t => { const k = low.get(t); if (!k) return t; low.set(t, k - 1); return '[[' + t + ']]'; }).join(' ');
+        const ht = l.bbox ? l.bbox.y1 - l.bbox.y0 : 0; if (ht) heights.push(ht);
+        lines.push({ text: out, plain: text, ht });
+      }
+      if (lines.length) paras.push(lines);
+    }
+    const conf = n ? sum / n : 0;
+    if (n < 8 || conf < min) throw Object.assign(new Error('the device is not sure of this page (' + Math.round(conf) + ')'), { weak: true });
+    const mid = heights.sort((a, b) => a - b)[heights.length >> 1] || 0, blocks = [];
+    for (const lines of paras) {
+      if (lines.length === 1 && mid && lines[0].ht > mid * 1.45 && lines[0].plain.length < 80) { blocks.push({ t: blocks.length ? 'h2' : 'h1', text: lines[0].text }); continue; }
+      let cur = null;
+      for (const l of lines) {
+        if (LOCAL_BUL.test(l.plain)) { blocks.push(cur = { t: 'li', text: l.text.replace(LOCAL_BUL, '') }); continue; }
+        if (!cur || LOCAL_NUM.test(l.plain)) { blocks.push(cur = { t: 'p', text: l.text }); continue; }
+        cur.text += ' ' + l.text;
+      }
+    }
+    const all = blocks.map(b => b.text).join(' '), cnt = re => (all.match(re) || []).length;
+    const he = cnt(/[֐-׿]/g), ar = cnt(/[؀-ۿ]/g), ru = cnt(/[Ѐ-ӿ]/g), la = cnt(/[A-Za-z]/g);
+    const top = Math.max(he, ar, ru, la), lang = top === he ? 'he' : top === ar ? 'ar' : top === ru ? 'ru' : 'en';
+    return JSON.stringify({ hand: false, lang, blocks, local: true });
+  });
+  localChain = job.catch(() => {});
+  return job;
+}
+// the last reading of a page says where it was read: p.local = on the device (a failed reading changes nothing)
 async function readPage(p, hint, quality, opts = {}) {
+  const was = !!p.local; p.local = false;
+  try { return await readPage0(p, hint, quality, opts); } catch (e) { p.local = was; throw e; }
+}
+async function readPage0(p, hint, quality, opts = {}) {
   if (quality === 'auto' || quality === 'print') {
-    const r = await readPrinted(p, hint, opts);
+    let r;
+    const canLocal = !!opts.local, min = quality === 'print' ? 35 : 60;
+    const local = async () => { p.localTried = true; const raw = await readLocal(p, hint, { signal: opts.signal, onLocal: opts.onLocal, min }); p.kind = 'print'; p.local = true; return raw; };
+    // the service just failed: the next pages go to the device first, without waiting for it again
+    let tried = false;
+    if (canLocal && Date.now() < AI_DOWN) {
+      tried = true;
+      try { return await local(); } catch (e) { if (e && e.name === 'AbortError') throw e; console.warn('reading on the device', e); }
+    }
+    try { r = await readPrinted(p, hint, canLocal ? Object.assign({}, opts, { tries: 2 }) : opts); }
+    catch (e) {
+      if (!canLocal || !e || e.name === 'AbortError' || /להירשם/.test(e.message || '')) throw e;
+      AI_DOWN = Date.now() + (/מכסה/.test(e.message || '') ? 20 : 3) * 60000;
+      const weak = () => { e.message += ' · המכשיר ניסה לקרוא את הדף בעצמו ולא היה בטוח במה שקרא (כתב יד או צילום לא חד)'; };
+      if (tried) { weak(); throw e; }          // the device already tried this page a moment ago
+      try { return await local(); }
+      catch (e2) {
+        if (e2 && e2.name === 'AbortError') throw e2;
+        console.warn('reading on the device', e2);
+        if (e2 && e2.weak) weak();
+        throw e;
+      }
+    }
     if (r && (quality === 'print' || !r.hand)) { p.kind = 'print'; return r.raw; }
     if (!r && quality === 'print') return ai({ mode: 'scan', image: p.b64, strips: p.strips || [], mime: 'image/jpeg', hint, quality: 'fast' }, { timeout: 150000, onWait: opts.onWait, signal: opts.signal });
     p.kind = 'hand'; opts.onHand && opts.onHand();
