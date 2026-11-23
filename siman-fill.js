@@ -1,5 +1,5 @@
 /* =====================================================================
-   סימן 5.9.6 — siman-fill.js
+   סימן 5.9.6 (6.9.7: תיבות עם שאלה, כותרות עמודות, רשימת כל המקומות) — siman-fill.js
    מילוי וחתימה: כשנפתח טופס, סימן מוצא בעצמו את המקומות למילוי
    · קווים ריקים (____ / .......), גם בטופס סרוק — לפי הציור של הדף
    · תאים ריקים בטבלה (מסגרת עם קווים מכל הצדדים ובלי טקסט בפנים)
@@ -38,7 +38,8 @@ const TX = {
   ru: { prev: 'Назад', save: 'Всё заполнено ✓ · Сохранить', badId: 'Номер ID не проходит проверку. Стоит проверить', badPhone: 'Номер телефона слишком короткий или длинный', badMail: 'Адрес почты выглядит неверно', addr: 'Адрес', email: 'Почта', tipK: 'Enter / Tab: далее · Shift+Tab: назад · Shift+Enter: новая строка' }
 };
 const LX = () => TX[LANG()] || TX.he;
-const kindName = t => { const k = t.kind === 'cell' ? (t.sub && t.sub !== 'text' ? t.sub : 'cell') : t.kind; return L().k[k] || LX()[k] || L().k.text; };
+const cleanLabel = s => String(s || '').replace(BLANK, ' ').replace(/[\[\]]\s*\d{1,2}\s*[\[\]]/g, ' ').replace(/(^|\s)[:：](?=\S)/g, '$1').replace(/\s+/g, ' ').replace(/^[\s:：–-]+|[\s:：–-]+$/g, '');
+const kindName = t => { const k = t.kind === 'cell' ? (t.sub && t.sub !== 'text' ? t.sub : t.inCell || t.area ? 'text' : 'cell') : t.kind; return L().k[k] || LX()[k] || L().k.text; };
 // what was typed before, kept only on this device: the next form suggests it (name, ID, phone, address, e-mail)
 const MEM_KEY = 'siman.fill.mem', MEM_KINDS = ['name', 'id', 'phone', 'addr', 'email'];
 const memGet = () => { try { return JSON.parse(localStorage.getItem(MEM_KEY) || '{}') || {}; } catch (_) { return {}; } };
@@ -120,6 +121,30 @@ body.fz-filling .a11y-fab,body.fz-filling .sb-back{visibility:hidden}
 [data-theme=dark] .fzp .row button.sun,[data-theme=dark] .fzbar .go{background:#F5CD3D;color:#2B1660}
 [data-theme=dark] .fzp .hd .cnt,[data-theme=dark] .fzp .tip{color:#B9AEE0}
 [data-theme=dark] .fzp .lens{border-color:#4B3F86}
+.fzp .q{font-size:14.5px;line-height:1.35;font-weight:600;margin:0 0 7px;max-height:4.1em;overflow-y:auto;overscroll-behavior:contain;unicode-bidi:plaintext}
+.fzp .q[hidden]{display:none}
+.fzp .hd .lab{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fzp .hd .ttl{flex:none}
+.fzp .hd .cnt{flex:none}
+.fzp .where{flex:none;display:flex;align-items:center;gap:6px;font:inherit;font-size:12.5px;color:inherit;background:#F4EEFF;border:1.5px solid #CFC4EA;border-radius:10px;padding:3px 8px 3px 5px;min-height:36px;cursor:pointer}
+.fzp .where .pg{position:relative;display:block;width:19px;height:26px;border:1.5px solid #2B1660;border-radius:2px;background:#fff;overflow:hidden;direction:ltr}
+.fzp .where .pg i{position:absolute;height:5px;min-width:5px;max-width:100%;background:#6B2BD9;border-radius:1px}
+.fzp .lens{max-height:min(128px,21vh);align-items:flex-start}
+@media (pointer:coarse){.fz.done:not(.check){pointer-events:auto}}
+.fzbar .lst{width:38px;padding:0;font-size:17px}
+.fzlist .pgh{position:sticky;top:-16px;z-index:1;background:#2B1660;color:#fff;font-size:13px;font-weight:700;border-radius:8px;padding:4px 10px;margin:10px 0 6px}
+.fzlist .it{display:flex;gap:10px;align-items:flex-start;width:100%;text-align:start;font:inherit;border:1.5px solid #E2D9F5;border-radius:12px;background:#fff;color:#2B1660;padding:9px 11px;margin:0 0 6px;cursor:pointer;min-height:48px}
+.fzlist .it .st{flex:none;width:22px;height:22px;border-radius:50%;border:2px solid #C99A00;background:#FFF5C7;display:grid;place-items:center;font-size:13px;font-weight:700;margin-top:1px}
+.fzlist .it.ok .st{border-color:#1B9E77;background:#2ED3A0;color:#0B3B2C}
+.fzlist .it.cur{border-color:#6B2BD9;box-shadow:0 0 0 2px rgba(107,43,217,.2)}
+.fzlist .it .bd{display:grid;gap:2px;min-width:0;flex:1}
+.fzlist .it b{font-size:14.5px;font-weight:600;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.fzlist .it .v{font-size:13.5px;color:#1C2333;unicode-bidi:plaintext;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fzlist .it .e{font-size:12.5px;color:#7D6FA3}
+[data-theme=dark] .fzp .where{background:#241D48;border-color:#4B3F86}
+[data-theme=dark] .fzlist .it{background:#241D48;color:#EDE9F7;border-color:#4B3F86}
+[data-theme=dark] .fzlist .it .v{color:#F4F1FF}
+[data-theme=dark] .fzlist .pgh{background:#C9B6FA;color:#1B1638}
 `;
 document.head.append(css);
 // 6.3: autofill, progress, "הפרטים שלי"
@@ -172,24 +197,29 @@ function kindOf1(t) {
   if (!t) return null;
   if (/חתימ|ח\s?ת\s?י\s?מ|signature|sign here|توقيع|подпис/i.test(t)) return 'sig';
   if (/תאריך|date|تاريخ|дата/i.test(t)) return 'date';
-  if (/(^|\s)ת\s?ז(\s|$)|תעודת זהות|מס(פר)?\s*זהות|\bid\b|identity|هوية|паспорт/i.test(t)) return 'id';
+  if (/(^|\s)ת\s?ז(\s|$)|תעודת ה?זהות|מס(פר)?\s*ה?זהות|\bid\b|identity|هوية|паспорт/i.test(t)) return 'id';
   if (/מייל|דוא\s?ל|e-?mail|بريد|почт/i.test(t)) return 'email';
   if (/טלפון|נייד|phone|mobile|هاتف|телефон/i.test(t)) return 'phone';
   if (/כתובת|רחוב|address|عنوان|адрес/i.test(t)) return 'addr';
-  if (/(^|\s)שם(\s|$)|משפחה|name|اسم|имя|фамил/i.test(t)) return 'name';
+  // (6.9.7: "שם המוסד" and "מספר הילדים במשפחה" are not a person's name)
+  if (/(^|\s)ה?שם(?!\s+ה?(?:מוסד|בית|חברה|עסק|בנק|סניף|גן|קופ|מעסיק|ארגון|עמות|רשות|יישוב|עיר|רחוב|תרופ|מקצוע|קורס|כיתה))(\s|$)|שם\s+ה?משפחה|name|اسم|имя|фамил/i.test(t)) return 'name';
   return 'text';
 }
 const BLANK = /_{3,}|\.{6,}|…{3,}|-{6,}|‗{3,}/g;
 const BOXCH = /[☐□▢◻❏❑⬜]/g;
 
+const flipRuns = s => s.split(/([_.…‗-]{3,})/).reverse().join('');
 async function textOf(page, vp) {
   const tc = await page.getTextContent();
   const out = [];
   for (const it of tc.items) {
     const s = String(it.str || ''); if (!s.trim()) continue;
+    // 6.9.7: a Hebrew line that is mostly a blank ("____ :שם") is kept by the file left to right. It is put back in
+    // reading order (the words, then the blank), and its letters are counted from its right
+    const vis = it.dir === 'ltr' && RTL_CH.test(s) && /[_.…‗-]{3,}/.test(s);
     const tx = it.transform, fh = Math.hypot(tx[2], tx[3]) || 10;
     const p1 = vp.convertToViewportPoint(tx[4], tx[5]), p2 = vp.convertToViewportPoint(tx[4] + (it.width || fh * s.length * .5), tx[5] + fh);
-    out.push({ s, fh, x0: Math.min(p1[0], p2[0]), x1: Math.max(p1[0], p2[0]), y0: Math.min(p1[1], p2[1]), y1: Math.max(p1[1], p2[1]), rtl: it.dir === 'rtl' || RTL_CH.test(s) });
+    out.push({ s: vis ? flipRuns(s) : s, fh, x0: Math.min(p1[0], p2[0]), x1: Math.max(p1[0], p2[0]), y0: Math.min(p1[1], p2[1]), y1: Math.max(p1[1], p2[1]), rtl: it.dir === 'rtl' || RTL_CH.test(s), prtl: vis || (it.dir ? it.dir === 'rtl' : RTL_CH.test(s)) });
   }
   return joinLine(out);
 }
@@ -208,13 +238,13 @@ function joinLine(items) {
     const row = ln.items.sort((a, b) => a.x0 - b.x0);
     let grp = [row[0]];
     const flush = () => {
-      if (grp.length === 1) { const t = grp[0]; t.segs = [{ i0: 0, i1: t.s.length, x0: t.x0, x1: t.x1, rtl: t.rtl, s: t.s, fh: t.fh }]; out.push(t); return; }
+      if (grp.length === 1) { const t = grp[0]; t.segs = [{ i0: 0, i1: t.s.length, x0: t.x0, x1: t.x1, rtl: t.prtl, s: t.s, fh: t.fh }]; out.push(t); return; }
       const rtl = grp.some(t => RTL_CH.test(t.s)) ? grp.filter(t => t.rtl).length * 2 >= grp.length || RTL_CH.test(grp[grp.length - 1].s) : false;
       const order = rtl ? [...grp].reverse() : grp;   // reading order: a Hebrew line starts at its right
       let s = '', prev = null; const segs = [];
       for (const t of order) {
         if (prev) { const gap = rtl ? prev.x0 - t.x1 : t.x0 - prev.x1; if (gap > Math.min(prev.fh, t.fh) * .12 && !/\s$/.test(s)) s += ' '; }
-        segs.push({ i0: s.length, i1: s.length + t.s.length, x0: t.x0, x1: t.x1, rtl: t.rtl, s: t.s, fh: t.fh }); s += t.s; prev = t;
+        segs.push({ i0: s.length, i1: s.length + t.s.length, x0: t.x0, x1: t.x1, rtl: t.prtl, s: t.s, fh: t.fh }); s += t.s; prev = t;
       }
       out.push({ s, fh: Math.max(...grp.map(t => t.fh)), x0: Math.min(...grp.map(t => t.x0)), x1: Math.max(...grp.map(t => t.x1)), y0: Math.min(...grp.map(t => t.y0)), y1: Math.max(...grp.map(t => t.y1)), rtl, segs });
     };
@@ -242,14 +272,15 @@ function spanOf(it, i0, i1) {
 }
 // the words next to a blank on the same line (Hebrew: to its right, otherwise to its left), and their size
 function labelFor(items, b, pageRtl) {
-  const midY = (b.y0 + b.y1) / 2, cand = items.filter(t => !t.blank && t.y0 < b.y1 + 2 && t.y1 > b.y0 - 6 && Math.abs((t.y0 + t.y1) / 2 - midY) < Math.max(8, t.fh));
+  const midY = (b.y0 + b.y1) / 2, tall = b.y1 - b.y0 > 24;   // a table cell: the words anywhere beside it, not only at its middle
+  const cand = items.filter(t => !t.blank && t.y0 < b.y1 + 2 && t.y1 > b.y0 - 6 && (tall ? (t.y0 + t.y1) / 2 > b.y0 - 2 && (t.y0 + t.y1) / 2 < b.y1 + 2 : Math.abs((t.y0 + t.y1) / 2 - midY) < Math.max(8, t.fh)));
   const right = cand.filter(t => t.x0 >= b.x1 - 3).sort((a, c) => a.x0 - c.x0)[0];
   const left = cand.filter(t => t.x1 <= b.x0 + 3).sort((a, c) => c.x1 - a.x1)[0];
   const near = t => t && Math.abs((t === right ? t.x0 - b.x1 : b.x0 - t.x1)) < 160;
   const first = pageRtl ? (near(right) ? right : near(left) ? left : null) : (near(left) ? left : near(right) ? right : null);
   if (first) return { text: first.s, fh: first.fh };
   // the label is written above the line ("שם מלא של התלמיד/ה:" and the line under it)
-  const above = items.filter(t => !t.blank && t.y1 <= b.y0 + 4 && b.y0 - t.y1 < Math.max(14, t.fh * 1.6) && t.x0 < b.x1 && t.x1 > b.x0)
+  const above = items.filter(t => !t.blank && t.y1 <= b.y0 + 7 && b.y0 - t.y1 < Math.max(14, t.fh * 1.6) && t.x0 < b.x1 && t.x1 > b.x0)
     .sort((a, c) => c.y1 - a.y1)[0];
   return above ? { text: above.s, fh: above.fh, above: true } : null;
 }
@@ -327,7 +358,7 @@ async function detectPage(P, widgets) {
   const push = t => {
     t.w = t.x1 - t.x0; t.h = t.y1 - t.y0; if (t.w < 6 || t.h < 4) return;
     if (widgets.some(r => t.x0 < r[2] && t.x1 > r[0] && t.y0 < r[3] && t.y1 > r[1])) return;  // a real form field is already there
-    const dup = out.find(o => o.x0 < t.x1 - 3 && o.x1 > t.x0 + 3 && Math.abs(o.y1 - t.y1) < Math.max(6, t.h * .6));
+    const dup = out.find(o => o.x0 < t.x1 - 3 && o.x1 > t.x0 + 3 && Math.abs(o.y1 - t.y1) < Math.max(6, Math.min(t.h, o.h || t.h) * .6));
     if (dup) return; out.push(t);
   };
   // 1. blanks written as characters: "שם: ________", "........", "☐ אני מסכים/ה"
@@ -340,11 +371,12 @@ async function detectPage(P, widgets) {
       // line); a blank at the start of the line takes the words after it
       const from = mi ? ms[mi - 1].index + ms[mi - 1][0].length : 0, to = mi < ms.length - 1 ? ms[mi + 1].index : n;
       const before = s.slice(from, m.index).replace(/[(（]\s*$/, '').trim(), after = s.slice(m.index + m[0].length, to).trim();
-      const rest = before.length > 1 ? before : !mi && after.length > 1 && !/^[(（]/.test(after) ? after : '';
+      // (in a Hebrew line the words of a blank come before it, never after it)
+      const rest = before.length > 1 ? before : !mi && !it.rtl && after.length > 1 && !/^[(（]/.test(after) ? after : '';
       const lb = rest.length > 1 ? { text: rest, fh: it.fh } : null;
       const bl = { x0, x1, y0: it.y1 - Math.max(14, it.fh * 1.5), y1: it.y1 + it.fh * .15 };
       const lab = lb || labelFor(items, bl, pageRtl);
-      push({ ...bl, kind: kindOf(lab && lab.text) || 'text', fh: lab ? lab.fh : it.fh, label: lab ? lab.text : '', rtl: pageRtl });
+      push({ ...bl, kind: kindOf(lab && lab.text) || 'text', fh: lab ? lab.fh : it.fh, label: lab ? lab.text : '', rtl: pageRtl, weak: !lb, lead: !mi && before.length < 2 });
       if (m[0].length === n) it.blank = true;
     });
     // check boxes written as a character
@@ -362,14 +394,33 @@ async function detectPage(P, widgets) {
         const len = pc.x1 - pc.x0; if (len < I.W * .035) continue;
         if (pc.cell) {
           // a table cell: the rule above it is where the vertical rules start
-          const top = cellTop(I, pc.x0, pc.x1, ln.y0, pc.h), hh = ln.y0 - top; if (hh < I.H * .014 || hh > I.H * .14) continue;
+          const top = cellTop(I, pc.x0, pc.x1, ln.y0, pc.h), hh = ln.y0 - top; if (hh < I.H * .014 || hh > I.H * .5) continue;
           const ix0 = pc.x0 + 3, ix1 = pc.x1 - 3, iy0 = ln.y0 - hh + 3, iy1 = ln.y0 - 3;
-          if (inkIn(I, ix0, iy0, ix1, iy1) > .006) continue;   // written in already
           const X0 = toV(pc.x0), X1 = toV(pc.x1), Y0 = toV(ln.y0 - hh), Y1 = toV(ln.y0);
-          if (textBox(X0, Y0, X1, Y1)) continue;
-          if (len < I.W * .06 && Math.abs(len - hh) < hh * .3) { push({ x0: X0 + 1, x1: X1 - 1, y0: Y0 + 1, y1: Y1 - 1, kind: 'check', label: '', rtl: pageRtl }); continue; }
+          const inside = items.filter(t => !t.blank && (t.x0 + t.x1) / 2 > X0 && (t.x0 + t.x1) / 2 < X1 && (t.y0 + t.y1) / 2 > Y0 && (t.y0 + t.y1) / 2 < Y1);
+          if (inkIn(I, ix0, iy0, ix1, iy1) > .006 || inside.length || textBox(X0, Y0, X1, Y1)) {
+            /* 6.9.7: a box with a question at its top and room under it ("תיאור כללי של התלמיד…:" and an empty
+               box), or words at its start and room beside them ("בתאריך:"): the room is the place to fill.
+               Found by the picture of the page, so it works in a scanned form too. */
+            if (len < I.W * .13 || hh > I.H * .45) continue;
+            const rowInk = y => { let n = 0; for (let x = ix0; x <= ix1; x++) n += I.dark[y * I.W + x]; return n; };
+            let yInk = iy1; while (yInk > iy0 && rowInk(yInk) < 2) yInk--;
+            const free = toV(iy1 - yInk), used = toV(yInk - iy0);
+            const words = inside.sort((a, b) => Math.abs(a.y1 - b.y1) < 4 ? (pageRtl ? b.x1 - a.x1 : a.x0 - b.x0) : a.y1 - b.y1).map(t => t.s).join(' ').replace(/\s+/g, ' ').trim();
+            const fh = inside.reduce((m, t) => Math.max(m, t.fh), 0), asks = /[:：?？]\s*$/.test(words) || /[:：?？]\s*[)）]?\s*$/.test(words) && free >= 30;
+            if (free >= 13 && used <= Math.max(64, toV(hh) * .6) && words.length <= 320 && (asks || free >= 45)) {
+              push({ x0: X0 + 1, x1: X1 - 1, y0: toV(yInk) + 2, y1: Y1 - 1, kind: 'cell', sub: words.length > 40 ? 'text' : kindOf(words), label: words, rtl: pageRtl, fh, area: free >= 26, inCell: true, free, asks, box: [X0, Y0, X1, Y1] });
+            } else if (inside.length && asks && toV(hh) < 60) {
+              // one line of words at the start of the box: the room beside them
+              let a = ix1, b = ix0; for (let x = ix0; x <= ix1; x++) { let n = 0; for (let y = iy0; y <= iy1; y++) n += I.dark[y * I.W + x]; if (n) { if (x < a) a = x; if (x > b) b = x; } }
+              const fl = toV(a - ix0), fr = toV(ix1 - b), side = Math.max(fl, fr);
+              if (side >= Math.max(50, toV(len) * .4)) push({ x0: fl >= fr ? X0 + 1 : toV(b) + 4, x1: fl >= fr ? toV(a) - 4 : X1 - 1, y0: Y0 + 1, y1: Y1 - 1, kind: 'cell', sub: words.length > 40 ? 'text' : kindOf(words), label: words, rtl: pageRtl, fh, inCell: true, free: 0, asks, box: [X0, Y0, X1, Y1] });
+            }
+            continue;
+          }
+          if (len < I.W * .06 && Math.abs(len - hh) < hh * .3) { push({ x0: X0 + 1, x1: X1 - 1, y0: Y0 + 1, y1: Y1 - 1, kind: 'check', label: '', rtl: pageRtl, empty: true }); continue; }
           const lab = labelFor(items, { x0: X0, x1: X1, y0: Y0, y1: Y1 }, pageRtl);
-          push({ x0: X0 + 1, x1: X1 - 1, y0: Y0 + 1, y1: Y1 - 1, kind: 'cell', sub: lab ? kindOf(lab.text) : null, label: lab ? lab.text : '', rtl: pageRtl, fh: lab ? lab.fh : 0 });
+          push({ x0: X0 + 1, x1: X1 - 1, y0: Y0 + 1, y1: Y1 - 1, kind: 'cell', sub: lab ? kindOf(lab.text) : null, label: lab ? lab.text : '', rtl: pageRtl, fh: lab ? lab.fh : 0, empty: true, side: lab && !lab.above ? lab.text : '', area: toV(hh) >= 44 && toV(len) >= 120 });
         } else {
           if (len > I.W * .8) continue;                         // a rule across the page
           const dn = Math.round(I.H * .012);
@@ -382,10 +433,37 @@ async function detectPage(P, widgets) {
           const X0 = toV(pc.x0), X1 = toV(pc.x1), Y1 = toV(ln.y0), Y0 = toV(ln.y0 - up);
           if (textBox(X0, Y0 + 2, X1, Y1 - 1)) continue;
           const lab = labelFor(items, { x0: X0, x1: X1, y0: Y0, y1: Y1 }, pageRtl);
-          push({ x0: X0, x1: X1, y0: Y0, y1: Y1 + 1, kind: kindOf(lab && lab.text) || 'text', label: lab ? lab.text : '', rtl: pageRtl, fh: lab ? lab.fh : 0 });
+          push({ x0: X0, x1: X1, y0: Y0, y1: Y1 + 1, kind: kindOf(lab && lab.text) || 'text', label: lab ? lab.text : '', rtl: pageRtl, fh: lab ? lab.fh : 0, weak: !lab || !!lab.above });
         }
       }
     }
+    // a box of words beside or above an empty cell is that cell's heading ("השם הפרטי" over its cell), not a place
+    const cells = out.filter(o => o.empty), ovl = (a0, a1, b0, b1) => (Math.min(a1, b1) - Math.max(a0, b0)) / Math.max(1, Math.min(a1 - a0, b1 - b0));
+    for (let i = out.length - 1; i >= 0; i--) { const t = out[i]; if (!t.inCell || (t.free >= 45 && t.asks)) continue;
+      const [bx0, by0, bx1, by1] = t.box;
+      if (cells.some(o => (Math.abs(o.y0 - by1) < 8 && ovl(o.x0, o.x1, bx0, bx1) > .6) || ((Math.abs(o.x1 - bx0) < 8 || Math.abs(o.x0 - bx1) < 8) && ovl(o.y0, o.y1, by0, by1) > .6))) out.splice(i, 1); }
+    // an empty cell of a table is named by the heading of its column (and the words that start its row, when they ask)
+    const headOf = c => {
+      const up = cells.find(o => o !== c && o.kind === 'cell' && Math.abs(o.y1 - c.y0) < 8 && ovl(o.x0, o.x1, c.x0, c.x1) > .8);
+      if (up) return up.head !== undefined ? up.head : (up.head = headOf(up));
+      const col = items.filter(t => !t.blank && (t.x0 + t.x1) / 2 > c.x0 && (t.x0 + t.x1) / 2 < c.x1 && t.y1 <= c.y0 + 2 && c.y0 - t.y1 < 70).sort((a, b) => b.y1 - a.y1);
+      if (!col.length || c.y0 - col[0].y1 > 45) return null;
+      const take = [col[0]]; for (let j = 1; j < col.length && take.length < 8; j++) { if (take[take.length - 1].y1 - col[j].y1 > col[j].fh * 1.7) break; take.push(col[j]); }
+      // the heading stands in its own cell of the same column: the column's side rules go on up beside it
+      // (a title over the whole table does not name each of its cells)
+      const need = (c.y0 - Math.min(...take.map(t => t.y0))) * k * .8, yy = Math.round(c.y0 * k);
+      if (Math.max(vUp(I, Math.round((c.x0 - 1) * k), yy), vUp(I, Math.round((c.x1 + 1) * k), yy)) < need) return null;
+      take.sort((a, b) => Math.abs(a.y1 - b.y1) < 4 ? (pageRtl ? b.x1 - a.x1 : a.x0 - b.x0) : a.y1 - b.y1);
+      return { text: take.map(t => t.s).join(' ').replace(/\s+/g, ' ').trim(), fh: take[0].fh };
+    };
+    for (const c of cells) { if (c.kind !== 'cell') continue;
+      const h = c.head !== undefined ? c.head : (c.head = headOf(c));
+      if (!h && !c.label) { // a box alone on the page: the title just above it ("הערות כלליות" and an empty box)
+        const ab = items.filter(t => !t.blank && t.y1 <= c.y0 + 2 && c.y0 - t.y1 < 30 && t.x0 < c.x1 && t.x1 > c.x0).sort((a, b) => b.y1 - a.y1)[0];
+        if (ab) { c.label = items.filter(t => !t.blank && Math.abs(t.y1 - ab.y1) < 4 && t.x0 < c.x1 && t.x1 > c.x0).sort((a, b) => pageRtl ? b.x1 - a.x1 : a.x0 - b.x0).map(t => t.s).join(' '); c.fh = ab.fh; c.sub = c.label.length > 40 ? 'text' : kindOf(c.label); } }
+      if (!h || !h.text) continue;
+      const row = c.side && /[:：]\s*$/.test(c.side) ? c.side.replace(/[:：]\s*$/, '') : '';
+      const kd = kindOf(h.text); c.label = h.text + (row ? ' · ' + row : ''); c.sub = kd; c.fh = c.fh || h.fh; }
     // drawn check boxes (the detector of send.js, when it is loaded)
     if (window.SIMAN_SEND && SIMAN_SEND.findBoxes) {
       try { const bw = { getImageData: () => { const d = new Uint8ClampedArray(I.W * I.H * 4); for (let i = 0, j = 0; i < I.dark.length; i++, j += 4) { const v = I.dark[i] ? 0 : 255; d[j] = d[j + 1] = d[j + 2] = v; d[j + 3] = 255; } return { data: d }; } };
@@ -394,12 +472,25 @@ async function detectPage(P, widgets) {
     I.dark = null; I.g = null;
   }
   // 3. a label with nothing after it ("חתימה:" at the end of a line): the space beside it
-  for (const it of items) {
-    const s = it.s.trim(); if (s.length > 30 || !/[:：]\s*$/.test(s)) continue;
+  for (const it0 of items) {
+    // 6.9.7: the words may be the end of a longer line ("שם: ____ חתימה: ____ תאריך:"): what comes after its last blank
+    let it = it0, s = it0.s.trim();
+    { const ms = [...it0.s.matchAll(new RegExp(BLANK.source, 'g'))];
+      if (ms.length) { const lm = ms[ms.length - 1], i0 = lm.index + lm[0].length, tail = it0.s.slice(i0); if (tail.trim().length < 2) continue;
+        const [a, b] = spanOf(it0, i0 + (tail.length - tail.trimStart().length), it0.s.length); it = { ...it0, x0: a, x1: b, s: tail.trim(), part: true }; s = it.s; } }
+    if (s.length > 30 || !/[:：]\s*$/.test(s)) continue;
     const kd = kindOf(s); if (!['sig', 'date', 'name', 'id', 'phone', 'email'].includes(kd)) continue;
     const wd = W1 * (kd === 'sig' ? .24 : .2);
     const x0 = it.rtl ? Math.max(8, it.x0 - 6 - wd) : it.x1 + 6, x1 = it.rtl ? it.x0 - 6 : Math.min(W1 - 8, it.x1 + 6 + wd);
-    if (items.some(t => t !== it && t.x0 < x1 && t.x1 > x0 && t.y0 < it.y1 && t.y1 > it.y0)) continue;  // something is written there
+    if (items.some(t => t !== it0 && t.x0 < x1 && t.x1 > x0 && t.y0 < it.y1 && t.y1 > it.y0)) continue;  // something is written there
+    // the line went on to the next row: the blank that starts the row under it is this label's ("תאריך:" at the end
+    // of a line and "______" at the start of the next), and so is a line just under and beside it
+    const lineH = Math.max(16, it.fh * 2.5);
+    const nextRow = out.filter(o => o.kind !== 'check' && !o.inCell && !o.empty && o.weak && o.y1 > it.y1 + 3 && o.y0 - it.y1 < lineH)
+      .filter(o => (o.x0 < it.x1 + 30 && o.x1 > it.x0 - 30) ||
+        (o.lead !== false && !items.some(t => !t.blank && t.y0 < o.y1 - 2 && t.y1 > o.y1 - 12 && (o.rtl ? t.x0 >= o.x1 - 2 : t.x1 <= o.x0 + 2))))
+      .sort((a, b) => a.y1 - b.y1)[0];
+    if (nextRow) { nextRow.label = s; nextRow.kind = kd; nextRow.fh = it.fh; nextRow.weak = false; continue; }
     // the label of a line under it (label above, line below): that line is the place, not the space beside the label
     if (out.some(o => o.kind !== 'check' && o.y1 > it.y1 && o.y0 - it.y1 < Math.max(16, it.fh * 2.5) && o.x0 < it.x1 + 4 && o.x1 > it.x0 - 4)) continue;
     push({ x0, x1, y0: it.y0 - 2, y1: it.y1 + 2, kind: kd, label: s, rtl: it.rtl, fh: it.fh });
@@ -494,6 +585,7 @@ const paintAll = () => S.pages.forEach(paint);
 /* ---------------------------------------------------------------- מילוי */
 // the text box sits on the line: the size of the words beside it, its start at the start of the line
 function sizeFor(t) {
+  if (t.area) return Math.round(clamp(t.fh ? t.fh * .95 : 11, 8, 12) * 2) / 2;   // a box for a few lines: the size of its question
   const room = t.kind === 'cell' ? (t.y1 - t.y0) * .62 : (t.y1 - t.y0) * .75;
   const base = t.fh ? t.fh * .95 : 11;
   return Math.round(clamp(Math.min(base, room), 7, 14) * 2) / 2;
@@ -506,6 +598,7 @@ function natural(a) {
 // grow: wider as you type (up to the page margin), then more lines
 function fit(a) {
   const f = a.fz; if (!f) return; const P = S.pages[a.page]; if (!P) return;
+  if (f.cell) return fitCell(a, f, P);
   const vp1 = P.page.getViewport({ scale: 1 });
   const fs = [...String(a.text || '')].find(c => RTL_CH.test(c) || LTR_CH.test(c));
   const rtl = fs ? RTL_CH.test(fs) : f.rtl;
@@ -517,6 +610,29 @@ function fit(a) {
   const el = P.tl.querySelector(`.tw[data-id="${a.id}"]`);
   if (el) { const [l, tp] = toCss(P, a.x, a.y); el.style.left = l + 'px'; el.style.top = tp + 'px'; const tx = el.querySelector('.tx'); if (tx) { tx.style.width = a.w * S.zoom + 'px'; tx.style.resize = 'none'; tx.dir = rtl ? 'rtl' : 'ltr'; tx.style.textAlign = rtl ? 'right' : 'left'; } }
 }
+/* 6.9.7: a table cell or a box keeps its text inside it: the width is the box's, the words break into lines, and
+   when the lines no longer fit the letters get a little smaller (down to 7). One short line stands in the middle
+   of a cell; a box for a few lines is written from its top. */
+function wrapA(a, w) {
+  meas.font = `${a.bold ? 700 : 400} ${a.size}px ${typeof cssFont === 'function' ? cssFont(a.font) : 'Arial'}`;
+  const out = [];
+  for (const para of String(a.text || '').split('\n')) { let line = '';
+    for (const wd of para.split(/(\s+)/)) { const test = line + wd; if (line && meas.measureText(test.trimEnd()).width > w + .5) { out.push(line.trimEnd()); line = wd.trimStart(); } else line = test; }
+    out.push(line.trimEnd()); }
+  return out;
+}
+function fitCell(a, f, P) {
+  const vp1 = P.page.getViewport({ scale: 1 }), w = Math.max(20, f.r - f.l);
+  const need = sz => { a.size = sz; return wrapA(a, (w - sz * .25) * .97).length * sz * 1.35 + 2; };   // a little spare: the saved file measures its own letters
+  let size = f.size0 || a.size; while (need(size) > f.h && size > 7) size -= .5;
+  const hh = need(size); f.over = hh > f.h + 1;
+  f.top = f.area || hh >= f.h - 2 ? f.y0 + 1 : f.y0 + (f.h - hh) / 2;
+  const fs = [...String(a.text || '')].find(c => RTL_CH.test(c) || LTR_CH.test(c)), rtl = fs ? RTL_CH.test(fs) : f.rtl;
+  const pt = vp1.convertToPdfPoint(f.l, f.top); a.w = w; a.x = pt[0]; a.y = pt[1];
+  const el = P.tl.querySelector(`.tw[data-id="${a.id}"]`); if (!el) return;
+  const [l, tp] = toCss(P, a.x, a.y); el.style.left = l + 'px'; el.style.top = tp + 'px';
+  const tx = el.querySelector('.tx'); if (tx) { tx.style.width = a.w * S.zoom + 'px'; tx.style.fontSize = a.size * S.zoom + 'px'; tx.style.resize = 'none'; tx.dir = rtl ? 'rtl' : 'ltr'; tx.style.textAlign = rtl ? 'right' : 'left'; }
+}
 function textAt(t, text) {
   const P = S.pages[t.page], vp1 = P.page.getViewport({ scale: 1 }), size = sizeFor(t);
   // the first line's letters stand on the line (or in the middle of a table cell)
@@ -524,7 +640,7 @@ function textAt(t, text) {
   const pt = vp1.convertToPdfPoint(t.rtl ? t.x1 - 30 : t.x0, top);
   t.hist = S.hist.length; snapshot();
   const a = { id: S.nextId++, type: 'text', page: t.page, x: pt[0], y: pt[1], w: Math.max(24, t.x1 - t.x0), size, color: (S.color && S.color.text) || '#1C2333', text: text || '', font: S.textFont, bold: false,
-    fz: { l: t.x0, r: t.x1, top, rtl: t.rtl, limL: t.limL, limR: t.limR } };
+    fz: t.kind === 'cell' ? { l: t.x0 + 3, r: t.x1 - 3, top, rtl: t.rtl, cell: true, area: !!t.area, y0: t.y0, h: t.y1 - t.y0, size0: size } : { l: t.x0, r: t.x1, top, rtl: t.rtl, limL: t.limL, limR: t.limR } };
   S.anns.push(a); t.ann = a.id; fit(a); drawAnns(P);
   return a;
 }
@@ -567,7 +683,8 @@ function act(t) {
 
 /* ---------------------------------------------------------------- חלונית המילוי */
 const pnl = document.createElement('div'); pnl.className = 'fzp'; pnl.hidden = true; pnl.setAttribute('role', 'dialog');
-pnl.innerHTML = `<div class="pbar" aria-hidden="true"><i></i></div><div class="hd"><b class="ttl"></b><span class="lab"></span><span class="cnt"></span></div>
+pnl.innerHTML = `<div class="pbar" aria-hidden="true"><i></i></div><div class="hd"><b class="ttl"></b><span class="lab"></span><span class="cnt"></span><button type="button" class="where" data-a="list"><span class="pg" aria-hidden="true"><i></i></span><span class="pn"></span></button></div>
+<div class="q" hidden></div>
 <div class="lens" aria-hidden="true"><canvas></canvas></div>
 <textarea rows="1" dir="auto" enterkeyhint="next" autocomplete="on"></textarea>
 <div class="warn" role="status" hidden></div>
@@ -591,7 +708,10 @@ async function lensOpen(t) {
   let x0 = t.rtl ? t.x0 - 8 : t.x0 - side, x1 = t.rtl ? t.x1 + side : t.x1 + 8;
   x0 = Math.max(0, x0); x1 = Math.min(W, x1);
   if (x1 - x0 > maxW) { if (t.rtl) x0 = x1 - maxW; else x1 = x0 + maxW; }
-  const y0 = Math.max(0, t.y0 - (t.kind === 'cell' ? 4 : 10)), y1 = Math.min(vp1.height, t.y1 + 8);
+  let y0 = Math.max(0, t.y0 - (t.kind === 'cell' ? 4 : 10)), y1 = Math.min(vp1.height, t.y1 + 8);
+  // a box with its question: the whole box (the question at its top, the writing under it)
+  if (t.box) { x0 = Math.max(0, t.box[0] - 3); x1 = Math.min(W, t.box[2] + 3); y0 = Math.max(0, (cleanLabel(t.label).length >= 40 ? t.y0 : t.box[1]) - 3); y1 = Math.min(vp1.height, t.box[3] + 3); }   // (a long question is written in full above the magnifier)
+  else if (t.kind === 'cell' && t.x1 - t.x0 > maxW - 20) { x0 = Math.max(0, t.x0 - 4); x1 = Math.min(W, t.x1 + 4); }
   const cssW = Math.max(200, Math.min(620, innerWidth) - 28);
   const s = Math.min(3.2, cssW / (x1 - x0)), dpr = Math.min(2, window.devicePixelRatio || 1), k = s * dpr;
   const c = document.createElement('canvas'); c.width = Math.round((x1 - x0) * k); c.height = Math.round((y1 - y0) * k);
@@ -617,8 +737,7 @@ function lensDraw() {
   g.font = `${a.bold ? 700 : 400} ${size * k}px ${typeof cssFont === 'function' ? cssFont(a.font) : 'Arial'}`;
   g.fillStyle = a.color || '#1C2333'; g.textBaseline = 'alphabetic'; g.direction = rtl ? 'rtl' : 'ltr'; g.textAlign = rtl ? 'right' : 'left';
   const base = (f.top != null ? f.top : t.y1 - size * 1.08) + size * 1.08 - .5;
-  const lines = String(a.text).split('\n');
-  lines.forEach((ln, i) => g.fillText(ln, rtl ? X(f.r != null ? f.r : t.x1) : X(f.l != null ? f.l : t.x0), Y(base + i * size * 1.35)));
+  (f.cell ? wrapA(a, a.w - size * .25) : String(a.text).split('\n')).forEach((ln, i) => g.fillText(ln, rtl ? X(f.r != null ? f.r : t.x1) : X(f.l != null ? f.l : t.x0), Y(base + i * size * 1.35)));
 }
 function openPanel(t) {
   F.cur = t; const l = L(), P = S.pages[t.page];
@@ -627,12 +746,20 @@ function openPanel(t) {
   if (isText && !a) a = textAt(t, '');
   const nm = kindName(t);
   pnl.querySelector('.ttl').textContent = nm;
-  pnl.querySelector('.lab').textContent = t.label && t.label.length < 40 ? '· ' + t.label.replace(BLANK, '').replace(/[:：]\s*$/, '') : '';
+  // 6.9.7: the words of the place are always shown: a short label beside the title, a long question in full under it
+  { const lb = cleanLabel(t.label), q = pnl.querySelector('.q');
+    pnl.querySelector('.lab').textContent = lb && lb.length < 40 ? '· ' + lb : '';
+    q.textContent = lb.length >= 40 ? lb : ''; q.hidden = lb.length < 40; q.scrollTop = 0; }
+  // where this place is: the page number, and a small page with a mark at the place (a tap opens the list of all places)
+  { const vp = P.page.getViewport({ scale: 1 }), w = pnl.querySelector('.where'), m = w.querySelector('i');
+    w.querySelector('.pn').textContent = `עמוד ${t.page + 1}/${S.pages.length}`; w.title = 'כל המקומות למילוי'; w.setAttribute('aria-label', `עמוד ${t.page + 1} מתוך ${S.pages.length}. כל המקומות למילוי`);
+    Object.assign(m.style, { left: t.x0 / vp.width * 100 + '%', top: clamp((t.y0 + t.y1) / 2 / vp.height * 100 - 6, 0, 88) + '%', width: Math.max(18, (t.x1 - t.x0) / vp.width * 100) + '%' }); }
+  ta.rows = t.area ? 3 : 1; ta.enterKeyHint = t.area ? 'enter' : 'next';
   pnl.querySelector('[data-a=next]').textContent = l.next + ' ›';
   pnl.querySelector('[data-a=done]').textContent = l.done;
   pnl.querySelector('[data-a=del]').textContent = l.del;
   { const an = annOf(t); pnl.querySelector('[data-a=del]').hidden = !an || (an.type === 'text' && !String(an.text || '').trim()); }
-  pnl.querySelector('.tip').textContent = LX().tipK;
+  pnl.querySelector('.tip').textContent = t.area ? 'Enter: שורה חדשה · Tab: הבא · Shift+Tab: הקודם' : LX().tipK;
   { const pv = pnl.querySelector('[data-a=prev]'); pv.textContent = '‹ ' + LX().prev; pv.hidden = F.list.indexOf(t) <= 0; }
   const chips = pnl.querySelector('.chips'); chips.innerHTML = '';
   const chip = (txt, fn, cls) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = txt; if (cls) b.className = cls; b.onclick = fn; chips.append(b); };
@@ -640,9 +767,9 @@ function openPanel(t) {
   if (kd === 'date') chip(l.today + ': ' + new Date().toLocaleDateString('he-IL'), () => { ta.value = new Date().toLocaleDateString('he-IL'); sync(); ta.focus(); }, 'sun');
   // 6.2: the Hebrew date too (school and community forms often ask for it)
   { const hd = kd === 'date' && window.SIMAN_HEBDATE ? SIMAN_HEBDATE() : ''; if (hd) chip('תאריך עברי: ' + hd, () => { ta.value = hd; sync(); ta.focus(); }); }
-  if (isText && (t.kind === 'sig' || t.kind === 'cell' || kd === 'sig')) chip('✍ ' + l.asSig, () => { dropAnn(t); if (sigInto(t)) openPanel(t); paint(P); bar(); });
+  if (isText && (t.kind === 'sig' || (t.kind === 'cell' && !t.area) || kd === 'sig')) chip('✍ ' + l.asSig, () => { dropAnn(t); if (sigInto(t)) openPanel(t); paint(P); bar(); });
   if (!isText) chip('✍ ' + l.otherSig, () => { dropAnn(t); F.sigFor = t; closePanel(true); openSig(); });
-  if (isText && (t.kind === 'cell' || (t.x1 - t.x0) < 60)) chip(l.asV, () => { dropAnn(t); imgAt(t, CHECK || (CHECK = checkSrc()), 1, false); paint(P); bar(); closePanel(true); next(); });
+  if (isText && ((t.kind === 'cell' && !t.area) || (t.x1 - t.x0) < 60)) chip(l.asV, () => { dropAnn(t); imgAt(t, CHECK || (CHECK = checkSrc()), 1, false); paint(P); bar(); closePanel(true); next(); });
   if (!isText) chip(l.asText, () => { dropAnn(t); openPanel(t); paint(P); });
   ta.hidden = !isText;
   if (isText) { ta.value = a.text || ''; ta.placeholder = l.ph; ta.dir = 'auto'; ta.inputMode = kd === 'id' ? 'numeric' : kd === 'phone' ? 'tel' : kd === 'email' ? 'email' : 'text'; }
@@ -661,7 +788,7 @@ function sync() {
 }
 const kindOfCur = () => { const t = F.cur; return t ? (t.kind === 'cell' ? t.sub : t.kind) : null; };
 // a gentle note under the box (an ID whose check digit is wrong, a short phone number); it never blocks
-function checkNow() { const w = pnl.querySelector('.warn'), m = warnFor(kindOfCur(), ta.value); w.textContent = m; w.hidden = !m || ta.hidden; }
+function checkNow() { const an = F.cur && annOf(F.cur), w = pnl.querySelector('.warn'), m = an && an.fz && an.fz.over ? 'הטקסט ארוך מהמקום שיש בטופס. כדאי לקצר, אחרת הוא ייצא מהמסגרת' : warnFor(kindOfCur(), ta.value); w.textContent = m; w.hidden = !m || ta.hidden; }
 // what was typed in this kind of place before (only on this device): one tap fills it
 function memShow(kd) {
   const box = pnl.querySelector('.mem'); box.innerHTML = '';
@@ -678,7 +805,7 @@ function memShow(kd) {
 function remember(t) { const a = t && annOf(t); if (!a || a.type !== 'text') return; const kd = t.kind === 'cell' ? t.sub : t.kind; memPut(kd, a.text); }
 ta.addEventListener('input', sync);
 ta.addEventListener('keydown', e => {
-  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); next(); }
+  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { if (F.cur && F.cur.area) return; e.preventDefault(); next(); }   // in a box for a few lines Enter is a new line
   else if (e.key === 'Tab' && !e.isComposing) { e.preventDefault(); if (e.shiftKey) prev(); else next(); }
   else if (e.key === 'Escape') { e.preventDefault(); closePanel(); }
 });
@@ -702,6 +829,7 @@ function next() {
 pnl.querySelector('[data-a=next]').onclick = () => next();
 pnl.querySelector('[data-a=prev]').onclick = () => prev();
 pnl.querySelector('[data-a=done]').onclick = () => closePanel();
+pnl.querySelector('[data-a=list]').onclick = () => listDialog();
 pnl.querySelector('[data-a=del]').onclick = () => { const t = F.cur; if (!t) return; ta.value = ''; dropAnn(t); closePanel(); };
 function count() {
   const n = open().length, all = F.list.length, i = F.cur ? F.list.indexOf(F.cur) + 1 : 0;
@@ -849,6 +977,32 @@ function profileDialog(after, note) {
   setTimeout(() => { const f = d.querySelector('[data-k=first]'); if (f && !f.value) f.focus(); }, 60);
 }
 
+/* ---------------------------------------------------------------- 6.9.7: כל המקומות, ברשימה
+   On a phone the page is small and the keyboard covers half of it, so it is hard to know where you are in the
+   form. The list shows every place by page, with its words and what was written in it; a tap goes to it. */
+function listDialog() {
+  if (!F.list.length) return;
+  const cur = F.cur; if (cur) closePanel(true);
+  const d = document.createElement('dialog'); d.className = 'fzdlg fzlist'; document.body.append(d);
+  const n = open().length, all = F.list.length;
+  let html = `<h3>כל המקומות למילוי</h3><p class="note">${all - n} מתוך ${all} מולאו. לוחצים על מקום כדי לעבור אליו.</p>`, pg = -1;
+  F.list.forEach((t, i) => {
+    if (t.page !== pg) { pg = t.page; html += `<div class="pgh">עמוד ${pg + 1}</div>`; }
+    const a = annOf(t), lb = cleanLabel(t.label), val = a ? (a.type === 'text' ? String(a.text || '').trim() : t.kind === 'check' ? 'מסומן' : 'חתימה') : '';
+    html += `<button type="button" class="it${a ? ' ok' : ''}${t === cur ? ' cur' : ''}" data-i="${i}"><span class="st" aria-hidden="true">${a ? '✓' : ''}</span><span class="bd"><b>${esc2(lb || kindName(t) + ' (בלי כיתוב)')}</b>${val ? `<span class="v">${esc2(val.slice(0, 90))}</span>` : `<span class="e">${esc2(lb ? kindName(t) : 'עוברים אליו כדי לראות איפה הוא בדף')}</span>`}</span></button>`;
+  });
+  html += `<div class="acts"><button type="button" class="free">✏️ לכתוב במקום אחר בדף</button><span style="flex:1"></span><button type="button" class="cancel">סגירה</button></div>`;
+  d.innerHTML = html;
+  d.querySelectorAll('.it').forEach(b => b.onclick = () => { const t = F.list[+b.dataset.i]; d.close(); document.body.classList.remove('fz-off');
+    if (t.kind === 'check') { show(t); const P = S.pages[t.page]; F.cur = t; paint(P); F.cur = null; setTimeout(() => paint(P), 1800); } else act(t); });
+  d.querySelector('.cancel').onclick = () => d.close();
+  // a place the form has and סימן did not mark: the text tool writes anywhere on the page
+  d.querySelector('.free').onclick = () => { d.close(); if (typeof setTool === 'function') setTool('text'); toast('לוחצים על המקום בדף שבו רוצים לכתוב, וכותבים'); };
+  d.addEventListener('close', () => d.remove());
+  d.showModal();
+  const at = d.querySelector('.it.cur') || d.querySelector('.it:not(.ok)'); if (at) at.scrollIntoView({ block: 'center' });
+}
+
 /* ---------------------------------------------------------------- הפס "מקומות למילוי" */
 function bar() {
   const n = open().length, b = bar.el, all = F.list.length;
@@ -864,10 +1018,11 @@ function bar() {
   b.querySelector('.auto').hidden = !can;
 }
 bar.el = document.createElement('div'); bar.el.className = 'fzbar'; bar.el.hidden = true;
-bar.el.innerHTML = '<button type="button" class="auto" title="ממלא בלחיצה את השם, מספר הזהות, הטלפון, הכתובת והתאריך מהפרטים שלך">✨ <span>מילוי אוטומטי</span></button><span class="prog" aria-hidden="true"><i></i></span><button type="button" class="go"></button><button type="button" class="me" title="הפרטים שלי (נשמרים רק במכשיר)" aria-label="הפרטים שלי">👤</button><button type="button" class="x"></button>';
+bar.el.innerHTML = '<button type="button" class="auto" title="ממלא בלחיצה את השם, מספר הזהות, הטלפון, הכתובת והתאריך מהפרטים שלך">✨ <span>מילוי אוטומטי</span></button><span class="prog" aria-hidden="true"><i></i></span><button type="button" class="go"></button><button type="button" class="lst" title="כל המקומות למילוי, לפי עמודים" aria-label="כל המקומות למילוי">☰</button><button type="button" class="me" title="הפרטים שלי (נשמרים רק במכשיר)" aria-label="הפרטים שלי">👤</button><button type="button" class="x"></button>';
 document.body.append(bar.el);
 bar.el.querySelector('.auto').onclick = () => autoFill();
 bar.el.querySelector('.me').onclick = () => profileDialog();
+bar.el.querySelector('.lst').onclick = () => listDialog();
 bar.el.querySelector('.go').onclick = () => {
   // everything is filled: the same button saves the form
   if (!open().length) { const sb = document.getElementById('saveBtn'); if (sb && !sb.disabled) sb.click(); return; }
