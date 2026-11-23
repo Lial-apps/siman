@@ -154,6 +154,24 @@ body.fz-filling .a11y-fab,body.fz-filling .sb-back{visibility:hidden}
 [data-theme=dark] .fzlist .it .v{color:#F4F1FF}
 [data-theme=dark] .fzlist .pgh{background:#C9B6FA;color:#1B1638}
 `;
+css.textContent += `
+.fzl .fz.cur,.fzl .fz.cur.done{background:rgba(107,43,217,.10);outline:3px solid #6B2BD9;outline-offset:1px;box-shadow:0 0 0 6px rgba(107,43,217,.22);animation:fzHere 1.1s ease-out 2;z-index:2}
+.fzl .fz.cur .fzk{opacity:1;font-size:12px;color:#fff;background:#6B2BD9;padding:2px 8px;margin-bottom:4px;border-radius:6px}
+.fzl .fz.cur .fzk::before{content:"✎ "}
+@keyframes fzHere{0%{box-shadow:0 0 0 0 rgba(107,43,217,.55)}100%{box-shadow:0 0 0 22px rgba(107,43,217,0)}}
+@media (prefers-reduced-motion:reduce){.fzl .fz.cur{animation:none}}
+@media (min-width:820px) and (pointer:fine){
+.fzp{left:14px;right:auto;bottom:14px!important;width:372px;max-width:calc(100vw - 28px);margin:0;border-bottom:2px solid #2B1660;border-radius:18px;box-shadow:4px 4px 0 #2B1660,0 10px 30px rgba(43,22,96,.22);max-height:calc(100dvh - 28px);overflow-y:auto}
+.fzp.flip{left:auto;right:14px}
+.fzp .lens{display:none!important}
+}
+@media (min-width:820px) and (pointer:fine) and (max-height:720px){
+body.fz-filling header.bar,body.fz-filling #opts{display:none!important}
+.fzp .tip{display:none}
+.fzp .q{max-height:2.75em;font-size:13.5px;margin-bottom:5px}
+.fzp textarea{max-height:4.6em}
+}
+`;
 document.head.append(css);
 // 6.3: autofill, progress, "הפרטים שלי"
 css.textContent += `
@@ -754,7 +772,7 @@ const lensBox = pnl.querySelector('.lens'), lensC = lensBox.querySelector('canva
 const LZ = { t: null, img: null, crop: null, s: 1, job: 0 };
 async function lensOpen(t) {
   const my = ++LZ.job; LZ.t = t; LZ.img = null;
-  const P = S.pages[t.page]; if (!P) { lensBox.hidden = true; return; }
+  const P = S.pages[t.page]; if (!P || matchMedia(DESK_MQ).matches) { lensBox.hidden = true; return; }   // (on a computer the page itself is in view)
   const vp1 = P.page.getViewport({ scale: 1 }), W = vp1.width;
   // the field and the words beside it (Hebrew: on its right), at most ~300pt wide
   const side = 210, maxW = 380;
@@ -828,6 +846,8 @@ function openPanel(t) {
   if (isText) { ta.value = a.text || ''; ta.placeholder = l.ph; ta.dir = 'auto'; ta.inputMode = kd === 'id' ? 'numeric' : kd === 'phone' ? 'tel' : kd === 'email' ? 'email' : 'text'; }
   memShow(isText ? kd : null);
   checkNow();
+  // (6.9.9, on a computer: the card goes to the corner away from the place)
+  { const vpw = P.page.getViewport({ scale: 1 }).width; pnl.classList.toggle('flip', (t.x0 + t.x1) / 2 < vpw * .42); }
   count(); pnl.hidden = false; document.body.classList.add('fz-filling'); paint(P); place(); bar();
   if (isText) { ta.focus({ preventScroll: true }); grow(); try { ta.setSelectionRange(ta.value.length, ta.value.length); } catch (_) {} }
   lensOpen(t);
@@ -889,16 +909,34 @@ function count() {
   pnl.querySelector('.cnt').textContent = (i ? `${i} מתוך ${all}` : '') + (n ? ' · ' + L().left(n) : ' · ' + L().all);
   const pr = pnl.querySelector('.pbar i'); if (pr) pr.style.width = (all ? (all - n) / all * 100 : 0) + '%';
 }
-function show(t) {
+/* 6.9.9: the place being filled is always in view, never under the fill window. On a computer the window is a
+   card in a bottom corner (the corner away from the place); the page is scrolled so the place stands in the part
+   of the screen that the card leaves free: beside the card when the place is narrow enough, above it when it is
+   as wide as the page. */
+const DESK_MQ = '(min-width:820px) and (pointer:fine)';
+function show(t, above) {
   const P = S.pages[t.page]; if (!P) return; const d = $('desk'); if (!d) return;
-  const vp1 = P.page.getViewport({ scale: 1 }), k = S.zoom;
-  const pr = P.el.getBoundingClientRect(), dr = d.getBoundingClientRect();
-  const y = pr.top + (t.y0 + t.y1) / 2 * k, x = pr.left + (t.x0 + t.x1) / 2 * k;
-  const bottom = pnl.hidden ? dr.bottom : Math.min(dr.bottom, pnl.getBoundingClientRect().top);
-  const want = dr.top + (bottom - dr.top) * .42;
-  if (y < dr.top + 40 || y > bottom - 30) d.scrollBy({ top: y - want, behavior: 'smooth' });
-  if (x < dr.left + 10 || x > dr.right - 10) d.scrollBy({ left: x - (dr.left + dr.right) / 2, behavior: 'smooth' });
-  void vp1;
+  const k = S.zoom, pr = P.el.getBoundingClientRect(), dr = d.getBoundingClientRect();
+  const fx0 = pr.left + t.x0 * k, fx1 = pr.left + t.x1 * k, fy0 = pr.top + t.y0 * k, fy1 = pr.top + t.y1 * k;
+  let L = dr.left, R = dr.right, B = dr.bottom;
+  // the card stands in the corner that does not cover the place (when only one of the two corners is free of it)
+  if (!pnl.hidden && matchMedia(DESK_MQ).matches) { const w = pnl.getBoundingClientRect().width, vw = document.documentElement.clientWidth;
+    const hitL = fx0 < 14 + w + 10, hitR = fx1 > vw - 14 - w - 10; if (hitL !== hitR) pnl.classList.toggle('flip', hitL); }
+  if (!pnl.hidden) { const q = pnl.getBoundingClientRect();
+    if (q.width < dr.width * .7) { // a card in a corner
+      const l2 = q.left - dr.left < dr.right - q.right ? q.right + 10 : L, r2 = l2 === L ? q.left - 10 : R;
+      if (!above && fx1 - fx0 <= r2 - l2 - 24) { L = l2; R = r2; } else B = Math.min(B, q.top - 10);
+    } else B = Math.min(B, q.top); }
+  let dy = 0, dx = 0;
+  if (fy0 < dr.top + 34 || fy1 > B - 14) dy = fy1 - fy0 > B - dr.top - 60 ? fy0 - (dr.top + 26) : (fy0 + fy1) / 2 - (dr.top + (B - dr.top) * .45);
+  if (fx0 < L + 8 || fx1 > R - 8) dx = fx1 - fx0 <= R - L - 24 ? (fx0 + fx1) / 2 - (L + R) / 2 : t.rtl ? fx1 - (R - 16) : fx0 - (L + 16);
+  // (at once, not a smooth scroll: a smooth one that is cut short leaves the place out of view)
+  if (dy || dx) d.scrollBy({ top: dy, left: dx, behavior: 'auto' });
+  // the page could not move aside (it is narrower than the screen) and the card still covers the place: the place
+  // goes above the card instead
+  if (!above && !pnl.hidden) { const q = pnl.getBoundingClientRect(), p2 = P.el.getBoundingClientRect();
+    const ax0 = p2.left + t.x0 * k, ax1 = p2.left + t.x1 * k, ay0 = p2.top + t.y0 * k, ay1 = p2.top + t.y1 * k;
+    if (q.width < dr.width * .7 && ax0 < q.right + 4 && ax1 > q.left - 4 && ay0 < q.bottom && ay1 > q.top - 4) show(t, true); }
 }
 // above the phone's keyboard
 function place() {
