@@ -1,5 +1,5 @@
 /* =====================================================================
-   סימן 5.9.6 (6.9.7: תיבות עם שאלה, כותרות עמודות, רשימת כל המקומות) — siman-fill.js
+   סימן 5.9.6 (6.9.7–6.9.8: תיבות עם שאלה, כותרות עמודות, רשימת כל המקומות, מילוי אוטומטי לפי בעל הפרטים) — siman-fill.js
    מילוי וחתימה: כשנפתח טופס, סימן מוצא בעצמו את המקומות למילוי
    · קווים ריקים (____ / .......), גם בטופס סרוק — לפי הציור של הדף
    · תאים ריקים בטבלה (מסגרת עם קווים מכל הצדדים ובלי טקסט בפנים)
@@ -38,6 +38,14 @@ const TX = {
   ru: { prev: 'Назад', save: 'Всё заполнено ✓ · Сохранить', badId: 'Номер ID не проходит проверку. Стоит проверить', badPhone: 'Номер телефона слишком короткий или длинный', badMail: 'Адрес почты выглядит неверно', addr: 'Адрес', email: 'Почта', tipK: 'Enter / Tab: далее · Shift+Tab: назад · Shift+Enter: новая строка' }
 };
 const LX = () => TX[LANG()] || TX.he;
+// 6.9.8: the list of all places, the page number, a box for a few lines
+const TZ = {
+  he: { pg: 'עמוד', all: 'כל המקומות למילוי', note: (d, a) => `${d} מתוך ${a} מולאו. לוחצים על מקום כדי לעבור אליו.`, on: 'מסומן', bare: '(בלי כיתוב)', see: 'עוברים אליו כדי לראות איפה הוא בדף', free: '✏️ לכתוב במקום אחר בדף', close: 'סגירה', freeTip: 'לוחצים על המקום בדף שבו רוצים לכתוב, וכותבים', tipA: 'Enter: שורה חדשה · Tab: הבא · Shift+Tab: הקודם', over: 'הטקסט ארוך מהמקום שיש בטופס. כדאי לקצר, אחרת הוא ייצא מהמסגרת' },
+  en: { pg: 'Page', all: 'All places to fill', note: (d, a) => `${d} of ${a} filled. Tap a place to go to it.`, on: 'Checked', bare: '(no label)', see: 'Go to it to see where it is on the page', free: '✏️ Write somewhere else on the page', close: 'Close', freeTip: 'Tap the spot on the page where you want to write, then type', tipA: 'Enter: new line · Tab: next · Shift+Tab: back', over: 'The text is longer than the room in the form. Shorten it, or it will run out of the box' },
+  ar: { pg: 'صفحة', all: 'كل أماكن التعبئة', note: (d, a) => `تمت تعبئة ${d} من ${a}. اضغطوا على مكان للانتقال إليه.`, on: 'مُعلَّم', bare: '(بدون عنوان)', see: 'انتقلوا إليه لرؤية مكانه في الصفحة', free: '✏️ الكتابة في مكان آخر في الصفحة', close: 'إغلاق', freeTip: 'اضغطوا على المكان في الصفحة الذي تريدون الكتابة فيه، ثم اكتبوا', tipA: 'Enter: سطر جديد · Tab: التالي · Shift+Tab: السابق', over: 'النص أطول من المكان المتاح في النموذج. يُفضَّل اختصاره وإلا سيخرج من الإطار' },
+  ru: { pg: 'Стр.', all: 'Все места для заполнения', note: (d, a) => `Заполнено ${d} из ${a}. Нажмите на место, чтобы перейти к нему.`, on: 'Отмечено', bare: '(без подписи)', see: 'Перейдите к нему, чтобы увидеть, где оно на странице', free: '✏️ Написать в другом месте страницы', close: 'Закрыть', freeTip: 'Нажмите на место на странице, где хотите написать, и пишите', tipA: 'Enter: новая строка · Tab: далее · Shift+Tab: назад', over: 'Текст длиннее места в форме. Сократите его, иначе он выйдет за рамку' }
+};
+const LZ2 = () => TZ[LANG()] || TZ.he;
 const cleanLabel = s => String(s || '').replace(BLANK, ' ').replace(/[\[\]]\s*\d{1,2}\s*[\[\]]/g, ' ').replace(/(^|\s)[:：](?=\S)/g, '$1').replace(/\s+/g, ' ').replace(/^[\s:：–-]+|[\s:：–-]+$/g, '');
 const kindName = t => { const k = t.kind === 'cell' ? (t.sub && t.sub !== 'text' ? t.sub : t.inCell || t.area ? 'text' : 'cell') : t.kind; return L().k[k] || LX()[k] || L().k.text; };
 // what was typed before, kept only on this device: the next form suggests it (name, ID, phone, address, e-mail)
@@ -195,10 +203,11 @@ function kindOf(t) {
 function kindOf1(t) {
   t = String(t || '').replace(/[|_=~<>"'״׳`.,;()\[\]{}:：*]/g, ' ').replace(/\s+/g, ' ').trim();
   if (!t) return null;
+  t = t.replace(/מורש[הי]\s+ה?חתימה/g, ' ').trim();   // "שם מורשה החתימה" asks for a name
   if (/חתימ|ח\s?ת\s?י\s?מ|signature|sign here|توقيع|подпис/i.test(t)) return 'sig';
   if (/תאריך|date|تاريخ|дата/i.test(t)) return 'date';
   if (/(^|\s)ת\s?ז(\s|$)|תעודת ה?זהות|מס(פר)?\s*ה?זהות|\bid\b|identity|هوية|паспорт/i.test(t)) return 'id';
-  if (/מייל|דוא\s?ל|e-?mail|بريد|почт/i.test(t)) return 'email';
+  if (/מייל|דוא\s?ל|דואר\s+אלקטרוני|e-?mail|بريد|почт/i.test(t)) return 'email';
   if (/טלפון|נייד|phone|mobile|هاتف|телефон/i.test(t)) return 'phone';
   if (/כתובת|רחוב|address|عنوان|адрес/i.test(t)) return 'addr';
   // (6.9.7: "שם המוסד" and "מספר הילדים במשפחה" are not a person's name)
@@ -282,7 +291,8 @@ function labelFor(items, b, pageRtl) {
   // the label is written above the line ("שם מלא של התלמיד/ה:" and the line under it)
   const above = items.filter(t => !t.blank && t.y1 <= b.y0 + 7 && b.y0 - t.y1 < Math.max(14, t.fh * 1.6) && t.x0 < b.x1 && t.x1 > b.x0)
     .sort((a, c) => c.y1 - a.y1)[0];
-  return above ? { text: above.s, fh: above.fh, above: true } : null;
+  // (the whole title: "הערות כלליות/סיכום" and "והמלצות" are two pieces of one line)
+  return above ? { text: items.filter(t => !t.blank && Math.abs(t.y1 - above.y1) < 4 && t.x0 < b.x1 + 20 && t.x1 > b.x0 - 20).sort((a, c) => pageRtl ? c.x1 - a.x1 : a.x0 - c.x0).map(t => t.s).join(' '), fh: above.fh, above: true } : null;
 }
 
 // the page drawn small: ink as 1/0
@@ -293,7 +303,7 @@ async function inkOf(page) {
   const g = c.getContext('2d', { willReadFrequently: true }); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
   await page.render({ canvasContext: g, viewport: vp, annotationMode: 0 }).promise;
   const W = c.width, H = c.height, d = g.getImageData(0, 0, W, H).data, dark = new Uint8Array(W * H);
-  for (let i = 0, j = 0; i < dark.length; i++, j += 4) dark[i] = (d[j] * .3 + d[j + 1] * .59 + d[j + 2] * .11) < 165 ? 1 : 0;
+  for (let i = 0, j = 0; i < dark.length; i++, j += 4) dark[i] = (d[j] * .3 + d[j + 1] * .59 + d[j + 2] * .11) < 190 ? 1 : 0;   // (6.9.8: 190, was 165: hair-thin rules of tables and check boxes come out grey)
   const out = { W, H, k, dark, g };
   c.width = c.height = 0; // the picture itself is not needed any more
   return out;
@@ -388,17 +398,19 @@ async function detectPage(P, widgets) {
   let I = null; try { I = await inkOf(page); } catch (e) { console.warn('fill: page picture', e); }
   if (I) {
     const k = I.k, toV = v => v / k;
+    // (6.9.8: a check box drawn by a symbol font is a "letter" of the file; only real words mean the box is taken)
+    const wordBox = (x0, y0, x1, y1) => items.some(t => !t.blank && /[A-Za-z0-9֐-׿؀-ۿЀ-ӿ]/.test(t.s) && t.x0 < x1 - 2 && t.x1 > x0 + 2 && t.y0 < y1 - 1 && t.y1 > y0 + 1);
     const textBox = (x0, y0, x1, y1) => items.some(t => !t.blank && t.x0 < x1 - 2 && t.x1 > x0 + 2 && t.y0 < y1 - 1 && t.y1 > y0 + 1);
     for (const ln of strokes(I)) {
       for (const pc of pieces(I, ln)) {
         const len = pc.x1 - pc.x0; if (len < I.W * .035) continue;
         if (pc.cell) {
           // a table cell: the rule above it is where the vertical rules start
-          const top = cellTop(I, pc.x0, pc.x1, ln.y0, pc.h), hh = ln.y0 - top; if (hh < I.H * .014 || hh > I.H * .5) continue;
+          const top = cellTop(I, pc.x0, pc.x1, ln.y0, pc.h), hh = ln.y0 - top; if (hh < I.H * .011 || hh > I.H * .5) continue;
           const ix0 = pc.x0 + 3, ix1 = pc.x1 - 3, iy0 = ln.y0 - hh + 3, iy1 = ln.y0 - 3;
           const X0 = toV(pc.x0), X1 = toV(pc.x1), Y0 = toV(ln.y0 - hh), Y1 = toV(ln.y0);
           const inside = items.filter(t => !t.blank && (t.x0 + t.x1) / 2 > X0 && (t.x0 + t.x1) / 2 < X1 && (t.y0 + t.y1) / 2 > Y0 && (t.y0 + t.y1) / 2 < Y1);
-          if (inkIn(I, ix0, iy0, ix1, iy1) > .006 || inside.length || textBox(X0, Y0, X1, Y1)) {
+          if (inkIn(I, ix0, iy0, ix1, iy1) > .006 || inside.length) {   // (words that only touch the cell's edge from the row above do not fill it)
             /* 6.9.7: a box with a question at its top and room under it ("תיאור כללי של התלמיד…:" and an empty
                box), or words at its start and room beside them ("בתאריך:"): the room is the place to fill.
                Found by the picture of the page, so it works in a scanned form too. */
@@ -408,13 +420,22 @@ async function detectPage(P, widgets) {
             const free = toV(iy1 - yInk), used = toV(yInk - iy0);
             const words = inside.sort((a, b) => Math.abs(a.y1 - b.y1) < 4 ? (pageRtl ? b.x1 - a.x1 : a.x0 - b.x0) : a.y1 - b.y1).map(t => t.s).join(' ').replace(/\s+/g, ' ').trim();
             const fh = inside.reduce((m, t) => Math.max(m, t.fh), 0), asks = /[:：?？]\s*$/.test(words) || /[:：?？]\s*[)）]?\s*$/.test(words) && free >= 30;
-            if (free >= 13 && used <= Math.max(64, toV(hh) * .6) && words.length <= 320 && (asks || free >= 45)) {
+            if (free >= 13 && used <= Math.max(64, toV(hh) * .6) && words.length <= 320 && (asks || free >= 45 || (!items.length && free >= 16))) {   // (a scanned page has no words to read: any real room under the ink of a box counts)
               push({ x0: X0 + 1, x1: X1 - 1, y0: toV(yInk) + 2, y1: Y1 - 1, kind: 'cell', sub: words.length > 40 ? 'text' : kindOf(words), label: words, rtl: pageRtl, fh, area: free >= 26, inCell: true, free, asks, box: [X0, Y0, X1, Y1] });
-            } else if (inside.length && asks && toV(hh) < 60) {
+            } else if (inside.length && asks) {
+              const sub = words.length > 40 ? 'text' : kindOf(words);
               // one line of words at the start of the box: the room beside them
               let a = ix1, b = ix0; for (let x = ix0; x <= ix1; x++) { let n = 0; for (let y = iy0; y <= iy1; y++) n += I.dark[y * I.W + x]; if (n) { if (x < a) a = x; if (x > b) b = x; } }
               const fl = toV(a - ix0), fr = toV(ix1 - b), side = Math.max(fl, fr);
-              if (side >= Math.max(50, toV(len) * .4)) push({ x0: fl >= fr ? X0 + 1 : toV(b) + 4, x1: fl >= fr ? toV(a) - 4 : X1 - 1, y0: Y0 + 1, y1: Y1 - 1, kind: 'cell', sub: words.length > 40 ? 'text' : kindOf(words), label: words, rtl: pageRtl, fh, inCell: true, free: 0, asks, box: [X0, Y0, X1, Y1] });
+              if (toV(hh) < 60 && side >= Math.max(50, toV(len) * .4)) push({ x0: fl >= fr ? X0 + 1 : toV(b) + 4, x1: fl >= fr ? toV(a) - 4 : X1 - 1, y0: Y0 + 1, y1: Y1 - 1, kind: 'cell', sub, label: words, rtl: pageRtl, fh, inCell: true, free: 0, asks, box: [X0, Y0, X1, Y1] });
+              // 6.9.8: the words fill their cell and a narrow strip is left under them ("שם ההורה/האפוטרופוס:" in a
+              // low row): one line in small letters fits there
+              else if (free >= 5.5 && words.length <= 40 && toV(hh) < 40) push({ x0: X0 + 1, x1: X1 - 1, y0: toV(yInk) + .5, y1: Y1 - .5, kind: 'cell', sub, label: words, rtl: pageRtl, fh, inCell: true, tight: true, free: 0, asks, box: [X0, Y0, X1, Y1] });
+              // 6.9.8: a wide box that its question fills to the end (the form left no room in it): the empty strip
+              // of the page just under the box is where the answer goes
+              else if (len >= I.W * .5) { const yb = ln.y1 + 3, maxG = Math.round(I.H * .12); let gp = 0;
+                while (gp < maxG && yb + gp < I.H - 1 && rowInk(yb + gp) < 2) gp++;
+                if (toV(gp) >= 12) push({ x0: X0 + 1, x1: X1 - 1, y0: toV(yb) + 1, y1: toV(yb + gp) - 2, kind: 'cell', sub: 'text', label: words, rtl: pageRtl, fh, area: true, inCell: true, under: true, free: 0, asks, box: [X0, Y0, X1, toV(yb + gp)] }); }
             }
             continue;
           }
@@ -437,18 +458,17 @@ async function detectPage(P, widgets) {
         }
       }
     }
-    // a box of words beside or above an empty cell is that cell's heading ("השם הפרטי" over its cell), not a place
     const cells = out.filter(o => o.empty), ovl = (a0, a1, b0, b1) => (Math.min(a1, b1) - Math.max(a0, b0)) / Math.max(1, Math.min(a1 - a0, b1 - b0));
-    for (let i = out.length - 1; i >= 0; i--) { const t = out[i]; if (!t.inCell || (t.free >= 45 && t.asks)) continue;
-      const [bx0, by0, bx1, by1] = t.box;
-      if (cells.some(o => (Math.abs(o.y0 - by1) < 8 && ovl(o.x0, o.x1, bx0, bx1) > .6) || ((Math.abs(o.x1 - bx0) < 8 || Math.abs(o.x0 - bx1) < 8) && ovl(o.y0, o.y1, by0, by1) > .6))) out.splice(i, 1); }
     // an empty cell of a table is named by the heading of its column (and the words that start its row, when they ask)
     const headOf = c => {
       const up = cells.find(o => o !== c && o.kind === 'cell' && Math.abs(o.y1 - c.y0) < 8 && ovl(o.x0, o.x1, c.x0, c.x1) > .8);
       if (up) return up.head !== undefined ? up.head : (up.head = headOf(up));
       const col = items.filter(t => !t.blank && (t.x0 + t.x1) / 2 > c.x0 && (t.x0 + t.x1) / 2 < c.x1 && t.y1 <= c.y0 + 2 && c.y0 - t.y1 < 70).sort((a, b) => b.y1 - a.y1);
       if (!col.length || c.y0 - col[0].y1 > 45) return null;
-      const take = [col[0]]; for (let j = 1; j < col.length && take.length < 8; j++) { if (take[take.length - 1].y1 - col[j].y1 > col[j].fh * 1.7) break; take.push(col[j]); }
+      const take = [col[0]]; for (let j = 1; j < col.length && take.length < 8; j++) { const lo = take[take.length - 1]; if (lo.y1 - col[j].y1 > col[j].fh * 1.7) break;
+        // (a rule between two lines: the upper one is another row of the table, like a title row over the headings)
+        let cut = false; for (let y = Math.round(col[j].y1 * k) + 1; y < Math.round(lo.y0 * k) + 2 && !cut; y++) cut = inkIn(I, c.x0 * k + 3, y, c.x1 * k - 3, y) > .6;
+        if (cut) break; take.push(col[j]); }
       // the heading stands in its own cell of the same column: the column's side rules go on up beside it
       // (a title over the whole table does not name each of its cells)
       const need = (c.y0 - Math.min(...take.map(t => t.y0))) * k * .8, yy = Math.round(c.y0 * k);
@@ -464,10 +484,29 @@ async function detectPage(P, widgets) {
       if (!h || !h.text) continue;
       const row = c.side && /[:：]\s*$/.test(c.side) ? c.side.replace(/[:：]\s*$/, '') : '';
       const kd = kindOf(h.text); c.label = h.text + (row ? ' · ' + row : ''); c.sub = kd; c.fh = c.fh || h.fh; }
+    // 6.9.8: a check box that the file writes as a letter of a symbol font (it reads as "∕" or the like): the letter
+    // is taken as a box when what is drawn in its place is an empty square
+    for (const it of items) { if (it.blank) continue;
+      [...it.s].forEach((ch, ci) => { if (/[\sA-Za-z0-9֐-׿؀-ۿЀ-ӿ.,:;!?()\[\]{}'"*•·\-–—_\/\\|+=<>%&#@]/.test(ch) || ci !== it.s.indexOf(ch, ci)) return;
+        const [sx0, sx1] = spanOf(it, ci, ci + 1);
+        const px0 = Math.max(0, Math.floor((sx0 - 1) * k)), px1 = Math.min(I.W - 1, Math.ceil((sx1 + 1) * k)), py0 = Math.max(0, Math.floor((it.y0 - 3) * k)), py1 = Math.min(I.H - 1, Math.ceil((it.y1 + 4) * k));
+        let a = 1e9, b = -1, c = 1e9, d = -1;
+        for (let y = py0; y <= py1; y++) for (let x = px0; x <= px1; x++) if (I.dark[y * I.W + x]) { if (x < a) a = x; if (x > b) b = x; if (y < c) c = y; if (y > d) d = y; }
+        const w = (b - a) / k, h = (d - c) / k; if (b < 0 || w < 5 || w > 16 || h < 5 || h > 16 || Math.abs(w - h) > Math.max(w, h) * .3) return;
+        if (inkIn(I, a + (b - a) * .3, c + (d - c) * .3, b - (b - a) * .3, d - (d - c) * .3) > .08) return;        // not hollow
+        if (inkIn(I, a, c, b, c + 1) < .35 || inkIn(I, a, d - 1, b, d) < .35) return;                                  // no top or bottom edge
+        push({ x0: toV(a), x1: toV(b), y0: toV(c), y1: toV(d), kind: 'check', label: '', rtl: pageRtl }); }); }
+    // a box of words beside or above an empty cell is that cell's heading ("השם הפרטי" over its cell), not a place.
+    // (6.9.8: an empty cell beside it that has a column heading of its own is another detail of the same row, so the
+    // box stays; and a box whose bottom rule splits into columns is the heading of the rows under it)
+    const dnC = Math.round(I.H * .008), colsUnder = (bx0, bx1, by1) => { const y = Math.round(by1 * k) - 1; for (let x = Math.round((bx0 + 8) * k); x < (bx1 - 8) * k; x++) if (vDown(I, x, y) >= dnC + 5) return true; return false; };
+    for (let i = out.length - 1; i >= 0; i--) { const t = out[i]; if (!t.inCell || (t.free >= 45 && t.asks)) continue;
+      const [bx0, by0, bx1, by1] = t.box;
+      if ((!t.under && colsUnder(bx0, bx1, by1)) || cells.some(o => (Math.abs(o.y0 - by1) < 8 && ovl(o.x0, o.x1, bx0, bx1) > .6) || (!o.head && (Math.abs(o.x1 - bx0) < 8 || Math.abs(o.x0 - bx1) < 8) && ovl(o.y0, o.y1, by0, by1) > .6))) out.splice(i, 1); }
     // drawn check boxes (the detector of send.js, when it is loaded)
     if (window.SIMAN_SEND && SIMAN_SEND.findBoxes) {
       try { const bw = { getImageData: () => { const d = new Uint8ClampedArray(I.W * I.H * 4); for (let i = 0, j = 0; i < I.dark.length; i++, j += 4) { const v = I.dark[i] ? 0 : 255; d[j] = d[j + 1] = d[j + 2] = v; d[j + 3] = 255; } return { data: d }; } };
-        for (const b of SIMAN_SEND.findBoxes(bw, I.W, I.H)) if (!textBox(toV(b.x), toV(b.y), toV(b.x + b.w), toV(b.y + b.h))) push({ x0: toV(b.x), x1: toV(b.x + b.w), y0: toV(b.y), y1: toV(b.y + b.h), kind: 'check', label: '', rtl: pageRtl }); } catch (e) { console.warn('fill: boxes', e); }
+        for (const b of SIMAN_SEND.findBoxes(bw, I.W, I.H)) if (!wordBox(toV(b.x), toV(b.y), toV(b.x + b.w), toV(b.y + b.h))) push({ x0: toV(b.x), x1: toV(b.x + b.w), y0: toV(b.y), y1: toV(b.y + b.h), kind: 'check', label: '', rtl: pageRtl }); } catch (e) { console.warn('fill: boxes', e); }
     }
     I.dark = null; I.g = null;
   }
@@ -495,6 +534,15 @@ async function detectPage(P, widgets) {
     if (out.some(o => o.kind !== 'check' && o.y1 > it.y1 && o.y0 - it.y1 < Math.max(16, it.fh * 2.5) && o.x0 < it.x1 + 4 && o.x1 > it.x0 - 4)) continue;
     push({ x0, x1, y0: it.y0 - 2, y1: it.y1 + 2, kind: kd, label: s, rtl: it.rtl, fh: it.fh });
   }
+  // 6.9.8: one blank that the file keeps in two touching pieces is one place (the piece with no words of its own
+  // joins the one that has them)
+  for (let again = true; again;) { again = false;
+    scan: for (const b of out) { if (!b.weak || b.kind === 'cell' || b.kind === 'check') continue;
+      for (const a of out) { if (a === b || a.kind === 'cell' || a.kind === 'check' || Math.abs(a.y1 - b.y1) > 3 || !(Math.abs(a.x1 - b.x0) < 4 || Math.abs(b.x1 - a.x0) < 4)) continue;
+        a.x0 = Math.min(a.x0, b.x0); a.x1 = Math.max(a.x1, b.x1); a.y0 = Math.min(a.y0, b.y0); out.splice(out.indexOf(b), 1); again = true; break scan; } } }
+  // 6.9.8: whose details a table asks for, by the title over it ("פרטי התלמיד/ה", "פרטי ההורים"): the nearest one above
+  { const secs = items.filter(t => !t.blank && t.s.length < 70 && (SEC_CHILD.test(t.s) || SEC_ADULT.test(t.s)));
+    if (secs.length) out.forEach(t => { const s = secs.filter(c => c.y1 <= t.y0 + 2 && t.y0 - c.y1 < 130).sort((a, b) => b.y1 - a.y1)[0]; if (s) t.about = SEC_CHILD.test(s.s) ? 'child' : 'adult'; }); }
   out.forEach(t => { t.page = P.i - 1; });
   // how far a box may grow on its line: up to the next words or the next place on the same line (then it wraps)
   out.forEach(t => {
@@ -585,6 +633,7 @@ const paintAll = () => S.pages.forEach(paint);
 /* ---------------------------------------------------------------- מילוי */
 // the text box sits on the line: the size of the words beside it, its start at the start of the line
 function sizeFor(t) {
+  if (t.tight) return Math.round(clamp((t.y1 - t.y0) / 1.45, 6, 8) * 2) / 2;       // one small line under the words of its cell
   if (t.area) return Math.round(clamp(t.fh ? t.fh * .95 : 11, 8, 12) * 2) / 2;   // a box for a few lines: the size of its question
   const room = t.kind === 'cell' ? (t.y1 - t.y0) * .62 : (t.y1 - t.y0) * .75;
   const base = t.fh ? t.fh * .95 : 11;
@@ -624,9 +673,13 @@ function wrapA(a, w) {
 function fitCell(a, f, P) {
   const vp1 = P.page.getViewport({ scale: 1 }), w = Math.max(20, f.r - f.l);
   const need = sz => { a.size = sz; return wrapA(a, (w - sz * .25) * .97).length * sz * 1.35 + 2; };   // a little spare: the saved file measures its own letters
+  // (a word longer than the cell, like an e-mail address in a narrow column, gets smaller too, down to 6)
+  const wide = sz => { a.size = sz; meas.font = `${a.bold ? 700 : 400} ${sz}px ${typeof cssFont === 'function' ? cssFont(a.font) : 'Arial'}`; return String(a.text || '').split(/\s+/).some(wd => meas.measureText(wd).width > w - 1); };
   let size = f.size0 || a.size; while (need(size) > f.h && size > 7) size -= .5;
-  const hh = need(size); f.over = hh > f.h + 1;
-  f.top = f.area || hh >= f.h - 2 ? f.y0 + 1 : f.y0 + (f.h - hh) / 2;
+  while (wide(size) && size > 6) size -= .5;
+  let hh = need(size); f.over = hh > f.h + 1;
+  if (f.tight) { size = f.size0; hh = Math.min(f.h, size * 1.2); a.size = size; f.over = wrapA(a, w).length > 1; }
+  f.top = f.tight ? f.y0 + (f.h - size * 1.35) / 2 : f.area || hh >= f.h - 2 ? f.y0 + 1 : f.y0 + (f.h - hh) / 2;
   const fs = [...String(a.text || '')].find(c => RTL_CH.test(c) || LTR_CH.test(c)), rtl = fs ? RTL_CH.test(fs) : f.rtl;
   const pt = vp1.convertToPdfPoint(f.l, f.top); a.w = w; a.x = pt[0]; a.y = pt[1];
   const el = P.tl.querySelector(`.tw[data-id="${a.id}"]`); if (!el) return;
@@ -640,7 +693,7 @@ function textAt(t, text) {
   const pt = vp1.convertToPdfPoint(t.rtl ? t.x1 - 30 : t.x0, top);
   t.hist = S.hist.length; snapshot();
   const a = { id: S.nextId++, type: 'text', page: t.page, x: pt[0], y: pt[1], w: Math.max(24, t.x1 - t.x0), size, color: (S.color && S.color.text) || '#1C2333', text: text || '', font: S.textFont, bold: false,
-    fz: t.kind === 'cell' ? { l: t.x0 + 3, r: t.x1 - 3, top, rtl: t.rtl, cell: true, area: !!t.area, y0: t.y0, h: t.y1 - t.y0, size0: size } : { l: t.x0, r: t.x1, top, rtl: t.rtl, limL: t.limL, limR: t.limR } };
+    fz: t.kind === 'cell' ? { l: t.x0 + 3, r: t.x1 - 3, top, rtl: t.rtl, cell: true, area: !!t.area, tight: !!t.tight, y0: t.y0, h: t.y1 - t.y0, size0: size } : { l: t.x0, r: t.x1, top, rtl: t.rtl, limL: t.limL, limR: t.limR } };
   S.anns.push(a); t.ann = a.id; fit(a); drawAnns(P);
   return a;
 }
@@ -752,14 +805,14 @@ function openPanel(t) {
     q.textContent = lb.length >= 40 ? lb : ''; q.hidden = lb.length < 40; q.scrollTop = 0; }
   // where this place is: the page number, and a small page with a mark at the place (a tap opens the list of all places)
   { const vp = P.page.getViewport({ scale: 1 }), w = pnl.querySelector('.where'), m = w.querySelector('i');
-    w.querySelector('.pn').textContent = `עמוד ${t.page + 1}/${S.pages.length}`; w.title = 'כל המקומות למילוי'; w.setAttribute('aria-label', `עמוד ${t.page + 1} מתוך ${S.pages.length}. כל המקומות למילוי`);
+    w.querySelector('.pn').textContent = `${LZ2().pg} ${t.page + 1}/${S.pages.length}`; w.title = LZ2().all; w.setAttribute('aria-label', `${LZ2().pg} ${t.page + 1}/${S.pages.length}. ${LZ2().all}`);
     Object.assign(m.style, { left: t.x0 / vp.width * 100 + '%', top: clamp((t.y0 + t.y1) / 2 / vp.height * 100 - 6, 0, 88) + '%', width: Math.max(18, (t.x1 - t.x0) / vp.width * 100) + '%' }); }
   ta.rows = t.area ? 3 : 1; ta.enterKeyHint = t.area ? 'enter' : 'next';
   pnl.querySelector('[data-a=next]').textContent = l.next + ' ›';
   pnl.querySelector('[data-a=done]').textContent = l.done;
   pnl.querySelector('[data-a=del]').textContent = l.del;
   { const an = annOf(t); pnl.querySelector('[data-a=del]').hidden = !an || (an.type === 'text' && !String(an.text || '').trim()); }
-  pnl.querySelector('.tip').textContent = t.area ? 'Enter: שורה חדשה · Tab: הבא · Shift+Tab: הקודם' : LX().tipK;
+  pnl.querySelector('.tip').textContent = t.area ? LZ2().tipA : LX().tipK;
   { const pv = pnl.querySelector('[data-a=prev]'); pv.textContent = '‹ ' + LX().prev; pv.hidden = F.list.indexOf(t) <= 0; }
   const chips = pnl.querySelector('.chips'); chips.innerHTML = '';
   const chip = (txt, fn, cls) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = txt; if (cls) b.className = cls; b.onclick = fn; chips.append(b); };
@@ -788,7 +841,7 @@ function sync() {
 }
 const kindOfCur = () => { const t = F.cur; return t ? (t.kind === 'cell' ? t.sub : t.kind) : null; };
 // a gentle note under the box (an ID whose check digit is wrong, a short phone number); it never blocks
-function checkNow() { const an = F.cur && annOf(F.cur), w = pnl.querySelector('.warn'), m = an && an.fz && an.fz.over ? 'הטקסט ארוך מהמקום שיש בטופס. כדאי לקצר, אחרת הוא ייצא מהמסגרת' : warnFor(kindOfCur(), ta.value); w.textContent = m; w.hidden = !m || ta.hidden; }
+function checkNow() { const an = F.cur && annOf(F.cur), w = pnl.querySelector('.warn'), m = an && an.fz && an.fz.over ? LZ2().over : warnFor(kindOfCur(), ta.value); w.textContent = m; w.hidden = !m || ta.hidden; }
 // what was typed in this kind of place before (only on this device): one tap fills it
 function memShow(kd) {
   const box = pnl.querySelector('.mem'); box.innerHTML = '';
@@ -877,6 +930,9 @@ function meOrMemory() {
 }
 // whose detail a place asks for, by the words beside it
 const CHILD_RE = /תלמיד|תלמידה|ילד|הילד|הילדה|בנ?\/?בת|בנך|בתך|קטין|חניך|נער|student|pupil|child|minor|ученик|ребен|طالب|الطفل/i;
+const OTHER_RE = /מנהל|מפקח|מחנ[ךכ]|מורה|רופא|יוע[ץצ]|פקיד|מאשר|ממליץ|מעסיק|נציג|גננת|מטפל|(^|\s)עד(\s|$)|עו"ד|עורך|מוסד|principal|teacher|doctor|witness|employer/i, SELF_RE = /ממלא|מגיש|מבקש|החתום|הח"מ|applicant|undersigned/i;
+const TODAY_RE = /(^|\s)ה?תאריך$|תאריך\s+ה?(מילוי|יום|חתימה|הפניה|בקשה|הגשה)|^date$|date of sign|today/i;
+const SEC_CHILD = /פרטי\s+ה?(תלמיד|ילד|קטין|חניך|מועמד|נער)|(student|child|pupil)('s)? details/i, SEC_ADULT = /פרטי\s+ה?(הורים|הורה|אפוטרופוס|מבקש|מגיש|עובד)|parents?('s)? details/i;
 const ADULT_RE = /הורה|אב|אם|האב|האם|מבקש|החתום|המבקש|העובד|parent|father|mother|applicant|родител|ولي/i;
 function valueFor(p, t) {
   const lb = String(t.label || ''), kd = t.kind === 'cell' ? t.sub : t.kind;
@@ -900,22 +956,27 @@ async function autoFill() {
   let kid = kids[0] || null;
   if (kids.length > 1 && empty.some(t => CHILD_RE.test(t.label || ''))) { kid = await pickKid(kids); if (kid === undefined) return; }
   if (F.cur) closePanel(true);
-  const ids = [], adultSeen = {}; let n = 0;
+  const ids = [], adultSeen = {}; let n = 0, noKid = 0;
   // a place whose words do not say whose it is ("מספר ת"ז:") belongs to the person its line is about
   // ("שם התלמיד/ה: ____ מספר ת"ז: ____" — both the child's)
   const lineAbout = t => { const same = F.list.filter(o => t.para != null ? o.para === t.para : o.page === t.page && Math.abs(o.y1 - t.y1) < 6);
     return same.some(o => CHILD_RE.test(o.label || '')) && !same.some(o => ADULT_RE.test(o.label || '')) ? 'child' : null; };
   for (const t of empty) {
     const kd = t.kind === 'cell' ? t.sub : t.kind, lb = t.label || '';
-    let p = CHILD_RE.test(lb) || (!ADULT_RE.test(lb) && lineAbout(t) === 'child') ? kid : me;
+    // 6.9.8: a detail of somebody else (the principal, the doctor, a witness) is never filled from "הפרטים שלי"
+    if (OTHER_RE.test(lb) && !SELF_RE.test(lb)) continue;
+    // (6.9.8: a table under "פרטי התלמיד/ה" is about the child even when its cells say only "השם הפרטי")
+    let p = CHILD_RE.test(lb) || (!ADULT_RE.test(lb) && (lineAbout(t) === 'child' || t.about === 'child')) ? kid : me;
+    if (p === kid && !kid) noKid++;
     // the second "שם ההורה" line on the form: the other parent
-    if (p === me && ADULT_RE.test(lb)) { const key = kd + '|' + lb.replace(/\s+/g, ''); if (adultSeen[key]) p = partner || null; adultSeen[key] = 1; }
-    let v = kd === 'date' && !/לידה|birth/i.test(lb) ? new Date().toLocaleDateString('he-IL') : valueFor(p, t);
+    if (p === me && (ADULT_RE.test(lb) || t.about === 'adult')) { const key = kd + '|' + lb.replace(/\s+/g, ''); if (adultSeen[key]) p = partner || null; adultSeen[key] = 1; }
+    // (6.9.8: today's date only where the form asks for the date of filling or signing, not "תאריך העלייה" or "בתאריך:")
+    let v = kd === 'date' && !/לידה|birth/i.test(lb) ? (TODAY_RE.test(cleanLabel(lb)) ? new Date().toLocaleDateString('he-IL') : '') : valueFor(p, t);
     if (!v) continue;
     const a = textAt(t, v); ids.push(a.id); n++;
   }
   S.pages.forEach(P => { drawAnns(P); paint(P); }); bar();
-  if (!n) { toast('לא נמצאו מקומות שאפשר למלא מהפרטים שלך. אפשר להוסיף פרטים ב"👤 הפרטים שלי"'); return; }
+  if (!n) { toast(noKid ? 'הטופס מבקש פרטים של ילד/ה או תלמיד/ה. מוסיפים אותם ב"👤 הפרטים שלי" (בן משפחה ← ילד/ה), ואז המילוי האוטומטי ימלא אותם' : 'לא נמצאו מקומות שאפשר למלא מהפרטים שלך. אפשר להוסיף פרטים ב"👤 הפרטים שלי"'); return; }
   AUTO = { ids, doc: S.doc };
   showUndo(n);
 }
@@ -985,19 +1046,20 @@ function listDialog() {
   const cur = F.cur; if (cur) closePanel(true);
   const d = document.createElement('dialog'); d.className = 'fzdlg fzlist'; document.body.append(d);
   const n = open().length, all = F.list.length;
-  let html = `<h3>כל המקומות למילוי</h3><p class="note">${all - n} מתוך ${all} מולאו. לוחצים על מקום כדי לעבור אליו.</p>`, pg = -1;
+  const z = LZ2();
+  let html = `<h3>${z.all}</h3><p class="note">${esc2(z.note(all - n, all))}</p>`, pg = -1;
   F.list.forEach((t, i) => {
-    if (t.page !== pg) { pg = t.page; html += `<div class="pgh">עמוד ${pg + 1}</div>`; }
-    const a = annOf(t), lb = cleanLabel(t.label), val = a ? (a.type === 'text' ? String(a.text || '').trim() : t.kind === 'check' ? 'מסומן' : 'חתימה') : '';
-    html += `<button type="button" class="it${a ? ' ok' : ''}${t === cur ? ' cur' : ''}" data-i="${i}"><span class="st" aria-hidden="true">${a ? '✓' : ''}</span><span class="bd"><b>${esc2(lb || kindName(t) + ' (בלי כיתוב)')}</b>${val ? `<span class="v">${esc2(val.slice(0, 90))}</span>` : `<span class="e">${esc2(lb ? kindName(t) : 'עוברים אליו כדי לראות איפה הוא בדף')}</span>`}</span></button>`;
+    if (t.page !== pg) { pg = t.page; html += `<div class="pgh">${z.pg} ${pg + 1}</div>`; }
+    const a = annOf(t), lb = cleanLabel(t.label), val = a ? (a.type === 'text' ? String(a.text || '').trim() : t.kind === 'check' ? z.on : L().k.sig) : '';
+    html += `<button type="button" class="it${a ? ' ok' : ''}${t === cur ? ' cur' : ''}" data-i="${i}"><span class="st" aria-hidden="true">${a ? '✓' : ''}</span><span class="bd"><b>${esc2(lb || kindName(t) + ' ' + z.bare)}</b>${val ? `<span class="v">${esc2(val.slice(0, 90))}</span>` : `<span class="e">${esc2(lb ? kindName(t) : z.see)}</span>`}</span></button>`;
   });
-  html += `<div class="acts"><button type="button" class="free">✏️ לכתוב במקום אחר בדף</button><span style="flex:1"></span><button type="button" class="cancel">סגירה</button></div>`;
+  html += `<div class="acts"><button type="button" class="free">${z.free}</button><span style="flex:1"></span><button type="button" class="cancel">${z.close}</button></div>`;
   d.innerHTML = html;
   d.querySelectorAll('.it').forEach(b => b.onclick = () => { const t = F.list[+b.dataset.i]; d.close(); document.body.classList.remove('fz-off');
     if (t.kind === 'check') { show(t); const P = S.pages[t.page]; F.cur = t; paint(P); F.cur = null; setTimeout(() => paint(P), 1800); } else act(t); });
   d.querySelector('.cancel').onclick = () => d.close();
   // a place the form has and סימן did not mark: the text tool writes anywhere on the page
-  d.querySelector('.free').onclick = () => { d.close(); if (typeof setTool === 'function') setTool('text'); toast('לוחצים על המקום בדף שבו רוצים לכתוב, וכותבים'); };
+  d.querySelector('.free').onclick = () => { d.close(); if (typeof setTool === 'function') setTool('text'); toast(LZ2().freeTip); };
   d.addEventListener('close', () => d.remove());
   d.showModal();
   const at = d.querySelector('.it.cur') || d.querySelector('.it:not(.ok)'); if (at) at.scrollIntoView({ block: 'center' });
@@ -1009,6 +1071,7 @@ function bar() {
   b.hidden = F.quiet || !F.list.length || !pnl.hidden || !S.doc || officeNoFill() || F.doc !== S.doc;
   b.querySelector('.go').textContent = n ? L().show(n) + ' ›' : LX().save;
   b.querySelector('.go').classList.toggle('fin', !n);
+  b.querySelector('.lst').title = LZ2().all; b.querySelector('.lst').setAttribute('aria-label', LZ2().all);
   b.querySelector('.x').title = L().hide; b.querySelector('.x').setAttribute('aria-label', L().hide);
   b.querySelector('.x').textContent = document.body.classList.contains('fz-off') ? '👁' : '×';
   // 6.3: progress, and autofill while there is something it can fill
@@ -1018,7 +1081,7 @@ function bar() {
   b.querySelector('.auto').hidden = !can;
 }
 bar.el = document.createElement('div'); bar.el.className = 'fzbar'; bar.el.hidden = true;
-bar.el.innerHTML = '<button type="button" class="auto" title="ממלא בלחיצה את השם, מספר הזהות, הטלפון, הכתובת והתאריך מהפרטים שלך">✨ <span>מילוי אוטומטי</span></button><span class="prog" aria-hidden="true"><i></i></span><button type="button" class="go"></button><button type="button" class="lst" title="כל המקומות למילוי, לפי עמודים" aria-label="כל המקומות למילוי">☰</button><button type="button" class="me" title="הפרטים שלי (נשמרים רק במכשיר)" aria-label="הפרטים שלי">👤</button><button type="button" class="x"></button>';
+bar.el.innerHTML = '<button type="button" class="auto" title="ממלא בלחיצה את השם, מספר הזהות, הטלפון, הכתובת והתאריך מהפרטים שלך">✨ <span>מילוי אוטומטי</span></button><span class="prog" aria-hidden="true"><i></i></span><button type="button" class="go"></button><button type="button" class="lst" title="☰" aria-label="☰">☰</button><button type="button" class="me" title="הפרטים שלי (נשמרים רק במכשיר)" aria-label="הפרטים שלי">👤</button><button type="button" class="x"></button>';
 document.body.append(bar.el);
 bar.el.querySelector('.auto').onclick = () => autoFill();
 bar.el.querySelector('.me').onclick = () => profileDialog();
